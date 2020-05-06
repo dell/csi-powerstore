@@ -1,0 +1,9 @@
+name: volumes
+version: 1.0.0
+appVersion: 1.0.0
+description: |
+  Tests PowerStore CSI deployments.
+keywords:
+  - csi-powerstore
+  - storage
+engine: gotpl

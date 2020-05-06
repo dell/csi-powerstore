@@ -1,0 +1,9 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: {{ required "Must provide a storage class name." .Values.storageClass.name}}-xfs
+  annotations:
+provisioner: {{ .Values.driverName }}
+reclaimPolicy: {{ required "Must provide a storage class reclaim policy." .Values.storageClass.reclaimPolicy }}
+parameters:
+  FsType: xfs

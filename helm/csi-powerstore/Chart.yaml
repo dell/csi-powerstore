@@ -1,0 +1,17 @@
+name: csi-powerstore
+apiVersion: v2
+version: 1.0.0
+appVersion: 1.0.0
+description: |
+  PowerStore CSI (Container Storage Interface) driver Kubernetes
+  integration. This chart includes everything required to provision via CSI as
+  well as a PowerStore StorageClass.
+keywords:
+- csi
+- storage
+home: https://github.com/dell/csi-powerstore
+sources:
+- https://github.com/dell/csi-powerstore
+maintainers:
+- name: DellEMC
+engine: gotpl
