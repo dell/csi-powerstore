@@ -14,7 +14,7 @@ ifndef DOCKER_REGISTRY
 endif
 
 ifndef DOCKER_IMAGE_NAME
-    DOCKER_IMAGE_NAME=csi_powerstore
+    DOCKER_IMAGE_NAME=csi-powerstore
 endif
 
 ifndef BASEIMAGE
