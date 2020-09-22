@@ -1,12 +1,13 @@
-{{- if ne .Values.connection.scsiProtocol "None" }}
+{{- if .Values.connection.nfs.enabled }}
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: {{ required "Must provide a storage class name." .Values.storageClass.name}}-xfs
+  name: {{ required "Must provide a storage class name." .Values.storageClass.name}}-nfs
   annotations:
 provisioner: {{ .Values.driverName }}
 reclaimPolicy: {{ required "Must provide a storage class reclaim policy." .Values.storageClass.reclaimPolicy }}
 allowVolumeExpansion: true
 parameters:
-  FsType: xfs
+  FsType: nfs
+  nasName: {{ .Values.connection.nfs.nasServerName }}
 {{- end }}

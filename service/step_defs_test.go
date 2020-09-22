@@ -58,6 +58,8 @@ type feature struct {
 	createVolumeResponse                 *csi.CreateVolumeResponse
 	publishVolumeResponse                *csi.ControllerPublishVolumeResponse
 	unpublishVolumeResponse              *csi.ControllerUnpublishVolumeResponse
+	expanvolumeRequest                   *csi.ControllerExpandVolumeRequest
+	expanvolumeResponse                  *csi.ControllerExpandVolumeResponse
 	nodeGetInfoResponse                  *csi.NodeGetInfoResponse
 	nodeGetCapabilitiesResponse          *csi.NodeGetCapabilitiesResponse
 	deleteVolumeResponse                 *csi.DeleteVolumeResponse
@@ -144,6 +146,10 @@ func (f *feature) aPowerStoreService(mode string) error {
 	}
 
 	f.checkGoRoutines("end aPowerStoreService")
+	err := f.service.ShutDown(context.Background())
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -231,10 +237,14 @@ func (f *feature) aValidGetPluginCapabilitiesResponseIsReturned() error {
 	capabilities := rep.GetCapabilities()
 	for _, capability := range capabilities {
 		if capability.GetService().GetType() != csi.PluginCapability_Service_CONTROLLER_SERVICE {
-			return errors.New("expected PluginCapabilitiesResponse to contain CONTROLLER_SERVICE")
+			continue
+		} else {
+			return nil
 		}
+
 	}
-	return nil
+	return errors.New("expected PluginCapabilitiesResponse to contain CONTROLLER_SERVICE")
+
 }
 
 func (f *feature) iCallNodeGetCapabilities() error {
@@ -252,10 +262,12 @@ func (f *feature) aValidNodeGetCapabilitiesResponseIsReturned() error {
 	capabilities := rep.GetCapabilities()
 	for _, capability := range capabilities {
 		if capability.GetRpc().GetType() != csi.NodeServiceCapability_RPC_STAGE_UNSTAGE_VOLUME {
-			return errors.New("expected nodeGetCapabilitiesResponse to contain STAGE_UNSTAGE_VOLUME")
+			continue
+		} else {
+			return nil
 		}
 	}
-	return nil
+	return errors.New("expected nodeGetCapabilitiesResponse to contain STAGE_UNSTAGE_VOLUME")
 }
 
 func (f *feature) iCallControllerGetCapabilities() error {
@@ -281,11 +293,12 @@ func (f *feature) aValidControllerGetCapabilitiesResponseIsReturned() error {
 			csi.ControllerServiceCapability_RPC_GET_CAPACITY,
 			csi.ControllerServiceCapability_RPC_CLONE_VOLUME,
 			csi.ControllerServiceCapability_RPC_CREATE_DELETE_SNAPSHOT,
+			csi.ControllerServiceCapability_RPC_EXPAND_VOLUME,
 			csi.ControllerServiceCapability_RPC_LIST_SNAPSHOTS:
 			continue
 		default:
 			return fmt.Errorf("expected controllerGetCapabilitiesResponse to contain %s",
-				capability.GetRpc().GetType())
+				capability.GetRpc().String())
 		}
 	}
 	return nil
@@ -480,6 +493,34 @@ func getTypicalCreateVolumeRequest(name string, size int64) *csi.CreateVolumeReq
 
 	return req
 }
+func getTypicalCreateVolumeNFSRequest(name string, size int64) *csi.CreateVolumeRequest {
+	req := new(csi.CreateVolumeRequest)
+	params := make(map[string]string)
+	req.Parameters = params
+	req.Name = name
+
+	capacityRange := new(csi.CapacityRange)
+	capacityRange.RequiredBytes = size
+	capacityRange.LimitBytes = size * 2
+	req.CapacityRange = capacityRange
+
+	mount := new(csi.VolumeCapability_MountVolume)
+	capability := new(csi.VolumeCapability)
+	accessType := new(csi.VolumeCapability_Mount)
+	accessType.Mount = mount
+	capability.AccessType = accessType
+
+	accessMode := new(csi.VolumeCapability_AccessMode)
+	accessMode.Mode = csi.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER
+	capability.AccessMode = accessMode
+
+	capabilities := make([]*csi.VolumeCapability, 0)
+	capabilities = append(capabilities, capability)
+	req.VolumeCapabilities = capabilities
+	params["FsType"] = "nfs"
+	params["nasName"] = "AnyAnanasName"
+	return req
+}
 
 func (f *feature) iCallCreateVolume(name string, size int64) error {
 	ctrl := gomock.NewController(nil)
@@ -498,6 +539,38 @@ func (f *feature) iCallCreateVolume(name string, size int64) error {
 	f.service.adminClient = c
 
 	req := getTypicalCreateVolumeRequest(name, size*1024*1024*1024)
+	f.createVolumeRequest = req
+
+	f.createVolumeResponse, f.err = f.service.CreateVolume(context.Background(), req)
+	if f.err != nil {
+		log.Printf("CreateVolume called failed: %s\n", f.err.Error())
+	}
+	if f.createVolumeResponse != nil {
+		log.Printf("vol id %s\n", f.createVolumeResponse.GetVolume().VolumeId)
+	}
+	return nil
+}
+
+func (f *feature) iCallCreateNFSVolume(name string, size int64) error {
+	ctrl := gomock.NewController(nil)
+	defer ctrl.Finish()
+
+	volID := GoodVolumeID
+
+	c := mock.NewMockClient(ctrl)
+	c.EXPECT().
+		CreateFS(gomock.Any(), gomock.Any()).
+		Return(gopowerstore.CreateResponse{ID: volID}, nil).
+		Times(1)
+
+	c.EXPECT().GetFS(gomock.Any(), gomock.Eq(volID)).
+		Return(gopowerstore.FileSystem{}, nil).Times(0)
+	c.EXPECT().GetNASByName(gomock.Any(), gomock.Any()).
+		Return(gopowerstore.NAS{}, nil).Times(1)
+	f.service.adminClient = c
+
+	req := getTypicalCreateVolumeNFSRequest(name, size*1024*1024*1024)
+
 	f.createVolumeRequest = req
 
 	f.createVolumeResponse, f.err = f.service.CreateVolume(context.Background(), req)
@@ -580,6 +653,43 @@ func (f *feature) iCallCreateSnapshot(name, volID string) error {
 	return nil
 }
 
+func (f *feature) iCallCreateNfsSnapshot(name, volID string) error {
+	ctrl := gomock.NewController(nil)
+	defer ctrl.Finish()
+
+	snapID := "64bed1b4f-5221-382e-9ece-18fbc25a924e"
+
+	c := mock.NewMockClient(ctrl)
+
+	c.EXPECT().GetVolume(gomock.Any(), gomock.Any()).
+		Return(gopowerstore.Volume{}, errors.New("doesn't exist")).Times(1)
+
+	c.EXPECT().GetFS(gomock.Any(), gomock.Any()).
+		Return(gopowerstore.FileSystem{SizeTotal: 3000}, nil).Times(1)
+
+	c.EXPECT().GetFSByName(gomock.Any(), name).
+		Return(gopowerstore.FileSystem{}, errors.New("doesn't exist")).
+		Times(1)
+
+	c.EXPECT().
+		CreateFsSnapshot(gomock.Any(), gomock.AssignableToTypeOf(&gopowerstore.SnapshotFSCreate{}), volID).
+		Return(gopowerstore.CreateResponse{ID: snapID}, nil).
+		Times(1)
+
+	f.service.adminClient = c
+
+	req := getTypicalCreateSnapshotRequest(name, volID)
+	f.createSnapshotRequest = req
+	f.createSnapshotResponse, f.err = f.service.CreateSnapshot(context.Background(), req)
+	if f.err != nil {
+		log.Printf("CreateSnapshot called failed: %s\n", f.err.Error())
+	}
+	if f.createVolumeResponse != nil {
+		log.Printf("snap id %s\n", f.createSnapshotResponse.GetSnapshot().SnapshotId)
+	}
+	return nil
+}
+
 func (f *feature) aValidCreateSnapshotResponseIsReturned() error {
 	if f.err != nil {
 		return f.err
@@ -591,7 +701,6 @@ func (f *feature) aValidCreateSnapshotResponseIsReturned() error {
 }
 
 func (f *feature) iCallCreateSnapshotWithError(name, volid string) error {
-
 	req := getTypicalCreateSnapshotRequest(name, volid)
 	f.createSnapshotRequest = req
 
@@ -615,6 +724,13 @@ func (f *feature) iCallCreateExistingSnapshot(name, volID string) error {
 
 	c := mock.NewMockClient(ctrl)
 
+	c.EXPECT().GetVolume(gomock.Any(), gomock.Any()).
+		Return(gopowerstore.Volume{
+			ID:   "0",
+			Name: "vol1",
+			Size: 8162,
+		}, nil).Times(1)
+
 	c.EXPECT().GetVolumeByName(gomock.Any(), gomock.Any()).
 		Return(gopowerstore.Volume{
 			ID:   "1",
@@ -622,6 +738,43 @@ func (f *feature) iCallCreateExistingSnapshot(name, volID string) error {
 			ProtectionData: gopowerstore.ProtectionData{
 				SourceID: "39bb1b5f",
 			},
+		}, nil).Times(1)
+
+	f.service.adminClient = c
+
+	req := getTypicalCreateSnapshotRequest(name, volID)
+	f.createSnapshotRequest = req
+	f.createSnapshotResponse, f.err = f.service.CreateSnapshot(context.Background(), req)
+	if f.err != nil {
+		log.Printf("CreateSnapshot called failed: %s\n", f.err.Error())
+	}
+	if f.createSnapshotResponse != nil {
+		log.Printf("snap id %s\n", f.createSnapshotResponse.GetSnapshot().SnapshotId)
+	}
+	return nil
+}
+
+func (f *feature) iCallCreateExistingNfsSnapshot(name, volID string) error {
+	ctrl := gomock.NewController(nil)
+	defer ctrl.Finish()
+
+	apiError := gopowerstore.NewAPIError()
+	apiError.ErrorCode = gopowerstore.SnapshotNameAlreadyUseErrorCode
+	apiError.StatusCode = http.StatusBadRequest
+
+	c := mock.NewMockClient(ctrl)
+	c.EXPECT().GetVolume(gomock.Any(), gomock.Any()).
+		Return(gopowerstore.Volume{}, errors.New("doesn't exist")).Times(1)
+
+	c.EXPECT().GetFS(gomock.Any(), gomock.Any()).
+		Return(gopowerstore.FileSystem{SizeTotal: 3000}, nil).Times(1)
+
+	c.EXPECT().GetFSByName(gomock.Any(), name).
+		Return(gopowerstore.FileSystem{
+			ID:        "0",
+			Name:      "fs1",
+			SizeTotal: 8162,
+			ParentId:  "39bb1b5f",
 		}, nil).Times(1)
 
 	f.service.adminClient = c
@@ -647,6 +800,12 @@ func (f *feature) iCallCreateExistingSnapshotIncompatible(name, volID string) er
 	apiError.StatusCode = http.StatusBadRequest
 
 	c := mock.NewMockClient(ctrl)
+	c.EXPECT().GetVolume(gomock.Any(), gomock.Any()).
+		Return(gopowerstore.Volume{
+			ID:   "0",
+			Name: "vol1",
+			Size: 8162,
+		}, nil).Times(1)
 	c.EXPECT().GetVolumeByName(gomock.Any(), gomock.Any()).
 		Return(gopowerstore.Volume{
 			ID:   "1",
@@ -679,6 +838,13 @@ func (f *feature) iCallCreateExistingSnapshotError(name, volID string) error {
 	apiError.StatusCode = http.StatusBadRequest
 
 	c := mock.NewMockClient(ctrl)
+	c.EXPECT().GetVolume(gomock.Any(), gomock.Any()).
+		Return(gopowerstore.Volume{
+			ID:   "0",
+			Name: "vol1",
+			Size: 8162,
+		}, nil).Times(1)
+
 	c.EXPECT().
 		CreateSnapshot(gomock.Any(), gomock.AssignableToTypeOf(&gopowerstore.SnapshotCreate{}), volID).
 		Return(gopowerstore.CreateResponse{}, *apiError).Times(1)
@@ -708,13 +874,20 @@ func (f *feature) iCallFailureCreateSnapshot(name, volID string) error {
 	apiError.Message = "Unknown error"
 
 	c := mock.NewMockClient(ctrl)
+	c.EXPECT().GetVolume(gomock.Any(), gomock.Any()).
+		Return(gopowerstore.Volume{
+			ID:   "0",
+			Name: "vol1",
+			Size: 8162,
+		}, nil).Times(1)
+
+	c.EXPECT().GetVolumeByName(gomock.Any(), gomock.Any()).
+		Return(gopowerstore.Volume{}, gopowerstore.NewAPIError()).Times(1)
+
 	c.EXPECT().
 		CreateSnapshot(gomock.Any(), gomock.AssignableToTypeOf(&gopowerstore.SnapshotCreate{}), volID).
 		Return(gopowerstore.CreateResponse{}, *apiError).
 		Times(1)
-
-	c.EXPECT().GetVolumeByName(gomock.Any(), gomock.Any()).
-		Return(gopowerstore.Volume{}, gopowerstore.NewAPIError()).Times(1)
 
 	f.service.adminClient = c
 
@@ -745,7 +918,32 @@ func (f *feature) iCallDeleteSnapshot(snapID string) error {
 	defer ctrl.Finish()
 
 	c := mock.NewMockClient(ctrl)
+	c.EXPECT().GetSnapshot(gomock.Any(), gomock.Any()).
+		Return(gopowerstore.Volume{ID: "1"}, nil)
+
 	c.EXPECT().DeleteSnapshot(gomock.Any(), gomock.Any(), gomock.Eq(snapID)).
+		Return(gopowerstore.EmptyResponse(""), nil).
+		Times(1)
+
+	f.service.adminClient = c
+
+	req := &csi.DeleteSnapshotRequest{SnapshotId: snapID}
+	f.deleteSnapshotResponse, f.err = f.service.DeleteSnapshot(context.Background(), req)
+	return nil
+}
+
+func (f *feature) iCallDeleteNfsSnapshot(snapID string) error {
+	ctrl := gomock.NewController(nil)
+	defer ctrl.Finish()
+
+	c := mock.NewMockClient(ctrl)
+	c.EXPECT().GetSnapshot(gomock.Any(), gomock.Eq(snapID)).
+		Return(gopowerstore.Volume{}, errors.New("doesn't exist"))
+
+	c.EXPECT().GetFsSnapshot(gomock.Any(), gomock.Eq(snapID)).
+		Return(gopowerstore.FileSystem{ID: snapID}, nil)
+
+	c.EXPECT().DeleteFsSnapshot(gomock.Any(), gomock.Eq(snapID)).
 		Return(gopowerstore.EmptyResponse(""), nil).
 		Times(1)
 
@@ -771,9 +969,62 @@ func (f *feature) iCallDeleteNonExistingSnapshot(snapID string) error {
 	apiError.StatusCode = http.StatusNotFound
 
 	c := mock.NewMockClient(ctrl)
+	c.EXPECT().GetSnapshot(gomock.Any(), gomock.Any()).
+		Return(gopowerstore.Volume{ID: "1"}, nil)
+
 	c.EXPECT().DeleteSnapshot(gomock.Any(), gomock.Any(), gomock.Eq(snapID)).
 		Return(gopowerstore.EmptyResponse(""), *apiError).
 		Times(1)
+
+	f.service.adminClient = c
+
+	req := &csi.DeleteSnapshotRequest{SnapshotId: snapID}
+	f.deleteSnapshotResponse, f.err = f.service.DeleteSnapshot(context.Background(), req)
+	return nil
+}
+
+func (f *feature) iCallDeleteNonExistingNfsSnapshot(snapID string) error {
+	ctrl := gomock.NewController(nil)
+	defer ctrl.Finish()
+
+	apiError := gopowerstore.NewAPIError()
+	apiError.ErrorCode = gopowerstore.UnknownVolumeErrorCode
+	apiError.StatusCode = http.StatusNotFound
+
+	c := mock.NewMockClient(ctrl)
+
+	c.EXPECT().GetSnapshot(gomock.Any(), gomock.Eq(snapID)).
+		Return(gopowerstore.Volume{}, errors.New("doesn't exist"))
+
+	c.EXPECT().GetFsSnapshot(gomock.Any(), gomock.Eq(snapID)).
+		Return(gopowerstore.FileSystem{ID: snapID}, nil)
+
+	c.EXPECT().DeleteFsSnapshot(gomock.Any(), gomock.Eq(snapID)).
+		Return(gopowerstore.EmptyResponse(""), *apiError).
+		Times(1)
+
+	f.service.adminClient = c
+
+	req := &csi.DeleteSnapshotRequest{SnapshotId: snapID}
+	f.deleteSnapshotResponse, f.err = f.service.DeleteSnapshot(context.Background(), req)
+	return nil
+}
+
+func (f *feature) iCallDeleteSnapshotButNoneFound(snapID string) error {
+	ctrl := gomock.NewController(nil)
+	defer ctrl.Finish()
+
+	apiError := gopowerstore.NewAPIError()
+	apiError.ErrorCode = gopowerstore.UnknownVolumeErrorCode
+	apiError.StatusCode = http.StatusNotFound
+
+	c := mock.NewMockClient(ctrl)
+
+	c.EXPECT().GetSnapshot(gomock.Any(), gomock.Eq(snapID)).
+		Return(gopowerstore.Volume{}, *apiError)
+
+	c.EXPECT().GetFsSnapshot(gomock.Any(), gomock.Eq(snapID)).
+		Return(gopowerstore.FileSystem{}, *apiError)
 
 	f.service.adminClient = c
 
@@ -1015,6 +1266,470 @@ func (f *feature) iCallFailureCreateVolumeFromSnapshot(size int) error {
 	return nil
 }
 
+func (f *feature) iCallCreateCloneVolume(size int) error {
+	ctrl := gomock.NewController(nil)
+	defer ctrl.Finish()
+	volSize := int64(size * 1024 * 1024)
+
+	volID := GoodVolumeID
+
+	c := mock.NewMockClient(ctrl)
+	c.EXPECT().
+		CloneVolume(gomock.Any(), gomock.AssignableToTypeOf(&gopowerstore.VolumeClone{}), "39bb1b5f").
+		Return(gopowerstore.CreateResponse{ID: volID}, nil).
+		Times(1)
+
+	c.EXPECT().GetVolume(gomock.Any(), gomock.Eq("39bb1b5f")).
+		Return(gopowerstore.Volume{
+			ID:   "39bb1b5f",
+			Size: volSize,
+		}, nil).
+		Times(1)
+
+	f.service.adminClient = c
+
+	req := getTypicalCreateVolumeRequest("vol1", volSize)
+	req.VolumeContentSource = &csi.VolumeContentSource{Type: &csi.VolumeContentSource_Volume{
+		Volume: &csi.VolumeContentSource_VolumeSource{
+			VolumeId: "39bb1b5f",
+		},
+	}}
+
+	f.createVolumeRequest = req
+	f.createVolumeResponse, f.err = f.service.CreateVolume(context.Background(), req)
+	if f.err != nil {
+		log.Printf("CreateVolume call failed: %s\n", f.err.Error())
+	}
+	if f.createVolumeResponse != nil {
+		log.Printf("vol id %s\n", f.createVolumeResponse.GetVolume().VolumeId)
+	}
+	return nil
+}
+
+func (f *feature) iCallCreateCloneVolumeIncompatible(size int) error {
+	ctrl := gomock.NewController(nil)
+	defer ctrl.Finish()
+	volSize := int64(size * 1024 * 1024)
+
+	c := mock.NewMockClient(ctrl)
+
+	c.EXPECT().GetVolume(gomock.Any(), gomock.Eq("39bb1b5f")).
+		Return(gopowerstore.Volume{
+			ID:   "39bb1b5f",
+			Size: 16 * 1024 * 1024,
+		}, nil).
+		Times(1)
+
+	f.service.adminClient = c
+
+	req := getTypicalCreateVolumeRequest("vol1", volSize)
+	req.VolumeContentSource = &csi.VolumeContentSource{Type: &csi.VolumeContentSource_Volume{
+		Volume: &csi.VolumeContentSource_VolumeSource{
+			VolumeId: "39bb1b5f",
+		},
+	}}
+
+	f.createVolumeRequest = req
+	f.createVolumeResponse, f.err = f.service.CreateVolume(context.Background(), req)
+	if f.err != nil {
+		log.Printf("CreateVolume call failed: %s\n", f.err.Error())
+	}
+	if f.createVolumeResponse != nil {
+		log.Printf("vol id %s\n", f.createVolumeResponse.GetVolume().VolumeId)
+	}
+	return nil
+}
+
+func (f *feature) iCallCreateCloneVolumeError(size int) error {
+	ctrl := gomock.NewController(nil)
+	defer ctrl.Finish()
+	volSize := int64(size * 1024 * 1024)
+
+	c := mock.NewMockClient(ctrl)
+
+	c.EXPECT().GetVolume(gomock.Any(), gomock.Eq("39bb1b5f")).
+		Return(gopowerstore.Volume{}, gopowerstore.NewAPIError()).
+		Times(1)
+
+	f.service.adminClient = c
+
+	req := getTypicalCreateVolumeRequest("vol1", volSize)
+	req.VolumeContentSource = &csi.VolumeContentSource{Type: &csi.VolumeContentSource_Volume{
+		Volume: &csi.VolumeContentSource_VolumeSource{
+			VolumeId: "39bb1b5f",
+		},
+	}}
+
+	f.createVolumeRequest = req
+	f.createVolumeResponse, f.err = f.service.CreateVolume(context.Background(), req)
+	if f.err != nil {
+		log.Printf("CreateVolume call failed: %s\n", f.err.Error())
+	}
+	if f.createVolumeResponse != nil {
+		log.Printf("vol id %s\n", f.createVolumeResponse.GetVolume().VolumeId)
+	}
+	return nil
+}
+
+func (f *feature) iCallFailureCreateCloneVolume(size int) error {
+	ctrl := gomock.NewController(nil)
+	defer ctrl.Finish()
+	volSize := int64(size * 1024 * 1024)
+
+	c := mock.NewMockClient(ctrl)
+	c.EXPECT().
+		CloneVolume(gomock.Any(), gomock.AssignableToTypeOf(&gopowerstore.VolumeClone{}), "39bb1b5f").
+		Return(gopowerstore.CreateResponse{}, gopowerstore.NewAPIError()).
+		Times(1)
+
+	c.EXPECT().GetVolume(gomock.Any(), gomock.Eq("39bb1b5f")).
+		Return(gopowerstore.Volume{
+			ID:   "39bb1b5f",
+			Size: volSize,
+		}, nil).
+		Times(1)
+
+	f.service.adminClient = c
+
+	req := getTypicalCreateVolumeRequest("vol1", volSize)
+	req.VolumeContentSource = &csi.VolumeContentSource{Type: &csi.VolumeContentSource_Volume{
+		Volume: &csi.VolumeContentSource_VolumeSource{
+			VolumeId: "39bb1b5f",
+		},
+	}}
+
+	f.createVolumeRequest = req
+	f.createVolumeResponse, f.err = f.service.CreateVolume(context.Background(), req)
+	if f.err != nil {
+		log.Printf("CreateVolume call failed: %s\n", f.err.Error())
+	}
+	if f.createVolumeResponse != nil {
+		log.Printf("vol id %s\n", f.createVolumeResponse.GetVolume().VolumeId)
+	}
+	return nil
+}
+
+func (f *feature) iCallCreateNfsFromSnapshot(size int) error {
+	ctrl := gomock.NewController(nil)
+	defer ctrl.Finish()
+	volSize := int64(size * 1024 * 1024)
+
+	volID := GoodVolumeID
+
+	c := mock.NewMockClient(ctrl)
+
+	c.EXPECT().GetFS(gomock.Any(), gomock.Eq("39bb1b5f")).
+		Return(gopowerstore.FileSystem{
+			ID:        "39bb1b5f",
+			SizeTotal: volSize + ReservedSize,
+		}, nil).
+		Times(1)
+	c.EXPECT().
+		CreateFsFromSnapshot(gomock.Any(), gomock.AssignableToTypeOf(&gopowerstore.FsClone{}), "39bb1b5f").
+		Return(gopowerstore.CreateResponse{ID: volID}, nil).
+		Times(1)
+
+	f.service.adminClient = c
+
+	req := getTypicalCreateVolumeNFSRequest("vol1", volSize)
+
+	params := make(map[string]string, 1)
+	params[keyFsType] = "nfs"
+	req.Parameters = params
+	req.VolumeContentSource = &csi.VolumeContentSource{Type: &csi.VolumeContentSource_Snapshot{
+		Snapshot: &csi.VolumeContentSource_SnapshotSource{
+			SnapshotId: "39bb1b5f",
+		},
+	}}
+
+	f.createVolumeRequest = req
+	f.createVolumeResponse, f.err = f.service.CreateVolume(context.Background(), req)
+	if f.err != nil {
+		log.Printf("CreateVolume call failed: %s\n", f.err.Error())
+	}
+	if f.createVolumeResponse != nil {
+		log.Printf("vol id %s\n", f.createVolumeResponse.GetVolume().VolumeId)
+	}
+	return nil
+}
+
+func (f *feature) iCallCreateNfsFromSnapshotIncompatible(size int) error {
+	ctrl := gomock.NewController(nil)
+	defer ctrl.Finish()
+	volSize := int64(size * 1024 * 1024)
+
+	c := mock.NewMockClient(ctrl)
+
+	c.EXPECT().GetFS(gomock.Any(), gomock.Any()).
+		Return(gopowerstore.FileSystem{
+			ID:        "39bb1b5f",
+			SizeTotal: 16 * 1024 * 1024,
+		}, nil).
+		Times(1)
+
+	f.service.adminClient = c
+
+	req := getTypicalCreateVolumeNFSRequest("vol1", volSize)
+
+	params := make(map[string]string, 1)
+	params[keyFsType] = "nfs"
+	req.Parameters = params
+	req.VolumeContentSource = &csi.VolumeContentSource{Type: &csi.VolumeContentSource_Snapshot{
+		Snapshot: &csi.VolumeContentSource_SnapshotSource{
+			SnapshotId: "39bb1b5f",
+		},
+	}}
+
+	f.createVolumeRequest = req
+	f.createVolumeResponse, f.err = f.service.CreateVolume(context.Background(), req)
+	if f.err != nil {
+		log.Printf("CreateVolume call failed: %s\n", f.err.Error())
+	}
+	if f.createVolumeResponse != nil {
+		log.Printf("vol id %s\n", f.createVolumeResponse.GetVolume().VolumeId)
+	}
+	return nil
+}
+
+func (f *feature) iCallCreateNfsFromSnapshotError(size int) error {
+	ctrl := gomock.NewController(nil)
+	defer ctrl.Finish()
+	volSize := int64(size * 1024 * 1024)
+
+	c := mock.NewMockClient(ctrl)
+
+	c.EXPECT().GetFS(gomock.Any(), gomock.Eq("39bb1b5f")).
+		Return(gopowerstore.FileSystem{}, gopowerstore.NewAPIError()).
+		Times(1)
+
+	f.service.adminClient = c
+
+	req := getTypicalCreateVolumeNFSRequest("vol1", volSize)
+
+	params := make(map[string]string, 1)
+	params[keyFsType] = "nfs"
+	req.Parameters = params
+
+	req.VolumeContentSource = &csi.VolumeContentSource{Type: &csi.VolumeContentSource_Snapshot{
+		Snapshot: &csi.VolumeContentSource_SnapshotSource{
+			SnapshotId: "39bb1b5f",
+		},
+	}}
+
+	f.createVolumeRequest = req
+	f.createVolumeResponse, f.err = f.service.CreateVolume(context.Background(), req)
+	if f.err != nil {
+		log.Printf("CreateVolume call failed: %s\n", f.err.Error())
+	}
+	if f.createVolumeResponse != nil {
+		log.Printf("vol id %s\n", f.createVolumeResponse.GetVolume().VolumeId)
+	}
+	return nil
+}
+
+func (f *feature) iCallFailureCreateNfsFromSnapshot(size int) error {
+	ctrl := gomock.NewController(nil)
+	defer ctrl.Finish()
+	volSize := int64(size * 1024 * 1024)
+
+	c := mock.NewMockClient(ctrl)
+
+	c.EXPECT().GetFS(gomock.Any(), gomock.Eq("39bb1b5f")).
+		Return(gopowerstore.FileSystem{
+			ID:        "39bb1b5f",
+			SizeTotal: volSize + ReservedSize,
+		}, nil).
+		Times(1)
+	c.EXPECT().
+		CreateFsFromSnapshot(gomock.Any(), gomock.AssignableToTypeOf(&gopowerstore.FsClone{}), "39bb1b5f").
+		Return(gopowerstore.CreateResponse{}, gopowerstore.NewAPIError()).
+		Times(1)
+
+	f.service.adminClient = c
+
+	req := getTypicalCreateVolumeNFSRequest("vol1", volSize)
+
+	params := make(map[string]string, 1)
+	params[keyFsType] = "nfs"
+	req.Parameters = params
+
+	req.VolumeContentSource = &csi.VolumeContentSource{Type: &csi.VolumeContentSource_Snapshot{
+		Snapshot: &csi.VolumeContentSource_SnapshotSource{
+			SnapshotId: "39bb1b5f",
+		},
+	}}
+
+	f.createVolumeRequest = req
+	f.createVolumeResponse, f.err = f.service.CreateVolume(context.Background(), req)
+	if f.err != nil {
+		log.Printf("CreateVolume call failed: %s\n", f.err.Error())
+	}
+	if f.createVolumeResponse != nil {
+		log.Printf("vol id %s\n", f.createVolumeResponse.GetVolume().VolumeId)
+	}
+	return nil
+}
+
+func (f *feature) iCallCreateCloneFs(size int) error {
+	ctrl := gomock.NewController(nil)
+	defer ctrl.Finish()
+	volSize := int64(size * 1024 * 1024)
+
+	volID := GoodVolumeID
+
+	c := mock.NewMockClient(ctrl)
+
+	c.EXPECT().GetFS(gomock.Any(), gomock.Eq("39bb1b5f")).
+		Return(gopowerstore.FileSystem{
+			ID:        "39bb1b5f",
+			SizeTotal: volSize + ReservedSize,
+		}, nil).
+		Times(1)
+	c.EXPECT().
+		CloneFS(gomock.Any(), gomock.AssignableToTypeOf(&gopowerstore.FsClone{}), "39bb1b5f").
+		Return(gopowerstore.CreateResponse{ID: volID}, nil).
+		Times(1)
+
+	f.service.adminClient = c
+
+	req := getTypicalCreateVolumeNFSRequest("vol1", volSize)
+
+	params := make(map[string]string, 1)
+	params[keyFsType] = "nfs"
+	req.Parameters = params
+	req.VolumeContentSource = &csi.VolumeContentSource{Type: &csi.VolumeContentSource_Volume{
+		Volume: &csi.VolumeContentSource_VolumeSource{
+			VolumeId: "39bb1b5f",
+		},
+	}}
+
+	f.createVolumeRequest = req
+	f.createVolumeResponse, f.err = f.service.CreateVolume(context.Background(), req)
+	if f.err != nil {
+		log.Printf("CreateVolume call failed: %s\n", f.err.Error())
+	}
+	if f.createVolumeResponse != nil {
+		log.Printf("vol id %s\n", f.createVolumeResponse.GetVolume().VolumeId)
+	}
+	return nil
+}
+
+func (f *feature) iCallCreateCloneFsIncompatible(size int) error {
+	ctrl := gomock.NewController(nil)
+	defer ctrl.Finish()
+	volSize := int64(size * 1024 * 1024)
+
+	c := mock.NewMockClient(ctrl)
+
+	c.EXPECT().GetFS(gomock.Any(), gomock.Any()).
+		Return(gopowerstore.FileSystem{
+			ID:        "39bb1b5f",
+			SizeTotal: 16 * 1024 * 1024,
+		}, nil).
+		Times(1)
+
+	f.service.adminClient = c
+
+	req := getTypicalCreateVolumeNFSRequest("vol1", volSize)
+
+	params := make(map[string]string, 1)
+	params[keyFsType] = "nfs"
+	req.Parameters = params
+	req.VolumeContentSource = &csi.VolumeContentSource{Type: &csi.VolumeContentSource_Volume{
+		Volume: &csi.VolumeContentSource_VolumeSource{
+			VolumeId: "39bb1b5f",
+		},
+	}}
+
+	f.createVolumeRequest = req
+	f.createVolumeResponse, f.err = f.service.CreateVolume(context.Background(), req)
+	if f.err != nil {
+		log.Printf("CreateVolume call failed: %s\n", f.err.Error())
+	}
+	if f.createVolumeResponse != nil {
+		log.Printf("vol id %s\n", f.createVolumeResponse.GetVolume().VolumeId)
+	}
+	return nil
+}
+
+func (f *feature) iCallCreateCloneFsError(size int) error {
+	ctrl := gomock.NewController(nil)
+	defer ctrl.Finish()
+	volSize := int64(size * 1024 * 1024)
+
+	c := mock.NewMockClient(ctrl)
+
+	c.EXPECT().GetFS(gomock.Any(), gomock.Eq("39bb1b5f")).
+		Return(gopowerstore.FileSystem{}, gopowerstore.NewAPIError()).
+		Times(1)
+
+	f.service.adminClient = c
+
+	req := getTypicalCreateVolumeNFSRequest("vol1", volSize)
+
+	params := make(map[string]string, 1)
+	params[keyFsType] = "nfs"
+	req.Parameters = params
+
+	req.VolumeContentSource = &csi.VolumeContentSource{Type: &csi.VolumeContentSource_Volume{
+		Volume: &csi.VolumeContentSource_VolumeSource{
+			VolumeId: "39bb1b5f",
+		},
+	}}
+	f.createVolumeRequest = req
+	f.createVolumeResponse, f.err = f.service.CreateVolume(context.Background(), req)
+	if f.err != nil {
+		log.Printf("CreateVolume call failed: %s\n", f.err.Error())
+	}
+	if f.createVolumeResponse != nil {
+		log.Printf("vol id %s\n", f.createVolumeResponse.GetVolume().VolumeId)
+	}
+	return nil
+}
+
+func (f *feature) iCallFailureCreateCloneFs(size int) error {
+	ctrl := gomock.NewController(nil)
+	defer ctrl.Finish()
+	volSize := int64(size * 1024 * 1024)
+
+	c := mock.NewMockClient(ctrl)
+
+	c.EXPECT().GetFS(gomock.Any(), gomock.Eq("39bb1b5f")).
+		Return(gopowerstore.FileSystem{
+			ID:        "39bb1b5f",
+			SizeTotal: volSize + ReservedSize,
+		}, nil).
+		Times(1)
+	c.EXPECT().
+		CloneFS(gomock.Any(), gomock.AssignableToTypeOf(&gopowerstore.FsClone{}), "39bb1b5f").
+		Return(gopowerstore.CreateResponse{}, gopowerstore.NewAPIError()).
+		Times(1)
+
+	f.service.adminClient = c
+
+	req := getTypicalCreateVolumeNFSRequest("vol1", volSize)
+
+	params := make(map[string]string, 1)
+	params[keyFsType] = "nfs"
+	req.Parameters = params
+
+	req.VolumeContentSource = &csi.VolumeContentSource{Type: &csi.VolumeContentSource_Volume{
+		Volume: &csi.VolumeContentSource_VolumeSource{
+			VolumeId: "39bb1b5f",
+		},
+	}}
+
+	f.createVolumeRequest = req
+	f.createVolumeResponse, f.err = f.service.CreateVolume(context.Background(), req)
+	if f.err != nil {
+		log.Printf("CreateVolume call failed: %s\n", f.err.Error())
+	}
+	if f.createVolumeResponse != nil {
+		log.Printf("vol id %s\n", f.createVolumeResponse.GetVolume().VolumeId)
+	}
+	return nil
+}
+
 func (f *feature) iCallNodeGetInfo() error {
 	ctx := new(context.Context)
 	req := new(csi.NodeGetInfoRequest)
@@ -1061,6 +1776,136 @@ func (f *feature) iCallCreateExistVolume(name string, size int64) error {
 	f.service.adminClient = c
 
 	req := getTypicalCreateVolumeRequest(name, sizeInBytes)
+	f.createVolumeRequest = req
+
+	f.createVolumeResponse, f.err = f.service.CreateVolume(context.Background(), req)
+	if f.err != nil {
+		log.Printf("CreateVolume called failed: %s\n", f.err.Error())
+	}
+	if f.createVolumeResponse != nil {
+		log.Printf("vol id %s\n", f.createVolumeResponse.GetVolume().VolumeId)
+	}
+	return nil
+}
+
+func (f *feature) iCallCreateExistingNfsVolume(name string, size int64) error {
+	sizeInBytes := size * 1024 * 1024 * 1024
+
+	ctrl := gomock.NewController(nil)
+	defer ctrl.Finish()
+
+	apiError := gopowerstore.NewAPIError()
+	apiError.ErrorCode = gopowerstore.VolumeNameAlreadyUseErrorCode
+	apiError.StatusCode = http.StatusUnprocessableEntity
+
+	c := mock.NewMockClient(ctrl)
+
+	c.EXPECT().GetNASByName(gomock.Any(), gomock.Any()).
+		Return(gopowerstore.NAS{
+			ID:   "nasId",
+			Name: "nasName",
+		}, nil).Times(1)
+	c.EXPECT().
+		CreateFS(gomock.Any(), gomock.Any()).
+		Return(gopowerstore.CreateResponse{}, *apiError).
+		Times(1)
+
+	c.EXPECT().GetFSByName(gomock.Any(), gomock.Any()).
+		Return(gopowerstore.FileSystem{
+			ID:             "somefsid",
+			Name:           "fsname",
+			NasServerID:    "nas-server",
+			FilesystemType: "nfs4",
+			SizeTotal:      sizeInBytes,
+		}, nil).Times(1)
+
+	f.service.adminClient = c
+
+	req := getTypicalCreateVolumeNFSRequest(name, sizeInBytes)
+	f.createVolumeRequest = req
+
+	f.createVolumeResponse, f.err = f.service.CreateVolume(context.Background(), req)
+	if f.err != nil {
+		log.Printf("CreateVolume called failed: %s\n", f.err.Error())
+	}
+	if f.createVolumeResponse != nil {
+		log.Printf("vol id %s\n", f.createVolumeResponse.GetVolume().VolumeId)
+	}
+	return nil
+}
+
+func (f *feature) iCallCreateExistingNfsVolumeError(name string, size int64) error {
+	sizeInBytes := size * 1024 * 1024 * 1024
+
+	ctrl := gomock.NewController(nil)
+	defer ctrl.Finish()
+
+	apiError := gopowerstore.NewAPIError()
+	apiError.ErrorCode = gopowerstore.VolumeNameAlreadyUseErrorCode
+	apiError.StatusCode = http.StatusUnprocessableEntity
+
+	c := mock.NewMockClient(ctrl)
+
+	c.EXPECT().GetNASByName(gomock.Any(), gomock.Any()).
+		Return(gopowerstore.NAS{
+			ID:   "nasId",
+			Name: "nasName",
+		}, nil).Times(1)
+	c.EXPECT().
+		CreateFS(gomock.Any(), gomock.Any()).
+		Return(gopowerstore.CreateResponse{}, *apiError).
+		Times(1)
+
+	c.EXPECT().GetFSByName(gomock.Any(), gomock.Any()).
+		Return(gopowerstore.FileSystem{}, gopowerstore.NewAPIError()).Times(1)
+
+	f.service.adminClient = c
+
+	req := getTypicalCreateVolumeNFSRequest(name, sizeInBytes)
+	f.createVolumeRequest = req
+
+	f.createVolumeResponse, f.err = f.service.CreateVolume(context.Background(), req)
+	if f.err != nil {
+		log.Printf("CreateVolume called failed: %s\n", f.err.Error())
+	}
+	if f.createVolumeResponse != nil {
+		log.Printf("vol id %s\n", f.createVolumeResponse.GetVolume().VolumeId)
+	}
+	return nil
+}
+
+func (f *feature) iCallCreateExistingNfsVolumeIncompatibleSize(name string, size int64) error {
+	sizeInBytes := size * 1024 * 1024 * 1024
+
+	ctrl := gomock.NewController(nil)
+	defer ctrl.Finish()
+
+	apiError := gopowerstore.NewAPIError()
+	apiError.ErrorCode = gopowerstore.VolumeNameAlreadyUseErrorCode
+	apiError.StatusCode = http.StatusUnprocessableEntity
+
+	c := mock.NewMockClient(ctrl)
+
+	c.EXPECT().GetNASByName(gomock.Any(), gomock.Any()).
+		Return(gopowerstore.NAS{
+			ID:   "nasId",
+			Name: "nasName",
+		}, nil).Times(1)
+	c.EXPECT().CreateFS(gomock.Any(), gomock.Any()).
+		Return(gopowerstore.CreateResponse{}, *apiError).
+		Times(1)
+	c.EXPECT().GetFSByName(gomock.Any(), gomock.Any()).
+		Return(gopowerstore.FileSystem{
+			ID:             "somefsid",
+			Name:           "fsname",
+			NasServerID:    "nas-server",
+			FilesystemType: "nfs4",
+			SizeTotal:      sizeInBytes,
+		}, nil).Times(1)
+
+	f.service.adminClient = c
+
+	req := getTypicalCreateVolumeNFSRequest(name, sizeInBytes+1024)
 	f.createVolumeRequest = req
 
 	f.createVolumeResponse, f.err = f.service.CreateVolume(context.Background(), req)
@@ -1182,8 +2027,126 @@ func (f *feature) iCallDeleteVolume(name string) error {
 	defer ctrl.Finish()
 
 	c := mock.NewMockClient(ctrl)
+	c.EXPECT().
+		GetVolume(gomock.Any(), gomock.Eq(GoodVolumeID)).
+		Return(gopowerstore.Volume{ID: GoodVolumeID}, nil).
+		Times(1)
+	c.EXPECT().
+		GetSnapshotsByVolumeID(gomock.Any(), gomock.Eq(GoodVolumeID)).
+		Return([]gopowerstore.Volume{}, nil).
+		Times(1)
 	c.EXPECT().DeleteVolume(gomock.Any(), gomock.Any(), gomock.Eq(GoodVolumeID)).
 		Return(gopowerstore.EmptyResponse(""), nil).
+		Times(1)
+
+	f.service.adminClient = c
+
+	req := &csi.DeleteVolumeRequest{VolumeId: GoodVolumeID}
+	f.deleteVolumeResponse, f.err = f.service.DeleteVolume(context.Background(), req)
+	return nil
+}
+
+func (f *feature) iCallDeleteVolumeSnapError(name string) error {
+	ctrl := gomock.NewController(nil)
+	defer ctrl.Finish()
+
+	c := mock.NewMockClient(ctrl)
+	c.EXPECT().
+		GetVolume(gomock.Any(), gomock.Eq(GoodVolumeID)).
+		Return(gopowerstore.Volume{ID: GoodVolumeID}, nil).
+		Times(1)
+	c.EXPECT().
+		GetSnapshotsByVolumeID(gomock.Any(), gomock.Eq(GoodVolumeID)).
+		Return([]gopowerstore.Volume{{ID: GoodVolumeID}}, nil).
+		Times(1)
+
+	f.service.adminClient = c
+
+	req := &csi.DeleteVolumeRequest{VolumeId: GoodVolumeID}
+	f.deleteVolumeResponse, f.err = f.service.DeleteVolume(context.Background(), req)
+	return nil
+}
+
+func (f *feature) iCallDeleteNFSVolumeSnapError(name string) error {
+	ctrl := gomock.NewController(nil)
+	defer ctrl.Finish()
+
+	c := mock.NewMockClient(ctrl)
+	c.EXPECT().
+		GetVolume(gomock.Any(), gomock.Eq(GoodVolumeID)).
+		Return(gopowerstore.Volume{}, errors.New("NFS")).
+		Times(1)
+	c.EXPECT().
+		GetFS(gomock.Any(), gomock.Eq(GoodVolumeID)).
+		Return(gopowerstore.FileSystem{ID: GoodVolumeID}, nil).
+		Times(1)
+	c.EXPECT().
+		GetFsSnapshotsByVolumeID(gomock.Any(), gomock.Eq(GoodVolumeID)).
+		Return([]gopowerstore.FileSystem{{ID: GoodVolumeID}}, nil).
+		Times(1)
+
+	f.service.adminClient = c
+
+	req := &csi.DeleteVolumeRequest{VolumeId: GoodVolumeID}
+	f.deleteVolumeResponse, f.err = f.service.DeleteVolume(context.Background(), req)
+	return nil
+}
+
+func (f *feature) iCallDeleteNFSVolume(name string) error {
+	ctrl := gomock.NewController(nil)
+	defer ctrl.Finish()
+
+	c := mock.NewMockClient(ctrl)
+	c.EXPECT().
+		GetVolume(gomock.Any(), gomock.Eq(GoodVolumeID)).
+		Return(gopowerstore.Volume{}, errors.New("NFS")).
+		Times(1)
+
+	c.EXPECT().GetFS(gomock.Any(), gomock.Eq(GoodVolumeID)).
+		Return(gopowerstore.FileSystem{
+			ID: GoodVolumeID,
+		}, nil)
+	c.EXPECT().
+		GetFsSnapshotsByVolumeID(gomock.Any(), gomock.Eq(GoodVolumeID)).
+		Return([]gopowerstore.FileSystem{}, nil).
+		Times(1)
+	c.EXPECT().DeleteFS(gomock.Any(), gomock.Eq(GoodVolumeID)).
+		Return(gopowerstore.EmptyResponse(""), nil).
+		Times(1)
+
+	f.service.adminClient = c
+
+	req := &csi.DeleteVolumeRequest{VolumeId: GoodVolumeID}
+	f.deleteVolumeResponse, f.err = f.service.DeleteVolume(context.Background(), req)
+	return nil
+}
+
+func (f *feature) iCallDeleteNonExistingNfsVolume(name string) error {
+	ctrl := gomock.NewController(nil)
+	defer ctrl.Finish()
+
+	apiError := gopowerstore.NewAPIError()
+	apiError.ErrorCode = gopowerstore.UnknownVolumeErrorCode
+	apiError.StatusCode = http.StatusNotFound
+
+	c := mock.NewMockClient(ctrl)
+	c.EXPECT().
+		GetVolume(gomock.Any(), gomock.Eq(GoodVolumeID)).
+		Return(gopowerstore.Volume{}, errors.New("NFS")).
+		Times(1)
+
+	c.EXPECT().GetFS(gomock.Any(), gomock.Eq(GoodVolumeID)).
+		Return(gopowerstore.FileSystem{
+			ID: GoodVolumeID,
+		}, nil)
+
+	c.EXPECT().
+		GetFsSnapshotsByVolumeID(gomock.Any(), gomock.Eq(GoodVolumeID)).
+		Return([]gopowerstore.FileSystem{}, nil).
+		Times(1)
+
+	c.EXPECT().DeleteFS(gomock.Any(), gomock.Eq(GoodVolumeID)).
+		Return(gopowerstore.EmptyResponse(""), *apiError).
 		Times(1)
 
 	f.service.adminClient = c
@@ -1202,9 +2165,41 @@ func (f *feature) iCallDeleteNonExistVolume(arg1 string) error {
 	apiError.StatusCode = http.StatusNotFound
 
 	c := mock.NewMockClient(ctrl)
+	c.EXPECT().
+		GetVolume(gomock.Any(), gomock.Eq(GoodVolumeID)).
+		Return(gopowerstore.Volume{ID: GoodVolumeID}, nil).
+		Times(1)
+	c.EXPECT().
+		GetSnapshotsByVolumeID(gomock.Any(), gomock.Eq(GoodVolumeID)).
+		Return([]gopowerstore.Volume{}, nil).
+		Times(1)
 	c.EXPECT().DeleteVolume(gomock.Any(), gomock.Any(), gomock.Eq(GoodVolumeID)).
 		Return(gopowerstore.EmptyResponse(""), *apiError).
 		Times(1)
+
+	f.service.adminClient = c
+
+	req := &csi.DeleteVolumeRequest{VolumeId: GoodVolumeID}
+	f.deleteVolumeResponse, f.err = f.service.DeleteVolume(context.Background(), req)
+	return nil
+}
+
+func (f *feature) iCallDeleteVolumeError(name string) error {
+	ctrl := gomock.NewController(nil)
+	defer ctrl.Finish()
+
+	apiError := gopowerstore.NewAPIError()
+	apiError.ErrorCode = gopowerstore.UnknownVolumeErrorCode
+	apiError.StatusCode = http.StatusNotFound
+
+	c := mock.NewMockClient(ctrl)
+	c.EXPECT().
+		GetVolume(gomock.Any(), gomock.Eq(GoodVolumeID)).
+		Return(gopowerstore.Volume{}, errors.New("NFS")).
+		Times(1)
+
+	c.EXPECT().GetFS(gomock.Any(), gomock.Eq(GoodVolumeID)).
+		Return(gopowerstore.FileSystem{}, gopowerstore.NewAPIError())
 
 	f.service.adminClient = c
 
@@ -1367,14 +2362,6 @@ func (f *feature) iCallListVolumesWithCacheAndStartToken(startToken string) erro
 	return nil
 }
 
-func (f *feature) iUpdateVolumeCache() error {
-	f.service.volumeCache.Update([]gopowerstore.Volume{
-		{ID: GoodVolumeID, Size: 8162},
-		{ID: GoodVolumeID, Size: 8162},
-	})
-	return nil
-}
-
 func (f *feature) iCallFailureListVolumes() error {
 	ctrl := gomock.NewController(nil)
 	defer ctrl.Finish()
@@ -1430,6 +2417,7 @@ func (f *feature) getControllerPublishVolumeRequest(access, nodeID string) *csi.
 
 func (f *feature) iCallPublishVolumeWithTo(accessMode, nodeID string) error {
 	req := f.getControllerPublishVolumeRequest(accessMode, nodeID)
+	req.VolumeContext = map[string]string{keyFsType: "xfs"}
 	f.publishVolumeRequest = req
 
 	ctrl := gomock.NewController(nil)
@@ -1475,6 +2463,71 @@ func (f *feature) iCallPublishVolumeWithTo(accessMode, nodeID string) error {
 	return nil
 }
 
+func (f *feature) iCallPublishNFSVolumeWithTo(accessMode, nodeID string) error {
+	req := f.getControllerPublishVolumeRequest(accessMode, nodeID)
+	req.VolumeContext = make(map[string]string)
+	req.VolumeContext["FsType"] = "nfs"
+	req.VolumeContext["nasName"] = "NASName"
+	f.publishVolumeRequest = req
+
+	ctrl := gomock.NewController(nil)
+	defer ctrl.Finish()
+	fsName := "testFS"
+	nfsID := "1ae5edac1-a796-886a-47dc-c72a3j8clw031"
+	nasID := "some-nas-id"
+
+	c := mock.NewMockClient(ctrl)
+	c.EXPECT().GetFS(gomock.Any(), gomock.Eq(req.VolumeId)).
+		Return(gopowerstore.FileSystem{
+			ID:          req.VolumeId,
+			Name:        fsName,
+			NasServerID: nasID,
+		}, nil).Times(2)
+
+	apiError := gopowerstore.NewAPIError()
+	apiError.ErrorCode = gopowerstore.UnknownVolumeErrorCode
+	apiError.StatusCode = http.StatusNotFound
+
+	c.EXPECT().GetNFSExportByFileSystemID(gomock.Any(), gomock.Any()).
+		Return(gopowerstore.NFSExport{
+			ID: nfsID,
+		}, *apiError).Times(1)
+
+	nfsExportCreate := &gopowerstore.NFSExportCreate{
+		Name:         fsName,
+		FileSystemID: req.VolumeId,
+		Path:         "/" + fsName,
+	}
+
+	c.EXPECT().CreateNFSExport(gomock.Any(), nfsExportCreate).
+		Return(gopowerstore.CreateResponse{ID: nfsID}, nil).
+		Times(1)
+
+	c.EXPECT().ModifyNFSExport(gomock.Any(), gomock.Any(), nfsID).
+		Return(gopowerstore.CreateResponse{}, nil).
+		Times(1)
+
+	interfaceID := "215as1223-d124-ss1h-njh4-c72a3j8clw031"
+
+	c.EXPECT().GetNAS(gomock.Any(), nasID).
+		Return(gopowerstore.NAS{
+			CurrentPreferredIPv4InterfaceId: interfaceID,
+		}, nil).Times(1)
+
+	c.EXPECT().GetFileInterface(gomock.Any(), interfaceID).
+		Return(gopowerstore.FileInterface{IpAddress: "192.168.1.2"}, nil).
+		Times(1)
+
+	f.service.adminClient = c
+
+	f.publishVolumeResponse, f.err = f.service.ControllerPublishVolume(context.Background(), req)
+	if f.err != nil {
+		log.Printf("PublishNFSVolume call failed: %s\n", f.err.Error())
+	}
+	f.publishVolumeRequest = nil
+	return nil
+}
+
 func (f *feature) aValidControllerPublishVolumeResponseIsReturned() error {
 	if f.err != nil {
 		return errors.New("PublishVolume returned error: " + f.err.Error())
@@ -1491,6 +2544,7 @@ func (f *feature) aValidControllerPublishVolumeResponseIsReturned() error {
 func (f *feature) iCallPublishVolumeWithAlreadyMappedVolume() error {
 	ctx := new(context.Context)
 	req := f.getControllerPublishVolumeRequest("single-writer", "node1")
+	req.VolumeContext = map[string]string{keyFsType: "xfs"}
 	f.publishVolumeRequest = req
 
 	ctrl := gomock.NewController(nil)
@@ -1532,7 +2586,6 @@ func (f *feature) iCallPublishVolumeWithAlreadyMappedVolume() error {
 }
 
 func (f *feature) iCallUnpublishVolume(nodeID string) error {
-	ctx := new(context.Context)
 	req := &csi.ControllerUnpublishVolumeRequest{VolumeId: GoodVolumeID, NodeId: nodeID}
 	f.unpublishVolumeRequest = req
 
@@ -1554,7 +2607,43 @@ func (f *feature) iCallUnpublishVolume(nodeID string) error {
 		Times(1)
 	f.service.adminClient = c
 
-	f.unpublishVolumeResponse, f.err = f.service.ControllerUnpublishVolume(*ctx, req)
+	f.unpublishVolumeResponse, f.err = f.service.ControllerUnpublishVolume(context.Background(), req)
+	if f.err != nil {
+		log.Printf("UnpublishVolume call failed: %s\n", f.err.Error())
+	}
+	return nil
+}
+
+func (f *feature) iCallUnpublishNFSVolume(nodeID string) error {
+	req := &csi.ControllerUnpublishVolumeRequest{VolumeId: GoodVolumeID, NodeId: "csi-node-test-127.0.0.1"}
+	f.unpublishVolumeRequest = req
+
+	ctrl := gomock.NewController(nil)
+	defer ctrl.Finish()
+
+	c := mock.NewMockClient(ctrl)
+	c.EXPECT().
+		GetVolume(gomock.Any(), gomock.Eq(req.VolumeId)).
+		Return(gopowerstore.Volume{}, errors.New("NFS")).
+		Times(1)
+
+	c.EXPECT().GetFS(gomock.Any(), gomock.Any()).
+		Return(gopowerstore.FileSystem{}, nil)
+
+	c.EXPECT().
+		GetNFSExportByFileSystemID(gomock.Any(), gomock.Any()).
+		Return(gopowerstore.NFSExport{
+			ID: "Some",
+		}, nil).
+		Times(1)
+	c.EXPECT().
+		ModifyNFSExport(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(gopowerstore.CreateResponse{}, nil).
+		Times(1)
+
+	f.service.adminClient = c
+
+	f.unpublishVolumeResponse, f.err = f.service.ControllerUnpublishVolume(context.Background(), req)
 	if f.err != nil {
 		log.Printf("UnpublishVolume call failed: %s\n", f.err.Error())
 	}
@@ -1568,8 +2657,188 @@ func (f *feature) aValidControllerUnpublishVolumeResponseIsReturned() error {
 	return nil
 }
 
+func (f *feature) aValidExpandVolumeResponseIsReturned() error {
+	if f.unpublishVolumeResponse == nil {
+		return errors.New("expected expandVolumeResponse (with no contents)but did not get one")
+	}
+	return nil
+}
+
+func (f *feature) iCallControllerExpandVolume() error {
+	var expandto int64 = MaxVolumeSizeBytes / 200
+	req := &csi.ControllerExpandVolumeRequest{
+		VolumeId: GoodVolumeID,
+		CapacityRange: &csi.CapacityRange{
+			RequiredBytes: expandto,
+			LimitBytes:    MaxVolumeSizeBytes,
+		},
+	}
+	f.expanvolumeRequest = req
+
+	ctrl := gomock.NewController(nil)
+	defer ctrl.Finish()
+
+	c := mock.NewMockClient(ctrl)
+	c.EXPECT().
+		GetVolume(gomock.Any(), gomock.Eq(req.VolumeId)).
+		Return(gopowerstore.Volume{ID: req.VolumeId}, nil).
+		Times(1)
+	c.EXPECT().
+		ModifyVolume(gomock.Any(), gomock.Any(), GoodVolumeID).
+		Return(gopowerstore.EmptyResponse(""), nil).
+		Times(1)
+	f.service.adminClient = c
+
+	f.expanvolumeResponse, f.err = f.service.ControllerExpandVolume(context.Background(), req)
+	if f.err != nil {
+		log.Printf("Controller Expand call failed: %s\n", f.err.Error())
+	}
+	return nil
+}
+func (f *feature) iCallControllerExpandVolumeSizeExceedLimit() error {
+	var expandto int64 = MaxVolumeSizeBytes * 2
+	req := &csi.ControllerExpandVolumeRequest{
+		VolumeId: GoodVolumeID,
+		CapacityRange: &csi.CapacityRange{
+			RequiredBytes: expandto,
+			LimitBytes:    MaxVolumeSizeBytes,
+		},
+	}
+	f.expanvolumeRequest = req
+
+	ctrl := gomock.NewController(nil)
+	defer ctrl.Finish()
+
+	c := mock.NewMockClient(ctrl)
+
+	f.service.adminClient = c
+
+	f.expanvolumeResponse, f.err = f.service.ControllerExpandVolume(context.Background(), req)
+	if f.err != nil {
+		log.Printf("Controller Expand call failed: %s\n", f.err.Error())
+	}
+	return nil
+}
+
+func (f *feature) iCallControllerExpandNFSVolumeSizeExceedLimit() error {
+	var expandto int64 = MaxVolumeSizeBytes * 2
+	req := &csi.ControllerExpandVolumeRequest{
+		VolumeId: GoodVolumeID,
+		CapacityRange: &csi.CapacityRange{
+			RequiredBytes: expandto,
+			LimitBytes:    MaxVolumeSizeBytes,
+		},
+	}
+	f.expanvolumeRequest = req
+
+	ctrl := gomock.NewController(nil)
+	defer ctrl.Finish()
+
+	c := mock.NewMockClient(ctrl)
+
+	f.service.adminClient = c
+
+	f.expanvolumeResponse, f.err = f.service.ControllerExpandVolume(context.Background(), req)
+	if f.err != nil {
+		log.Printf("Controller Expand call failed: %s\n", f.err.Error())
+	}
+	return nil
+}
+
+func (f *feature) iCallControllerExpandNFSVolumeShrink() error {
+	var expandto int64 = MaxVolumeSizeBytes / 10000
+	req := &csi.ControllerExpandVolumeRequest{
+		VolumeId: GoodVolumeID,
+		CapacityRange: &csi.CapacityRange{
+			RequiredBytes: expandto,
+			LimitBytes:    MaxVolumeSizeBytes,
+		},
+	}
+	f.expanvolumeRequest = req
+
+	ctrl := gomock.NewController(nil)
+	defer ctrl.Finish()
+
+	c := mock.NewMockClient(ctrl)
+	c.EXPECT().
+		GetVolume(gomock.Any(), gomock.Eq(req.VolumeId)).
+		Return(gopowerstore.Volume{
+			ID: req.VolumeId,
+		}, errors.New("Gimme NFS")).
+		Times(1)
+	c.EXPECT().GetFS(gomock.Any(), gomock.Any()).
+		Return(gopowerstore.FileSystem{SizeTotal: MaxVolumeSizeBytes / 1000}, nil)
+	f.service.adminClient = c
+
+	f.expanvolumeResponse, f.err = f.service.ControllerExpandVolume(context.Background(), req)
+	if f.err != nil {
+		log.Printf("Controller Expand call failed: %s\n", f.err.Error())
+	}
+	return nil
+}
+
+func (f *feature) iCallControllerExpandVolumeShrink() error {
+	var expandto int64 = MaxVolumeSizeBytes / 10000
+	req := &csi.ControllerExpandVolumeRequest{
+		VolumeId: GoodVolumeID,
+		CapacityRange: &csi.CapacityRange{
+			RequiredBytes: expandto,
+			LimitBytes:    MaxVolumeSizeBytes,
+		},
+	}
+	f.expanvolumeRequest = req
+
+	ctrl := gomock.NewController(nil)
+	defer ctrl.Finish()
+
+	c := mock.NewMockClient(ctrl)
+	c.EXPECT().
+		GetVolume(gomock.Any(), gomock.Eq(req.VolumeId)).
+		Return(gopowerstore.Volume{ID: req.VolumeId, Size: MaxVolumeSizeBytes / 100}, nil).
+		Times(1)
+	f.service.adminClient = c
+
+	f.expanvolumeResponse, f.err = f.service.ControllerExpandVolume(context.Background(), req)
+	if f.err != nil {
+		log.Printf("Controller Expand call failed: %s\n", f.err.Error())
+	}
+	return nil
+}
+
+func (f *feature) iCallControllerExpandNFSVolume() error {
+	var expandto int64 = MaxVolumeSizeBytes / 200
+	req := &csi.ControllerExpandVolumeRequest{
+		VolumeId: GoodVolumeID,
+		CapacityRange: &csi.CapacityRange{
+			RequiredBytes: expandto,
+			LimitBytes:    MaxVolumeSizeBytes,
+		},
+	}
+	f.expanvolumeRequest = req
+
+	ctrl := gomock.NewController(nil)
+	defer ctrl.Finish()
+
+	c := mock.NewMockClient(ctrl)
+	c.EXPECT().
+		GetVolume(gomock.Any(), gomock.Eq(req.VolumeId)).
+		Return(gopowerstore.Volume{ID: req.VolumeId}, errors.New("I want NFS")).
+		Times(1)
+	c.EXPECT().GetFS(gomock.Any(), gomock.Any()).
+		Return(gopowerstore.FileSystem{}, nil)
+	c.EXPECT().
+		ModifyFS(gomock.Any(), gomock.Any(), GoodVolumeID).
+		Return(gopowerstore.EmptyResponse(""), nil).
+		Times(1)
+	f.service.adminClient = c
+
+	f.expanvolumeResponse, f.err = f.service.ControllerExpandVolume(context.Background(), req)
+	if f.err != nil {
+		log.Printf("Controller Expand call failed: %s\n", f.err.Error())
+	}
+	return nil
+}
 func (f *feature) iCallUnpublishVolumeWithNotFoundHost() error {
-	ctx := new(context.Context)
 	req := &csi.ControllerUnpublishVolumeRequest{VolumeId: GoodVolumeID, NodeId: "node1"}
 	f.unpublishVolumeRequest = req
 
@@ -1581,8 +2850,9 @@ func (f *feature) iCallUnpublishVolumeWithNotFoundHost() error {
 	apiError.StatusCode = http.StatusBadRequest
 
 	c := mock.NewMockClient(ctrl)
+
 	c.EXPECT().
-		GetVolume(gomock.Any(), gomock.Eq(req.VolumeId)).
+		GetVolume(gomock.Any(), gomock.Any()).
 		Return(gopowerstore.Volume{ID: req.VolumeId}, nil).
 		Times(1)
 	c.EXPECT().
@@ -1593,9 +2863,10 @@ func (f *feature) iCallUnpublishVolumeWithNotFoundHost() error {
 		DetachVolumeFromHost(gomock.Any(), GoodHostID, gomock.AssignableToTypeOf(&gopowerstore.HostVolumeDetach{})).
 		Return(gopowerstore.EmptyResponse(""), *apiError).
 		Times(1)
+
 	f.service.adminClient = c
 
-	f.unpublishVolumeResponse, f.err = f.service.ControllerUnpublishVolume(*ctx, req)
+	f.unpublishVolumeResponse, f.err = f.service.ControllerUnpublishVolume(context.Background(), req)
 	if f.err != nil {
 		log.Printf("UnpublishVolume call failed: %s\n", f.err.Error())
 	}
@@ -1622,17 +2893,26 @@ func FeatureContext(s *godog.Suite) {
 	s.Step(`^a valid ProbeResponse is returned$`, f.aValidProbeResponseIsReturned)
 	s.Step(`^the error contains "([^"]*)"$`, f.theErrorContains)
 	s.Step(`^I call CreateVolume "([^"]*)" "(\d+)"$`, f.iCallCreateVolume)
+	s.Step(`^I call CreateNFSVolume "([^"]*)" "(\d+)"$`, f.iCallCreateNFSVolume)
 	s.Step(`^I call CreateVolume "([^"]*)" "(\d+)" with error$`, f.iCallCreateVolumeWithError)
 	s.Step(`^a valid CreateVolumeResponse is returned$`, f.aValidCreateVolumeResponseIsReturned)
 	s.Step(`^I call NodeGetInfo$`, f.iCallNodeGetInfo)
 	s.Step(`^a valid NodeGetInfoResponse is returned$`, f.aValidNodeGetInfoResponseIsReturned)
 	s.Step(`^I call CreateExistVolume "([^"]*)" "(\d+)"$`, f.iCallCreateExistVolume)
 	s.Step(`^I call CreateExistVolumeIncompatible "([^"]*)" "(\d+)"$`, f.iCallCreateExistVolumeIncompatible)
+	s.Step(`^I call CreateExistingNfsVolumeIncompatibleSize "([^"]*)" "(\d+)"$`, f.iCallCreateExistingNfsVolumeIncompatibleSize)
 	s.Step(`^I call CreateExistVolumeError "([^"]*)" "(\d+)"$`, f.iCallCreateExistVolumeError)
+	s.Step(`^I call CreateExistingNfsVolumeError "([^"]*)" "(\d+)"$`, f.iCallCreateExistingNfsVolumeError)
+	s.Step(`^I call DeleteVolumeError "([^"]*)"$`, f.iCallDeleteVolumeError)
 	s.Step(`^I call failure CreateVolume "([^"]*)" "(\d+)"$`, f.iCallFailureCreateVolume)
+	s.Step(`^I call CreateExistingNfsVolume "([^"]*)" "(\d+)"$`, f.iCallCreateExistingNfsVolume)
 	s.Step(`^I call DeleteVolume "([^"]*)"$`, f.iCallDeleteVolume)
+	s.Step(`^I call DeleteVolumeSnapError "([^"]*)"$`, f.iCallDeleteVolumeSnapError)
+	s.Step(`^I call DeleteNFSVolumeSnapError "([^"]*)"$`, f.iCallDeleteNFSVolumeSnapError)
+	s.Step(`^I call DeleteNFSVolume "([^"]*)"$`, f.iCallDeleteNFSVolume)
 	s.Step(`^a valid DeleteVolumeResponse is returned$`, f.aValidDeleteVolumeResponseIsReturned)
 	s.Step(`^I call DeleteNonExistVolume "([^"]*)"$`, f.iCallDeleteNonExistVolume)
+	s.Step(`^I call DeleteNonExistingNfsVolume "([^"]*)"$`, f.iCallDeleteNonExistingNfsVolume)
 	s.Step(`^I call GetCapacity$`, f.iCallGetCapacity)
 	s.Step(`^a valid GetCapacityResponse is returned$`, f.aValidGetCapacityResponseIsReturned)
 	s.Step(`^I call GetCapacity with Probe error$`, f.iCallGetCapacityWithProbeError)
@@ -1640,33 +2920,58 @@ func FeatureContext(s *godog.Suite) {
 	s.Step(`^I call GetCapacity with volume capabilities voltype "([^"]*)" access "([^"]*)"$`, f.iCallGetCapacityWithVolumeCapabilitiesVoltypeAccess)
 	s.Step(`^I call ListVolumes$`, f.iCallListVolumes)
 	s.Step(`^a valid ListVolumesResponse is returned$`, f.aValidListVolumesResponseIsReturned)
-	s.Step(`^I update volume cache$`, f.iUpdateVolumeCache)
 	s.Step(`^I call ListVolumes with cache and start token "([^"]*)"$`, f.iCallListVolumesWithCacheAndStartToken)
 	s.Step(`^I call failure ListVolumes$`, f.iCallFailureListVolumes)
 	s.Step(`^I call PublishVolume with "([^"]*)" to "([^"]*)"$`, f.iCallPublishVolumeWithTo)
+	s.Step(`^I call PublishNFSVolume with "([^"]*)" to "([^"]*)"$`, f.iCallPublishNFSVolumeWithTo)
 	s.Step(`^a valid ControllerPublishVolumeResponse is returned$`, f.aValidControllerPublishVolumeResponseIsReturned)
 	s.Step(`^I call PublishVolume with already mapped volume$`, f.iCallPublishVolumeWithAlreadyMappedVolume)
 	s.Step(`^I call UnpublishVolume from "([^"]*)"$`, f.iCallUnpublishVolume)
+	s.Step(`^I call UnpublishNFSVolume from "([^"]*)"$`, f.iCallUnpublishNFSVolume)
 	s.Step(`^a valid ControllerUnpublishVolumeResponse is returned$`, f.aValidControllerUnpublishVolumeResponseIsReturned)
 	s.Step(`^I call UnpublishVolume with not found host$`, f.iCallUnpublishVolumeWithNotFoundHost)
 	s.Step(`^I call CreateSnapshot "([^"]*)" "([^"]*)"$`, f.iCallCreateSnapshot)
+	s.Step(`^I call CreateNfsSnapshot "([^"]*)" "([^"]*)"$`, f.iCallCreateNfsSnapshot)
 	s.Step(`^a valid CreateSnapshotResponse is returned$`, f.aValidCreateSnapshotResponseIsReturned)
 	s.Step(`^I call CreateSnapshot "([^"]*)" "([^"]*)" with error$`, f.iCallCreateSnapshotWithError)
 	s.Step(`^I call CreateExistingSnapshot "([^"]*)" "([^"]*)"$`, f.iCallCreateExistingSnapshot)
+	s.Step(`^I call CreateExistingNfsSnapshot "([^"]*)" "([^"]*)"$`, f.iCallCreateExistingNfsSnapshot)
 	s.Step(`^I call CreateExistingSnapshotIncompatible "([^"]*)" "([^"]*)" with error$`, f.iCallCreateExistingSnapshotIncompatible)
 	s.Step(`^I call CreateExistingSnapshotError "([^"]*)" "([^"]*)"$`, f.iCallCreateExistingSnapshotError)
 	s.Step(`^I call failure CreateSnapshot "([^"]*)" "([^"]*)"$`, f.iCallFailureCreateSnapshot)
 	s.Step(`^I call DeleteSnapshot "([^"]*)"$`, f.iCallDeleteSnapshot)
+	s.Step(`^I call DeleteNfsSnapshot "([^"]*)"$`, f.iCallDeleteNfsSnapshot)
 	s.Step(`^I call DeleteSnapshot "([^"]*)" with error$`, f.iCallDeleteSnapshotWithError)
 	s.Step(`^a valid DeleteSnapshotResponse is returned$`, f.aValidDeleteSnapshotResponseIsReturned)
 	s.Step(`^I call DeleteNonExistingSnapshot "([^"]*)"$`, f.iCallDeleteNonExistingSnapshot)
+	s.Step(`^I call DeleteNonExistingNfsSnapshot "([^"]*)"$`, f.iCallDeleteNonExistingNfsSnapshot)
+	s.Step(`^I call DeleteSnapshotButNoneFound "([^"]*)"$`, f.iCallDeleteSnapshotButNoneFound)
 	s.Step(`^I call ListSnapshots "([^"]*)" "([^"]*)"$`, f.iCallListSnapshots)
 	s.Step(`^a valid ListSnapshotsResponse is returned$`, f.aValidListSnapshotsResponseIsReturned)
 	s.Step(`^I call ListSnapshotsError "([^"]*)"$`, f.iCallListSnapshotsError)
 	s.Step(`^I call ListSnapshotsWithStartToken "([^"]*)"$`, f.iCallListSnapshotsWithStartToken)
 	s.Step(`^I call failure ListSnapshots`, f.iCallFailureListSnapshots)
 	s.Step(`^I call CreateVolumeFromSnapshot "(\d+)"$`, f.iCallCreateVolumeFromSnapshot)
+	s.Step(`^I call CreateNfsFromSnapshot "(\d+)"$`, f.iCallCreateNfsFromSnapshot)
 	s.Step(`^I call CreateVolumeFromSnapshotIncompatible "(\d+)"$`, f.iCallCreateVolumeFromSnapshotIncompatible)
+	s.Step(`^I call CreateNfsFromSnapshotIncompatible "(\d+)"$`, f.iCallCreateNfsFromSnapshotIncompatible)
 	s.Step(`^I call CreateVolumeFromSnapshotError "(\d+)"$`, f.iCallCreateVolumeFromSnapshotError)
+	s.Step(`^I call CreateNfsFromSnapshotError "(\d+)"$`, f.iCallCreateNfsFromSnapshotError)
 	s.Step(`^I call failure CreateVolumeFromSnapshot "(\d+)"`, f.iCallFailureCreateVolumeFromSnapshot)
+	s.Step(`^I call failure CreateNfsFromSnapshot "(\d+)"`, f.iCallFailureCreateNfsFromSnapshot)
+	s.Step(`^I call CreateCloneFs "(\d+)"$`, f.iCallCreateCloneFs)
+	s.Step(`^I call CreateCloneFsIncompatible "(\d+)"$`, f.iCallCreateCloneFsIncompatible)
+	s.Step(`^I call CreateCloneFsError "(\d+)"$`, f.iCallCreateCloneFsError)
+	s.Step(`^I call failure CreateCloneFs "(\d+)"`, f.iCallFailureCreateCloneFs)
+	s.Step(`^I call CreateCloneVolume "(\d+)"$`, f.iCallCreateCloneVolume)
+	s.Step(`^I call CreateCloneVolumeIncompatible "(\d+)"$`, f.iCallCreateCloneVolumeIncompatible)
+	s.Step(`^I call CreateCloneVolumeError "(\d+)"$`, f.iCallCreateCloneVolumeError)
+	s.Step(`^I call failure CreateCloneVolume "(\d+)"`, f.iCallFailureCreateCloneVolume)
+	s.Step(`^I call ExpandVolumeSize$`, f.iCallControllerExpandVolume)
+	s.Step(`^I call ExpandNFSVolumeSize$`, f.iCallControllerExpandNFSVolume)
+	s.Step(`^I call ExpandVolumeSizeExceedlimit$`, f.iCallControllerExpandVolumeSizeExceedLimit)
+	s.Step(`^I call ExpandNFSVolumeSizeExceedlimit$`, f.iCallControllerExpandNFSVolumeSizeExceedLimit)
+	s.Step(`^I call ExpandVolumeSizeShrink$`, f.iCallControllerExpandVolumeShrink)
+	s.Step(`^I call ExpandNFSVolumeSizeShrink$`, f.iCallControllerExpandNFSVolumeShrink)
+	s.Step(`^a valid ExpandVolumeResponse is returned$`, f.aValidExpandVolumeResponseIsReturned)
 }

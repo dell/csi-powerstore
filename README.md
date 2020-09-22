@@ -1,10 +1,27 @@
-# CSI Driver for Dell EMC PowerStore
-**Repository for CSI Driver for Dell EMC PowerStore development project**
+# CSI PowerStore
 
-## Description
-CSI Driver for Dell EMC PowerStore is a Container Storage Interface ([CSI](https://github.com/container-storage-interface/spec)) driver that provides support for provisioning persistent storage using Dell EMC PowerStore.
+[![Go Report Card](https://goreportcard.com/badge/github.com/dell/csi-powerstore)](https://goreportcard.com/report/github.com/dell/csi-powerstore)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/dell/csi-powerstore/blob/master/LICENSE)
+[![Docker](https://img.shields.io/docker/pulls/dellemc/csi-powerstore.svg?logo=docker)](https://hub.docker.com/r/dellemc/csi-powerstore)
+[![Last Release](https://img.shields.io/github/v/release/dell/csi-powerstore?label=latest&style=flat-square)](https://github.com/dell/csi-powerstore/releases)
+
+This repository contains [Container Storage Interface (CSI)](https://github.com/container-storage-interface/) driver for Dell EMC PowerStore 
+
+## Overview
+CSI PowerStore is a [Container Storage Interface (CSI)](https://github.com/container-storage-interface/) driver that provides support for provisioning persistent storage using Dell EMC PowerStore.
 
 It supports CSI specification version 1.1.
+
+A more detailed guide can be found in [Product Guide](https://github.com/dell/csi-powerstore/blob/master/CSI%20Driver%20for%20Dell%20EMC%20PowerStore%20Product%20Guide.pdf) 
+
+
+## Support
+
+The CSI Driver for Dell EMC PowerStore image, which is the built driver code, is available on Dockerhub and is officially supported by Dell EMC.
+
+The source code for CSI Driver for Dell EMC PowerStore available on Github is unsupported and provided solely under the terms of the license attached to the source code. For clarity, Dell EMC does not provide support for any source code modifications.
+
+For any CSI driver issues, questions or feedback, join the [Dell EMC Container community](https://www.dell.com/community/Containers/bd-p/Containers).
 
 ## Building
 
@@ -20,48 +37,57 @@ To build a docker image, execute `make docker`.
 ## Runtime Dependencies
 Both the Controller and the Node portions of the driver can only be run on nodes with network connectivity to a Dell EMC PowerStore server (which is used by the driver). 
 
-The Node portion of the driver can only be run on nodes that have the iscsi-initiator-utils package installed. 
+If you want to use iSCSI as a transport protocol be sure that `iscsi-initiator-utils` package is installed on your node. 
 
-You can verify said runtime dependencies by running the `verify.sh` script located inside of the helm directory.
+If you want to use FC be sure that zoning of Host Bus Adapters to the FC port directors was done. 
 
+If you want to use NFS be sure to enable it in `myvalues.yaml` and configure NAS server on PowerStore
 ## Installation
 
-- Clone the repository
-```git clone https://github.com/dell/csi-powerstore```
+Installation in a Kubernetes cluster should be done using the scripts within the `dell-csi-helm-installer` directory. 
+#### Prerequisites
+- Upstream Kubernetes versions 1.17, 1.18 or 1.19 or OpenShift versions 4.3, 4.4
+- Snapshot CRDs and snapshot controller installed in cluster
 
-_Notice: After release driver will be available at_ ```github.com/dell/csi-powestore```
+    If your Kubernetes distribution does not bundle the snapshot controller, you may manually install these components by executing the following steps
+    ```bash
+    git clone https://github.com/kubernetes-csi/external-snapshotter/
+    cd ./external-snapshotter
+    git checkout release-2.1
+    kubectl create -f config/crd
+    kubectl create -f deploy/kubernetes/snapshot-controller
+    ```
+    > For general use, update the snapshot controller YAMLs with an appropriate namespace prior to installing. For example, on a Vanilla Kubernetes cluster update the namespace from 'default' to 'kube-system' prior to issuing the kubectl create command.
+- You can access your cluster with `kubectl`
 
+#### Procedure
+1. Run `git clone https://github.com/dell/csi-powerstore.git` to clone the git repository
+2. Ensure that you've created namespace where you want to install the driver. You can run `kubectl create namespace csi-powerstore` to create a new one 
+3. Edit the `helm/secret.yaml`, point to correct namespace and replace the values for the username and password parameters.
+    These values can be obtained using base64 encoding as described in the following example:
+    ```
+    echo -n "myusername" | base64
+    echo -n "mypassword" | base64
+    ```
+   where *myusername* & *mypassword* are credentials that would be used for accessing PowerStore API
+4. Create the secret by running `kubectl create -f helm/secret.yaml` 
+5. Copy the default values.yaml file `cd dell-csi-helm-installer && cp ../helm/csi-powerstore/values.yaml ./my-powerstore-settings.yaml`
+6. Edit the newly created file and provide values for the following parameters:
+    - *powerStoreApi*: defines the full URL path to the PowerStore API
+    - *volumeNamePrefix*: defines the string added to each volume that the CSI driver creates
+    - *nodeNamePrefix*: defines the string added to each node that the CSI driver registers
+    - *nodeIDPath*: defines a path to file with a unique identifier identifying the node in the Kubernetes cluster
+    - *connection.transportProtocol*: defines which transport protocol to use (FC, ISCSI, None, or auto).
+    - *connection.nfs.enable*: enables or disables NFS support
+    - *connection.nfs.nasServerName*: points to the NAS server that would be used
+7. Install the driver using `csi-install.sh` bash script by running `./csi-install.sh --namespace csi-powerstore --values ./my-powerstore-settings.yaml` 
 
-- Enter helm folder and copy values file
-```
-# copying values.yaml
-cd csi-powerstore/helm
-cp csi-powerstore/values.yaml ./myvalues.yaml
-```
-- Edit myvalues.yaml using your favorite text editor and change the following parameters:
-
-| Parameter        | Description           |
-| ------------- |:-------------:|
-| powerStoreApi     | This value defines full URL path to PowerStore API |
-| powerStoreApiUser      | Username to login to PowerStore API       |
-| powerStoreApiPassword | Password to login to PowerStore API |
-
-
-- (Optional) Customize additional parameters in myvalues.yaml if required.
-
-- Run the “install.sh” shell script, it will check your cluster with verify.sh script and install driver using helm
-```
-# running install.sh
-chmod +x install.sh verify.sh uninstall.sh upgrade.sh
-./install.sh
-```
-
+For more information on the installation scripts, consult the [README.md](dell-csi-helm-installer/README.md)
 
 
 ## Using driver
-
-A number of test helm charts and scripts are found in the directory test/helm.
-Product Guide provides descriptions of how to run these and explains how they work.
+To check if the driver is functioning correctly you can run simple tests from directory `test/simple` 
+[Product Guide](https://github.com/dell/csi-powerstore/blob/master/CSI%20Driver%20for%20Dell%20EMC%20PowerStore%20Product%20Guide.pdf) provides descriptions of how to run these and explains how they work.
 
 If you want to interact with the driver directly, you can use the Container Storage Client (`csc`) program provided via the [GoCSI](https://github.com/rexray/gocsi) project:
 
@@ -92,14 +118,11 @@ SINGLE_NODE_WRITER = 1;
 // Can only be published once as readonly on a single node,
 // at any given time.
 SINGLE_NODE_READER_ONLY = 2;
-
-// Can be published as readonly at multiple nodes simultaneously.
-MULTI_NODE_READER_ONLY = 3;
 ```
 
 This means that volumes can be mounted to either single node at a time, with read-write or read-only permission, or can be mounted on multiple nodes, but all must be read-only.
 
-For volumes that are used as block devices, only the following are supported:
+For volumes that are used as raw block devices or NFS volumes, the following are supported:
 
 ```go
 // Can only be published as read/write on a single node, at
@@ -113,14 +136,5 @@ MULTI_NODE_MULTI_WRITER = 5;
 
 This means that giving a workload read-only access to a block device is not supported.
 
-In general, volumes should be formatted with xfs or ext4.
-
-## Support
-The CSI Driver for Dell EMC PowerStore image available on Dockerhub is officially supported by Dell EMC.
- 
-The source code available on Github is unsupported and provided solely under the terms of the license attached to the source code. For clarity, Dell EMC does not provide support for any source code modifications.
- 
-For any CSI driver setup, configuration issues, questions or feedback, join the Dell EMC Container community at https://www.dell.com/community/Containers/bd-p/Containers
- 
-For any Dell EMC storage issues, please contact Dell support at: https://www.dell.com/support.
+In general, block volumes should be formatted with xfs or ext4.
 

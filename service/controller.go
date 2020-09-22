@@ -20,6 +20,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/dell/gopowerstore"
 	"github.com/golang/protobuf/ptypes"
@@ -52,6 +53,9 @@ const (
 	PublishContextISCSITargetsPrefix = "TARGET"
 	PublishContextFCWWPNPrefix       = "FCWWPN"
 	WWNPrefix                        = "naa."
+
+	keyFsType         = "FsType"
+	keyNasName string = "nasName"
 )
 
 func (s *service) CreateVolume(
@@ -68,15 +72,34 @@ func (s *service) CreateVolume(
 		return nil, err
 	}
 
-	// Get the required capacity
-	sizeInBytes, err := getVolumeSize(req.GetCapacityRange())
-	if err != nil {
+	// Check if should use nfs
+	var useNFS bool
+	fsType, ok := params[keyFsType]
+	// FsType can be empty
+	if ok {
+		useNFS = strings.ToLower(fsType) == "nfs"
+
+	}
+
+	var creator VolumeCreator
+
+	if useNFS {
+		creator = &NfsCreator{}
+		vcs := req.GetVolumeCapabilities()
+		isBlock := accTypeIsBlock(vcs)
+		if isBlock {
+			return nil, errors.New("raw block requested from NFS Volume")
+		}
+	} else {
+		creator = &SCSICreator{}
+	}
+
+	if err := creator.CheckName(ctx, req.GetName()); err != nil {
 		return nil, err
 	}
 
-	// Get the volume name
-	volumeName := req.GetName()
-	if err := volumeNameValidation(volumeName); err != nil {
+	sizeInBytes, err := creator.CheckSize(ctx, req.GetCapacityRange())
+	if err != nil {
 		return nil, err
 	}
 
@@ -84,32 +107,30 @@ func (s *service) CreateVolume(
 	if contentSource != nil {
 		volumeSource := contentSource.GetVolume()
 		if volumeSource != nil {
-			return nil, status.Error(codes.InvalidArgument, "Volume as a VolumeContentSource is not supported (i.e. clone)")
+			log.Printf("volume %s specified as volume content source", volumeSource.VolumeId)
+			return creator.Clone(ctx, volumeSource, req.GetName(), sizeInBytes, req.Parameters, s.adminClient)
 		}
 		snapshotSource := contentSource.GetSnapshot()
 		if snapshotSource != nil {
 			log.Printf("snapshot %s specified as volume content source", snapshotSource.SnapshotId)
-			return s.createVolumeFromSnapshot(ctx, req, snapshotSource, volumeName, sizeInBytes)
+			return creator.CreateVolumeFromSnapshot(ctx, snapshotSource,
+				req.GetName(), sizeInBytes, req.Parameters, s.adminClient)
 		}
 	}
 
-	storageType := gopowerstore.StorageTypeEnumBlock
-	reqParams := &gopowerstore.VolumeCreate{Name: &volumeName, Size: &sizeInBytes, StorageType: &storageType}
-
 	var volumeResponse *csi.Volume
-
 	if err = s.apiThrottle.Acquire(ctx); err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	resp, err := s.adminClient.CreateVolume(ctx, reqParams)
+	resp, err := creator.Create(ctx, req, sizeInBytes, s.adminClient)
 	s.apiThrottle.Release(ctx)
+
 	if err != nil {
-		if apiError, ok := err.(gopowerstore.APIError); ok && apiError.VolumeNameIsAlreadyUse() {
-			alreadyExistVolume, err := s.getExistVolume(ctx, volumeName, sizeInBytes)
+		if apiError, ok := err.(gopowerstore.APIError); ok && (apiError.VolumeNameIsAlreadyUse() || apiError.FSNameIsAlreadyUse()) {
+			volumeResponse, err = creator.CheckIfAlreadyExists(ctx, req, sizeInBytes, s.adminClient)
 			if err != nil {
 				return nil, err
 			}
-			volumeResponse = getCSIVolume(alreadyExistVolume.ID, alreadyExistVolume.Size)
 		} else {
 			return nil, status.Error(codes.Internal, err.Error())
 		}
@@ -117,23 +138,10 @@ func (s *service) CreateVolume(
 		volumeResponse = getCSIVolume(resp.ID, sizeInBytes)
 	}
 
+	volumeResponse.VolumeContext = req.Parameters
 	return &csi.CreateVolumeResponse{
 		Volume: volumeResponse,
 	}, nil
-}
-
-func (s *service) getExistVolume(ctx context.Context, volumeName string, requiredSize int64) (gopowerstore.Volume, error) {
-	alreadyExistVolume, err := s.adminClient.GetVolumeByName(ctx, volumeName)
-	if err != nil {
-		return gopowerstore.Volume{}, status.Errorf(codes.Internal, "can't find volume '%s': %s", volumeName, err.Error())
-	}
-
-	if alreadyExistVolume.Size < requiredSize {
-		return gopowerstore.Volume{}, status.Errorf(codes.AlreadyExists,
-			"volume '%s' already exists but is incompatible volume size: %d < %d",
-			volumeName, alreadyExistVolume.Size, requiredSize)
-	}
-	return alreadyExistVolume, nil
 }
 
 func getVolumeSize(cr *csi.CapacityRange) (int64, error) {
@@ -167,19 +175,6 @@ func getCSIVolume(VolumeID string, size int64) *csi.Volume {
 	return volume
 }
 
-func getCSIVolumeFromSnapshot(VolumeID string, snapshotSource *csi.VolumeContentSource_SnapshotSource, size int64) *csi.Volume {
-	volume := &csi.Volume{
-		CapacityBytes: size,
-		VolumeId:      VolumeID,
-		ContentSource: &csi.VolumeContentSource{
-			Type: &csi.VolumeContentSource_Snapshot{
-				Snapshot: snapshotSource,
-			},
-		},
-	}
-	return volume
-}
-
 func getCSISnapshot(snapshotId string, sourceVolumeId string, sizeInBytes int64) *csi.Snapshot {
 	snap := &csi.Snapshot{
 		SizeBytes:      sizeInBytes,
@@ -189,39 +184,6 @@ func getCSISnapshot(snapshotId string, sourceVolumeId string, sizeInBytes int64)
 		ReadyToUse:     true,
 	}
 	return snap
-}
-
-// Create a volume (which is actually a snapshot) from an existing snapshot.
-// The snapshotSource gives the SnapshotId which is the volume to be replicated.
-func (s *service) createVolumeFromSnapshot(ctx context.Context, req *csi.CreateVolumeRequest,
-	snapshotSource *csi.VolumeContentSource_SnapshotSource,
-	volumeName string, sizeInBytes int64) (*csi.CreateVolumeResponse, error) {
-	var volumeResponse *csi.Volume
-	// Lookup the volume source volume.
-	sourceVol, err := s.getVolByID(ctx, snapshotSource.SnapshotId)
-	if err != nil {
-		return nil, status.Errorf(codes.NotFound, "snapshot not found: %s", snapshotSource.SnapshotId)
-	}
-	if sourceVol.Size != sizeInBytes {
-		return nil, status.Errorf(codes.InvalidArgument,
-			"snapshot %s has incompatible size %d bytes with requested %d bytes",
-			snapshotSource.SnapshotId, sourceVol.Size, sizeInBytes)
-	}
-
-	createParams := gopowerstore.VolumeClone{
-		Name:        &volumeName,
-		Description: nil,
-	}
-
-	volume, err := s.adminClient.CreateVolumeFromSnapshot(ctx, &createParams, snapshotSource.SnapshotId)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "can't create volume: %s", snapshotSource.SnapshotId)
-	}
-
-	volumeResponse = getCSIVolumeFromSnapshot(volume.ID, snapshotSource, sizeInBytes)
-	return &csi.CreateVolumeResponse{
-		Volume: volumeResponse,
-	}, nil
 }
 
 func (s *service) DeleteVolume(
@@ -234,24 +196,69 @@ func (s *service) DeleteVolume(
 	}
 
 	id := req.GetVolumeId()
-
-	if err := s.apiThrottle.Acquire(ctx); err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-	_, err := s.adminClient.DeleteVolume(ctx, nil, id)
-	s.apiThrottle.Release(ctx)
+	_, err := s.adminClient.GetVolume(ctx, id)
 	if err == nil {
-		return &csi.DeleteVolumeResponse{}, nil
-	}
-	if apiError, ok := err.(gopowerstore.APIError); ok {
-		if apiError.VolumeIsNotExist() {
+		listSnaps, err := s.adminClient.GetSnapshotsByVolumeID(ctx, id)
+		if err != nil {
+			return nil, status.Errorf(codes.Unknown,
+				"failure getting snapshot: %s",
+				err.Error())
+		}
+		if len(listSnaps) > 0 {
+			return nil, status.Errorf(codes.FailedPrecondition,
+				"Unable to delete volume. Snapshots based on this volume still exist: %v",
+				listSnaps)
+		}
+		if err := s.apiThrottle.Acquire(ctx); err != nil {
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+		_, err = s.adminClient.DeleteVolume(ctx, nil, id)
+		s.apiThrottle.Release(ctx)
+		if err == nil {
 			return &csi.DeleteVolumeResponse{}, nil
 		}
-		if apiError.VolumeAttachedToHost() {
-			err = status.Errorf(codes.Internal,
-				"volume with ID '%s' is still attached to host: %s", id, apiError.Error())
+		if apiError, ok := err.(gopowerstore.APIError); ok {
+			if apiError.VolumeIsNotExist() {
+				return &csi.DeleteVolumeResponse{}, nil
+			}
+			if apiError.VolumeAttachedToHost() {
+				err = status.Errorf(codes.Internal,
+					"volume with ID '%s' is still attached to host: %s", id, apiError.Error())
+			}
+		}
+	} else {
+		_, err := s.adminClient.GetFS(ctx, id)
+		if err == nil {
+			listSnaps, err := s.adminClient.GetFsSnapshotsByVolumeID(ctx, id)
+			if err != nil {
+				return nil, status.Errorf(codes.Unknown,
+					"failure getting snapshot: %s",
+					err.Error())
+			}
+			if len(listSnaps) > 0 {
+				return nil, status.Errorf(codes.FailedPrecondition,
+					"Unable to delete FS volume. Snapshots based on this volume still exist: %v",
+					listSnaps)
+			}
+			if err := s.apiThrottle.Acquire(ctx); err != nil {
+				return nil, status.Error(codes.Internal, err.Error())
+			}
+			_, err = s.adminClient.DeleteFS(ctx, id)
+			s.apiThrottle.Release(ctx)
+			if err == nil {
+				return &csi.DeleteVolumeResponse{}, nil
+			}
+			if apiError, ok := err.(gopowerstore.APIError); ok {
+				if apiError.VolumeIsNotExist() {
+					return &csi.DeleteVolumeResponse{}, nil
+				}
+			}
+			return nil, err
+		} else {
+			return &csi.DeleteVolumeResponse{}, nil
 		}
 	}
+
 	return nil, err
 }
 
@@ -290,9 +297,36 @@ func (s *service) ControllerPublishVolume(
 	ctx context.Context,
 	req *csi.ControllerPublishVolumeRequest) (
 	*csi.ControllerPublishVolumeResponse, error) {
-
 	if err := s.requireProbe(ctx); err != nil {
 		return nil, err
+	}
+
+	volumeContext := req.GetVolumeContext()
+
+	var useNFS bool
+	if volumeContext != nil {
+		log.Printf("VolumeContext:")
+		for key, value := range volumeContext {
+			log.Debugf("    [%s]=%s", key, value)
+		}
+	} else {
+		// We don't get volumeContext in static provisioning
+		// So we try to check by probing id with volume and fs
+		id := req.GetVolumeId()
+		_, err := s.adminClient.GetVolume(ctx, id)
+		if err != nil {
+			_, err := s.adminClient.GetFS(ctx, id)
+			if err != nil {
+				return nil, err
+			}
+			useNFS = true
+		}
+	}
+
+	fsType, ok := volumeContext[keyFsType]
+	// FsType can be empty
+	if ok {
+		useNFS = strings.ToLower(fsType) == "nfs"
 	}
 
 	vc := req.GetVolumeCapability()
@@ -312,124 +346,25 @@ func (s *service) ControllerPublishVolume(
 	if volID == "" {
 		return nil, status.Error(codes.InvalidArgument, "volume ID is required")
 	}
-	volume, err := s.getVolByID(ctx, volID)
-	if err != nil {
-		if apiError, ok := err.(gopowerstore.APIError); ok && apiError.VolumeIsNotExist() {
-			return nil, status.Errorf(codes.NotFound, "volume with ID '%s' not found", volID)
-		}
-		return nil, status.Errorf(codes.Internal,
-			"failure checking volume status for volume publishing: %s",
-			err.Error())
-	}
 
 	kubeNodeID := req.GetNodeId()
 	if kubeNodeID == "" {
 		return nil, status.Error(codes.InvalidArgument, "node ID is required")
 	}
-	node, err := s.getNodeByID(ctx, kubeNodeID)
-	if err != nil {
-		if apiError, ok := err.(gopowerstore.APIError); ok && apiError.HostIsNotExist() {
-			return nil, status.Errorf(codes.NotFound, "host with k8s node ID '%s' not found", kubeNodeID)
-		}
-		return nil, status.Errorf(codes.Internal,
-			"failure checking host '%s' status for volume publishing: %s",
-			kubeNodeID, err.Error())
+
+	var publisher VolumePublisher
+
+	if useNFS {
+		publisher = &NfsPublisher{}
+	} else {
+		publisher = &SCSIPublisher{}
 	}
 
-	mapping, err := s.adminClient.GetHostVolumeMappingByVolumeID(ctx, volume.ID)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal,
-			"failed to get mapping for volume with ID '%s': %s",
-			volume.ID, err.Error())
+	if err := publisher.CheckIfVolumeExists(ctx, s.adminClient, volID); err != nil {
+		return nil, err
 	}
 
-	publishContext := make(map[string]string)
-
-	err = s.addTargetsInfoToPublishContext(publishContext)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "Could not get iscsi iscsiTargets: %s", err.Error())
-	}
-
-	mappingCount := len(mapping)
-
-	// Check if the volume is already attached to some host
-	for _, m := range mapping {
-		if m.HostID == node.ID {
-			log.Debug("Volume already mapped")
-			s.addLUNIDToPublishContext(publishContext, m, *volume)
-			return &csi.ControllerPublishVolumeResponse{
-				PublishContext: publishContext}, nil
-		}
-	}
-
-	if mappingCount != 0 {
-		switch am.Mode {
-		case csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
-			csi.VolumeCapability_AccessMode_SINGLE_NODE_READER_ONLY:
-			log.Error(fmt.Sprintf(
-				"ControllerPublishVolume: Volume present in a different lun mapping - '%s'",
-				mapping[0].HostID))
-			return nil, status.Errorf(
-				codes.FailedPrecondition,
-				"volume already present in a different lun mapping on node '%s'",
-				mapping[0].HostID)
-		}
-	}
-	// Attach volume to host
-	log.Debugf("Attach volume %s to host %s", volume.ID, node.ID)
-	params := gopowerstore.HostVolumeAttach{VolumeID: &volume.ID}
-	if err = s.apiThrottle.Acquire(ctx); err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-	_, err = s.adminClient.AttachVolumeToHost(ctx, node.ID, &params)
-	s.apiThrottle.Release(ctx)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal,
-			"failed to attach volume with ID '%s' to host with ID '%s': %s",
-			volume.ID, node.ID, err.Error())
-	}
-
-	mapping, err = s.adminClient.GetHostVolumeMappingByVolumeID(ctx, volume.ID)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal,
-			"failed to get mapping for volume with ID '%s' after attaching: %s",
-			volume.ID, err.Error())
-	}
-	s.addLUNIDToPublishContext(publishContext, mapping[0], *volume)
-
-	return &csi.ControllerPublishVolumeResponse{
-		PublishContext: publishContext}, nil
-}
-
-func (s *service) addLUNIDToPublishContext(
-	publishContext map[string]string,
-	mapping gopowerstore.HostVolumeMapping,
-	volume gopowerstore.Volume) {
-
-	publishContext[PublishContextDeviceWWN] = strings.TrimPrefix(volume.Wwn, WWNPrefix)
-	publishContext[PublishContextLUNAddress] = strconv.FormatInt(mapping.LogicalUnitNumber, 10)
-}
-
-func (s *service) addTargetsInfoToPublishContext(
-	publishContext map[string]string) error {
-
-	iscsiTargetsInfo, err := s.impl.getISCSITargetsInfoFromStorage()
-	if err != nil {
-		return err
-	}
-	for i, t := range iscsiTargetsInfo {
-		publishContext[fmt.Sprintf("%s%d", PublishContextISCSIPortalsPrefix, i)] = t.Portal
-		publishContext[fmt.Sprintf("%s%d", PublishContextISCSITargetsPrefix, i)] = t.Target
-	}
-	fcTargetsInfo, err := s.impl.getFCTargetsInfoFromStorage()
-	if err != nil {
-		return err
-	}
-	for i, t := range fcTargetsInfo {
-		publishContext[fmt.Sprintf("%s%d", PublishContextFCWWPNPrefix, i)] = t.WWPN
-	}
-
-	return nil
+	return publisher.Publish(ctx, req, s.adminClient, s.apiThrottle, kubeNodeID)
 }
 
 func (s *service) ControllerUnpublishVolume(
@@ -445,33 +380,71 @@ func (s *service) ControllerUnpublishVolume(
 	if volID == "" {
 		return nil, status.Error(codes.InvalidArgument, "volume ID is required")
 	}
-	_, err := s.getVolByID(ctx, volID)
-	if err != nil {
-		if apiError, ok := err.(gopowerstore.APIError); ok && apiError.VolumeIsNotExist() {
-			return nil, status.Errorf(codes.NotFound, "volume with ID '%s' not found", volID)
-		}
-		return nil, status.Errorf(codes.Unknown,
-			"failure checking volume status for volume unpublishing: %s",
-			err.Error())
-	}
 
 	kubeNodeID := req.GetNodeId()
 	if kubeNodeID == "" {
 		return nil, status.Error(codes.InvalidArgument, "node ID is required")
 	}
-	node, err := s.getNodeByID(ctx, kubeNodeID)
-	if err != nil {
-		if apiError, ok := err.(gopowerstore.APIError); ok && apiError.HostIsNotExist() {
-			return nil, status.Errorf(codes.NotFound, "host with k8s node ID '%s' not found", kubeNodeID)
-		}
-		return nil, status.Errorf(codes.Unknown,
-			"failure checking host '%s' status for volume unpublishing: %s",
-			kubeNodeID, err.Error())
-	}
 
-	err = s.impl.detachVolumeFromHost(ctx, node.ID, volID)
-	if err != nil {
-		return nil, err
+	id := req.GetVolumeId()
+	_, err := s.adminClient.GetVolume(ctx, id)
+	if err == nil {
+		node, err := s.getNodeByID(ctx, kubeNodeID)
+		if err != nil {
+			if apiError, ok := err.(gopowerstore.APIError); ok && apiError.HostIsNotExist() {
+				return nil, status.Errorf(codes.NotFound, "host with k8s node ID '%s' not found", kubeNodeID)
+			}
+			return nil, status.Errorf(codes.Unknown,
+				"failure checking host '%s' status for volume unpublishing: %s",
+				kubeNodeID, err.Error())
+		}
+		if err = s.apiThrottle.Acquire(ctx); err != nil {
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+		err = s.impl.detachVolumeFromHost(ctx, node.ID, volID)
+		s.apiThrottle.Release(ctx)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		fs, err := s.adminClient.GetFS(ctx, id)
+		if err != nil {
+			if apiError, ok := err.(gopowerstore.APIError); ok && apiError.VolumeIsNotExist() {
+				return &csi.ControllerUnpublishVolumeResponse{}, nil
+			}
+			return nil, status.Errorf(codes.Unknown,
+				"failure checking volume status for volume unpublishing: %s",
+				err.Error())
+		}
+
+		// Parse volumeID to get an IP
+		ip, err := getIPFromNodeID(kubeNodeID)
+		if err != nil {
+			return nil, err
+		}
+
+		export, err := s.adminClient.GetNFSExportByFileSystemID(ctx, fs.ID)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal,
+				"failure checking nfs export status for volume unpublishing: %s",
+				err.Error())
+		}
+		// Detach host from nfs export
+		if err = s.apiThrottle.Acquire(ctx); err != nil {
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+		_, err = s.adminClient.ModifyNFSExport(ctx, &gopowerstore.NFSExportModify{
+			RemoveHosts: &[]string{ip + "/255.255.255.255"}, // You can't remove without netmask
+		}, export.ID)
+		s.apiThrottle.Release(ctx)
+
+		if err != nil {
+			if apiError, ok := err.(gopowerstore.APIError); !(ok && apiError.HostAlreadyRemovedFromNFSExport()) {
+				return nil, status.Errorf(codes.Internal,
+					"failure when removing new host to nfs export: %s",
+					err.Error())
+			}
+		}
 	}
 
 	return &csi.ControllerUnpublishVolumeResponse{}, nil
@@ -485,9 +458,27 @@ func (s *service) ValidateVolumeCapabilities(
 	if err := s.requireProbe(ctx); err != nil {
 		return nil, err
 	}
+	params := req.GetParameters()
+
+	// Check if should use nfs
+	var useNFS bool
+	fsType, ok := params[keyFsType]
+	// FsType can be empty
+	if ok {
+		useNFS = strings.ToLower(fsType) == "nfs"
+	}
 
 	volID := req.GetVolumeId()
-	vol, err := s.getVolByID(ctx, volID)
+
+	var err error
+	resp := &csi.ValidateVolumeCapabilitiesResponse{}
+	if useNFS {
+		_, err = s.adminClient.GetFS(ctx, volID)
+
+	} else {
+		_, err = s.getVolByID(ctx, volID)
+	}
+
 	if err != nil {
 		if apiError, ok := err.(gopowerstore.APIError); ok && apiError.VolumeIsNotExist() {
 			return nil, status.Errorf(codes.NotFound, "volume with ID '%s' not found", volID)
@@ -496,11 +487,10 @@ func (s *service) ValidateVolumeCapabilities(
 			"failure checking volume status for capabilities: %s",
 			err.Error())
 	}
-
 	vcs := req.GetVolumeCapabilities()
-	supported, reason := valVolumeCaps(vcs, vol)
+	log.Info("Is Block? ", accTypeIsBlock(vcs))
+	supported, reason := valVolumeCaps(vcs)
 
-	resp := &csi.ValidateVolumeCapabilitiesResponse{}
 	if supported {
 		// The optional fields volume_context and parameters are not passed.
 		confirmed := &csi.ValidateVolumeCapabilitiesResponse_Confirmed{}
@@ -541,9 +531,7 @@ func checkValidAccessTypes(vcs []*csi.VolumeCapability) bool {
 	return true
 }
 
-func valVolumeCaps(
-	vcs []*csi.VolumeCapability,
-	vol *gopowerstore.Volume) (bool, string) {
+func valVolumeCaps(vcs []*csi.VolumeCapability) (bool, string) {
 
 	var (
 		supported = true
@@ -809,7 +797,7 @@ func (s *service) GetCapacity(
 	// Optionally validate the volume capability
 	vcs := req.GetVolumeCapabilities()
 	if vcs != nil {
-		supported, reason := valVolumeCaps(vcs, nil)
+		supported, reason := valVolumeCaps(vcs)
 		if !supported {
 			return nil, status.Errorf(codes.InvalidArgument, reason)
 		}
@@ -845,6 +833,10 @@ func (s *service) ControllerGetCapabilities(
 		csi.ControllerServiceCapability_RPC_PUBLISH_UNPUBLISH_VOLUME,
 		csi.ControllerServiceCapability_RPC_LIST_VOLUMES,
 		csi.ControllerServiceCapability_RPC_GET_CAPACITY,
+		csi.ControllerServiceCapability_RPC_CREATE_DELETE_SNAPSHOT,
+		csi.ControllerServiceCapability_RPC_LIST_SNAPSHOTS,
+		csi.ControllerServiceCapability_RPC_CLONE_VOLUME,
+		csi.ControllerServiceCapability_RPC_EXPAND_VOLUME,
 	} {
 		capabilities = append(capabilities, newCap(capability))
 	}
@@ -899,45 +891,64 @@ func (s *service) CreateSnapshot(
 		return nil, status.Errorf(codes.InvalidArgument, "volume ID to be snapped is required")
 	}
 
+	// Check source volume type
+	var useNFS bool
+	var sourceVolumeSize int64
+
+	vol, err := s.adminClient.GetVolume(ctx, sourceVolId)
+	if err == nil {
+		useNFS = false
+		sourceVolumeSize = vol.Size
+	} else {
+		fs, err := s.adminClient.GetFS(ctx, sourceVolId)
+		if err == nil {
+			useNFS = true
+			sourceVolumeSize = fs.SizeTotal - ReservedSize
+		} else {
+			return &csi.CreateSnapshotResponse{}, status.Errorf(codes.Internal,
+				"can't find source volume '%s': %s", sourceVolId, err.Error())
+		}
+	}
+
+	var snapshotter VolumeSnapshotter
+
+	if useNFS {
+		snapshotter = &NfsSnapshotter{}
+	} else {
+		snapshotter = &SCSISnapshotter{}
+	}
+
 	var snapResponse *csi.Snapshot
 
-	reqParams := &gopowerstore.SnapshotCreate{
-		Name:        &snapName,
-		Description: nil,
-	}
 	if err := s.apiThrottle.Acquire(ctx); err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	defer s.apiThrottle.Release(ctx)
 
 	// Check if snapshot with provided name already exists but has a different source volume id
-	existingSnapshot, err := s.getExistingSnapshot(ctx, snapName, sourceVolId)
+
+	existingSnapshot, err := snapshotter.GetExistingSnapshot(ctx, snapName, s.adminClient)
 	if err == nil {
-		if existingSnapshot.ProtectionData.SourceID != sourceVolId {
+		if existingSnapshot.GetSourceID() != sourceVolId {
 			return nil, status.Errorf(codes.AlreadyExists,
 				"snapshot with name '%s' exists, but SourceVolumeId %s doesn't match", snapName, sourceVolId)
 		} else {
-			snapResponse = getCSISnapshot(existingSnapshot.ID, sourceVolId, existingSnapshot.Size)
+			snapResponse = getCSISnapshot(existingSnapshot.GetID(), sourceVolId, existingSnapshot.GetSize())
 		}
 	} else {
-		resp, err := s.adminClient.CreateSnapshot(ctx, reqParams, sourceVolId)
+		resp, err := snapshotter.Create(ctx, snapName, sourceVolId, s.adminClient)
 		if err != nil {
 			if apiError, ok := err.(gopowerstore.APIError); ok && apiError.SnapshotNameIsAlreadyUse() {
-				existingSnapshot, err := s.getExistingSnapshot(ctx, snapName, sourceVolId)
+				existingSnapshot, err := snapshotter.GetExistingSnapshot(ctx, snapName, s.adminClient)
 				if err != nil {
 					return nil, err
 				}
-				snapResponse = getCSISnapshot(existingSnapshot.ID, sourceVolId, existingSnapshot.Size)
+				snapResponse = getCSISnapshot(existingSnapshot.GetID(), sourceVolId, existingSnapshot.GetSize())
 			} else {
 				return nil, status.Error(codes.Internal, err.Error())
 			}
 		} else {
-			// Get sourceVolume size
-			sourceVolume, err := s.adminClient.GetVolume(ctx, sourceVolId)
-			if err != nil {
-				return nil, status.Error(codes.Internal, err.Error())
-			}
-			snapResponse = getCSISnapshot(resp.ID, sourceVolId, sourceVolume.Size)
+			snapResponse = getCSISnapshot(resp.ID, sourceVolId, sourceVolumeSize)
 		}
 	}
 
@@ -946,19 +957,10 @@ func (s *service) CreateSnapshot(
 	}, nil
 }
 
-func (s *service) getExistingSnapshot(ctx context.Context, snapName, sourceVolId string) (gopowerstore.Volume, error) {
-	snap, err := s.adminClient.GetVolumeByName(ctx, snapName)
-	if err != nil {
-		return gopowerstore.Volume{}, status.Errorf(codes.Internal, "can't find snapshot '%s': %s", snapName, err.Error())
-	}
-	return snap, nil
-}
-
 func (s *service) DeleteSnapshot(
 	ctx context.Context,
 	req *csi.DeleteSnapshotRequest) (
 	*csi.DeleteSnapshotResponse, error) {
-
 	if err := s.requireProbe(ctx); err != nil {
 		return nil, err
 	}
@@ -968,10 +970,34 @@ func (s *service) DeleteSnapshot(
 		return nil, status.Errorf(codes.InvalidArgument, "snapshot ID to be deleted is required")
 	}
 
-	_, err := s.adminClient.DeleteSnapshot(ctx, nil, id)
+	_, err := s.adminClient.GetSnapshot(ctx, id)
 	if err == nil {
-		return &csi.DeleteSnapshotResponse{}, nil
+		_, err := s.adminClient.DeleteSnapshot(ctx, nil, id)
+		if err == nil {
+			return &csi.DeleteSnapshotResponse{}, nil
+		}
+		if apiError, ok := err.(gopowerstore.APIError); ok {
+			if apiError.VolumeIsNotExist() {
+				return &csi.DeleteSnapshotResponse{}, nil
+			}
+		}
+		return nil, err
 	}
+
+	_, err = s.adminClient.GetFsSnapshot(ctx, id)
+	if err == nil {
+		_, err := s.adminClient.DeleteFsSnapshot(ctx, id)
+		if err == nil {
+			return &csi.DeleteSnapshotResponse{}, nil
+		}
+		if apiError, ok := err.(gopowerstore.APIError); ok {
+			if apiError.VolumeIsNotExist() {
+				return &csi.DeleteSnapshotResponse{}, nil
+			}
+		}
+		return nil, err
+	}
+
 	if apiError, ok := err.(gopowerstore.APIError); ok {
 		if apiError.VolumeIsNotExist() {
 			return &csi.DeleteSnapshotResponse{}, nil
@@ -984,6 +1010,38 @@ func (s *service) ControllerExpandVolume(
 	ctx context.Context,
 	req *csi.ControllerExpandVolumeRequest) (
 	*csi.ControllerExpandVolumeResponse, error) {
+	if err := s.requireProbe(ctx); err != nil {
+		return nil, err
+	}
+	id := req.GetVolumeId()
+	requiredBytes := req.GetCapacityRange().GetRequiredBytes()
+	if requiredBytes > MaxVolumeSizeBytes {
+		return nil, status.Errorf(codes.OutOfRange, "Volume exceeds allowed limit")
+	}
+	vol, err := s.adminClient.GetVolume(ctx, id)
+	if err == nil {
+		if vol.Size < requiredBytes {
+			_, err = s.adminClient.ModifyVolume(context.Background(), &gopowerstore.VolumeModify{Size: requiredBytes}, id)
+			if err != nil {
+				return nil, err
+			}
+			return &csi.ControllerExpandVolumeResponse{CapacityBytes: requiredBytes, NodeExpansionRequired: true}, nil
+		} else {
+			return &csi.ControllerExpandVolumeResponse{}, nil
+		}
 
-	return nil, status.Error(codes.Unimplemented, "")
+	} else {
+		fs, err := s.adminClient.GetFS(ctx, id)
+		if err == nil {
+			if fs.SizeTotal < requiredBytes {
+				_, err = s.adminClient.ModifyFS(context.Background(), &gopowerstore.FSModify{Size: int(requiredBytes + ReservedSize)}, id)
+				if err != nil {
+					return nil, err
+				}
+			}
+
+		}
+		return &csi.ControllerExpandVolumeResponse{CapacityBytes: requiredBytes, NodeExpansionRequired: false}, nil
+	}
+
 }

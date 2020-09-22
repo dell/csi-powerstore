@@ -436,36 +436,6 @@ func (m *MockinternalServiceAPI) EXPECT() *MockinternalServiceAPIMockRecorder {
 	return m.recorder
 }
 
-// getISCSITargetsInfoFromStorage mocks base method
-func (m *MockinternalServiceAPI) getISCSITargetsInfoFromStorage() ([]ISCSITargetInfo, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "getISCSITargetsInfoFromStorage")
-	ret0, _ := ret[0].([]ISCSITargetInfo)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// getISCSITargetsInfoFromStorage indicates an expected call of getISCSITargetsInfoFromStorage
-func (mr *MockinternalServiceAPIMockRecorder) getISCSITargetsInfoFromStorage() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "getISCSITargetsInfoFromStorage", reflect.TypeOf((*MockinternalServiceAPI)(nil).getISCSITargetsInfoFromStorage))
-}
-
-// getFCTargetsInfoFromStorage mocks base method
-func (m *MockinternalServiceAPI) getFCTargetsInfoFromStorage() ([]FCTargetInfo, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "getFCTargetsInfoFromStorage")
-	ret0, _ := ret[0].([]FCTargetInfo)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// getFCTargetsInfoFromStorage indicates an expected call of getFCTargetsInfoFromStorage
-func (mr *MockinternalServiceAPIMockRecorder) getFCTargetsInfoFromStorage() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "getFCTargetsInfoFromStorage", reflect.TypeOf((*MockinternalServiceAPI)(nil).getFCTargetsInfoFromStorage))
-}
-
 // nodeProbe mocks base method
 func (m *MockinternalServiceAPI) nodeProbe(ctx context.Context) (bool, error) {
 	m.ctrl.T.Helper()
@@ -706,19 +676,19 @@ func (mr *MockinternalServiceAPIMockRecorder) initNodeVolToDevMapper() *gomock.C
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "initNodeVolToDevMapper", reflect.TypeOf((*MockinternalServiceAPI)(nil).initNodeVolToDevMapper))
 }
 
-// readPublishContext mocks base method
-func (m *MockinternalServiceAPI) readPublishContext(req publishContextGetter) (publishContextData, error) {
+// readSCSIPublishContext mocks base method
+func (m *MockinternalServiceAPI) readSCSIPublishContext(req publishContextGetter) (scsiPublishContextData, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "readPublishContext", req)
-	ret0, _ := ret[0].(publishContextData)
+	ret := m.ctrl.Call(m, "readSCSIPublishContext", req)
+	ret0, _ := ret[0].(scsiPublishContextData)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// readPublishContext indicates an expected call of readPublishContext
-func (mr *MockinternalServiceAPIMockRecorder) readPublishContext(req interface{}) *gomock.Call {
+// readSCSIPublishContext indicates an expected call of readSCSIPublishContext
+func (mr *MockinternalServiceAPIMockRecorder) readSCSIPublishContext(req interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "readPublishContext", reflect.TypeOf((*MockinternalServiceAPI)(nil).readPublishContext), req)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "readSCSIPublishContext", reflect.TypeOf((*MockinternalServiceAPI)(nil).readSCSIPublishContext), req)
 }
 
 // readISCSITargetsFromPublishContext mocks base method
@@ -780,7 +750,7 @@ func (mr *MockinternalServiceAPIMockRecorder) readFCPortsFilterFile(ctx interfac
 }
 
 // connectDevice mocks base method
-func (m *MockinternalServiceAPI) connectDevice(ctx context.Context, data publishContextData) (string, error) {
+func (m *MockinternalServiceAPI) connectDevice(ctx context.Context, data scsiPublishContextData) (string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "connectDevice", ctx, data)
 	ret0, _ := ret[0].(string)
@@ -795,7 +765,7 @@ func (mr *MockinternalServiceAPIMockRecorder) connectDevice(ctx, data interface{
 }
 
 // connectISCSIDevice mocks base method
-func (m *MockinternalServiceAPI) connectISCSIDevice(ctx context.Context, lun int, data publishContextData) (gobrick.Device, error) {
+func (m *MockinternalServiceAPI) connectISCSIDevice(ctx context.Context, lun int, data scsiPublishContextData) (gobrick.Device, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "connectISCSIDevice", ctx, lun, data)
 	ret0, _ := ret[0].(gobrick.Device)
@@ -810,7 +780,7 @@ func (mr *MockinternalServiceAPIMockRecorder) connectISCSIDevice(ctx, lun, data 
 }
 
 // connectFCDevice mocks base method
-func (m *MockinternalServiceAPI) connectFCDevice(ctx context.Context, lun int, data publishContextData) (gobrick.Device, error) {
+func (m *MockinternalServiceAPI) connectFCDevice(ctx context.Context, lun int, data scsiPublishContextData) (gobrick.Device, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "connectFCDevice", ctx, lun, data)
 	ret0, _ := ret[0].(gobrick.Device)
@@ -934,12 +904,13 @@ func (mr *MockwrapperFsLibMockRecorder) Unmount(ctx, target interface{}) *gomock
 }
 
 // WWNToDevicePath mocks base method
-func (m *MockwrapperFsLib) WWNToDevicePath(ctx context.Context, wwn string) (string, error) {
+func (m *MockwrapperFsLib) WWNToDevicePath(ctx context.Context, wwn string) (string, string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "WWNToDevicePath", ctx, wwn)
 	ret0, _ := ret[0].(string)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret1, _ := ret[1].(string)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
 }
 
 // WWNToDevicePath indicates an expected call of WWNToDevicePath
@@ -1148,6 +1119,20 @@ func (mr *MockmountLibMockRecorder) StageVolume(ctx, req, device interface{}) *g
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StageVolume", reflect.TypeOf((*MockmountLib)(nil).StageVolume), ctx, req, device)
 }
 
+// StageVolumeNFS mocks base method
+func (m *MockmountLib) StageVolumeNFS(ctx context.Context, req *csi.NodeStageVolumeRequest, path string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "StageVolumeNFS", ctx, req, path)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// StageVolumeNFS indicates an expected call of StageVolumeNFS
+func (mr *MockmountLibMockRecorder) StageVolumeNFS(ctx, req, path interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StageVolumeNFS", reflect.TypeOf((*MockmountLib)(nil).StageVolumeNFS), ctx, req, path)
+}
+
 // UnstageVolume mocks base method
 func (m *MockmountLib) UnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest) (string, error) {
 	m.ctrl.T.Helper()
@@ -1175,6 +1160,20 @@ func (m *MockmountLib) PublishVolume(ctx context.Context, req *csi.NodePublishVo
 func (mr *MockmountLibMockRecorder) PublishVolume(ctx, req interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PublishVolume", reflect.TypeOf((*MockmountLib)(nil).PublishVolume), ctx, req)
+}
+
+// PublishVolumeNFS mocks base method
+func (m *MockmountLib) PublishVolumeNFS(ctx context.Context, req *csi.NodePublishVolumeRequest) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PublishVolumeNFS", ctx, req)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// PublishVolumeNFS indicates an expected call of PublishVolumeNFS
+func (mr *MockmountLibMockRecorder) PublishVolumeNFS(ctx, req interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PublishVolumeNFS", reflect.TypeOf((*MockmountLib)(nil).PublishVolumeNFS), ctx, req)
 }
 
 // UnpublishVolume mocks base method
@@ -1234,6 +1233,21 @@ func (m *MockmountLib) IsReadyToPublish(ctx context.Context, stagingPath string)
 func (mr *MockmountLibMockRecorder) IsReadyToPublish(ctx, stagingPath interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsReadyToPublish", reflect.TypeOf((*MockmountLib)(nil).IsReadyToPublish), ctx, stagingPath)
+}
+
+// IsReadyToPublishNFS mocks base method
+func (m *MockmountLib) IsReadyToPublishNFS(ctx context.Context, stagingPath string) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IsReadyToPublishNFS", ctx, stagingPath)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// IsReadyToPublishNFS indicates an expected call of IsReadyToPublishNFS
+func (mr *MockmountLibMockRecorder) IsReadyToPublishNFS(ctx, stagingPath interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsReadyToPublishNFS", reflect.TypeOf((*MockmountLib)(nil).IsReadyToPublishNFS), ctx, stagingPath)
 }
 
 // MockmountLibStageCheck is a mock of mountLibStageCheck interface
@@ -1326,6 +1340,21 @@ func (m *MockmountLibPublishCheck) isReadyToPublish(ctx context.Context, device 
 func (mr *MockmountLibPublishCheckMockRecorder) isReadyToPublish(ctx, device interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "isReadyToPublish", reflect.TypeOf((*MockmountLibPublishCheck)(nil).isReadyToPublish), ctx, device)
+}
+
+// isReadyToPublishNFS mocks base method
+func (m *MockmountLibPublishCheck) isReadyToPublishNFS(ctx context.Context, device string) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "isReadyToPublishNFS", ctx, device)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// isReadyToPublishNFS indicates an expected call of isReadyToPublishNFS
+func (mr *MockmountLibPublishCheckMockRecorder) isReadyToPublishNFS(ctx, device interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "isReadyToPublishNFS", reflect.TypeOf((*MockmountLibPublishCheck)(nil).isReadyToPublishNFS), ctx, device)
 }
 
 // MockmountLibMountsReader is a mock of mountLibMountsReader interface

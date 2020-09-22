@@ -1,0 +1,41 @@
+# Dockerfile to build PowerStore CSI Driver
+# based on UBI standard image.
+# Alternative way without RHEL host/subscription, using centos.repo
+FROM registry.access.redhat.com/ubi7/ubi:latest
+
+LABEL vendor="Dell Inc." \
+      name="csi-powerstore" \
+      summary="CSI Driver for Dell EMC PowerStore" \
+      description="CSI Driver for provisioning persistent storage from Dell EMC PowerStore" \
+      version="1.1.0" \
+      license="Apache-2.0"
+
+COPY licenses /licenses
+
+# Adding Centos.repo file
+RUN echo $'[centos] \n\
+name=centos \n\
+baseurl=http://mirror.centos.org/centos-7/7/os/x86_64/ \n\
+enabled=1 \n\
+gpgcheck=0' > /etc/yum.repos.d/centos.repo
+
+# dependencies, following by cleaning the cache
+RUN yum -y update && \
+	yum -y install \
+	e2fsprogs.x86_64 \
+	xfsprogs.x86_64 \
+	nfs-utils.x86_64 \
+	which \
+	device-mapper-multipath \
+	&& \
+	yum clean all \
+	&& \
+	rm -rf /var/cache/run
+
+# validate some cli utilities are found
+RUN which mke2fs
+RUN which mkfs.xfs
+RUN echo "export PATH=$PATH:/sbin:/bin" > /etc/profile.d/ubuntu_path.sh
+
+COPY "csi-powerstore" .
+ENTRYPOINT ["/csi-powerstore"]

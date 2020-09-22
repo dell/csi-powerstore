@@ -17,14 +17,22 @@ ifndef DOCKER_IMAGE_NAME
     DOCKER_IMAGE_NAME=csi-powerstore
 endif
 
-ifndef DOCKER_FILE
-    DOCKER_FILE=Dockerfile
+ifndef BASEIMAGE
+	BASEIMAGE=centos:7.8.2003
+endif
+
+# figure out if podman or docker should be used (use podman if found)
+ifneq (, $(shell which podman 2>/dev/null))
+	BUILDER=podman
+else
+	BUILDER=docker
 endif
 
 docker:
 	echo "MAJOR $(MAJOR) MINOR $(MINOR) PATCH $(PATCH) BUILD $(BUILD) RELNOTE $(RELNOTE) SEMVER $(SEMVER)"
-	docker build -f $(DOCKER_FILE) -t "$(DOCKER_REGISTRY)/$(DOCKER_IMAGE_NAME):v$(MAJOR).$(MINOR).$(PATCH).$(BUILD)$(RELNOTE)" .
+	echo "$(DOCKER_FILE)"
+	$(BUILDER) build -f $(DOCKER_FILE) -t "$(DOCKER_REGISTRY)/$(DOCKER_IMAGE_NAME):v$(MAJOR).$(MINOR).$(PATCH).$(BUILD)$(RELNOTE)" --build-arg BASEIMAGE=$(BASEIMAGE) .
 
 push:   
 	echo "MAJOR $(MAJOR) MINOR $(MINOR) PATCH $(PATCH) BUILD $(BUILD) RELNOTE $(RELNOTE) SEMVER $(SEMVER)"
-	docker push "$(DOCKER_REGISTRY)/$(DOCKER_IMAGE_NAME):v$(MAJOR).$(MINOR).$(PATCH).$(BUILD)$(RELNOTE)"
+	$(BUILDER) push "$(DOCKER_REGISTRY)/$(DOCKER_IMAGE_NAME):v$(MAJOR).$(MINOR).$(PATCH).$(BUILD)$(RELNOTE)"

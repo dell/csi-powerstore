@@ -38,7 +38,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -64,6 +63,7 @@ const (
 	fcTransport         transportType = "FC"
 	iSCSITransport      transportType = "iSCSI"
 	autoDetectTransport transportType = "AUTO"
+	noneTransport       transportType = "None"
 )
 
 // Name is the name of the CSI plug-in.
@@ -111,37 +111,6 @@ type FCTargetInfo struct {
 	WWPN string
 }
 
-type volumeCache struct {
-	volumes []gopowerstore.Volume
-	sync.RWMutex
-}
-
-func (c *volumeCache) Clear() {
-	c.Lock()
-	defer c.Unlock()
-	c.volumes = make([]gopowerstore.Volume, 0)
-}
-
-func (c *volumeCache) Length() int {
-	return len(c.volumes)
-}
-
-func (c *volumeCache) Update(newVols []gopowerstore.Volume) int {
-	c.Lock()
-	defer c.Unlock()
-	c.volumes = make([]gopowerstore.Volume, len(newVols))
-	n := copy(c.volumes, newVols)
-	return n
-}
-
-func (c *volumeCache) Get() []gopowerstore.Volume {
-	c.Lock()
-	defer c.Unlock()
-	volumes := make([]gopowerstore.Volume, len(c.volumes))
-	copy(volumes, c.volumes)
-	return volumes
-}
-
 type TimeoutSemaphoreError struct {
 	msg string
 }
@@ -187,8 +156,6 @@ func (ts *timeoutSemaphoreIMPL) Release(ctx context.Context) {
 type service struct {
 	opts Opts
 	mode string
-
-	volumeCache volumeCache
 
 	// controller
 	adminClient gopowerstore.Client
@@ -284,13 +251,13 @@ func (s *service) BeforeServe(
 		opts.Endpoint = ep
 	}
 	if user, ok := csictx.LookupEnv(ctx, EnvUser); ok {
-		opts.User = user
+		opts.User = strings.Trim(user, "\n")
 	}
 	if opts.User == "" {
 		opts.User = "admin"
 	}
 	if pw, ok := csictx.LookupEnv(ctx, EnvPassword); ok {
-		opts.Password = pw
+		opts.Password = strings.Trim(pw, "\n")
 	}
 	if path, ok := csictx.LookupEnv(ctx, EnvNodeIDFilePath); ok {
 		opts.NodeIDFilePath = path
@@ -421,6 +388,8 @@ func getTransportProtocolFromEnv() transportType {
 			return fcTransport
 		case "iscsi":
 			return iSCSITransport
+		case "none":
+			return noneTransport
 		}
 	}
 	log.Errorf("enable storage transport auto detect")
@@ -546,38 +515,6 @@ func (s *service) getNodeByID(ctx context.Context, id string) (*gopowerstore.Hos
 	return &node, nil
 }
 
-func (si *serviceIMPL) getISCSITargetsInfoFromStorage() ([]ISCSITargetInfo, error) {
-	addrInfo, err := si.service.adminClient.GetStorageISCSITargetAddresses(context.Background())
-	if err != nil {
-		log.Error(err.Error())
-		return []ISCSITargetInfo{}, err
-	}
-	// sort data by id
-	sort.Slice(addrInfo, func(i, j int) bool {
-		return addrInfo[i].ID < addrInfo[j].ID
-	})
-	result := make([]ISCSITargetInfo, len(addrInfo))
-	for i, t := range addrInfo {
-		result[i] = ISCSITargetInfo{Target: t.IPPort.TargetIqn, Portal: fmt.Sprintf("%s:3260", t.Address)}
-	}
-	return result, nil
-}
-
-func (si *serviceIMPL) getFCTargetsInfoFromStorage() ([]FCTargetInfo, error) {
-	fcPorts, err := si.service.adminClient.GetFCPorts(context.Background())
-	if err != nil {
-		log.Error(err.Error())
-		return nil, err
-	}
-	var result []FCTargetInfo
-	for _, t := range fcPorts {
-		if t.IsLinkUp {
-			result = append(result, FCTargetInfo{WWPN: strings.Replace(t.Wwn, ":", "", -1)})
-		}
-	}
-	return result, nil
-}
-
 // internal API implementation
 type serviceIMPL struct {
 	// service is a pointer to the service instance
@@ -605,7 +542,7 @@ func (io *filepathWrapper) Glob(pattern string) (matches []string, err error) {
 type osWrapper struct{}
 
 func (io *osWrapper) OpenFile(name string, flag int, perm os.FileMode) (limitedFileIFace, error) {
-	return os.OpenFile(name, flag, perm)
+	return os.OpenFile(name, flag, perm) // #nosec G304
 }
 
 func (io *osWrapper) Stat(name string) (limitedFileInfoIFace, error) {

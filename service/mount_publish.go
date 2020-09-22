@@ -20,23 +20,28 @@ package service
 
 import (
 	"context"
+	"strings"
+
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"strings"
 )
 
 func newMountLibPublishIMPL(
 	publishCheck mountLibPublishCheck,
 	helpers reqHelpers,
 	mountBlock mountLibPublishBlock,
-	mountMount mountLibPublishMount) *mountLibPublishIMPL {
+	mountMount mountLibPublishMount,
+	mkdir dirCreator,
+	fsLib wrapperFsLib) *mountLibPublishIMPL {
 	return &mountLibPublishIMPL{
 		publishCheck: publishCheck,
 		helpers:      helpers,
 		mountBlock:   mountBlock,
 		mountMount:   mountMount,
+		mkdir:        mkdir,
+		fsLib:        fsLib,
 	}
 }
 
@@ -45,6 +50,8 @@ type mountLibPublishIMPL struct {
 	helpers      reqHelpers
 	mountBlock   mountLibPublishBlock
 	mountMount   mountLibPublishMount
+	mkdir        dirCreator
+	fsLib        wrapperFsLib
 }
 
 func (mpi *mountLibPublishIMPL) publish(ctx context.Context, req *csi.NodePublishVolumeRequest) error {
@@ -61,6 +68,43 @@ func (mpi *mountLibPublishIMPL) publish(ctx context.Context, req *csi.NodePublis
 		return mpi.mountBlock.publishBlock(ctx, req)
 	}
 	return mpi.mountMount.publishMount(ctx, req)
+}
+
+func (mpi *mountLibPublishIMPL) publishNFS(ctx context.Context, req *csi.NodePublishVolumeRequest) error {
+	stagingPath := mpi.helpers.getStagingPath(ctx, req)
+	targetPath := req.GetTargetPath()
+	logFields := getLogFields(ctx)
+	isRO := req.GetReadonly()
+	published, err := mpi.publishCheck.isAlreadyPublished(ctx, targetPath, getRWModeString(isRO))
+	if err != nil {
+		return err
+	}
+	if published {
+		return nil
+	}
+
+	if _, err := mpi.mkdir.mkDir(targetPath); err != nil {
+		return status.Errorf(codes.Internal, "can't create target folder %s: %s",
+			stagingPath, err.Error())
+	}
+	log.WithFields(logFields).Info("target path successfully created")
+
+	mountCap := req.GetVolumeCapability().GetMount()
+
+	mntFlags := mountCap.GetMountFlags()
+
+	if isRO {
+		mntFlags = append(mntFlags, "ro")
+	}
+
+	if err := mpi.fsLib.BindMount(ctx, stagingPath, targetPath, mntFlags...); err != nil {
+		return status.Errorf(codes.Internal,
+			"error bind disk %s to target path: %s", stagingPath,
+			err.Error())
+	}
+
+	log.WithFields(logFields).Info("volume successfully binded")
+	return nil
 }
 
 func newMountLibUnpublishIMPL(mountsReader mountLibMountsReader,
@@ -177,7 +221,11 @@ func (mpm *mountLibPublishMountIMPL) publishMount(
 			"Mount volumes do not support AccessMode MULTI_NODE_MULTI_WRITER")
 	}
 	mountCap := req.GetVolumeCapability().GetMount()
+	fs := mountCap.GetFsType()
 	mntFlags := mountCap.GetMountFlags()
+	if fs == "xfs" {
+		mntFlags = append(mntFlags, "nouuid")
+	}
 	targetFS := mountCap.GetFsType()
 
 	targetPath := req.GetTargetPath()
@@ -277,6 +325,25 @@ func (pc *mountLibPublishCheckIMPL) isReadyToPublish(ctx context.Context, stagin
 		return found, false, err
 	}
 	return found, devFS != "mpath_member", nil
+}
+
+func (pc *mountLibPublishCheckIMPL) isReadyToPublishNFS(ctx context.Context, stagingPath string) (bool, error) {
+	logFields := getLogFields(ctx)
+	stageInfo, found, err := pc.mountsReader.getTargetMount(ctx, stagingPath)
+	if err != nil {
+		return found, err
+	}
+	if !found {
+		log.WithFields(logFields).Warning("staged device not found")
+		return found, nil
+	}
+
+	if strings.HasSuffix(stageInfo.Source, "deleted") {
+		log.WithFields(logFields).Warning("staged device linked with deleted path")
+		return found, nil
+	}
+
+	return found, nil
 }
 
 func getRWModeString(isRO bool) string {

@@ -31,6 +31,7 @@ import (
 	gopowerstoremock "github.com/dell/gopowerstore/mock"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
+	"os"
 	"path"
 	"path/filepath"
 	"strings"
@@ -90,8 +91,8 @@ func getValidPublishContext() map[string]string {
 	}
 }
 
-func getValidPublishContextData() publishContextData {
-	return publishContextData{
+func getValidPublishContextData() scsiPublishContextData {
+	return scsiPublishContextData{
 		iscsiTargets:     validISCSITargetInfo,
 		deviceWWN:        validDeviceWWN,
 		volumeLUNAddress: validLUNID,
@@ -147,6 +148,22 @@ func getNodePublishValidRequest() *csi.NodePublishVolumeRequest {
 
 func getNodeUnpublishValidRequest() *csi.NodeUnpublishVolumeRequest {
 	req := csi.NodeUnpublishVolumeRequest{VolumeId: validVolumeID, TargetPath: validTargetPath}
+	return &req
+}
+
+func getNodeVolumeExpandValidRequest() *csi.NodeExpandVolumeRequest {
+	var size int64 = MaxVolumeSizeBytes / 100
+	req := csi.NodeExpandVolumeRequest{
+		VolumeId:   GoodVolumeID,
+		VolumePath: validTargetPath,
+		CapacityRange: &csi.CapacityRange{
+			RequiredBytes: size,
+			LimitBytes:    MaxVolumeSizeBytes,
+		},
+		XXX_NoUnkeyedLiteral: struct{}{},
+		XXX_unrecognized:     nil,
+		XXX_sizecache:        0,
+	}
 	return &req
 }
 
@@ -224,12 +241,6 @@ func Test_readFCTargetsFromPublishContext(t *testing.T) {
 	svc.impl = &serviceIMPL{service: &svc}
 	tgts := svc.impl.readFCTargetsFromPublishContext(getValidPublishContext())
 	assert.Len(t, tgts, 2)
-}
-
-func Test_NodeExpandVolume(t *testing.T) {
-	svc := service{}
-	_, err := svc.NodeExpandVolume(context.Background(), nil)
-	assert.EqualError(t, err, "rpc error: code = Unimplemented desc = ")
 }
 
 func Test_NodePublish_ProbeFailed(t *testing.T) {
@@ -360,8 +371,24 @@ func TestNodeStageVolume(t *testing.T) {
 		return isReadyToPublishMock().Return(false, false, errors.New(testErrMsg))
 	}
 
+	isReadyToPublishNfsMock := func() *gomock.Call {
+		return nodeMountLibMock.EXPECT().IsReadyToPublishNFS(gomock.Any(), gomock.Any())
+	}
+
+	isReadyToPublishNfsMockNotFound := func() *gomock.Call {
+		return isReadyToPublishNfsMock().Return(false, nil)
+	}
+
+	isReadyToPublishNfsMockFound := func() *gomock.Call {
+		return isReadyToPublishNfsMock().Return(true, nil)
+	}
+
+	isReadyToPublishNfsMockErr := func() *gomock.Call {
+		return isReadyToPublishNfsMock().Return(false, errors.New(testErrMsg))
+	}
+
 	readPublishContextMockOK := func() *gomock.Call {
-		return implMock.EXPECT().readPublishContext(gomock.Any()).
+		return implMock.EXPECT().readSCSIPublishContext(gomock.Any()).
 			Return(getValidPublishContextData(), nil)
 	}
 
@@ -394,6 +421,16 @@ func TestNodeStageVolume(t *testing.T) {
 			Return(nil)
 	}
 
+	stageVolumeNfsMockOK := func() *gomock.Call {
+		return nodeMountLibMock.EXPECT().StageVolumeNFS(gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(nil)
+	}
+
+	stageVolumeNfsMockErr := func() *gomock.Call {
+		return nodeMountLibMock.EXPECT().StageVolumeNFS(gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(errors.New(testErrMsg))
+	}
+
 	t.Run("node probe error", func(t *testing.T) {
 		implMock.EXPECT().nodeProbe(gomock.Any()).Return(false, errors.New(testErrMsg))
 		_, err := funcUnderTest(nil)
@@ -412,6 +449,7 @@ func TestNodeStageVolume(t *testing.T) {
 		assert.EqualError(t, err, "rpc error: code = InvalidArgument"+
 			" desc = volume ID is required")
 	})
+
 	t.Run("no StagingPath in request", func(t *testing.T) {
 		nodeProbeMockOK()
 		req := getNodeStageValidRequest()
@@ -420,11 +458,12 @@ func TestNodeStageVolume(t *testing.T) {
 		assert.EqualError(t, err, "rpc error: code = InvalidArgument"+
 			" desc = staging target path is required")
 	})
+
 	t.Run("read publishContext error", func(t *testing.T) {
 		nodeProbeMockOK()
 		getStagingPathMockOK()
-		implMock.EXPECT().readPublishContext(gomock.Any()).
-			Return(publishContextData{}, errors.New(testErrMsg))
+		implMock.EXPECT().readSCSIPublishContext(gomock.Any()).
+			Return(scsiPublishContextData{}, errors.New(testErrMsg))
 		_, err := funcUnderTest(nil)
 		assert.EqualError(t, err, testErrMsg)
 	})
@@ -480,6 +519,7 @@ func TestNodeStageVolume(t *testing.T) {
 		assert.EqualError(t, err, fmt.Sprintf("rpc error: code = Internal "+
 			"desc = error during volume staging: %s", testErrMsg))
 	})
+
 	t.Run("success", func(t *testing.T) {
 		nodeProbeMockOK()
 		getStagingPathMockOK()
@@ -488,6 +528,68 @@ func TestNodeStageVolume(t *testing.T) {
 		connectDeviceOK()
 		stageVolumeMockOK()
 		_, err := funcUnderTest(nil)
+		assert.Nil(t, err)
+	})
+
+	publishContext := getValidPublishContext()
+	publishContext[keyFsType] = "nfs"
+
+	t.Run("publish check err nfs", func(t *testing.T) {
+		nodeProbeMockOK()
+		getStagingPathMockOK()
+		isReadyToPublishNfsMockErr()
+		_, err := funcUnderTest(&csi.NodeStageVolumeRequest{
+			VolumeId:       GoodVolumeID,
+			PublishContext: publishContext,
+			VolumeCapability: getCapabilityWithVoltypeAccessFstype(
+				"mount", "multi-writer", "nfs"),
+			StagingTargetPath: filepath.Join(nodeStagePrivateDir, GoodVolumeID),
+		})
+		assert.EqualError(t, err, testErrMsg)
+	})
+
+	t.Run("already staged nfs", func(t *testing.T) {
+		nodeProbeMockOK()
+		getStagingPathMockOK()
+		isReadyToPublishNfsMockFound()
+		_, err := funcUnderTest(&csi.NodeStageVolumeRequest{
+			VolumeId:       GoodVolumeID,
+			PublishContext: publishContext,
+			VolumeCapability: getCapabilityWithVoltypeAccessFstype(
+				"mount", "multi-writer", "nfs"),
+			StagingTargetPath: filepath.Join(nodeStagePrivateDir, GoodVolumeID),
+		})
+		assert.Nil(t, err)
+	})
+
+	t.Run("stage failure nfs", func(t *testing.T) {
+		nodeProbeMockOK()
+		getStagingPathMockOK()
+		isReadyToPublishNfsMockNotFound()
+		stageVolumeNfsMockErr()
+		_, err := funcUnderTest(&csi.NodeStageVolumeRequest{
+			VolumeId:       GoodVolumeID,
+			PublishContext: publishContext,
+			VolumeCapability: getCapabilityWithVoltypeAccessFstype(
+				"mount", "multi-writer", "nfs"),
+			StagingTargetPath: filepath.Join(nodeStagePrivateDir, GoodVolumeID),
+		})
+		assert.EqualError(t, err, fmt.Sprintf("rpc error: code = Internal "+
+			"desc = error during volume staging: %s", testErrMsg))
+	})
+
+	t.Run("success nfs", func(t *testing.T) {
+		nodeProbeMockOK()
+		getStagingPathMockOK()
+		isReadyToPublishNfsMockNotFound()
+		stageVolumeNfsMockOK()
+		_, err := funcUnderTest(&csi.NodeStageVolumeRequest{
+			VolumeId:       GoodVolumeID,
+			PublishContext: publishContext,
+			VolumeCapability: getCapabilityWithVoltypeAccessFstype(
+				"mount", "multi-writer", "nfs"),
+			StagingTargetPath: filepath.Join(nodeStagePrivateDir, GoodVolumeID),
+		})
 		assert.Nil(t, err)
 	})
 }
@@ -697,14 +799,15 @@ func TestUpdateNodeID(t *testing.T) {
 	svc.opts.NodeNamePrefix = testNodeNamePrefix
 	err = impl.updateNodeID()
 	assert.Nil(t, err)
-	assert.Equal(t, fmt.Sprintf("%s-%s", testNodeNamePrefix, testNodeID), svc.nodeID)
+	assert.Contains(t, svc.nodeID, fmt.Sprintf("%s-%s", testNodeNamePrefix, testNodeID))
+	//assert.Equal(t, fmt.Sprintf("%s-%s", testNodeNamePrefix, testNodeID), svc.nodeID)
 }
 
 func TestNodeGetCapabilities(t *testing.T) {
 	svc := service{}
 	r, err := svc.NodeGetCapabilities(nil, &csi.NodeGetCapabilitiesRequest{})
 	assert.Nil(t, err)
-	assert.Len(t, r.Capabilities, 1)
+	assert.Len(t, r.Capabilities, 2)
 }
 
 func TestNodeGetInfo(t *testing.T) {
@@ -991,8 +1094,108 @@ func Test_service_NodeUnpublishVolume(t *testing.T) {
 	})
 }
 
-func TestNode_readPublishContext(t *testing.T) {
+func Test_service_NodeExpandVolume(t *testing.T) {
 	impl, implMock, ctrl := getIMPLWitIMPLMock(t)
+	ctrl.Finish()
+	svc := impl.service
+	ctx := context.Background()
+	adminClientMock := gopowerstoremock.NewMockClient(ctrl)
+	svc.adminClient = adminClientMock
+	nodeMountLibMock := NewMockmountLib(ctrl)
+	svc.nodeMountLib = nodeMountLibMock
+	nodeProbeMockOK := func() *gomock.Call {
+		return implMock.EXPECT().nodeProbe(gomock.Any()).Return(true, nil)
+	}
+	nodeProbeMockBad := func() *gomock.Call {
+		return implMock.EXPECT().nodeProbe(gomock.Any()).Return(false, errors.New("Failed"))
+	}
+	getVolMockBad := func() *gomock.Call {
+		return adminClientMock.EXPECT().GetVolume(ctx, gomock.Any()).
+			Return(gopowerstore.Volume{ID: GoodVolumeID, Size: 20 * VolumeSizeMultiple}, errors.New(testErrMsg))
+	}
+	getVolMockOK := func() *gomock.Call {
+		return adminClientMock.EXPECT().GetVolume(ctx, gomock.Any()).
+			Return(gopowerstore.Volume{ID: GoodVolumeID, Size: 20 * VolumeSizeMultiple}, nil)
+	}
+
+	t.Run("node probe bad", func(t *testing.T) {
+		nodeProbeMockBad()
+		req := getNodeVolumeExpandValidRequest()
+		_, err := svc.NodeExpandVolume(ctx, req)
+		assert.EqualError(t, err, "Failed")
+	})
+
+	t.Run("no targetPath in req", func(t *testing.T) {
+		nodeProbeMockOK()
+		req := getNodeVolumeExpandValidRequest()
+		req.VolumePath = ""
+		_, err := svc.NodeExpandVolume(ctx, req)
+		assert.EqualError(t, err, "rpc error: code = InvalidArgument desc"+
+			" = targetPath is required")
+	})
+
+	t.Run("no volumeID in req", func(t *testing.T) {
+		nodeProbeMockOK()
+		req := getNodeVolumeExpandValidRequest()
+		req.VolumeId = ""
+		_, err := svc.NodeExpandVolume(ctx, req)
+		assert.EqualError(t, err, "rpc error: code = InvalidArgument "+
+			"desc = volume ID is required")
+	})
+
+	t.Run("Volume Not Found", func(t *testing.T) {
+		nodeProbeMockOK()
+		req := getNodeVolumeExpandValidRequest()
+		getVolMockBad()
+		_, err := svc.NodeExpandVolume(ctx, req)
+		assert.EqualError(t, err, "rpc error: code = NotFound desc = Volume not found")
+	})
+
+	t.Run("Unable to find mount points. Should try offline and fail again", func(t *testing.T) {
+		gofsutil.UseMockFS()
+
+		nodeProbeMockOK()
+		req := getNodeVolumeExpandValidRequest()
+		getVolMockOK()
+		gofsutil.GOFSMock.InduceGetMountInfoFromDeviceError = true
+		_, err := svc.NodeExpandVolume(ctx, req)
+		gofsutil.GOFSMock.InduceGetMountInfoFromDeviceError = false
+		_, staterr := os.Stat(fmt.Sprintf("tmp/%s", req.VolumeId))
+		assert.Error(t, staterr)
+		assert.EqualError(t, err, "rpc error: code = Internal desc = Failed to find mount info for () with error (getMounts induced error: Failed to find mount information)")
+	})
+
+	t.Run("Good scenario", func(t *testing.T) {
+		gofsutil.UseMockFS()
+
+		nodeProbeMockOK()
+		req := getNodeVolumeExpandValidRequest()
+		getVolMockOK()
+		_, err := svc.NodeExpandVolume(ctx, req)
+		assert.NoError(t, err)
+	})
+	t.Run("Failed to perform a fake mount ", func(t *testing.T) {
+		gofsutil.UseMockFS()
+
+		nodeProbeMockOK()
+		req := getNodeVolumeExpandValidRequest()
+		getVolMockOK()
+		gofsutil.GOFSMock.InduceGetMountInfoFromDeviceError = true
+		gofsutil.GOFSMock.InduceMountError = true
+		_, err := svc.NodeExpandVolume(ctx, req)
+		gofsutil.GOFSMock.InduceGetMountInfoFromDeviceError = false
+		gofsutil.GOFSMock.InduceMountError = false
+		assert.EqualError(t, err, "rpc error: code = Internal desc = Failed to find mount info for () with error (mount induced error)")
+	})
+
+}
+
+func TestNode_readPublishContext(t *testing.T) {
+	svc := service{}
+	implMock, ctrl := getServiceIMPLMock(t)
+	svc.impl = implMock
+	impl := serviceIMPL{&svc, implMock}
+
 	defer ctrl.Finish()
 
 	var err error
@@ -1006,34 +1209,36 @@ func TestNode_readPublishContext(t *testing.T) {
 	t.Run("no deviceWWN", func(t *testing.T) {
 		pc := getValidPublishContext()
 		delete(pc, PublishContextDeviceWWN)
-		_, err = impl.readPublishContext(buildReq(pc))
+		_, err = impl.readSCSIPublishContext(buildReq(pc))
 		assert.EqualError(t, err, "rpc error: code = InvalidArgument"+
 			" desc = deviceWWN must be in publish context")
 	})
 	t.Run("no volumeLUNAddress", func(t *testing.T) {
 		pc := getValidPublishContext()
 		delete(pc, PublishContextLUNAddress)
-		_, err = impl.readPublishContext(buildReq(pc))
+		_, err = impl.readSCSIPublishContext(buildReq(pc))
 		assert.EqualError(t, err, "rpc error: code = InvalidArgument "+
 			"desc = volumeLUNAddress must be in publish context")
 	})
 	t.Run("no target data", func(t *testing.T) {
+		svc.useFC = false
 		implMock.EXPECT().readISCSITargetsFromPublishContext(gomock.Any()).Return([]ISCSITargetInfo{})
-		_, err = impl.readPublishContext(buildReq(getValidPublishContext()))
+		_, err = impl.readSCSIPublishContext(buildReq(getValidPublishContext()))
 		assert.EqualError(t, err, "rpc error: code = InvalidArgument"+
 			" desc = iscsiTargets data must be in publish context")
 	})
 	t.Run("no FC target data", func(t *testing.T) {
+		svc.useFC = true
 		implMock.EXPECT().readISCSITargetsFromPublishContext(gomock.Any()).Return(validISCSITargetInfo)
 		implMock.EXPECT().readFCTargetsFromPublishContext(gomock.Any()).Return([]FCTargetInfo{})
-		_, err = impl.readPublishContext(buildReq(getValidPublishContext()))
+		_, err = impl.readSCSIPublishContext(buildReq(getValidPublishContext()))
 		assert.EqualError(t, err, "rpc error: code = InvalidArgument"+
 			" desc = fcTargets data must be in publish context")
 	})
 	t.Run("success", func(t *testing.T) {
 		implMock.EXPECT().readISCSITargetsFromPublishContext(gomock.Any()).Return(validISCSITargetInfo)
 		implMock.EXPECT().readFCTargetsFromPublishContext(gomock.Any()).Return(validFCTargetsInfo)
-		data, err := impl.readPublishContext(buildReq(getValidPublishContext()))
+		data, err := impl.readSCSIPublishContext(buildReq(getValidPublishContext()))
 		assert.Nil(t, err)
 		assert.Equal(t, validDeviceWWN, data.deviceWWN)
 		assert.Equal(t, validLUNID, data.volumeLUNAddress)
@@ -1357,7 +1562,7 @@ func TestNode_connectDevice(t *testing.T) {
 	svc := impl.service
 	ctx := context.Background()
 
-	funcUnderTest := func(data publishContextData) (string, error) {
+	funcUnderTest := func(data scsiPublishContextData) (string, error) {
 		return impl.connectDevice(ctx, data)
 	}
 	implProxyConnectFCDeviceMock := func() *gomock.Call {

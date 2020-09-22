@@ -44,6 +44,12 @@ func (m *mount) StageVolume(ctx context.Context,
 	return m.getStageVolumeIMPL().stage(ctx, req, device)
 }
 
+// StageVolumeNFS stages nfs volume to required node path
+func (m *mount) StageVolumeNFS(ctx context.Context,
+	req *csi.NodeStageVolumeRequest, path string) error {
+	return m.getStageVolumeIMPL().stageNFS(ctx, req, path)
+}
+
 // UnstageVolume unstage volume from required node path
 func (m *mount) UnstageVolume(ctx context.Context,
 	req *csi.NodeUnstageVolumeRequest) (string, error) {
@@ -54,6 +60,12 @@ func (m *mount) UnstageVolume(ctx context.Context,
 func (m *mount) PublishVolume(ctx context.Context,
 	req *csi.NodePublishVolumeRequest) error {
 	return m.getPublishVolumeIMPL().publish(ctx, req)
+}
+
+// PublishVolumeNFS mount nfs volume to required node path
+func (m *mount) PublishVolumeNFS(ctx context.Context,
+	req *csi.NodePublishVolumeRequest) error {
+	return m.getPublishVolumeIMPL().publishNFS(ctx, req)
 }
 
 // UnpublishVolume unmount volume from required node path
@@ -83,9 +95,15 @@ func (m *mount) IsReadyToPublish(ctx context.Context, device string) (bool, bool
 	return m.getPublishCheckIMPL().isReadyToPublish(ctx, device)
 }
 
+// IsReadyToPublishNFS check if nfs volume is ready to be published
+func (m *mount) IsReadyToPublishNFS(ctx context.Context, device string) (bool, error) {
+	return m.getPublishCheckIMPL().isReadyToPublishNFS(ctx, device)
+}
+
 func (m *mount) getStageVolumeIMPL() *mountLibStageIMPL {
 	return newMountLibStageIMPL(
 		newMkfile(&osWrapper{}),
+		newMkdir(&osWrapper{}),
 		&reqHelpersIMPL{},
 		&gofsutilWrapper{},
 		newMountLibStageCheckIMPL(
@@ -128,6 +146,8 @@ func (m *mount) getPublishVolumeIMPL() *mountLibPublishIMPL {
 			&reqHelpersIMPL{},
 			&gofsutilWrapper{},
 			newMkFS(&osWrapper{})),
+		newMkdir(&osWrapper{}),
+		&gofsutilWrapper{},
 	)
 }
 
