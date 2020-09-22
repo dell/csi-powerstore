@@ -424,13 +424,14 @@ func TestMount_mountLibStageIMPL_stage(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	mkfile := NewMockfileCreator(ctrl)
+	mkdir := NewMockdirCreator(ctrl)
 	reqHelper := NewMockreqHelpers(ctrl)
 	fsLib := NewMockwrapperFsLib(ctrl)
 	stageCheck := NewMockmountLibStageCheck(ctrl)
 
 	ctx := context.Background()
 
-	impl := newMountLibStageIMPL(mkfile, reqHelper, fsLib, stageCheck)
+	impl := newMountLibStageIMPL(mkfile, mkdir, reqHelper, fsLib, stageCheck)
 
 	funcUnderTest := func() error {
 		return impl.stage(ctx, getNodeStageValidRequest(), validDevPath)
@@ -485,6 +486,77 @@ func TestMount_mountLibStageIMPL_stage(t *testing.T) {
 		getStagingPathMockOK()
 		mkFileMockCreated()
 		bindMountOK()
+		err := funcUnderTest()
+		assert.Nil(t, err)
+	})
+}
+
+func TestMount_mountLibStageIMPL_stageNFS(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	mkfile := NewMockfileCreator(ctrl)
+	mkdir := NewMockdirCreator(ctrl)
+	reqHelper := NewMockreqHelpers(ctrl)
+	fsLib := NewMockwrapperFsLib(ctrl)
+	stageCheck := NewMockmountLibStageCheck(ctrl)
+
+	ctx := context.Background()
+
+	impl := newMountLibStageIMPL(mkfile, mkdir, reqHelper, fsLib, stageCheck)
+
+	funcUnderTest := func() error {
+		return impl.stageNFS(ctx, getNodeStageValidRequest(), validDevPath)
+	}
+
+	getStagingPathMockOK := func() {
+		reqHelper.EXPECT().getStagingPath(gomock.Any(), gomock.Any()).
+			Return(validStagingPath)
+	}
+	mkDirMock := func() *gomock.Call {
+		return mkdir.EXPECT().mkDir(validStagingPath)
+	}
+	mkDirMockError := func() {
+		mkDirMock().Return(false, errors.New(testErrMsg))
+	}
+	mkDirMockCreated := func() {
+		mkDirMock().Return(true, nil)
+	}
+	mountMock := func() *gomock.Call {
+		return fsLib.EXPECT().
+			Mount(gomock.Any(), validDevPath, validStagingPath, "")
+	}
+	mountError := func() {
+		mountMock().Return(errors.New(testErrMsg))
+	}
+	mountOK := func() {
+		mountMock().Return(nil)
+	}
+
+	t.Run("can't create target folder", func(t *testing.T) {
+		getStagingPathMockOK()
+		mkDirMockError()
+		err := funcUnderTest()
+		assert.EqualError(t, err,
+			fmt.Sprintf("rpc error: code = Internal"+
+				" desc = can't create target folder %s: %s",
+				validStagingPath, testErrMsg))
+	})
+
+	t.Run("mount error", func(t *testing.T) {
+		getStagingPathMockOK()
+		mkDirMockCreated()
+		mountError()
+		err := funcUnderTest()
+		assert.EqualError(t, err,
+			fmt.Sprintf("rpc error: code = Internal "+
+				"desc = error mount nfs share %s to target path: %s",
+				validDevPath, testErrMsg))
+	})
+
+	t.Run("success", func(t *testing.T) {
+		getStagingPathMockOK()
+		mkDirMockCreated()
+		mountOK()
 		err := funcUnderTest()
 		assert.Nil(t, err)
 	})
@@ -661,10 +733,12 @@ func TestMount_mountLibPublishIMPL_publish(t *testing.T) {
 	reqHelper := NewMockreqHelpers(ctrl)
 	mountBlock := NewMockmountLibPublishBlock(ctrl)
 	mountMount := NewMockmountLibPublishMount(ctrl)
+	mkdir := NewMockdirCreator(ctrl)
+	fsLib := NewMockwrapperFsLib(ctrl)
 
 	ctx := context.Background()
 
-	impl := newMountLibPublishIMPL(publishCheck, reqHelper, mountBlock, mountMount)
+	impl := newMountLibPublishIMPL(publishCheck, reqHelper, mountBlock, mountMount, mkdir, fsLib)
 
 	funcUnderTest := func() error {
 		return impl.publish(ctx, getNodePublishValidRequest())
@@ -747,6 +821,111 @@ func TestMount_mountLibPublishIMPL_publish(t *testing.T) {
 		isAlreadyPublishedMockFalse()
 		isBlockMockFalse()
 		publishMountMockOK()
+		err := funcUnderTest()
+		assert.Nil(t, err)
+	})
+}
+
+func TestMount_mountLibPublishIMPL_publishNFS(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	publishCheck := NewMockmountLibPublishCheck(ctrl)
+	reqHelper := NewMockreqHelpers(ctrl)
+	mountBlock := NewMockmountLibPublishBlock(ctrl)
+	mountMount := NewMockmountLibPublishMount(ctrl)
+	mkdir := NewMockdirCreator(ctrl)
+	fsLib := NewMockwrapperFsLib(ctrl)
+
+	ctx := context.Background()
+
+	impl := newMountLibPublishIMPL(publishCheck, reqHelper, mountBlock, mountMount, mkdir, fsLib)
+
+	funcUnderTest := func() error {
+		return impl.publishNFS(ctx, getNodePublishValidRequest())
+	}
+
+	getStagingPathMockOK := func() {
+		reqHelper.EXPECT().getStagingPath(gomock.Any(), gomock.Any()).
+			Return(validStagingPath)
+	}
+
+	isAlreadyPublishedMock := func() *gomock.Call {
+		return publishCheck.EXPECT().isAlreadyPublished(
+			gomock.Any(), gomock.Any(), gomock.Any())
+	}
+	isAlreadyPublishedMockError := func() {
+		isAlreadyPublishedMock().Return(false, errors.New(testErrMsg))
+	}
+	isAlreadyPublishedMockTrue := func() {
+		isAlreadyPublishedMock().Return(true, nil)
+	}
+	isAlreadyPublishedMockFalse := func() {
+		isAlreadyPublishedMock().Return(false, nil)
+	}
+
+	mkDirMock := func() *gomock.Call {
+		return mkdir.EXPECT().mkDir(gomock.Any())
+	}
+	mkDirMockError := func() {
+		mkDirMock().Return(false, errors.New(testErrMsg))
+	}
+	mkDirMockCreated := func() {
+		mkDirMock().Return(true, nil)
+	}
+
+	publishNfsMock := func() *gomock.Call {
+		return fsLib.EXPECT().BindMount(gomock.Any(), gomock.Any(), gomock.Any())
+	}
+	publishNfsMockOK := func() {
+		publishNfsMock().Return(nil)
+	}
+	publishNfsMockError := func() {
+		publishNfsMock().Return(errors.New(testErrMsg))
+	}
+
+	t.Run("isAlreadyPublished error", func(t *testing.T) {
+		getStagingPathMockOK()
+		isAlreadyPublishedMockError()
+		err := funcUnderTest()
+		assert.EqualError(t, err, testErrMsg)
+	})
+
+	t.Run("isAlreadyPublished true", func(t *testing.T) {
+		getStagingPathMockOK()
+		isAlreadyPublishedMockTrue()
+		err := funcUnderTest()
+		assert.Nil(t, err)
+	})
+
+	t.Run("can't create target folder", func(t *testing.T) {
+		getStagingPathMockOK()
+		isAlreadyPublishedMockFalse()
+		mkDirMockError()
+		err := funcUnderTest()
+		assert.EqualError(t, err,
+			fmt.Sprintf("rpc error: code = Internal"+
+				" desc = can't create target folder %s: %s",
+				validStagingPath, testErrMsg))
+	})
+
+	t.Run("publish error", func(t *testing.T) {
+		getStagingPathMockOK()
+		isAlreadyPublishedMockFalse()
+		mkDirMockCreated()
+		publishNfsMockError()
+		err := funcUnderTest()
+		assert.EqualError(t, err,
+			fmt.Sprintf("rpc error: code = Internal "+
+				"desc = error bind disk %s to target path: %s",
+				validStagingPath, testErrMsg))
+	})
+
+	t.Run("success", func(t *testing.T) {
+		getStagingPathMockOK()
+		isAlreadyPublishedMockFalse()
+		mkDirMockCreated()
+		publishNfsMockOK()
 		err := funcUnderTest()
 		assert.Nil(t, err)
 	})
@@ -970,6 +1149,65 @@ func TestMount_mountLibPublishCheckIMPL_isReadyToPublish(t *testing.T) {
 		found, ready, err := funcUnderTest()
 		assert.Nil(t, err)
 		assert.True(t, ready)
+		assert.True(t, found)
+	})
+
+}
+
+func TestMount_mountLibPublishCheckIMPL_isReadyToPublishNFS(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mountReader := NewMockmountLibMountsReader(ctrl)
+	fsLib := NewMockwrapperFsLib(ctrl)
+
+	ctx := context.Background()
+	impl := newMountLibPublishCheckIMPL(mountReader, fsLib)
+
+	funcUnderTest := func() (bool, error) {
+		return impl.isReadyToPublishNFS(ctx, validStagingPath)
+	}
+	getTargetMountMock := func() *gomock.Call {
+		return mountReader.EXPECT().getTargetMount(gomock.Any(), validStagingPath)
+	}
+	getTargetMountMockError := func() {
+		getTargetMountMock().Return(gofsutil.Info{}, false, errors.New(testErrMsg))
+	}
+	getTargetMountMockFound := func() {
+		getTargetMountMock().Return(getValidGofsutilTargetDevInfo(), true, nil)
+	}
+	getTargetMountMockNotFound := func() {
+		getTargetMountMock().Return(gofsutil.Info{}, false, nil)
+	}
+	getTargetMountMockFoundWithDeleted := func() {
+		getTargetMountMock().Return(gofsutil.Info{Source: "/dev/sdb/deleted"}, true, nil)
+	}
+
+	t.Run("getTargetMount error", func(t *testing.T) {
+		getTargetMountMockError()
+		found, err := funcUnderTest()
+		assert.EqualError(t, err, testErrMsg)
+		assert.False(t, found)
+	})
+
+	t.Run("getTargetMount not found", func(t *testing.T) {
+		getTargetMountMockNotFound()
+		found, err := funcUnderTest()
+		assert.Nil(t, err)
+		assert.False(t, found)
+	})
+
+	t.Run("device has deleted suffix", func(t *testing.T) {
+		getTargetMountMockFoundWithDeleted()
+		found, err := funcUnderTest()
+		assert.Nil(t, err)
+		assert.True(t, found)
+	})
+
+	t.Run("ready", func(t *testing.T) {
+		getTargetMountMockFound()
+		found, err := funcUnderTest()
+		assert.Nil(t, err)
 		assert.True(t, found)
 	})
 

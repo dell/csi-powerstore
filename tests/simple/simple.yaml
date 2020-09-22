@@ -47,6 +47,20 @@ spec:
       storage: 12Gi
   storageClassName: powerstore-xfs
 ---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: pvol2
+  namespace: testpowerstore
+spec:
+  accessModes:
+    - ReadWriteMany
+  volumeMode: Filesystem
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: powerstore-nfs
+---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -79,6 +93,8 @@ spec:
                 name: pvol0
               - mountPath: "/data1"
                 name: pvol1
+              - mountPath: "/data2"
+                name: pvol2
         volumes:
           - name: pvol0
             persistentVolumeClaim:
@@ -86,3 +102,6 @@ spec:
           - name: pvol1
             persistentVolumeClaim:
               claimName: pvol1
+          - name: pvol2
+            persistentVolumeClaim:
+              claimName: pvol2

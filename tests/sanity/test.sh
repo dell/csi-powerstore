@@ -1,6 +1,6 @@
 #!/bin/sh
 IMAGE=$1
-OVERRIDE='
+kubectl run csi-sanity --image=$IMAGE --overrides='
 {
   	"apiVersion": "v1",
 	"spec": {
@@ -39,6 +39,4 @@ OVERRIDE='
 		}]
 	}
 }
-'
-
-kubectl run csi-sanity --image=$IMAGE --overrides=$OVERRIDE --rm -ti --attach --restart=Never
+' --rm -ti --attach --restart=Never

@@ -1,3 +1,4 @@
+{{- if ne .Values.connection.scsiProtocol "None" }}
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
@@ -6,4 +7,5 @@ metadata:
     storageclass.beta.kubernetes.io/is-default-class: {{ .Values.storageClass.isDefault | quote }}
 provisioner: {{ .Values.driverName }}
 reclaimPolicy: {{ required "Must provide a storage class reclaim policy." .Values.storageClass.reclaimPolicy }}
-
+allowVolumeExpansion: true
+{{- end }}

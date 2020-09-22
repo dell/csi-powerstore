@@ -39,8 +39,6 @@ type Service interface {
 }
 
 type internalServiceAPI interface {
-	getISCSITargetsInfoFromStorage() ([]ISCSITargetInfo, error)
-	getFCTargetsInfoFromStorage() ([]FCTargetInfo, error)
 	nodeProbe(ctx context.Context) (bool, error)
 	initPowerStoreClient() error
 	initApiThrottle() error
@@ -60,14 +58,14 @@ type internalServiceAPI interface {
 	initISCSIConnector()
 	initFCConnector()
 	initNodeVolToDevMapper()
-	readPublishContext(req publishContextGetter) (publishContextData, error)
+	readSCSIPublishContext(req publishContextGetter) (scsiPublishContextData, error)
 	readISCSITargetsFromPublishContext(pc map[string]string) []ISCSITargetInfo
 	readFCTargetsFromPublishContext(pc map[string]string) []FCTargetInfo
 	getNodeFCPorts(ctx context.Context) ([]string, error)
 	readFCPortsFilterFile(ctx context.Context) ([]string, error)
-	connectDevice(ctx context.Context, data publishContextData) (string, error)
-	connectISCSIDevice(ctx context.Context, lun int, data publishContextData) (gobrick.Device, error)
-	connectFCDevice(ctx context.Context, lun int, data publishContextData) (gobrick.Device, error)
+	connectDevice(ctx context.Context, data scsiPublishContextData) (string, error)
+	connectISCSIDevice(ctx context.Context, lun int, data scsiPublishContextData) (gobrick.Device, error)
+	connectFCDevice(ctx context.Context, lun int, data scsiPublishContextData) (gobrick.Device, error)
 }
 
 // wrapperFsLib represent required interface for wrapperFsLib
@@ -78,7 +76,7 @@ type wrapperFsLib interface {
 	Mount(ctx context.Context, source, target, fsType string, options ...string) error
 	BindMount(ctx context.Context, source, target string, options ...string) error
 	Unmount(ctx context.Context, target string) error
-	WWNToDevicePath(ctx context.Context, wwn string) (string, error)
+	WWNToDevicePath(ctx context.Context, wwn string) (string, string, error)
 	RemoveBlockDevice(ctx context.Context, blockDevicePath string) error
 	// wrapper methods
 	ParseProcMounts(ctx context.Context, content io.Reader) ([]gofsutil.Info, error)
@@ -99,12 +97,15 @@ type fcConnector interface {
 // mountLib provide interface for volume mounting
 type mountLib interface {
 	StageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest, device string) error
+	StageVolumeNFS(ctx context.Context, req *csi.NodeStageVolumeRequest, path string) error
 	UnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest) (string, error)
 	PublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) error
+	PublishVolumeNFS(ctx context.Context, req *csi.NodePublishVolumeRequest) error
 	UnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) error
 	GetMountsByDev(ctx context.Context, device string) ([]gofsutil.Info, error)
 	GetStagingPath(ctx context.Context, req commonReqGetters) string
 	IsReadyToPublish(ctx context.Context, stagingPath string) (bool, bool, error)
+	IsReadyToPublishNFS(ctx context.Context, stagingPath string) (bool, error)
 }
 
 // mountLib internal interfaces
@@ -115,6 +116,7 @@ type mountLibStageCheck interface {
 type mountLibPublishCheck interface {
 	isAlreadyPublished(ctx context.Context, targetPath, rwMode string) (bool, error)
 	isReadyToPublish(ctx context.Context, device string) (bool, bool, error)
+	isReadyToPublishNFS(ctx context.Context, device string) (bool, error)
 }
 
 type mountLibMountsReader interface {

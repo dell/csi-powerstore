@@ -27,13 +27,15 @@ import (
 	"path"
 )
 
-func newMountLibStageIMPL(mkfile fileCreator, reqHelper reqHelpers, fsLib wrapperFsLib,
+func newMountLibStageIMPL(mkfile fileCreator, mkdir dirCreator, reqHelper reqHelpers, fsLib wrapperFsLib,
 	stageCheck mountLibStageCheck) *mountLibStageIMPL {
 	return &mountLibStageIMPL{
 		reqHelper:  reqHelper,
 		fsLib:      fsLib,
 		mkfile:     mkfile,
-		stageCheck: stageCheck}
+		mkdir:      mkdir,
+		stageCheck: stageCheck,
+	}
 }
 
 type mountLibStageIMPL struct {
@@ -41,6 +43,7 @@ type mountLibStageIMPL struct {
 	reqHelper  reqHelpers
 	fsLib      wrapperFsLib
 	mkfile     fileCreator
+	mkdir      dirCreator
 	stageCheck mountLibStageCheck
 }
 
@@ -80,6 +83,27 @@ func (msi *mountLibStageIMPL) stage(ctx context.Context, req *csi.NodeStageVolum
 			err.Error())
 	}
 	log.WithFields(logFields).Info("volume successfully binded")
+
+	return nil
+}
+
+func (msi *mountLibStageIMPL) stageNFS(ctx context.Context, req *csi.NodeStageVolumeRequest, path string) error {
+	stagingPath := msi.reqHelper.getStagingPath(ctx, req)
+	logFields := getLogFields(ctx)
+	log.WithFields(logFields).Info("start staging")
+
+	if _, err := msi.mkdir.mkDir(stagingPath); err != nil {
+		return status.Errorf(codes.Internal, "can't create target folder %s: %s",
+			stagingPath, err.Error())
+	}
+	log.WithFields(logFields).Info("stage path successfully created")
+
+	if err := msi.fsLib.Mount(ctx, path, stagingPath, ""); err != nil {
+		return status.Errorf(codes.Internal,
+			"error mount nfs share %s to target path: %s", path,
+			err.Error())
+	}
+	log.WithFields(logFields).Info("nfs share successfully mounted")
 
 	return nil
 }

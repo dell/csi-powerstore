@@ -24,10 +24,13 @@ import (
 	"fmt"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/gobrick"
+	"github.com/dell/gofsutil"
 	"github.com/dell/gopowerstore"
+	"google.golang.org/grpc/metadata"
 	"math/rand"
+	"net"
+	"os"
 	"path"
-	"strconv"
 	"strings"
 	"time"
 
@@ -40,6 +43,7 @@ import (
 const (
 	maximumStartupDelay         = 30
 	powerStoreMaxNodeNameLength = 64
+	blockVolumePathMarker       = "/csi/volumeDevices/publish/"
 )
 
 func (s *service) NodeStageVolume(
@@ -54,6 +58,14 @@ func (s *service) NodeStageVolume(
 		return nil, err
 	}
 
+	publishContext := req.GetPublishContext()
+	var useNFS bool
+	fsType, ok := publishContext[keyFsType]
+	// FsType can be empty
+	if ok {
+		useNFS = strings.ToLower(fsType) == "nfs"
+	}
+
 	// Get the VolumeID and validate against the volume
 	volID := req.GetVolumeId()
 	if volID == "" {
@@ -63,114 +75,16 @@ func (s *service) NodeStageVolume(
 	if req.GetStagingTargetPath() == "" {
 		return nil, status.Error(codes.InvalidArgument, "staging target path is required")
 	}
-	// append additional path to be able to do bind mounts
-	stagingPath := s.nodeMountLib.GetStagingPath(ctx, req)
 
-	publishContext, err := s.impl.readPublishContext(req)
-	if err != nil {
-		return nil, err
-	}
+	var stager VolumeStager
 
-	logFields["ID"] = volID
-	logFields["Targets"] = publishContext.iscsiTargets
-	logFields["WWN"] = publishContext.deviceWWN
-	logFields["Lun"] = publishContext.volumeLUNAddress
-	logFields["StagingPath"] = stagingPath
-	ctx = setLogFields(ctx, logFields)
-
-	found, ready, err := s.nodeMountLib.IsReadyToPublish(ctx, stagingPath)
-	if err != nil {
-		return nil, err
-	}
-	if ready {
-		log.WithFields(logFields).Info("device already staged")
-		return &csi.NodeStageVolumeResponse{}, nil
-	} else if found {
-		log.WithFields(logFields).Warning("volume found in staging path but it is not ready for publish," +
-			"try to unmount it and retry staging again")
-		_, err := s.nodeMountLib.UnstageVolume(ctx,
-			&csi.NodeUnstageVolumeRequest{VolumeId: volID, StagingTargetPath: req.GetStagingTargetPath()})
-		if err != nil {
-			log.WithFields(logFields).Error(err)
-			return nil, status.Errorf(codes.Internal, "failed to unmount volume: %s", err.Error())
-		}
-	}
-
-	ctx = setLogFields(ctx, logFields)
-	devicePath, err := s.impl.connectDevice(ctx, publishContext)
-	if err != nil {
-		return nil, err
-	}
-	logFields["DevicePath"] = devicePath
-
-	log.WithFields(logFields).Info("calling stage")
-
-	if err := s.nodeMountLib.StageVolume(ctx, req, devicePath); err != nil {
-		return nil, status.Errorf(codes.Internal,
-			"error during volume staging: %s", err.Error())
-	}
-	log.WithFields(logFields).Info("stage complete")
-	return &csi.NodeStageVolumeResponse{}, nil
-}
-
-func (si *serviceIMPL) connectDevice(ctx context.Context, data publishContextData) (string, error) {
-	logFields := getLogFields(ctx)
-	var err error
-	lun, err := strconv.Atoi(data.volumeLUNAddress)
-	if err != nil {
-		log.WithFields(logFields).Errorf("failed to convert lun number to int: %s", err.Error())
-		return "", err
-	}
-	var device gobrick.Device
-	if si.service.useFC {
-		device, err = si.implProxy.connectFCDevice(ctx, lun, data)
+	if useNFS {
+		stager = &NFSStager{}
 	} else {
-		device, err = si.implProxy.connectISCSIDevice(ctx, lun, data)
+		stager = &SCSIStager{}
 	}
 
-	if err != nil {
-		log.Errorf("Unable to find device after multiple discovery attempts: %s", err.Error())
-		return "", status.Errorf(codes.Internal,
-			"Unable to find device after multiple discovery attempts: %s", err.Error())
-	}
-	devicePath := path.Join("/dev/", device.Name)
-	return devicePath, nil
-}
-
-func (si *serviceIMPL) connectISCSIDevice(ctx context.Context,
-	lun int, data publishContextData) (gobrick.Device, error) {
-	logFields := getLogFields(ctx)
-	var targets []gobrick.ISCSITargetInfo
-	for _, t := range data.iscsiTargets {
-		targets = append(targets, gobrick.ISCSITargetInfo{Target: t.Target, Portal: t.Portal})
-	}
-	// separate context to prevent 15 seconds cancel from kubernetes
-	connectorCtx, cFunc := context.WithTimeout(context.Background(), time.Second*120)
-	defer cFunc()
-	connectorCtx = copyTraceObj(ctx, connectorCtx)
-	connectorCtx = setLogFields(connectorCtx, logFields)
-	return si.service.iscsiConnector.ConnectVolume(connectorCtx, gobrick.ISCSIVolumeInfo{
-		Targets: targets,
-		Lun:     lun,
-	})
-}
-
-func (si *serviceIMPL) connectFCDevice(ctx context.Context,
-	lun int, data publishContextData) (gobrick.Device, error) {
-	logFields := getLogFields(ctx)
-	var targets []gobrick.FCTargetInfo
-	for _, t := range data.fcTargets {
-		targets = append(targets, gobrick.FCTargetInfo{WWPN: t.WWPN})
-	}
-	// separate context to prevent 15 seconds cancel from kubernetes
-	connectorCtx, cFunc := context.WithTimeout(context.Background(), time.Second*120)
-	defer cFunc()
-	connectorCtx = copyTraceObj(ctx, connectorCtx)
-	connectorCtx = setLogFields(connectorCtx, logFields)
-	return si.service.fcConnector.ConnectVolume(connectorCtx, gobrick.FCVolumeInfo{
-		Targets: targets,
-		Lun:     lun,
-	})
+	return stager.Stage(ctx, req, s, logFields, s.nodeMountLib)
 }
 
 func (s *service) NodeUnstageVolume(
@@ -217,7 +131,7 @@ func (s *service) NodeUnstageVolume(
 	}
 	f := log.Fields{"Device": device}
 	log.WithFields(logFields).WithFields(f).Info("unstage complete")
-
+	// TODO: We shouldn't do that for nfs if we can, maybe write info to a file in NodeStage?
 	connectorCtx := setLogFields(context.Background(), logFields)
 	connectorCtx = copyTraceObj(ctx, connectorCtx)
 	if s.useFC {
@@ -251,6 +165,14 @@ func (s *service) NodePublishVolume(
 		return nil, err
 	}
 
+	publishContext := req.GetPublishContext()
+	var useNFS bool
+	fsType, ok := publishContext[keyFsType]
+	// FsType can be empty
+	if ok {
+		useNFS = strings.ToLower(fsType) == "nfs"
+	}
+
 	// Get the VolumeID and validate against the volume
 	volID := req.GetVolumeId()
 	if volID == "" {
@@ -279,9 +201,16 @@ func (s *service) NodePublishVolume(
 	ctx = setLogFields(ctx, logFields)
 
 	log.WithFields(logFields).Info("calling publish")
-	if err := s.nodeMountLib.PublishVolume(ctx, req); err != nil {
-		log.WithFields(logFields).Error(err)
-		return nil, err
+	if useNFS {
+		if err := s.nodeMountLib.PublishVolumeNFS(ctx, req); err != nil {
+			log.WithFields(logFields).Error(err)
+			return nil, err
+		}
+	} else {
+		if err := s.nodeMountLib.PublishVolume(ctx, req); err != nil {
+			log.WithFields(logFields).Error(err)
+			return nil, err
+		}
 	}
 	log.WithFields(logFields).Info("publish complete")
 	return &csi.NodePublishVolumeResponse{}, nil
@@ -332,6 +261,13 @@ func (s *service) NodeGetCapabilities(
 					Type: csi.NodeServiceCapability_RPC_STAGE_UNSTAGE_VOLUME,
 				},
 			},
+			},
+			{
+				Type: &csi.NodeServiceCapability_Rpc{
+					Rpc: &csi.NodeServiceCapability_RPC{
+						Type: csi.NodeServiceCapability_RPC_EXPAND_VOLUME,
+					},
+				},
 			},
 		},
 	}, nil
@@ -387,8 +323,9 @@ func (si *serviceIMPL) updateNodeID() error {
 			return status.Errorf(codes.FailedPrecondition,
 				"Could not readNode ID file: %s", err.Error())
 		}
+		ip := getOutboundIP()
 		nodeID := fmt.Sprintf(
-			"%s-%s", si.service.opts.NodeNamePrefix, strings.TrimSpace(string(hostID)))
+			"%s-%s-%s", si.service.opts.NodeNamePrefix, strings.TrimSpace(string(hostID)), ip.String())
 		if len(nodeID) > powerStoreMaxNodeNameLength {
 			err := errors.New("node name prefix is too long")
 			log.WithFields(log.Fields{
@@ -400,6 +337,19 @@ func (si *serviceIMPL) updateNodeID() error {
 		si.service.nodeID = nodeID
 	}
 	return nil
+}
+
+// Get preferred outbound ip of this machine
+func getOutboundIP() net.IP {
+	conn, err := net.Dial("udp", "192.168.100.1:80")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer conn.Close()
+
+	localAddr := conn.LocalAddr().(*net.UDPAddr)
+
+	return localAddr.IP
 }
 
 func (si *serviceIMPL) initNodeFSLib() {
@@ -499,53 +449,56 @@ func (si *serviceIMPL) nodeStartup(ctx context.Context, gs gracefulStopper) erro
 		return fmt.Errorf("there is no PowerStore connection")
 	}
 
-	var iscsiAvailable bool
-	var fcAvailable bool
-
-	iscsiInitiators, err := si.service.iscsiConnector.GetInitiatorName(ctx)
-	if err != nil {
-		log.Error("nodeStartup could not GetInitiatorIQNs")
-	} else if len(iscsiInitiators) == 0 {
-		log.Error("iscsi initiators not found on node")
-	} else {
-		log.Error("iscsi initiators found on node")
-		iscsiAvailable = true
-	}
-
-	fcInitiators, err := si.implProxy.getNodeFCPorts(ctx)
-	if err != nil {
-		log.Error("nodeStartup could not FC initiators for node")
-	} else if len(fcInitiators) == 0 {
-		log.Error("FC was not found or filtered with FCPortsFilterFile")
-	} else {
-		log.Error("FC initiators found on node")
-		fcAvailable = true
-	}
-
-	if !iscsiAvailable && !fcAvailable {
-		return fmt.Errorf("FC and iSCSI initiators not found on node")
-	}
-
-	switch si.service.opts.PreferredTransport {
-	case iSCSITransport:
-		if !iscsiAvailable {
-			return fmt.Errorf("iSCSI transport was requested but iSCSI initiator is not available")
-		}
-		si.service.useFC = false
-	case fcTransport:
-		if !fcAvailable {
-			return fmt.Errorf("FC transport was requested but FC initiator is not available")
-		}
-		si.service.useFC = true
-	default:
-		si.service.useFC = fcAvailable
-	}
-
+	var err error
 	var initiators []string
-	if si.service.useFC {
-		initiators = fcInitiators
-	} else {
-		initiators = iscsiInitiators
+	if si.service.opts.PreferredTransport != noneTransport {
+		var iscsiAvailable bool
+		var fcAvailable bool
+
+		iscsiInitiators, err := si.service.iscsiConnector.GetInitiatorName(ctx)
+		if err != nil {
+			log.Error("nodeStartup could not GetInitiatorIQNs")
+		} else if len(iscsiInitiators) == 0 {
+			log.Error("iscsi initiators not found on node")
+		} else {
+			log.Error("iscsi initiators found on node")
+			iscsiAvailable = true
+		}
+
+		fcInitiators, err := si.implProxy.getNodeFCPorts(ctx)
+		if err != nil {
+			log.Error("nodeStartup could not FC initiators for node")
+		} else if len(fcInitiators) == 0 {
+			log.Error("FC was not found or filtered with FCPortsFilterFile")
+		} else {
+			log.Error("FC initiators found on node")
+			fcAvailable = true
+		}
+
+		if !iscsiAvailable && !fcAvailable {
+			return fmt.Errorf("FC and iSCSI initiators not found on node")
+		}
+
+		switch si.service.opts.PreferredTransport {
+		case iSCSITransport:
+			if !iscsiAvailable {
+				return fmt.Errorf("iSCSI transport was requested but iSCSI initiator is not available")
+			}
+			si.service.useFC = false
+		case fcTransport:
+			if !fcAvailable {
+				return fmt.Errorf("FC transport was requested but FC initiator is not available")
+			}
+			si.service.useFC = true
+		default:
+			si.service.useFC = fcAvailable
+		}
+
+		if si.service.useFC {
+			initiators = fcInitiators
+		} else {
+			initiators = iscsiInitiators
+		}
 	}
 
 	go func() {
@@ -581,11 +534,14 @@ func (si *serviceIMPL) nodeHostSetup(initiators []string, useFC bool, maximumSta
 	}
 
 	// register node on PowerStore
-	err := si.implProxy.createOrUpdateHost(context.Background(), useFC, initiators)
-	if err != nil {
-		log.Error(err.Error())
-		return err
+	if len(initiators) > 0 {
+		err := si.implProxy.createOrUpdateHost(context.Background(), useFC, initiators)
+		if err != nil {
+			log.Error(err.Error())
+			return err
+		}
 	}
+
 	si.service.nodeIsInitialized = true
 
 	return nil
@@ -685,39 +641,6 @@ func buildInitiatorsArray(useFC bool, initiators []string) []gopowerstore.Initia
 	return initiatorsReq
 }
 
-type publishContextData struct {
-	deviceWWN        string
-	volumeLUNAddress string
-	iscsiTargets     []ISCSITargetInfo
-	fcTargets        []FCTargetInfo
-}
-
-func (si *serviceIMPL) readPublishContext(
-	req publishContextGetter) (publishContextData, error) {
-	// Get publishContext
-	var data publishContextData
-	publishContext := req.GetPublishContext()
-	deviceWWN, ok := publishContext[PublishContextDeviceWWN]
-	if !ok {
-		return data, status.Error(codes.InvalidArgument, "deviceWWN must be in publish context")
-	}
-	volumeLUNAddress, ok := publishContext[PublishContextLUNAddress]
-	if !ok {
-		return data, status.Error(codes.InvalidArgument, "volumeLUNAddress must be in publish context")
-	}
-
-	iscsiTargets := si.implProxy.readISCSITargetsFromPublishContext(publishContext)
-	if len(iscsiTargets) == 0 {
-		return data, status.Error(codes.InvalidArgument, "iscsiTargets data must be in publish context")
-	}
-	fcTargets := si.implProxy.readFCTargetsFromPublishContext(publishContext)
-	if len(fcTargets) == 0 {
-		return data, status.Error(codes.InvalidArgument, "fcTargets data must be in publish context")
-	}
-	return publishContextData{deviceWWN: deviceWWN, volumeLUNAddress: volumeLUNAddress,
-		iscsiTargets: iscsiTargets, fcTargets: fcTargets}, nil
-}
-
 func (si *serviceIMPL) readFCPortsFilterFile(ctx context.Context) ([]string, error) {
 	if si.service.opts.FCPortsFilterFilePath == "" {
 		return nil, nil
@@ -806,12 +729,152 @@ func formatWWPN(data string) (string, error) {
 	return buffer.String(), nil
 }
 
+//NodeExpandVolume helps extending a volume size on a node
 func (s *service) NodeExpandVolume(
 	ctx context.Context,
 	req *csi.NodeExpandVolumeRequest) (
 	*csi.NodeExpandVolumeResponse, error) {
 
-	return nil, status.Error(codes.Unimplemented, "")
+	var reqID string
+	var err error
+	headers, ok := metadata.FromIncomingContext(ctx)
+	if ok {
+		if req, ok := headers["csi.requestid"]; ok && len(req) > 0 {
+			reqID = req[0]
+		}
+	}
+
+	// Probe the node if required and make sure startup called
+	_, err = s.impl.nodeProbe(ctx)
+	if err != nil {
+		log.Error("nodeProbe failed with error: " + err.Error())
+		return nil, err
+	}
+
+	// Get the VolumeID and validate against the volume
+	id := req.GetVolumeId()
+	if id == "" {
+		return nil, status.Error(codes.InvalidArgument, "volume ID is required")
+	}
+
+	targetPath := req.GetVolumePath()
+	if targetPath == "" {
+		return nil, status.Error(codes.InvalidArgument, "targetPath is required")
+	}
+	isBlock := strings.Contains(targetPath, blockVolumePathMarker)
+
+	// Parse the CSI VolumeId and validate against the volume
+	vol, err := s.adminClient.GetVolume(ctx, id)
+	if err != nil {
+		// If the volume isn't found, we cannot stage it
+		return nil, status.Error(codes.NotFound, "Volume not found")
+	}
+	volumeWWN := vol.Wwn
+
+	//Locate and fetch all (multipath/regular) mounted paths using this volume
+	var devMnt *gofsutil.DeviceMountInfo
+	var targetmount string
+	devMnt, err = gofsutil.GetMountInfoFromDevice(ctx, vol.Name)
+	if err != nil {
+		if isBlock {
+			log.WithField("CSIRequestID", reqID).Info("Block device detected- node expansion not required")
+			return &csi.NodeExpandVolumeResponse{}, nil
+		}
+		log.Infof("Failed to find mount info for (%s) with error (%s)", vol.Name, err.Error())
+		log.Info("Probably offline volume expansion. Will try to perform a temporary mount.")
+		var disklocation string
+
+		disklocation = fmt.Sprintf("%s/%s", targetPath, vol.ID)
+		log.Infof("DisklLocation: %s", disklocation)
+		targetmount = fmt.Sprintf("tmp/%s/%s", vol.ID, vol.Name)
+		log.Infof("TargetMount: %s", targetmount)
+		err = os.MkdirAll(targetmount, 0750)
+		if err != nil {
+			return nil, status.Error(codes.Internal,
+				fmt.Sprintf("Failed to find mount info for (%s) with error (%s)", vol.Name, err.Error()))
+		}
+		err = gofsutil.Mount(ctx, disklocation, targetmount, "")
+		if err != nil {
+			return nil, status.Error(codes.Internal,
+				fmt.Sprintf("Failed to find mount info for (%s) with error (%s)", vol.Name, err.Error()))
+		}
+
+		defer func() {
+			if targetmount != "" {
+				log.Infof("Clearing down temporary mount points in: %s", targetmount)
+				err := gofsutil.Unmount(ctx, targetmount)
+				if err != nil {
+					log.Error("Failed to remove temporary mount points")
+				}
+				err = os.RemoveAll(targetmount)
+				if err != nil {
+					log.Error("Failed to remove temporary mount points")
+				}
+			}
+		}()
+
+		devMnt, err = gofsutil.GetMountInfoFromDevice(ctx, vol.Name)
+		if err != nil {
+			return nil, status.Error(codes.Internal,
+				fmt.Sprintf("Failed to find mount info for (%s) with error (%s)", vol.Name, err.Error()))
+		}
+
+	}
+
+	log.Infof("Mount info for volume %s: %+v", vol.Name, devMnt)
+
+	size := req.GetCapacityRange().GetRequiredBytes()
+
+	f := log.Fields{
+		"CSIRequestID": reqID,
+		"VolumeName":   vol.Name,
+		"VolumePath":   targetPath,
+		"Size":         size,
+		"VolumeWWN":    volumeWWN,
+	}
+	log.WithFields(f).Info("Calling resize the file system")
+
+	// Rescan the device for the volume expanded on the array
+	for _, device := range devMnt.DeviceNames {
+		devicePath := "/sys/block/" + device
+		err = gofsutil.DeviceRescan(context.Background(), devicePath)
+		if err != nil {
+			log.Errorf("Failed to rescan device (%s) with error (%s)", devicePath, err.Error())
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+	}
+	// Expand the filesystem with the actual expanded volume size.
+	if devMnt.MPathName != "" {
+		err = gofsutil.ResizeMultipath(context.Background(), devMnt.MPathName)
+		if err != nil {
+			log.Errorf("Failed to resize filesystem: device  (%s) with error (%s)", devMnt.MountPoint, err.Error())
+
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+	}
+	//For a regular device, get the device path (devMnt.DeviceNames[1]) where the filesystem is mounted
+	//PublishVolume creates devMnt.DeviceNames[0] but is left unused for regular devices
+	var devicePath string
+	if len(devMnt.DeviceNames) > 1 {
+		devicePath = "/dev/" + devMnt.DeviceNames[1]
+	} else {
+		devicePath = "/dev/" + devMnt.DeviceNames[0]
+	}
+	fsType, err := gofsutil.FindFSType(context.Background(), devMnt.MountPoint)
+	if err != nil {
+		log.Errorf("Failed to fetch filesystem for volume  (%s) with error (%s)", devMnt.MountPoint, err.Error())
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	log.Infof("Found %s filesystem mounted on volume %s", fsType, devMnt.MountPoint)
+	//Resize the filesystem
+	err = gofsutil.ResizeFS(context.Background(), devMnt.MountPoint, devicePath, devMnt.MPathName, fsType)
+	if err != nil {
+		log.Errorf("Failed to resize filesystem: mountpoint (%s) device (%s) with error (%s)",
+			devMnt.MountPoint, devicePath, err.Error())
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	return &csi.NodeExpandVolumeResponse{}, nil
 }
 
 type volToDevFile struct {

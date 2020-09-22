@@ -3,12 +3,18 @@
 
 all: clean build
 
+# Dockerfile defines which base image to use [Dockerfile.centos, Dockerfile.ubi, Dockerfile.ubi.min, Dockerfile.ubi.alt]
+# e.g.:$ make docker DOCKER_FILE=Dockerfile.ubi.alt
+ifndef DOCKER_FILE
+    DOCKER_FILE = Dockerfile.centos
+endif
+
 # Tag parameters
 ifndef MAJOR
     MAJOR=1
 endif
 ifndef MINOR
-    MINOR=0
+    MINOR=1
 endif
 ifndef PATCH
     PATCH=0
@@ -20,11 +26,13 @@ ifndef NOTES
     NOTES=R
 endif
 ifndef TAGMSG
-    TAGMSG="CSI Spec 1.0"
+    TAGMSG="CSI Spec 1.2"
 endif
+
 
 clean:
 	rm -f core/core_generated.go
+	rm -f semver.mk
 	go clean
 
 build:
@@ -44,7 +52,7 @@ tag:
 docker:
 	go generate
 	go run core/semver/semver.go -f mk >semver.mk
-	make -f docker.mk docker
+	make -f docker.mk DOCKER_FILE=docker-files/$(DOCKER_FILE) docker
 
 # Pushes container to the repository
 push:	docker

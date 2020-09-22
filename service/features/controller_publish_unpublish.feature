@@ -21,6 +21,14 @@ Feature: PowerStore CSI interface
 
 @controllerPublish
 @current
+Scenario: Call ControllerNFSPublishVolume good scenario
+  Given a PowerStore service on "controller"
+  When I call Probe
+  And I call PublishNFSVolume with "multiple-writer" to "csi-node-test-127.0.0.1"
+  Then a valid ControllerPublishVolumeResponse is returned
+
+@controllerPublish
+@current
     Scenario: Call ControllerUnpublishVolume good scenario
       Given a PowerStore service on "controller"
       When I call Probe
@@ -34,3 +42,11 @@ Feature: PowerStore CSI interface
       When I call Probe
       And I call UnpublishVolume with not found host
       Then the error contains "not found"
+
+@controllerPublish
+@current
+    Scenario: Call ControllerNFSUnpublishVolume good scenario
+      Given a PowerStore service on "controller"
+      When I call Probe
+      And I call UnpublishNFSVolume from "node1"
+      Then a valid ControllerUnpublishVolumeResponse is returned
