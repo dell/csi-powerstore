@@ -273,6 +273,31 @@ func (m *mkdir) mkDir(path string) (bool, error) {
 	return false, nil
 }
 
+type mkdirall struct {
+	os limitedOSIFace
+}
+
+func newMkdirAll(os limitedOSIFace) *mkdirall {
+	return &mkdirall{os: os}
+}
+
+func (m *mkdirall) mkDirAll(path string) (bool, error) {
+	st, err := m.os.Stat(path)
+	if m.os.IsNotExist(err) {
+		if err := m.os.MkdirAll(path, 0750); err != nil {
+			log.WithField("dir", path).WithError(
+				err).Error("Unable to create dir")
+			return false, err
+		}
+		log.WithField("path", path).Debug("created directory")
+		return true, nil
+	}
+	if !st.IsDir() {
+		return false, fmt.Errorf("existing path is not a directory")
+	}
+	return false, nil
+}
+
 func newMkfile(os limitedOSIFace) *mkfile {
 	return &mkfile{os: os}
 }

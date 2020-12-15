@@ -18,7 +18,7 @@ ifndef DOCKER_IMAGE_NAME
 endif
 
 ifndef BASEIMAGE
-	BASEIMAGE=centos:7.8.2003
+	BASEIMAGE=centos:8
 endif
 
 # figure out if podman or docker should be used (use podman if found)

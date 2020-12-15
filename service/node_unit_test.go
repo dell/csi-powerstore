@@ -27,6 +27,7 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/gobrick"
 	"github.com/dell/gofsutil"
+	"github.com/dell/goiscsi"
 	"github.com/dell/gopowerstore"
 	gopowerstoremock "github.com/dell/gopowerstore/mock"
 	"github.com/golang/mock/gomock"
@@ -44,7 +45,7 @@ const (
 	validLUNIDINT       = 3
 	nodeStagePrivateDir = "test/stage"
 	unimplementedErrMsg = "rpc error: code = Unimplemented desc = "
-	validNodeID         = "csi-node-1a47a1b91c444a8a90193d8066669603"
+	validNodeID         = "csi-node-1a47a1b91c444a8a90193d8066669603-127.0.0.1"
 	validHostID         = "e8f4c5f8-c2fc-4df4-bd99-c292c12b55be"
 	testErrMsg          = "test err"
 	validDeviceWWN      = "68ccf09800e23ab798312a05426acae0"
@@ -167,6 +168,19 @@ func getNodeVolumeExpandValidRequest() *csi.NodeExpandVolumeRequest {
 	return &req
 }
 
+func getNodeEphemeralVolumePublishValidRequest() *csi.NodePublishVolumeRequest {
+	return &csi.NodePublishVolumeRequest{
+		VolumeId:       GoodVolumeID,
+		VolumeContext:  map[string]string{"csi.storage.k8s.io/ephemeral": "true", "size": "2Gi"},
+		PublishContext: getValidPublishContext(),
+		VolumeCapability: getCapabilityWithVoltypeAccessFstype(
+			"block", "single-writer", "none"),
+		TargetPath:        validTargetPath,
+		StagingTargetPath: validStagingPath,
+	}
+
+}
+
 func getNodeStageValidRequest() *csi.NodeStageVolumeRequest {
 	return &csi.NodeStageVolumeRequest{
 		VolumeId:       GoodVolumeID,
@@ -224,7 +238,9 @@ func TestCheckIQNs(t *testing.T) {
 }
 
 func Test_buildInitiatorsArray(t *testing.T) {
-	resp := buildInitiatorsArray(false, validISCSIInitiators)
+	svc := service{}
+	svc.impl = &serviceIMPL{service: &svc}
+	resp := svc.impl.buildInitiatorsArray(false, validISCSIInitiators)
 	assert.Equal(t, len(validISCSIInitiators), len(resp))
 	assert.Equal(t, *resp[0].PortType, gopowerstore.InitiatorProtocolTypeEnumISCSI)
 }
@@ -758,6 +774,7 @@ func TestNodeProbe(t *testing.T) {
 	implMock.EXPECT().initISCSIConnector().MinTimes(1)
 	implMock.EXPECT().initFCConnector().MinTimes(1)
 	implMock.EXPECT().initNodeVolToDevMapper().MinTimes(1)
+	implMock.EXPECT().initISCSILib().MinTimes(1)
 	ready, err = impl.nodeProbe(context.Background())
 	assert.False(t, ready)
 	assert.Nil(t, err)
@@ -800,7 +817,7 @@ func TestUpdateNodeID(t *testing.T) {
 	err = impl.updateNodeID()
 	assert.Nil(t, err)
 	assert.Contains(t, svc.nodeID, fmt.Sprintf("%s-%s", testNodeNamePrefix, testNodeID))
-	//assert.Equal(t, fmt.Sprintf("%s-%s", testNodeNamePrefix, testNodeID), svc.nodeID)
+	// assert.Equal(t, fmt.Sprintf("%s-%s", testNodeNamePrefix, testNodeID), svc.nodeID)
 }
 
 func TestNodeGetCapabilities(t *testing.T) {
@@ -813,27 +830,116 @@ func TestNodeGetCapabilities(t *testing.T) {
 func TestNodeGetInfo(t *testing.T) {
 	impl, implMock, ctrl := getIMPLWitIMPLMock(t)
 	defer ctrl.Finish()
+	adminClientMock, ctrl := getAdminClient(t)
+	defer ctrl.Finish()
+	iscsiMock := goiscsi.NewMockISCSI(nil)
 	svc := impl.service
+	svc.adminClient = adminClientMock
+	svc.iscsiLib = iscsiMock
 
-	// already updated
-	svc.nodeID = validNodeID
-	r, err := svc.NodeGetInfo(nil, &csi.NodeGetInfoRequest{})
-	assert.Nil(t, err)
-	assert.Equal(t, r.NodeId, validNodeID)
+	svc.endpointIP = "127.0.0.1"
 
-	// updateNodeID error
-	svc.nodeID = ""
-	implMock.EXPECT().updateNodeID().Return(errors.New(testErrMsg))
-	r, err = svc.NodeGetInfo(nil, &csi.NodeGetInfoRequest{})
-	assert.EqualError(t, err, testErrMsg)
-	assert.Nil(t, r)
+	getISCSITargets := func() *gomock.Call {
+		return adminClientMock.EXPECT().GetStorageISCSITargetAddresses(gomock.Any()).Return([]gopowerstore.IPPoolAddress{{
+			Address: "127.0.0.1",
+			IPPort: gopowerstore.IPPortInstance{
+				TargetIqn: "iqn.of.the.target",
+			},
+		}}, nil)
+	}
 
-	// updateNodeID success
-	svc.nodeID = ""
-	implMock.EXPECT().updateNodeID().Do(func() { svc.nodeID = validNodeID }).Return(nil)
-	r, err = svc.NodeGetInfo(nil, &csi.NodeGetInfoRequest{})
-	assert.Nil(t, err)
-	assert.Equal(t, validNodeID, svc.nodeID)
+	getISCSITargetsFail := func() *gomock.Call {
+		return adminClientMock.EXPECT().GetStorageISCSITargetAddresses(gomock.Any()).Return(nil, errors.New(testErrMsg))
+	}
+
+	getHost := func() *gomock.Call {
+		return adminClientMock.EXPECT().GetHostByName(gomock.Any(), validNodeID).Return(gopowerstore.Host{
+			Initiators: []gopowerstore.InitiatorInstance{
+				{
+					ActiveSessions: []gopowerstore.ActiveSessionInstance{
+						{
+							FcPortID: "some-id-of-fc-port",
+						},
+					},
+				},
+			},
+		}, nil)
+	}
+
+	getHostFail := func() *gomock.Call {
+		return adminClientMock.EXPECT().GetHostByName(gomock.Any(), validNodeID).Return(gopowerstore.Host{}, errors.New(testErrMsg))
+	}
+
+	t.Run("node id was already updated - iscsi route", func(t *testing.T) {
+		svc.nodeID = validNodeID
+		svc.useFC = false
+		getISCSITargets()
+		r, err := svc.NodeGetInfo(nil, &csi.NodeGetInfoRequest{})
+		assert.Nil(t, err)
+		assert.Equal(t, validNodeID, r.NodeId)
+		assert.Equal(t, map[string]string{
+			"csi-powerstore.dellemc.com/127.0.0.1-iscsi": "true",
+			"csi-powerstore.dellemc.com/127.0.0.1-nfs":   "true",
+		}, r.AccessibleTopology.Segments)
+	})
+
+	t.Run("node id was already updated - iscsi route - fail", func(t *testing.T) {
+		svc.nodeID = validNodeID
+		svc.useFC = false
+		getISCSITargetsFail()
+		r, err := svc.NodeGetInfo(nil, &csi.NodeGetInfoRequest{})
+		assert.Equal(t, "rpc error: code = Internal desc = Couldn't get targets from array: "+testErrMsg, err.Error())
+		assert.Equal(t, validNodeID, r.NodeId)
+		assert.Equal(t, map[string]string{
+			"csi-powerstore.dellemc.com/127.0.0.1-nfs": "true",
+		}, r.AccessibleTopology.Segments)
+	})
+
+	t.Run("node id was already updated - fc route", func(t *testing.T) {
+		svc.nodeID = validNodeID
+		svc.useFC = true
+		getHost()
+		r, err := svc.NodeGetInfo(nil, &csi.NodeGetInfoRequest{})
+		assert.Nil(t, err)
+		assert.Equal(t, validNodeID, r.NodeId)
+		assert.Equal(t, map[string]string{
+			"csi-powerstore.dellemc.com/127.0.0.1-fc":  "true",
+			"csi-powerstore.dellemc.com/127.0.0.1-nfs": "true",
+		}, r.AccessibleTopology.Segments)
+	})
+
+	t.Run("node id was already updated - fc route - fail", func(t *testing.T) {
+		svc.nodeID = validNodeID
+		svc.useFC = true
+		getHostFail()
+		r, err := svc.NodeGetInfo(nil, &csi.NodeGetInfoRequest{})
+		assert.Equal(t, "rpc error: code = Internal desc = Could not find host on PowerStore array: "+testErrMsg, err.Error())
+		assert.Equal(t, validNodeID, r.NodeId)
+		assert.Equal(t, map[string]string{
+			"csi-powerstore.dellemc.com/127.0.0.1-nfs": "true",
+		}, r.AccessibleTopology.Segments)
+	})
+
+	t.Run("error updating node id", func(t *testing.T) {
+		svc.nodeID = ""
+		svc.useFC = false
+		implMock.EXPECT().updateNodeID().Return(errors.New(testErrMsg))
+		r, err := svc.NodeGetInfo(nil, &csi.NodeGetInfoRequest{})
+		assert.EqualError(t, err, testErrMsg)
+		assert.Nil(t, r)
+	})
+
+	t.Run("update node info", func(t *testing.T) {
+		svc.nodeID = ""
+		svc.useFC = false
+		implMock.EXPECT().updateNodeID().Do(func() { svc.nodeID = validNodeID }).Return(nil)
+		getISCSITargets()
+		r, err := svc.NodeGetInfo(nil, &csi.NodeGetInfoRequest{})
+		assert.Nil(t, err)
+		assert.Equal(t, validNodeID, svc.nodeID)
+		assert.NotNil(t, r)
+	})
+
 }
 
 func TestNodeGetVolumeStats(t *testing.T) {
@@ -997,13 +1103,9 @@ func TestNodeStartup(t *testing.T) {
 	t.Run("nodeHostSetup error", func(t *testing.T) {
 		iscsiConnectorGetInitiatorNameMockNonEmpty()
 		implProxyGetNodeFCPortsMockNonEmpty()
-		wg := sync.WaitGroup{}
-		wg.Add(1)
-		implMock.EXPECT().nodeHostSetup(validFCTargetsWWPNPowerstore, true, gomock.Any()).
-			Do(func(args ...interface{}) { wg.Done() }).Return(errors.New(testErrMsg))
+		implMock.EXPECT().nodeHostSetup(validFCTargetsWWPNPowerstore, true, gomock.Any()).Return(errors.New(testErrMsg))
 		gs.EXPECT().GracefulStop(ctx).Return().AnyTimes()
-		assert.Nil(t, funcUnderTest())
-		wg.Wait()
+		assert.Equal(t, funcUnderTest(), errors.New(testErrMsg))
 	})
 }
 
@@ -1013,22 +1115,112 @@ func TestNodeHostSetup(t *testing.T) {
 	svc := impl.service
 	maxStartDelay := 1
 
-	// no nodeID
-	err := impl.nodeHostSetup(validISCSIInitiators, false, maxStartDelay)
-	assert.EqualError(t, err, "nodeID not set")
+	adminClientMock, ctrl := getAdminClient(t)
+	defer ctrl.Finish()
+	svc.adminClient = adminClientMock
 
-	svc.nodeID = validNodeID
+	t.Run("no nodeID failure", func(t *testing.T) {
+		svc.nodeID = ""
+		err := impl.nodeHostSetup(validISCSIInitiators, false, maxStartDelay)
+		assert.EqualError(t, err, "nodeID not set")
+	})
 
-	// createOrUpdateHost error
-	implMock.EXPECT().createOrUpdateHost(gomock.Any(), false, validISCSIInitiators).Return(errors.New(testErrMsg))
-	err = impl.nodeHostSetup(validISCSIInitiators, false, maxStartDelay)
-	assert.EqualError(t, err, testErrMsg)
+	t.Run("no hosts found", func(t *testing.T) {
+		svc.nodeID = validNodeID
+		svc.endpointIP = "127.0.0.1"
+		adminClientMock.EXPECT().GetHostByName(gomock.Any(), svc.nodeID).Return(gopowerstore.Host{}, errors.New(testErrMsg))
+		adminClientMock.EXPECT().GetHosts(gomock.Any()).Return([]gopowerstore.Host{}, errors.New(testErrMsg))
+		err := impl.nodeHostSetup(validISCSIInitiators, false, maxStartDelay)
+		assert.EqualError(t, err, testErrMsg)
+	})
 
-	implMock.EXPECT().createOrUpdateHost(gomock.Any(), false, validISCSIInitiators).Return(nil)
-	// ok
-	err = impl.nodeHostSetup(validISCSIInitiators, false, maxStartDelay)
-	assert.Nil(t, err)
-	assert.True(t, svc.nodeIsInitialized)
+	t.Run("reusing existing host (nodeID == hostName)", func(t *testing.T) {
+		svc.nodeID = validNodeID
+		svc.endpointIP = "127.0.0.1"
+		adminClientMock.EXPECT().GetHostByName(gomock.Any(), svc.nodeID).Return(gopowerstore.Host{}, nil)
+		err := impl.nodeHostSetup(validISCSIInitiators, false, maxStartDelay)
+		assert.Nil(t, err)
+		assert.True(t, svc.nodeIsInitialized)
+	})
+
+	t.Run("reusing existing host", func(t *testing.T) {
+		svc.nodeID = validNodeID
+		svc.endpointIP = "127.0.0.1"
+		adminClientMock.EXPECT().GetHostByName(gomock.Any(), svc.nodeID).Return(gopowerstore.Host{}, errors.New(testErrMsg))
+		adminClientMock.EXPECT().GetHosts(gomock.Any()).Return([]gopowerstore.Host{{
+			ID: "host-id",
+			Initiators: []gopowerstore.InitiatorInstance{{
+				PortName: validISCSIInitiators[0],
+				PortType: gopowerstore.InitiatorProtocolTypeEnumISCSI,
+			}},
+			Name: "host-name",
+		}}, nil)
+		err := impl.nodeHostSetup(validISCSIInitiators, false, maxStartDelay)
+		assert.Nil(t, err)
+		assert.Equal(t, "host-name-127.0.0.1", svc.nodeID)
+		assert.True(t, svc.nodeIsInitialized)
+		assert.True(t, svc.reusedHost)
+	})
+
+	t.Run("reusing existing host chap failure", func(t *testing.T) {
+		svc.nodeID = validNodeID
+		svc.endpointIP = "127.0.0.1"
+		svc.opts.EnableCHAP = true
+
+		adminClientMock.EXPECT().GetHostByName(gomock.Any(), svc.nodeID).Return(gopowerstore.Host{}, errors.New(testErrMsg))
+		adminClientMock.EXPECT().GetHosts(gomock.Any()).Return([]gopowerstore.Host{{
+			ID: "host-id",
+			Initiators: []gopowerstore.InitiatorInstance{{
+				PortName: validISCSIInitiators[0],
+				PortType: gopowerstore.InitiatorProtocolTypeEnumISCSI,
+			}},
+			Name: "host-name",
+		}}, nil)
+		implMock.EXPECT().modifyHostInitiators(
+			gomock.Any(), gomock.Any(), gomock.Any(), nil, nil, gomock.Any()).Return(errors.New(testErrMsg))
+
+		err := impl.nodeHostSetup(validISCSIInitiators, false, maxStartDelay)
+		assert.Equal(t, "can't modify initiators CHAP credentials "+testErrMsg, err.Error())
+	})
+
+	t.Run("creating new host", func(t *testing.T) {
+		svc.nodeID = validNodeID
+		svc.endpointIP = "127.0.0.1"
+		svc.reusedHost = false
+		adminClientMock.EXPECT().GetHostByName(gomock.Any(), svc.nodeID).Return(gopowerstore.Host{}, errors.New(testErrMsg))
+		adminClientMock.EXPECT().GetHosts(gomock.Any()).Return([]gopowerstore.Host{{
+			ID: "host-id",
+			Initiators: []gopowerstore.InitiatorInstance{{
+				PortName: "not-matching-port-name",
+				PortType: gopowerstore.InitiatorProtocolTypeEnumISCSI,
+			}},
+			Name: "host-name",
+		}}, nil)
+		implMock.EXPECT().createOrUpdateHost(gomock.Any(), false, validISCSIInitiators).Return(nil)
+		err := impl.nodeHostSetup(validISCSIInitiators, false, maxStartDelay)
+		assert.Nil(t, err)
+		assert.Equal(t, validNodeID, svc.nodeID)
+		assert.True(t, svc.nodeIsInitialized)
+		assert.False(t, svc.reusedHost)
+	})
+
+	t.Run("creating new host failure", func(t *testing.T) {
+		svc.nodeID = validNodeID
+		svc.endpointIP = "127.0.0.1"
+		svc.reusedHost = false
+		adminClientMock.EXPECT().GetHostByName(gomock.Any(), svc.nodeID).Return(gopowerstore.Host{}, errors.New(testErrMsg))
+		adminClientMock.EXPECT().GetHosts(gomock.Any()).Return([]gopowerstore.Host{{
+			ID: "host-id",
+			Initiators: []gopowerstore.InitiatorInstance{{
+				PortName: "not-matching-port-name",
+				PortType: gopowerstore.InitiatorProtocolTypeEnumISCSI,
+			}},
+			Name: "host-name",
+		}}, nil)
+		implMock.EXPECT().createOrUpdateHost(gomock.Any(), false, validISCSIInitiators).Return(errors.New(testErrMsg))
+		err := impl.nodeHostSetup(validISCSIInitiators, false, maxStartDelay)
+		assert.EqualError(t, err, testErrMsg)
+	})
 }
 
 func TestCreateHost(t *testing.T) {
@@ -1060,7 +1252,8 @@ func Test_service_NodeUnpublishVolume(t *testing.T) {
 	ctx := context.Background()
 	nodeMountLibMock := NewMockmountLib(ctrl)
 	svc.nodeMountLib = nodeMountLibMock
-
+	osMock := NewMocklimitedOSIFace(ctrl)
+	svc.os = osMock
 	t.Run("no targetPath in req", func(t *testing.T) {
 		req := getNodeUnpublishValidRequest()
 		req.TargetPath = ""
@@ -1079,6 +1272,7 @@ func Test_service_NodeUnpublishVolume(t *testing.T) {
 
 	t.Run("unpublish error", func(t *testing.T) {
 		req := getNodeUnpublishValidRequest()
+		osMock.EXPECT().Stat(gomock.Any()).Return(&MocklimitedFileInfoIFace{ctrl: ctrl}, os.ErrNotExist)
 		nodeMountLibMock.EXPECT().UnpublishVolume(gomock.Any(), gomock.Any()).
 			Return(errors.New(testErrMsg))
 		_, err := svc.NodeUnpublishVolume(ctx, req)
@@ -1087,10 +1281,467 @@ func Test_service_NodeUnpublishVolume(t *testing.T) {
 
 	t.Run("unpublish ok", func(t *testing.T) {
 		req := getNodeUnpublishValidRequest()
+		osMock.EXPECT().Stat(gomock.Any()).Return(&MocklimitedFileInfoIFace{ctrl: ctrl}, os.ErrNotExist)
 		nodeMountLibMock.EXPECT().UnpublishVolume(gomock.Any(), gomock.Any()).
 			Return(nil)
 		_, err := svc.NodeUnpublishVolume(ctx, req)
 		assert.Nil(t, err)
+	})
+}
+
+func Test_service_NodeEphemeralVolumePublish(t *testing.T) {
+	impl, implmock, ctrl := getIMPLWitIMPLMock(t)
+	ctx := context.Background()
+	defer ctrl.Finish()
+	adminClientMock, ctrl := getAdminClient(t)
+	defer ctrl.Finish()
+	svc := impl.service
+	nodeMountLibMock := NewMockmountLib(ctrl)
+	svc.nodeMountLib = nodeMountLibMock
+	svc.adminClient = adminClientMock
+	osMock := NewMocklimitedOSIFace(ctrl)
+	svc.os = osMock
+	getStagingPathMockOK := func() *gomock.Call {
+		return nodeMountLibMock.EXPECT().GetStagingPath(gomock.Any(), gomock.Any()).
+			Return(validStagingPath).AnyTimes()
+	}
+
+	isReadyToPublishMock := func() *gomock.Call {
+		return nodeMountLibMock.EXPECT().IsReadyToPublish(gomock.Any(), gomock.Any())
+	}
+
+	nodeProbeMockOK := func() *gomock.Call {
+		return implmock.EXPECT().nodeProbe(gomock.Any()).Return(true, nil).AnyTimes()
+	}
+
+	isReadyToPublishMockReady := func() *gomock.Call {
+		return isReadyToPublishMock().Return(true, true, nil).AnyTimes()
+	}
+	getVolMockOK := func() *gomock.Call {
+		return adminClientMock.EXPECT().GetVolume(gomock.Any(), gomock.Eq(GoodVolumeID)).
+			Return(gopowerstore.Volume{ID: GoodVolumeID, Wwn: "naa.68ccf098003ceb5e4577a20be6d11bf9"}, nil).
+			Times(1)
+	}
+	getVolMockBad := func() *gomock.Call {
+		return adminClientMock.EXPECT().GetVolume(gomock.Any(), gomock.Eq(GoodVolumeID)).
+			Return(gopowerstore.Volume{}, errors.New("no volume")).
+			Times(1)
+	}
+	getHostByNameMockOK := func() *gomock.Call {
+		return adminClientMock.EXPECT().GetHostByName(gomock.Any(), gomock.Eq(svc.nodeID)).
+			Return(gopowerstore.Host{ID: GoodHostID}, nil).
+			Times(1)
+	}
+	getHostVolumeMappingByVolumeIDMockEmpty := func() *gomock.Call {
+		return adminClientMock.EXPECT().
+			GetHostVolumeMappingByVolumeID(gomock.Any(), gomock.Eq(GoodVolumeID)).
+			Return([]gopowerstore.HostVolumeMapping{}, nil).
+			Times(1)
+	}
+	attachVolumeToHostMockOK := func() *gomock.Call {
+		return adminClientMock.EXPECT().
+			AttachVolumeToHost(gomock.Any(), gomock.Eq(GoodHostID), gomock.AssignableToTypeOf(&gopowerstore.HostVolumeAttach{})).
+			Return(gopowerstore.EmptyResponse(""), nil).
+			Times(1)
+	}
+	getHostVolumeMappingByVolumeIDMockOK := func() *gomock.Call {
+		return adminClientMock.EXPECT().
+			GetHostVolumeMappingByVolumeID(gomock.Any(), gomock.Eq(GoodVolumeID)).
+			Return([]gopowerstore.HostVolumeMapping{{HostID: GoodHostID, LogicalUnitNumber: 1}}, nil).
+			Times(1)
+	}
+	readSCSIPublishContextMockOK := func() *gomock.Call {
+		return implmock.EXPECT().readSCSIPublishContext(gomock.Any()).
+			Return(getValidPublishContextData(), nil)
+	}
+	readSCSIPublishContextMockBad := func() *gomock.Call {
+		return implmock.EXPECT().readSCSIPublishContext(gomock.Any()).
+			Return(getValidPublishContextData(), errors.New("Err"))
+	}
+	createVolMockOK := func() *gomock.Call {
+		return adminClientMock.EXPECT().
+			CreateVolume(gomock.Any(), gomock.AssignableToTypeOf(&gopowerstore.VolumeCreate{})).
+			Return(gopowerstore.CreateResponse{ID: GoodVolumeID}, nil).
+			Times(1)
+	}
+	createVolMockBad := func() *gomock.Call {
+		return adminClientMock.EXPECT().
+			CreateVolume(gomock.Any(), gomock.AssignableToTypeOf(&gopowerstore.VolumeCreate{})).
+			Return(gopowerstore.CreateResponse{}, errors.New("badMock")).
+			Times(1)
+	}
+	getVolMockNilTimes := func() *gomock.Call {
+		return adminClientMock.EXPECT().GetVolume(gomock.Any(), gomock.Any()).
+			Return(gopowerstore.Volume{ID: GoodVolumeID}, nil).Times(0)
+	}
+	publishVolumeMockOK := func() *gomock.Call {
+		return nodeMountLibMock.EXPECT().PublishVolume(gomock.Any(), gomock.Any()).
+			Return(nil).AnyTimes()
+	}
+	statAnyNotExistsMock := func() *gomock.Call {
+		return osMock.EXPECT().Stat(gomock.Any()).Return(&MocklimitedFileInfoIFace{ctrl: ctrl}, os.ErrNotExist).AnyTimes()
+	}
+	mkdirAllEphemeralStagingMountPathMockOK := func() *gomock.Call {
+		return osMock.EXPECT().MkdirAll(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	}
+	mkdirAllEphemeralStagingMountPathGoodVolumeIDMockOK := func() *gomock.Call {
+		return osMock.EXPECT().MkdirAll(ephemeralStagingMountPath+GoodVolumeID, gomock.Any()).Return(nil).AnyTimes()
+	}
+	createEphemeralStagingMountPathGoodVolumeIDMockOK := func() *gomock.Call {
+		return osMock.EXPECT().Create(ephemeralStagingMountPath+GoodVolumeID+"/id").Return(&os.File{}, nil).AnyTimes()
+	}
+	writeStringGoodVolIDMockOK := func() *gomock.Call {
+		return osMock.EXPECT().WriteString(&os.File{}, GoodVolumeID).Return(322, nil).AnyTimes()
+	}
+
+	svc.opts.AutoProbe = true
+	t.Run("Good", func(t *testing.T) {
+		nodeProbeMockOK()
+		gofsutil.UseMockFS()
+		statAnyNotExistsMock()
+		mkdirAllEphemeralStagingMountPathMockOK()
+		//CREATE VOLUME
+		createVolMockOK()
+		getVolMockNilTimes()
+
+		//CONPUB
+		svc.nodeID = "k8s-node1"
+		getVolMockOK()
+		getHostByNameMockOK()
+		getHostVolumeMappingByVolumeIDMockEmpty()
+		attachVolumeToHostMockOK()
+		getHostVolumeMappingByVolumeIDMockOK()
+		isReadyToPublishMockReady()
+		readSCSIPublishContextMockOK()
+		registerGetStorageISCSITargetAddressesMock(adminClientMock)
+
+		//NODESTAGE
+		nodeProbeMockOK()
+		getStagingPathMockOK()
+		mkdirAllEphemeralStagingMountPathGoodVolumeIDMockOK()
+		createEphemeralStagingMountPathGoodVolumeIDMockOK()
+		writeStringGoodVolIDMockOK()
+		getStagingPathMockOK()
+		publishVolumeMockOK()
+		req := getNodeEphemeralVolumePublishValidRequest()
+		_, err := svc.NodePublishVolume(ctx, req)
+		assert.NoError(t, err)
+	})
+	t.Run("CreateEphVolumeFailed", func(t *testing.T) {
+		nodeProbeMockOK()
+		gofsutil.UseMockFS()
+		statAnyNotExistsMock()
+		mkdirAllEphemeralStagingMountPathMockOK()
+		//CREATE VOLUME
+		createVolMockBad()
+
+		req := getNodeEphemeralVolumePublishValidRequest()
+		_, err := svc.NodePublishVolume(ctx, req)
+		assert.EqualError(t, err, "rpc error: code = Internal desc = inline ephemeral create volume failed")
+	})
+	t.Run("ParseSizeFailed", func(t *testing.T) {
+		req := getNodeEphemeralVolumePublishValidRequest()
+		req.VolumeContext["size"] = "Does not look like a valid size declaration"
+		nodeProbeMockOK()
+		gofsutil.UseMockFS()
+		statAnyNotExistsMock()
+		mkdirAllEphemeralStagingMountPathMockOK()
+		_, err := svc.NodePublishVolume(ctx, req)
+		assert.EqualError(t, err, "rpc error: code = Internal desc = inline ephemeral parse size failed")
+	})
+	t.Run("ControllerEphVolumePublishFailed", func(t *testing.T) {
+
+		nodeProbeMockOK()
+		gofsutil.UseMockFS()
+		statAnyNotExistsMock()
+		mkdirAllEphemeralStagingMountPathMockOK()
+		//CREATE VOLUME
+		createVolMockOK()
+		getVolMockNilTimes()
+
+		//CONPUB
+		svc.nodeID = "k8s-node1"
+		getVolMockBad()
+		nodeMountLibMock.EXPECT().UnpublishVolume(gomock.Any(), gomock.Any()).Return(nil)
+
+		req := getNodeEphemeralVolumePublishValidRequest()
+		_, err := svc.NodePublishVolume(ctx, req)
+		assert.EqualError(t, err, "rpc error: code = Internal desc = inline ephemeral controller publish failed")
+	})
+
+	t.Run("ControllerEphVolumeStageFailed", func(t *testing.T) {
+		req := getNodeEphemeralVolumePublishValidRequest()
+		nodeProbeMockOK()
+		gofsutil.UseMockFS()
+		statAnyNotExistsMock()
+		mkdirAllEphemeralStagingMountPathMockOK()
+		//CREATE VOLUME
+		createVolMockOK()
+		getVolMockNilTimes()
+
+		//CONPUB AND STAGE
+		svc.nodeID = "k8s-node1"
+		getVolMockOK()
+		getHostByNameMockOK()
+		getHostVolumeMappingByVolumeIDMockEmpty()
+		attachVolumeToHostMockOK()
+		getHostVolumeMappingByVolumeIDMockOK()
+		isReadyToPublishMockReady()
+		readSCSIPublishContextMockBad()
+		registerGetStorageISCSITargetAddressesMock(adminClientMock)
+
+		nodeMountLibMock.EXPECT().UnpublishVolume(gomock.Any(), gomock.Any()).Return(nil)
+		_, err := svc.NodePublishVolume(ctx, req)
+		assert.EqualError(t, err, "rpc error: code = Internal desc = inline ephemeral node stage failed")
+	})
+	t.Run("PublishEphFailed", func(t *testing.T) {
+		req := getNodeEphemeralVolumePublishValidRequest()
+		nodeProbeMockOK()
+		gofsutil.UseMockFS()
+		statAnyNotExistsMock()
+		mkdirAllEphemeralStagingMountPathMockOK()
+		//CREATE VOLUME
+		createVolMockOK()
+		getVolMockNilTimes()
+
+		//CONPUB
+		svc.nodeID = "k8s-node1"
+		getVolMockOK()
+		getHostByNameMockOK()
+		getHostVolumeMappingByVolumeIDMockEmpty()
+		attachVolumeToHostMockOK()
+		getHostVolumeMappingByVolumeIDMockOK()
+		isReadyToPublishMockReady()
+		readSCSIPublishContextMockOK()
+		registerGetStorageISCSITargetAddressesMock(adminClientMock)
+
+		//NODESTAGE
+		req.TargetPath = ""
+		req.StagingTargetPath = ""
+		_, err := svc.NodePublishVolume(ctx, req)
+		assert.EqualError(t, err, "rpc error: code = Internal desc = inline ephemeral node publish failed")
+	})
+}
+
+func Test_service_NodeEphemeralVolumeUnpublish(t *testing.T) {
+	impl, implMock, ctrl := getIMPLWitIMPLMock(t)
+	ctx := context.Background()
+	defer ctrl.Finish()
+	adminClientMock, ctrl := getAdminClient(t)
+	defer ctrl.Finish()
+	svc := impl.service
+	nodeMountLibMock := NewMockmountLib(ctrl)
+	svc.nodeMountLib = nodeMountLibMock
+	svc.adminClient = adminClientMock
+	osMock := NewMocklimitedOSIFace(ctrl)
+	svc.os = osMock
+	svc.opts.AutoProbe = true
+	iscisConnectorMock := NewMockiSCSIConnector(ctrl)
+	volToDevMapperMock := NewMockvolToDevMapper(ctrl)
+	svc.iscsiConnector = iscisConnectorMock
+	svc.volToDevMapper = volToDevMapperMock
+	getStagingPathMockOK := func() *gomock.Call {
+		return nodeMountLibMock.EXPECT().GetStagingPath(gomock.Any(), gomock.Any()).
+			Return(validStagingPath)
+	}
+	getStagingPathMockBad := func() *gomock.Call {
+		return nodeMountLibMock.EXPECT().GetStagingPath(gomock.Any(), gomock.Any()).
+			Return("")
+	}
+	unstageVolumeMockOK := func() *gomock.Call {
+		return nodeMountLibMock.EXPECT().UnstageVolume(gomock.Any(), gomock.Any()).
+			Return(validDevName, nil)
+	}
+	unstageVolumeMockBad := func() *gomock.Call {
+		return nodeMountLibMock.EXPECT().UnstageVolume(gomock.Any(), gomock.Any()).
+			Return("", errors.New("error"))
+	}
+	disconnectVolumeByDeviceNameMock := func() *gomock.Call {
+		return iscisConnectorMock.EXPECT().DisconnectVolumeByDeviceName(gomock.Any(), validDevName)
+	}
+	disconnectVolumeByDeviceNameMockOK := func() {
+		disconnectVolumeByDeviceNameMock().Return(nil)
+	}
+	volToDevMapperCreateMappingMock := func() *gomock.Call {
+		return volToDevMapperMock.EXPECT().CreateMapping(GoodVolumeID, validDevName)
+	}
+	volToDevMapperCreateMappingErr := func() *gomock.Call {
+		return volToDevMapperCreateMappingMock().Return(errors.New(testErrMsg))
+	}
+	volToDevMapperDeleteMappingMock := func() *gomock.Call {
+		return volToDevMapperMock.EXPECT().DeleteMapping(GoodVolumeID)
+	}
+
+	volToDevMapperDeleteMappingMockOK := func() *gomock.Call {
+		return volToDevMapperDeleteMappingMock().Return(nil)
+	}
+	detachVolumeFromHostMock := func() *gomock.Call {
+		return implMock.EXPECT().detachVolumeFromHost(gomock.Any(), GoodHostID, GoodVolumeID)
+	}
+	getVolMockOK := func() *gomock.Call {
+		return adminClientMock.EXPECT().GetVolume(gomock.Any(), gomock.Any()).
+			Return(gopowerstore.Volume{ID: GoodVolumeID}, nil).AnyTimes()
+	}
+	statMockOK := func() *gomock.Call {
+		return osMock.EXPECT().Stat(gomock.Any()).Return(&MocklimitedFileInfoIFace{ctrl: ctrl}, nil)
+	}
+	unpublishVolumeMockOK := func() *gomock.Call {
+		return nodeMountLibMock.EXPECT().UnpublishVolume(gomock.Any(), gomock.Any()).
+			Return(nil)
+	}
+	readFileMockOK := func() *gomock.Call {
+		return osMock.EXPECT().ReadFile(gomock.Any()).Return([]byte(GoodVolumeID), nil)
+	}
+	readFileMockBad := func() *gomock.Call {
+		return osMock.EXPECT().ReadFile(gomock.Any()).Return(nil, os.ErrNotExist)
+	}
+	getVolMockNilTimes := func() *gomock.Call {
+		return adminClientMock.EXPECT().GetVolume(gomock.Any(), gomock.Any()).
+			Return(gopowerstore.Volume{ID: GoodVolumeID}, nil).Times(0)
+	}
+	getHostByNameMockOK := func() *gomock.Call {
+		return adminClientMock.EXPECT().GetHostByName(gomock.Any(), gomock.Eq(svc.nodeID)).
+			Return(gopowerstore.Host{ID: GoodHostID}, nil).
+			Times(1)
+	}
+	getHostByNameMockBad := func() *gomock.Call {
+		return adminClientMock.EXPECT().GetHostByName(gomock.Any(), gomock.Eq(svc.nodeID)).
+			Return(gopowerstore.Host{ID: GoodHostID}, errors.New("error")).
+			Times(1)
+	}
+	deleteVolumeMockOK := func() *gomock.Call {
+		return adminClientMock.EXPECT().DeleteVolume(gomock.Any(), gomock.Any(), gomock.Eq(GoodVolumeID)).
+			Return(gopowerstore.EmptyResponse(""), nil).
+			Times(1)
+	}
+	apiThrottleMock := NewMocktimeoutSemaphore(ctrl)
+	svc.apiThrottle = apiThrottleMock
+	apiThrottleAcquireMockOK := func() *gomock.Call {
+		return apiThrottleMock.EXPECT().Acquire(gomock.Any()).
+			Return(nil).
+			Times(1).AnyTimes()
+	}
+	apiThrottleReleaseMockOK := func() *gomock.Call {
+		return apiThrottleMock.EXPECT().Release(gomock.Any()).Times(1).AnyTimes()
+	}
+	getSnapByVolIdMockOK := func() *gomock.Call {
+		return adminClientMock.EXPECT().GetSnapshotsByVolumeID(gomock.Any(), gomock.Any()).
+			Return([]gopowerstore.Volume{}, nil).Times(1)
+	}
+	getSnapByVolIdMockBad := func() *gomock.Call {
+		return adminClientMock.EXPECT().GetSnapshotsByVolumeID(gomock.Any(), gomock.Any()).
+			Return([]gopowerstore.Volume{}, errors.New("error")).Times(1)
+	}
+	t.Run("Good", func(t *testing.T) {
+
+		gofsutil.UseMockFS()
+		getVolMockOK()
+		statMockOK()
+		unpublishVolumeMockOK()
+		readFileMockOK()
+		//Unstage
+		getStagingPathMockOK()
+		unstageVolumeMockOK()
+		disconnectVolumeByDeviceNameMockOK()
+		volToDevMapperCreateMappingErr()
+		volToDevMapperDeleteMappingMockOK()
+		//Unpublish
+		svc.nodeID = GoodHostID
+		getVolMockNilTimes()
+		getHostByNameMockOK()
+		detachVolumeFromHostMock().Return(nil)
+		getSnapByVolIdMockOK()
+		deleteVolumeMockOK()
+		apiThrottleAcquireMockOK()
+		apiThrottleReleaseMockOK()
+
+		req := getNodeUnpublishValidRequest()
+		_, err := svc.NodeUnpublishVolume(ctx, req)
+		assert.NoError(t, err)
+	})
+	t.Run("StatBad", func(t *testing.T) {
+
+		gofsutil.UseMockFS()
+		getVolMockOK()
+		statMockOK()
+		unpublishVolumeMockOK()
+		readFileMockBad()
+
+		req := getNodeUnpublishValidRequest()
+		_, err := svc.NodeUnpublishVolume(ctx, req)
+		assert.EqualError(t, err, "rpc error: code = Internal desc = Inline ephemeral. Was unable to read lockfile")
+	})
+	t.Run("ReadVolBad", func(t *testing.T) {
+
+		gofsutil.UseMockFS()
+
+		req := getNodeUnpublishValidRequest()
+		req.VolumeId = ""
+		_, err := svc.NodeUnpublishVolume(ctx, req)
+		assert.EqualError(t, err, "rpc error: code = InvalidArgument desc = volume ID is required")
+	})
+
+	t.Run("UnstageBad", func(t *testing.T) {
+
+		gofsutil.UseMockFS()
+		getVolMockOK()
+		statMockOK()
+		unpublishVolumeMockOK()
+		readFileMockOK()
+		//Unstage
+		getStagingPathMockBad()
+		unstageVolumeMockBad()
+
+		req := getNodeUnpublishValidRequest()
+		_, err := svc.NodeUnpublishVolume(ctx, req)
+		assert.EqualError(t, err, "Inline ephemeral node unstage failed")
+	})
+	t.Run("UnpublishBad", func(t *testing.T) {
+
+		gofsutil.UseMockFS()
+		getVolMockOK()
+		statMockOK()
+		unpublishVolumeMockOK()
+		readFileMockOK()
+		//Unstage
+		getStagingPathMockOK()
+		unstageVolumeMockOK()
+		disconnectVolumeByDeviceNameMockOK()
+		volToDevMapperCreateMappingErr()
+		volToDevMapperDeleteMappingMockOK()
+		//Unpublish
+		svc.nodeID = GoodHostID
+		getVolMockNilTimes()
+		getHostByNameMockBad()
+		detachVolumeFromHostMock().Return(nil)
+
+		req := getNodeUnpublishValidRequest()
+		_, err := svc.NodeUnpublishVolume(ctx, req)
+		assert.EqualError(t, err, "Inline ephemeral controller unpublish failed")
+	})
+	t.Run("DeleteBad", func(t *testing.T) {
+
+		gofsutil.UseMockFS()
+		getVolMockOK()
+		statMockOK()
+		unpublishVolumeMockOK()
+		readFileMockOK()
+		//Unstage
+		getStagingPathMockOK()
+		unstageVolumeMockOK()
+		disconnectVolumeByDeviceNameMockOK()
+		volToDevMapperCreateMappingErr()
+		volToDevMapperDeleteMappingMockOK()
+		//Unpublish
+		svc.nodeID = GoodHostID
+		getVolMockNilTimes()
+		getHostByNameMockOK()
+
+		getSnapByVolIdMockBad()
+
+		req := getNodeUnpublishValidRequest()
+		_, err := svc.NodeUnpublishVolume(ctx, req)
+		assert.EqualError(t, err, "rpc error: code = Unknown desc = failure getting snapshot: error")
 	})
 }
 
@@ -1256,7 +1907,7 @@ func TestNode_modifyHostInitiators(t *testing.T) {
 	ctx := context.Background()
 
 	funcUnderTest := func(iqnToAdd []string, iqnToDel []string) error {
-		return impl.modifyHostInitiators(ctx, validHostID, false, iqnToAdd, iqnToDel)
+		return impl.modifyHostInitiators(ctx, validHostID, false, iqnToAdd, iqnToDel, nil)
 	}
 	adminClientModifyHostMock := func() *gomock.Call {
 		return adminClientMock.EXPECT().ModifyHost(ctx, gomock.Any(), validHostID)
@@ -1318,7 +1969,7 @@ func TestNode_createOrUpdateHost(t *testing.T) {
 
 	modifyHostInitiatorsMockOK := func() *gomock.Call {
 		return implMock.EXPECT().modifyHostInitiators(
-			gomock.Any(), gomock.Any(), gomock.Any(), []string{validISCSIInitiators[0]}, gomock.Any()).
+			gomock.Any(), gomock.Any(), gomock.Any(), []string{validISCSIInitiators[0]}, gomock.Any(), nil).
 			Return(nil)
 	}
 
@@ -1348,7 +1999,7 @@ func TestNode_createOrUpdateHost(t *testing.T) {
 	t.Run("modifyHostInitiators error", func(t *testing.T) {
 		getHostByNameMockOK()
 		implMock.EXPECT().modifyHostInitiators(
-			gomock.Any(), gomock.Any(), gomock.Any(), []string{validISCSIInitiators[0]}, gomock.Any()).
+			gomock.Any(), gomock.Any(), gomock.Any(), []string{validISCSIInitiators[0]}, gomock.Any(), nil).
 			Return(errors.New(testErrMsg))
 		err := funcUnderTest([]string{validISCSIInitiators[0]})
 		assert.EqualError(t, err, testErrMsg)

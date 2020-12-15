@@ -220,6 +220,7 @@ func (mpm *mountLibPublishMountIMPL) publishMount(
 		return status.Error(codes.Unimplemented,
 			"Mount volumes do not support AccessMode MULTI_NODE_MULTI_WRITER")
 	}
+	opts := []string{}
 	mountCap := req.GetVolumeCapability().GetMount()
 	fs := mountCap.GetFsType()
 	mntFlags := mountCap.GetMountFlags()
@@ -227,7 +228,9 @@ func (mpm *mountLibPublishMountIMPL) publishMount(
 		mntFlags = append(mntFlags, "nouuid")
 	}
 	targetFS := mountCap.GetFsType()
-
+	if targetFS == "xfs" {
+		opts = []string{"-m", "crc=0,finobt=0"}
+	}
 	targetPath := req.GetTargetPath()
 	stagingPath := mpm.helpers.getStagingPath(ctx, req)
 
@@ -257,7 +260,7 @@ func (mpm *mountLibPublishMountIMPL) publishMount(
 				"RO mount required but no fs detected on staged volume %s",
 				stagingPath)
 		}
-		if err := mpm.mkfs.format(ctx, stagingPath, targetFS); err != nil {
+		if err := mpm.mkfs.format(ctx, stagingPath, targetFS, opts...); err != nil {
 			return status.Errorf(codes.Internal,
 				"can't format staged device %s: %s",
 				stagingPath, err.Error())

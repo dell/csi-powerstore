@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"github.com/dell/csi-powerstore/core"
 	"github.com/dell/gofsutil"
+	"github.com/dell/goiscsi"
 	"github.com/dell/gopowerstore"
 	"github.com/rexray/gocsi"
 	csictx "github.com/rexray/gocsi/context"
@@ -38,6 +39,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -83,21 +85,24 @@ type Opts struct {
 	Endpoint                     string
 	User                         string
 	Password                     string
-	Insecure                     bool
-	AutoProbe                    bool
 	NodeIDFilePath               string
 	NodeNamePrefix               string
 	KubeNodeName                 string
 	NodeChrootPath               string
+	FCPortsFilterFilePath        string
+	TmpDir                       string
+	CHAPUserName                 string
+	CHAPPassword                 string
+	DebugHTTPServerListenAddress string
+	Insecure                     bool
+	AutoProbe                    bool
+	EnableTracing                bool
+	EnableCHAP                   bool
 	NodePublishDeviceWaitRetries int
 	NodePublishDeviceWaitSeconds int
 	ThrottlingTimeoutSeconds     int
 	ThrottlingRateLimit          int
-	EnableTracing                bool
-	DebugHTTPServerListenAddress string
 	PreferredTransport           transportType
-	FCPortsFilterFilePath        string
-	TmpDir                       string
 }
 
 // ISCSITargetInfo represents basic information about iSCSI target
@@ -171,6 +176,9 @@ type service struct {
 	iscsiConnector    iSCSIConnector
 	fcConnector       fcConnector
 	volToDevMapper    volToDevMapper
+	endpointIP        string
+	iscsiLib          goiscsi.ISCSIinterface
+	reusedHost        bool
 
 	// wrappers
 	fileReader fileReader
@@ -249,6 +257,14 @@ func (s *service) BeforeServe(
 
 	if ep, ok := csictx.LookupEnv(ctx, EnvEndpoint); ok {
 		opts.Endpoint = ep
+
+		ipList := getIPListFromString(ep)
+		if ipList == nil || len(ipList) == 0 {
+			log.Error("can't find ip in endpoint")
+		} else {
+			s.endpointIP = ipList[0]
+		}
+
 	}
 	if user, ok := csictx.LookupEnv(ctx, EnvUser); ok {
 		opts.User = strings.Trim(user, "\n")
@@ -294,6 +310,14 @@ func (s *service) BeforeServe(
 		opts.FCPortsFilterFilePath = fcPortsFilterFilePath
 	}
 
+	if chapUsername, ok := csictx.LookupEnv(ctx, EnvCHAPUserName); ok {
+		opts.CHAPUserName = chapUsername
+	}
+
+	if chapPw, ok := csictx.LookupEnv(ctx, EnvCHAPPassword); ok {
+		opts.CHAPPassword = chapPw
+	}
+
 	if tmpDir, ok := csictx.LookupEnv(ctx, EnvTmpDir); ok {
 		opts.TmpDir = tmpDir
 	}
@@ -326,6 +350,7 @@ func (s *service) BeforeServe(
 	opts.Insecure = pb(EnvInsecure)
 	opts.AutoProbe = pb(EnvAutoProbe)
 	opts.EnableTracing = pb(EnvEnableTracing)
+	opts.EnableCHAP = pb(EnvEnableCHAP)
 
 	if throttlingRateLimit, ok := csictx.LookupEnv(ctx, EnvThrottlingRateLimit); ok {
 		opts.ThrottlingRateLimit, err = strconv.Atoi(throttlingRateLimit)
@@ -515,6 +540,13 @@ func (s *service) getNodeByID(ctx context.Context, id string) (*gopowerstore.Hos
 	return &node, nil
 }
 
+// Returns list of ips in string form found in input string
+// A return value of nil indicates no match
+func getIPListFromString(input string) []string {
+	re := regexp.MustCompile(`(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)){3}`)
+	return re.FindAllString(input, -1)
+}
+
 // internal API implementation
 type serviceIMPL struct {
 	// service is a pointer to the service instance
@@ -545,6 +577,18 @@ func (io *osWrapper) OpenFile(name string, flag int, perm os.FileMode) (limitedF
 	return os.OpenFile(name, flag, perm) // #nosec G304
 }
 
+func (io *osWrapper) WriteString(file *os.File, string string) (int, error) {
+	return file.WriteString(string) // #nosec G304
+}
+
+func (io *osWrapper) Create(name string) (*os.File, error) {
+	return os.Create(name) // #nosec G304
+}
+
+func (io *osWrapper) ReadFile(name string) ([]byte, error) {
+	return ioutil.ReadFile(filepath.Clean(name))
+}
+
 func (io *osWrapper) Stat(name string) (limitedFileInfoIFace, error) {
 	return os.Stat(name)
 }
@@ -555,6 +599,10 @@ func (io *osWrapper) IsNotExist(err error) bool {
 
 func (io *osWrapper) Mkdir(name string, perm os.FileMode) error {
 	return os.Mkdir(name, perm)
+}
+
+func (io *osWrapper) MkdirAll(name string, perm os.FileMode) error {
+	return os.MkdirAll(name, perm)
 }
 
 func (io *osWrapper) Remove(name string) error {

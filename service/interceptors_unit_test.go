@@ -23,16 +23,16 @@ package service
 import (
 	"context"
 	"fmt"
-	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/stretchr/testify/assert"
-	"golang.org/x/net/trace"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/metadata"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/container-storage-interface/spec/lib/go/csi"
 	csictx "github.com/rexray/gocsi/context"
+	"github.com/stretchr/testify/assert"
+	"golang.org/x/net/trace"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 )
 
 const testID = "111"
@@ -43,12 +43,11 @@ func testHandler(ctx context.Context, _ interface{}) (interface{}, error) {
 
 func TestRewriteRequestIDInterceptor_RequestIDExist(t *testing.T) {
 	handleInterceptor := NewRewriteRequestIDInterceptor()
-	ctx := new(context.Context)
 	md := metadata.Pairs()
-	*ctx = metadata.NewIncomingContext(*ctx, md)
+	ctx := metadata.NewIncomingContext(context.Background(), md)
 	md[csictx.RequestIDKey] = []string{testID}
 
-	newCtx, _ := handleInterceptor(*ctx, nil, nil, testHandler)
+	newCtx, _ := handleInterceptor(ctx, nil, nil, testHandler)
 	requestID, ok := newCtx.(context.Context).Value(csictx.RequestIDKey).(string)
 
 	assert.Equal(t, ok, true)

@@ -22,15 +22,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/gopowerstore"
 	"github.com/golang/protobuf/ptypes"
+	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"strconv"
-	"strings"
-
-	"github.com/container-storage-interface/spec/lib/go/csi"
-	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -54,8 +52,9 @@ const (
 	PublishContextFCWWPNPrefix       = "FCWWPN"
 	WWNPrefix                        = "naa."
 
-	keyFsType         = "FsType"
-	keyNasName string = "nasName"
+	keyFsType           = "csi.storage.k8s.io/fstype"
+	keyFsTypeOld        = "FsType"
+	keyNasName   string = "nasName"
 )
 
 func (s *service) CreateVolume(
@@ -73,23 +72,28 @@ func (s *service) CreateVolume(
 	}
 
 	// Check if should use nfs
-	var useNFS bool
-	fsType, ok := params[keyFsType]
-	// FsType can be empty
-	if ok {
-		useNFS = strings.ToLower(fsType) == "nfs"
+	useNFS := false
+	fsType := req.VolumeCapabilities[0].GetMount().GetFsType()
+	useNFS = fsType == "nfs"
 
+	if req.VolumeCapabilities[0].GetBlock() != nil {
+		// We need to check if user requests raw block access from nfs and prevent that
+		fsType, ok := params[keyFsType]
+		// FsType can be empty
+		if ok && fsType == "nfs" {
+			return nil, errors.New("raw block requested from NFS Volume")
+		}
+
+		fsType, ok = params[keyFsTypeOld]
+		if ok && fsType == "nfs" {
+			return nil, errors.New("raw block requested from NFS Volume")
+		}
 	}
 
 	var creator VolumeCreator
 
 	if useNFS {
 		creator = &NfsCreator{}
-		vcs := req.GetVolumeCapabilities()
-		isBlock := accTypeIsBlock(vcs)
-		if isBlock {
-			return nil, errors.New("raw block requested from NFS Volume")
-		}
 	} else {
 		creator = &SCSICreator{}
 	}
@@ -281,14 +285,18 @@ func (si *serviceIMPL) detachVolumeFromHost(ctx context.Context, hostID string, 
 	_, err := si.service.adminClient.DetachVolumeFromHost(ctx, hostID, dp)
 	if err != nil {
 		apiError, ok := err.(gopowerstore.APIError)
-		if ok && apiError.HostIsNotExist() {
-			return status.Errorf(codes.NotFound, "host with ID '%s' not found", hostID)
-		}
-		if !ok || !apiError.HostIsNotAttachedToVolume() {
+		if !ok {
 			return status.Errorf(codes.Unknown,
 				"failed to detach volume '%s' from host: %s",
 				volumeID, err.Error())
 		}
+
+		if apiError.HostIsNotExist() {
+			return status.Errorf(codes.NotFound, "host with ID '%s' not found", hostID)
+		} else if !apiError.VolumeIsNotAttachedToHost() && !apiError.HostIsNotAttachedToVolume() {
+			return status.Errorf(codes.Unknown, "unexpected api error when detaching volume from host:%s", err.Error())
+		}
+
 	}
 	return nil
 }
@@ -301,32 +309,10 @@ func (s *service) ControllerPublishVolume(
 		return nil, err
 	}
 
-	volumeContext := req.GetVolumeContext()
-
 	var useNFS bool
-	if volumeContext != nil {
-		log.Printf("VolumeContext:")
-		for key, value := range volumeContext {
-			log.Debugf("    [%s]=%s", key, value)
-		}
-	} else {
-		// We don't get volumeContext in static provisioning
-		// So we try to check by probing id with volume and fs
-		id := req.GetVolumeId()
-		_, err := s.adminClient.GetVolume(ctx, id)
-		if err != nil {
-			_, err := s.adminClient.GetFS(ctx, id)
-			if err != nil {
-				return nil, err
-			}
-			useNFS = true
-		}
-	}
-
-	fsType, ok := volumeContext[keyFsType]
-	// FsType can be empty
-	if ok {
-		useNFS = strings.ToLower(fsType) == "nfs"
+	mount := req.VolumeCapability.GetMount()
+	if mount != nil {
+		useNFS = mount.FsType == "nfs"
 	}
 
 	vc := req.GetVolumeCapability()
@@ -386,17 +372,29 @@ func (s *service) ControllerUnpublishVolume(
 		return nil, status.Error(codes.InvalidArgument, "node ID is required")
 	}
 
+	var node gopowerstore.Host
 	id := req.GetVolumeId()
 	_, err := s.adminClient.GetVolume(ctx, id)
 	if err == nil {
-		node, err := s.getNodeByID(ctx, kubeNodeID)
+		node, err = s.adminClient.GetHostByName(ctx, kubeNodeID)
 		if err != nil {
 			if apiError, ok := err.(gopowerstore.APIError); ok && apiError.HostIsNotExist() {
-				return nil, status.Errorf(codes.NotFound, "host with k8s node ID '%s' not found", kubeNodeID)
+				// We need additional check here since we can just have host without ip in it
+				ipList := getIPListFromString(kubeNodeID)
+				if ipList == nil || len(ipList) == 0 {
+					return nil, errors.New("can't find ip in nodeID")
+				}
+				ip := ipList[0]
+				nodeID := kubeNodeID[:len(kubeNodeID)-len(ip)-1]
+				node, err = s.adminClient.GetHostByName(ctx, nodeID)
+				if err != nil {
+					return nil, status.Errorf(codes.NotFound, "host with k8s node ID '%s' not found", kubeNodeID)
+				}
+			} else {
+				return nil, status.Errorf(codes.Internal,
+					"failure checking host '%s' status for volume unpublishing: %s",
+					kubeNodeID, err.Error())
 			}
-			return nil, status.Errorf(codes.Unknown,
-				"failure checking host '%s' status for volume unpublishing: %s",
-				kubeNodeID, err.Error())
 		}
 		if err = s.apiThrottle.Acquire(ctx); err != nil {
 			return nil, status.Error(codes.Internal, err.Error())
@@ -418,10 +416,11 @@ func (s *service) ControllerUnpublishVolume(
 		}
 
 		// Parse volumeID to get an IP
-		ip, err := getIPFromNodeID(kubeNodeID)
-		if err != nil {
-			return nil, err
+		ipList := getIPListFromString(kubeNodeID)
+		if ipList == nil || len(ipList) == 0 {
+			return nil, errors.New("can't find ip in nodeID")
 		}
+		ip := ipList[0]
 
 		export, err := s.adminClient.GetNFSExportByFileSystemID(ctx, fs.ID)
 		if err != nil {
@@ -458,14 +457,12 @@ func (s *service) ValidateVolumeCapabilities(
 	if err := s.requireProbe(ctx); err != nil {
 		return nil, err
 	}
-	params := req.GetParameters()
 
 	// Check if should use nfs
 	var useNFS bool
-	fsType, ok := params[keyFsType]
-	// FsType can be empty
-	if ok {
-		useNFS = strings.ToLower(fsType) == "nfs"
+	mount := req.VolumeCapabilities[0].GetMount()
+	if mount != nil {
+		useNFS = mount.FsType == "nfs"
 	}
 
 	volID := req.GetVolumeId()

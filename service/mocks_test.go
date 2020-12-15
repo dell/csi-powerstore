@@ -9,6 +9,7 @@ import (
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	gobrick "github.com/dell/gobrick"
 	gofsutil "github.com/dell/gofsutil"
+	gopowerstore "github.com/dell/gopowerstore"
 	gomock "github.com/golang/mock/gomock"
 	gocsi "github.com/rexray/gocsi"
 	io "io"
@@ -575,17 +576,31 @@ func (mr *MockinternalServiceAPIMockRecorder) createHost(ctx, useFC, initiators 
 }
 
 // modifyHostInitiators mocks base method
-func (m *MockinternalServiceAPI) modifyHostInitiators(ctx context.Context, hostID string, useFC bool, initiatorsToAdd, initiatorsToDelete []string) error {
+func (m *MockinternalServiceAPI) modifyHostInitiators(ctx context.Context, hostID string, useFC bool, initiatorsToAdd, initiatorsToDelete, initiatorsToModify []string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "modifyHostInitiators", ctx, hostID, useFC, initiatorsToAdd, initiatorsToDelete)
+	ret := m.ctrl.Call(m, "modifyHostInitiators", ctx, hostID, useFC, initiatorsToAdd, initiatorsToDelete, initiatorsToModify)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // modifyHostInitiators indicates an expected call of modifyHostInitiators
-func (mr *MockinternalServiceAPIMockRecorder) modifyHostInitiators(ctx, hostID, useFC, initiatorsToAdd, initiatorsToDelete interface{}) *gomock.Call {
+func (mr *MockinternalServiceAPIMockRecorder) modifyHostInitiators(ctx, hostID, useFC, initiatorsToAdd, initiatorsToDelete, initiatorsToModify interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "modifyHostInitiators", reflect.TypeOf((*MockinternalServiceAPI)(nil).modifyHostInitiators), ctx, hostID, useFC, initiatorsToAdd, initiatorsToDelete)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "modifyHostInitiators", reflect.TypeOf((*MockinternalServiceAPI)(nil).modifyHostInitiators), ctx, hostID, useFC, initiatorsToAdd, initiatorsToDelete, initiatorsToModify)
+}
+
+// buildInitiatorsArray mocks base method
+func (m *MockinternalServiceAPI) buildInitiatorsArray(useFC bool, initiators []string) []gopowerstore.InitiatorCreateModify {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "buildInitiatorsArray", useFC, initiators)
+	ret0, _ := ret[0].([]gopowerstore.InitiatorCreateModify)
+	return ret0
+}
+
+// buildInitiatorsArray indicates an expected call of buildInitiatorsArray
+func (mr *MockinternalServiceAPIMockRecorder) buildInitiatorsArray(useFC, initiators interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "buildInitiatorsArray", reflect.TypeOf((*MockinternalServiceAPI)(nil).buildInitiatorsArray), useFC, initiators)
 }
 
 // detachVolumeFromAllHosts mocks base method
@@ -638,6 +653,18 @@ func (m *MockinternalServiceAPI) initNodeMountLib() {
 func (mr *MockinternalServiceAPIMockRecorder) initNodeMountLib() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "initNodeMountLib", reflect.TypeOf((*MockinternalServiceAPI)(nil).initNodeMountLib))
+}
+
+// initISCSILib mocks base method
+func (m *MockinternalServiceAPI) initISCSILib() {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "initISCSILib")
+}
+
+// initISCSILib indicates an expected call of initISCSILib
+func (mr *MockinternalServiceAPIMockRecorder) initISCSILib() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "initISCSILib", reflect.TypeOf((*MockinternalServiceAPI)(nil).initISCSILib))
 }
 
 // initISCSIConnector mocks base method
@@ -1717,6 +1744,36 @@ func (mr *MocklimitedOSIFaceMockRecorder) Stat(name interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Stat", reflect.TypeOf((*MocklimitedOSIFace)(nil).Stat), name)
 }
 
+// Create mocks base method
+func (m *MocklimitedOSIFace) Create(name string) (*os.File, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Create", name)
+	ret0, _ := ret[0].(*os.File)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Create indicates an expected call of Create
+func (mr *MocklimitedOSIFaceMockRecorder) Create(name interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MocklimitedOSIFace)(nil).Create), name)
+}
+
+// ReadFile mocks base method
+func (m *MocklimitedOSIFace) ReadFile(name string) ([]byte, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ReadFile", name)
+	ret0, _ := ret[0].([]byte)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ReadFile indicates an expected call of ReadFile
+func (mr *MocklimitedOSIFaceMockRecorder) ReadFile(name interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadFile", reflect.TypeOf((*MocklimitedOSIFace)(nil).ReadFile), name)
+}
+
 // IsNotExist mocks base method
 func (m *MocklimitedOSIFace) IsNotExist(err error) bool {
 	m.ctrl.T.Helper()
@@ -1745,6 +1802,20 @@ func (mr *MocklimitedOSIFaceMockRecorder) Mkdir(name, perm interface{}) *gomock.
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Mkdir", reflect.TypeOf((*MocklimitedOSIFace)(nil).Mkdir), name, perm)
 }
 
+// MkdirAll mocks base method
+func (m *MocklimitedOSIFace) MkdirAll(name string, perm os.FileMode) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "MkdirAll", name, perm)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// MkdirAll indicates an expected call of MkdirAll
+func (mr *MocklimitedOSIFaceMockRecorder) MkdirAll(name, perm interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MkdirAll", reflect.TypeOf((*MocklimitedOSIFace)(nil).MkdirAll), name, perm)
+}
+
 // Remove mocks base method
 func (m *MocklimitedOSIFace) Remove(name string) error {
 	m.ctrl.T.Helper()
@@ -1757,6 +1828,21 @@ func (m *MocklimitedOSIFace) Remove(name string) error {
 func (mr *MocklimitedOSIFaceMockRecorder) Remove(name interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Remove", reflect.TypeOf((*MocklimitedOSIFace)(nil).Remove), name)
+}
+
+// WriteString mocks base method
+func (m *MocklimitedOSIFace) WriteString(file *os.File, string string) (int, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "WriteString", file, string)
+	ret0, _ := ret[0].(int)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// WriteString indicates an expected call of WriteString
+func (mr *MocklimitedOSIFaceMockRecorder) WriteString(file, string interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WriteString", reflect.TypeOf((*MocklimitedOSIFace)(nil).WriteString), file, string)
 }
 
 // ExecCommand mocks base method

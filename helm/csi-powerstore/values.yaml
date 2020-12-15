@@ -14,12 +14,47 @@ nodeNamePrefix: csi-node
 # "nodeIDPath" defines the path to file with node identifier (e.g. /etc/machine-id, /etc/hostname).
 nodeIDPath: /etc/machine-id
 
+# "controller" allows to configure controller specific parameters
+controller:
+  # "controller.nodeSelector" defines what nodes would be selected for pods of controller deployment
+  # Leave as blank to use all nodes
+  nodeSelector:
+  #   node-role.kubernetes.io/master: ""
+
+  # "controller.tolerations" defines tolerations that would be applied to controller deployment
+  # Leave as blank to install controller on worker nodes
+  tolerations:
+  #  - key: "node-role.kubernetes.io/master"
+  #    operator: "Exists"
+  #    effect: "NoSchedule"
+
+  # "controller.replicas" defines number of replicas of controller deployment
+  replicas: 2
+
+# "node" allows to configure node specific parameters
+node:
+  # "node.nodeSelector" defines what nodes would be selected for pods of node daemonset
+  # Leave as blank to use all nodes
+  nodeSelector:
+  #   node-role.kubernetes.io/master: ""
+
+  # "node.tolerations" defines tolerations that would be applied to node daemonset
+  # Leave as blank to install node driver only on worker nodes
+  tolerations:
+  #  - key: "node-role.kubernetes.io/master"
+  #    operator: "Exists"
+  #    effect: "NoSchedule"
+
 # "connection" allows to configure connection to storage array
 connection:
   # "connection.scsiProtocol" allows to specify which scsi protocol to use
   # Can be "FC", "ISCSI", "auto", "None". If "auto", will choose FC if both are available.
   # If "None" the driver will try to use NFS
   scsiProtocol: auto
+
+  # "connection.enableCHAP" allows to enable CHAP for iSCSI connections
+  # Be sure to configure "chapuser" and "chapsecret" fields in your "powerstore-creds" secret
+  enableCHAP: false
 
   # "connection.nfs" allows to configure nfs connection
   nfs:
@@ -29,9 +64,6 @@ connection:
     nasServerName: nas-server
     # "connection.version" allows to set version of nfs protocol
     version: v3
-
-# "nodeOnMaster" specifies if node driver should be installed on master node
-nodeOnMaster: true
 
 # "nodeFCPortsFilterFile" is the name of the environment variable which store path to the file which
 # provide list of WWPN which should be used by the driver for FC connection on this node

@@ -94,4 +94,18 @@ const (
 
 	// EnvThrottlingRateLimit sets a number of concurrent requests to APi
 	EnvThrottlingRateLimit = "X_CSI_POWERSTORE_THROTTLING_RATE_LIMIT"
+
+	// EnvEnableCHAP is the flag which determines if the driver is going
+	// to set the CHAP credentials in the ISCSI node database at the time
+	// of node plugin boot
+	EnvEnableCHAP = "X_CSI_POWERSTORE_ENABLE_CHAP"
+
+	// EnvCHAPUserName is the the username for the ISCSI CHAP
+	// authentication for the host initiator(s)
+	// If set to none, then the driver will use the ISCSI IQN as the username
+	EnvCHAPUserName = "X_CSI_POWERSTORE_CHAP_USERNAME"
+
+	// EnvCHAPPassword is the the password for the ISCSI CHAP
+	// authentication for the host initiator(s)
+	EnvCHAPPassword = "X_CSI_POWERSTORE_CHAP_PASSWORD" // #nosec G101
 )

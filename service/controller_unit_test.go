@@ -35,8 +35,7 @@ import (
 
 const (
 	anotherHostID  = "b0ec603a-cebd-4a5c-a0e1-b2e88c0a81cc"
-	k8sNodeID      = "k8s-node1"
-	nfsK8sNodeID   = "k8s-node1-127.0.0.1"
+	k8sNodeID      = "k8s-node1-127.0.0.1"
 	validVolumeID  = "e997a58a-b017-4bf0-8958-ac7faef3eca9"
 	validVolumeID2 = "d6e8d0fe-7fad-4441-94f1-0b11687900dd"
 )
@@ -49,14 +48,6 @@ func getClientAndService(t *testing.T) (*mock.MockClient, *service, *gomock.Cont
 	svc.adminClient = c
 	svc.impl.initApiThrottle()
 	return c, svc, ctrl
-}
-
-func getVolumeCapability() *csi.VolumeCapability {
-	accessMode := new(csi.VolumeCapability_AccessMode)
-	accessMode.Mode = csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER
-	capability := new(csi.VolumeCapability)
-	capability.AccessMode = accessMode
-	return capability
 }
 
 func Test_ControllerCreateVolume_FailApiThrottleAcquire(t *testing.T) {
@@ -201,11 +192,10 @@ func Test_ControllerPublishVolume_NFS_VolumeIsNotExist(t *testing.T) {
 
 	ctx := new(context.Context)
 	req := &csi.ControllerPublishVolumeRequest{
-		VolumeId:      GoodVolumeID,
-		NodeId:        nfsK8sNodeID,
-		VolumeContext: map[string]string{"FsType": "nfs"},
+		VolumeId: GoodVolumeID,
+		NodeId:   k8sNodeID,
 	}
-	req.VolumeCapability = getVolumeCapability()
+	req.VolumeCapability = getVolumeCapabilityNFS()
 
 	apiError := gopowerstore.NewAPIError()
 	apiError.ErrorCode = gopowerstore.UnknownVolumeErrorCode
@@ -227,10 +217,10 @@ func Test_ControllerPublishVolume_NFS_VolumeIsNotExistInPublish(t *testing.T) {
 	ctx := new(context.Context)
 	req := &csi.ControllerPublishVolumeRequest{
 		VolumeId:      GoodVolumeID,
-		NodeId:        nfsK8sNodeID,
-		VolumeContext: map[string]string{"FsType": "nfs"},
+		NodeId:        k8sNodeID,
+		VolumeContext: map[string]string{keyFsType: "nfs"},
 	}
-	req.VolumeCapability = getVolumeCapability()
+	req.VolumeCapability = getVolumeCapabilityNFS()
 
 	apiError := gopowerstore.NewAPIError()
 	apiError.ErrorCode = gopowerstore.UnknownVolumeErrorCode
@@ -275,11 +265,10 @@ func Test_ControllerPublishVolume_NFS_FailureVolumeStatus(t *testing.T) {
 
 	ctx := new(context.Context)
 	req := &csi.ControllerPublishVolumeRequest{
-		VolumeId:      GoodVolumeID,
-		NodeId:        nfsK8sNodeID,
-		VolumeContext: map[string]string{"FsType": "nfs"},
+		VolumeId: GoodVolumeID,
+		NodeId:   k8sNodeID,
 	}
-	req.VolumeCapability = getVolumeCapability()
+	req.VolumeCapability = getVolumeCapabilityNFS()
 
 	adminClient.EXPECT().GetFS(gomock.Any(), gomock.Any()).
 		Return(gopowerstore.FileSystem{}, gopowerstore.NewAPIError()).Times(1)
@@ -296,11 +285,10 @@ func Test_ControllerPublishVolume_NFS_FailureVolumeStatusInPublish(t *testing.T)
 
 	ctx := new(context.Context)
 	req := &csi.ControllerPublishVolumeRequest{
-		VolumeId:      GoodVolumeID,
-		NodeId:        nfsK8sNodeID,
-		VolumeContext: map[string]string{"FsType": "nfs"},
+		VolumeId: GoodVolumeID,
+		NodeId:   k8sNodeID,
 	}
-	req.VolumeCapability = getVolumeCapability()
+	req.VolumeCapability = getVolumeCapabilityNFS()
 	adminClient.EXPECT().GetFS(gomock.Any(), gomock.Any()).
 		Return(gopowerstore.FileSystem{}, nil)
 
@@ -319,11 +307,10 @@ func Test_ControllerPublishVolume_NFS_IncorrectNodeId(t *testing.T) {
 
 	ctx := new(context.Context)
 	req := &csi.ControllerPublishVolumeRequest{
-		VolumeId:      GoodVolumeID,
-		NodeId:        "someRandomNodeId",
-		VolumeContext: map[string]string{"FsType": "nfs"},
+		VolumeId: GoodVolumeID,
+		NodeId:   "someRandomNodeId",
 	}
-	req.VolumeCapability = getVolumeCapability()
+	req.VolumeCapability = getVolumeCapabilityNFS()
 
 	adminClient.EXPECT().GetFS(gomock.Any(), gomock.Any()).
 		Return(gopowerstore.FileSystem{}, nil).Times(2)
@@ -331,7 +318,7 @@ func Test_ControllerPublishVolume_NFS_IncorrectNodeId(t *testing.T) {
 	_, err := svc.ControllerPublishVolume(*ctx, req)
 
 	assert.NotNil(t, err)
-	assert.Contains(t, err.Error(), "can't find the ip in volumeID")
+	assert.Contains(t, err.Error(), "can't find ip in nodeID")
 }
 
 func Test_ControllerPublishVolume_NFS_FailureNfsStatus(t *testing.T) {
@@ -340,11 +327,10 @@ func Test_ControllerPublishVolume_NFS_FailureNfsStatus(t *testing.T) {
 
 	ctx := new(context.Context)
 	req := &csi.ControllerPublishVolumeRequest{
-		VolumeId:      GoodVolumeID,
-		NodeId:        nfsK8sNodeID,
-		VolumeContext: map[string]string{"FsType": "nfs"},
+		VolumeId: GoodVolumeID,
+		NodeId:   k8sNodeID,
 	}
-	req.VolumeCapability = getVolumeCapability()
+	req.VolumeCapability = getVolumeCapabilityNFS()
 
 	adminClient.EXPECT().GetFS(gomock.Any(), gomock.Any()).
 		Return(gopowerstore.FileSystem{}, nil).Times(2)
@@ -366,11 +352,10 @@ func Test_ControllerPublishVolume_NFS_FailureCreatingNfsExport(t *testing.T) {
 
 	ctx := new(context.Context)
 	req := &csi.ControllerPublishVolumeRequest{
-		VolumeId:      GoodVolumeID,
-		NodeId:        nfsK8sNodeID,
-		VolumeContext: map[string]string{"FsType": "nfs"},
+		VolumeId: GoodVolumeID,
+		NodeId:   k8sNodeID,
 	}
-	req.VolumeCapability = getVolumeCapability()
+	req.VolumeCapability = getVolumeCapabilityNFS()
 
 	adminClient.EXPECT().GetFS(gomock.Any(), gomock.Any()).
 		Return(gopowerstore.FileSystem{
@@ -409,11 +394,10 @@ func Test_ControllerPublishVolume_NFS_FailureModifyingNfsExport(t *testing.T) {
 
 	ctx := new(context.Context)
 	req := &csi.ControllerPublishVolumeRequest{
-		VolumeId:      GoodVolumeID,
-		NodeId:        nfsK8sNodeID,
-		VolumeContext: map[string]string{"FsType": "nfs"},
+		VolumeId: GoodVolumeID,
+		NodeId:   k8sNodeID,
 	}
-	req.VolumeCapability = getVolumeCapability()
+	req.VolumeCapability = getVolumeCapabilityNFS()
 
 	adminClient.EXPECT().GetFS(gomock.Any(), gomock.Any()).
 		Return(gopowerstore.FileSystem{
@@ -432,6 +416,10 @@ func Test_ControllerPublishVolume_NFS_FailureModifyingNfsExport(t *testing.T) {
 		Return(gopowerstore.CreateResponse{
 			ID: "exportID",
 		}, nil).
+		Times(1)
+
+	adminClient.EXPECT().GetNFSExportByFileSystemID(gomock.Any(), gomock.Any()).
+		Return(gopowerstore.NFSExport{ID: "exportID", Name: "exportName"}, nil).
 		Times(1)
 
 	apiThrottleMock.EXPECT().Acquire(gomock.Any()).
@@ -485,7 +473,7 @@ func Test_ControllerPublishVolume_NodeNotFound(t *testing.T) {
 	adminClient.EXPECT().GetVolume(gomock.Any(), gomock.Any()).
 		Return(gopowerstore.Volume{ID: req.VolumeId}, nil)
 	adminClient.EXPECT().GetHostByName(gomock.Any(), gomock.Any()).
-		Return(gopowerstore.Host{}, *apiError)
+		Return(gopowerstore.Host{}, *apiError).Times(2)
 
 	_, err := svc.ControllerPublishVolume(*ctx, req)
 
@@ -751,7 +739,7 @@ func Test_ControllerUnpublishVolume_NodeNotFound(t *testing.T) {
 	adminClient.EXPECT().GetVolume(gomock.Any(), gomock.Any()).
 		Return(gopowerstore.Volume{ID: req.VolumeId}, nil)
 	adminClient.EXPECT().GetHostByName(gomock.Any(), gomock.Any()).
-		Return(gopowerstore.Host{}, *apiError)
+		Return(gopowerstore.Host{}, *apiError).Times(2)
 
 	_, err := svc.ControllerUnpublishVolume(*ctx, req)
 
