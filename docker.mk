@@ -10,11 +10,11 @@ else
 endif
 
 ifndef DOCKER_REGISTRY
-    DOCKER_REGISTRY=
+    DOCKER_REGISTRY=dellemc
 endif
 
 ifndef DOCKER_IMAGE_NAME
-    DOCKER_IMAGE_NAME=csi_powerstore
+    DOCKER_IMAGE_NAME=csi-powerstore
 endif
 
 ifndef BASEIMAGE
