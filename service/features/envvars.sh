@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-X_CSI_POWERSTORE_ENDPOINT=http://localhost
+X_CSI_POWERSTORE_ENDPOINT=http://127.0.0.1/api/rest
 X_CSI_POWERSTORE_USER=admin
 X_CSI_POWERSTORE_PASSWORD=password
 X_CSI_POWERSTORE_NODE_ID_PATH=./features/machine-id

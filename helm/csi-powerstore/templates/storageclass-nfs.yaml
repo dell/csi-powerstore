@@ -4,6 +4,7 @@ kind: StorageClass
 metadata:
   name: {{ required "Must provide a storage class name." .Values.storageClass.name}}-nfs
   annotations:
+    "helm.sh/resource-policy": keep
 provisioner: {{ .Values.driverName }}
 reclaimPolicy: {{ required "Must provide a storage class reclaim policy." .Values.storageClass.reclaimPolicy }}
 allowVolumeExpansion: true

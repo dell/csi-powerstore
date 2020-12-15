@@ -12,14 +12,15 @@ CSI PowerStore is a [Container Storage Interface (CSI)](https://github.com/conta
 
 It supports CSI specification version 1.1.
 
-A more detailed guide can be found in [Product Guide](https://github.com/dell/csi-powerstore/blob/master/CSI%20Driver%20for%20Dell%20EMC%20PowerStore%20Product%20Guide.pdf) 
+This project may be compiled as a stand-alone binary using Golang that, when run, provides a valid CSI endpoint. This project can also be built as a Golang plug-in in order to extend the functionality of other programs.
 
+For Documentation, please go to [Dell CSI Driver Documentation](https://dell.github.io/storage-plugin-docs).
 
 ## Support
 
-The CSI Driver for Dell EMC PowerStore image, which is the built driver code, is available on Dockerhub and is officially supported by Dell EMC.
+The CSI Driver for Dell EMC PowerStore image, which is the built driver code, is available on DockerHub and is officially supported by Dell EMC.
 
-The source code for CSI Driver for Dell EMC PowerStore available on Github is unsupported and provided solely under the terms of the license attached to the source code. For clarity, Dell EMC does not provide support for any source code modifications.
+The source code for CSI Driver for Dell EMC PowerStore available on GitHub is unsupported and provided solely under the terms of the license attached to the source code. For clarity, Dell EMC does not provide support for any source code modifications.
 
 For any CSI driver issues, questions or feedback, join the [Dell EMC Container community](https://www.dell.com/community/Containers/bd-p/Containers).
 
@@ -35,6 +36,7 @@ To run unit tests, execute `make test`.
 To build a docker image, execute `make docker`.
 
 ## Runtime Dependencies
+
 Both the Controller and the Node portions of the driver can only be run on nodes with network connectivity to a Dell EMC PowerStore server (which is used by the driver). 
 
 If you want to use iSCSI as a transport protocol be sure that `iscsi-initiator-utils` package is installed on your node. 
@@ -42,27 +44,19 @@ If you want to use iSCSI as a transport protocol be sure that `iscsi-initiator-u
 If you want to use FC be sure that zoning of Host Bus Adapters to the FC port directors was done. 
 
 If you want to use NFS be sure to enable it in `myvalues.yaml` and configure NAS server on PowerStore
+
 ## Installation
+This is brief description of installation procedure, for more detailed installation instructions go to [Helm Installation](https://dell.github.io/storage-plugin-docs/docs/installation/helm/powerstore/) page of documentation. 
 
 Installation in a Kubernetes cluster should be done using the scripts within the `dell-csi-helm-installer` directory. 
-#### Prerequisites
-- Upstream Kubernetes versions 1.17, 1.18 or 1.19 or OpenShift versions 4.3, 4.4
-- Snapshot CRDs and snapshot controller installed in cluster
 
-    If your Kubernetes distribution does not bundle the snapshot controller, you may manually install these components by executing the following steps
-    ```bash
-    git clone https://github.com/kubernetes-csi/external-snapshotter/
-    cd ./external-snapshotter
-    git checkout release-2.1
-    kubectl create -f config/crd
-    kubectl create -f deploy/kubernetes/snapshot-controller
-    ```
-    > For general use, update the snapshot controller YAMLs with an appropriate namespace prior to installing. For example, on a Vanilla Kubernetes cluster update the namespace from 'default' to 'kube-system' prior to issuing the kubectl create command.
-- You can access your cluster with `kubectl`
+#### Prerequisites
+- Upstream Kubernetes versions 1.17, 1.18, 1.19 or 1.20 or OpenShift versions 4.5, 4.6
+- You can access your cluster with `kubectl` and `helm`
 
 #### Procedure
 1. Run `git clone https://github.com/dell/csi-powerstore.git` to clone the git repository
-2. Ensure that you've created namespace where you want to install the driver. You can run `kubectl create namespace csi-powerstore` to create a new one 
+2. Ensure that you've created namespace where you want to install the driver. You can run `kubectl create namespace csi-powerstore` to create a new one. 
 3. Edit the `helm/secret.yaml`, point to correct namespace and replace the values for the username and password parameters.
     These values can be obtained using base64 encoding as described in the following example:
     ```
@@ -82,12 +76,10 @@ Installation in a Kubernetes cluster should be done using the scripts within the
     - *connection.nfs.nasServerName*: points to the NAS server that would be used
 7. Install the driver using `csi-install.sh` bash script by running `./csi-install.sh --namespace csi-powerstore --values ./my-powerstore-settings.yaml` 
 
-For more information on the installation scripts, consult the [README.md](dell-csi-helm-installer/README.md)
-
 
 ## Using driver
-To check if the driver is functioning correctly you can run simple tests from directory `test/simple` 
-[Product Guide](https://github.com/dell/csi-powerstore/blob/master/CSI%20Driver%20for%20Dell%20EMC%20PowerStore%20Product%20Guide.pdf) provides descriptions of how to run these and explains how they work.
+To check if the driver is functioning correctly you can run simple tests from directory `test/simple`
+[Test PowerStore Driver](https://dell.github.io/storage-plugin-docs/docs/installation/test/powerstore) page of documentation provides descriptions of how to run these and explains how they work.
 
 If you want to interact with the driver directly, you can use the Container Storage Client (`csc`) program provided via the [GoCSI](https://github.com/rexray/gocsi) project:
 

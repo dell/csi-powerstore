@@ -380,6 +380,7 @@ func (f *feature) iCallValidateVolumeCapabilitiesWithNotExistVolume() error {
 	ctx := new(context.Context)
 	req := new(csi.ValidateVolumeCapabilitiesRequest)
 	req.VolumeId = GoodVolumeID
+	req.VolumeCapabilities = append(req.VolumeCapabilities, getVolumeCapability())
 
 	apiError := gopowerstore.NewAPIError()
 	apiError.ErrorCode = gopowerstore.UnknownVolumeErrorCode
@@ -404,6 +405,7 @@ func (f *feature) iCallValidateVolumeCapabilitiesWithFailure() error {
 	ctx := new(context.Context)
 	req := new(csi.ValidateVolumeCapabilitiesRequest)
 	req.VolumeId = GoodVolumeID
+	req.VolumeCapabilities = append(req.VolumeCapabilities, getVolumeCapability())
 
 	ctrl := gomock.NewController(nil)
 	defer ctrl.Finish()
@@ -504,21 +506,10 @@ func getTypicalCreateVolumeNFSRequest(name string, size int64) *csi.CreateVolume
 	capacityRange.LimitBytes = size * 2
 	req.CapacityRange = capacityRange
 
-	mount := new(csi.VolumeCapability_MountVolume)
-	capability := new(csi.VolumeCapability)
-	accessType := new(csi.VolumeCapability_Mount)
-	accessType.Mount = mount
-	capability.AccessType = accessType
-
-	accessMode := new(csi.VolumeCapability_AccessMode)
-	accessMode.Mode = csi.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER
-	capability.AccessMode = accessMode
-
 	capabilities := make([]*csi.VolumeCapability, 0)
-	capabilities = append(capabilities, capability)
+	capabilities = append(capabilities, getVolumeCapabilityNFS())
 	req.VolumeCapabilities = capabilities
-	params["FsType"] = "nfs"
-	params["nasName"] = "AnyAnanasName"
+	params[keyNasName] = "AnyAnanasName"
 	return req
 }
 
@@ -1731,9 +1722,32 @@ func (f *feature) iCallFailureCreateCloneFs(size int) error {
 }
 
 func (f *feature) iCallNodeGetInfo() error {
+	ctrl := gomock.NewController(nil)
+	defer ctrl.Finish()
+
+	c := mock.NewMockClient(ctrl)
+
+	_, err := f.service.fileReader.ReadFile(f.service.opts.NodeIDFilePath)
+	if err == nil {
+		c.EXPECT().GetHostByName(gomock.Any(), gomock.Any()).Return(gopowerstore.Host{
+			Initiators: []gopowerstore.InitiatorInstance{
+				{
+					ActiveSessions: []gopowerstore.ActiveSessionInstance{
+						{
+							FcPortID: "some-id-of-fc-port",
+						},
+					},
+				},
+			},
+		}, nil).Times(1)
+	}
+
 	ctx := new(context.Context)
 	req := new(csi.NodeGetInfoRequest)
+
+	f.service.adminClient = c
 	f.service.nodeID = ""
+	f.service.useFC = true
 	f.nodeGetInfoResponse, f.err = f.service.NodeGetInfo(*ctx, req)
 	return nil
 }
@@ -2463,11 +2477,32 @@ func (f *feature) iCallPublishVolumeWithTo(accessMode, nodeID string) error {
 	return nil
 }
 
+func getVolumeCapability() *csi.VolumeCapability {
+	accessMode := new(csi.VolumeCapability_AccessMode)
+	accessMode.Mode = csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER
+	capability := new(csi.VolumeCapability)
+	capability.AccessMode = accessMode
+	return capability
+}
+
+func getVolumeCapabilityNFS() *csi.VolumeCapability {
+	accessMode := new(csi.VolumeCapability_AccessMode)
+	accessMode.Mode = csi.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER
+	accessType := new(csi.VolumeCapability_Mount)
+	mountVolume := new(csi.VolumeCapability_MountVolume)
+	mountVolume.FsType = "nfs"
+	accessType.Mount = mountVolume
+	capability := new(csi.VolumeCapability)
+	capability.AccessMode = accessMode
+	capability.AccessType = accessType
+	return capability
+}
+
 func (f *feature) iCallPublishNFSVolumeWithTo(accessMode, nodeID string) error {
 	req := f.getControllerPublishVolumeRequest(accessMode, nodeID)
 	req.VolumeContext = make(map[string]string)
-	req.VolumeContext["FsType"] = "nfs"
-	req.VolumeContext["nasName"] = "NASName"
+	req.VolumeCapability = getVolumeCapabilityNFS()
+	req.VolumeContext[keyNasName] = "NASName"
 	f.publishVolumeRequest = req
 
 	ctrl := gomock.NewController(nil)
@@ -2502,6 +2537,11 @@ func (f *feature) iCallPublishNFSVolumeWithTo(accessMode, nodeID string) error {
 	c.EXPECT().CreateNFSExport(gomock.Any(), nfsExportCreate).
 		Return(gopowerstore.CreateResponse{ID: nfsID}, nil).
 		Times(1)
+
+	c.EXPECT().GetNFSExportByFileSystemID(gomock.Any(), gomock.Any()).
+		Return(gopowerstore.NFSExport{
+			ID: nfsID,
+		}, nil).Times(1)
 
 	c.EXPECT().ModifyNFSExport(gomock.Any(), gomock.Any(), nfsID).
 		Return(gopowerstore.CreateResponse{}, nil).

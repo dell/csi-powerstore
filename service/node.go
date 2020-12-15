@@ -20,30 +20,34 @@ package service
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
+
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/gobrick"
 	"github.com/dell/gofsutil"
+	"github.com/dell/goiscsi"
 	"github.com/dell/gopowerstore"
-	"google.golang.org/grpc/metadata"
-	"math/rand"
-	"net"
-	"os"
-	"path"
-	"strings"
-	"time"
-
-	"context"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+
+	"net"
+	"os"
+	"os/exec"
+	"path"
+	"regexp"
+	"strconv"
+	"strings"
 )
 
 const (
 	maximumStartupDelay         = 30
 	powerStoreMaxNodeNameLength = 64
 	blockVolumePathMarker       = "/csi/volumeDevices/publish/"
+	sysBlock                    = "/sys/block/"
 )
 
 func (s *service) NodeStageVolume(
@@ -58,13 +62,9 @@ func (s *service) NodeStageVolume(
 		return nil, err
 	}
 
-	publishContext := req.GetPublishContext()
 	var useNFS bool
-	fsType, ok := publishContext[keyFsType]
-	// FsType can be empty
-	if ok {
-		useNFS = strings.ToLower(fsType) == "nfs"
-	}
+	fsType := req.VolumeCapability.GetMount().GetFsType()
+	useNFS = fsType == "nfs"
 
 	// Get the VolumeID and validate against the volume
 	volID := req.GetVolumeId()
@@ -165,14 +165,20 @@ func (s *service) NodePublishVolume(
 		return nil, err
 	}
 
-	publishContext := req.GetPublishContext()
 	var useNFS bool
-	fsType, ok := publishContext[keyFsType]
-	// FsType can be empty
+	fsType := req.VolumeCapability.GetMount().GetFsType()
+	useNFS = fsType == "nfs"
+
+	var ephemeralVolume bool
+	ephemeral, ok := req.VolumeContext["csi.storage.k8s.io/ephemeral"]
 	if ok {
-		useNFS = strings.ToLower(fsType) == "nfs"
+		ephemeralVolume = strings.ToLower(ephemeral) == "true"
 	}
 
+	if ephemeralVolume {
+		resp, err := s.ephemeralNodePublish(ctx, req)
+		return resp, err
+	}
 	// Get the VolumeID and validate against the volume
 	volID := req.GetVolumeId()
 	if volID == "" {
@@ -212,6 +218,7 @@ func (s *service) NodePublishVolume(
 			return nil, err
 		}
 	}
+
 	log.WithFields(logFields).Info("publish complete")
 	return &csi.NodePublishVolumeResponse{}, nil
 }
@@ -229,16 +236,19 @@ func (s *service) NodeUnpublishVolume(
 		log.Error("target path required")
 		return nil, status.Error(codes.InvalidArgument, "target path required")
 	}
-
 	volID := req.GetVolumeId()
 	if volID == "" {
 		return nil, status.Error(codes.InvalidArgument, "volume ID is required")
 	}
 
+	var ephemeralVolume bool
+	lockFile := ephemeralStagingMountPath + volID + "/id"
+	if s.fileExists(lockFile) {
+		ephemeralVolume = true
+	}
 	logFields["ID"] = volID
 	logFields["TargetPath"] = target
 	ctx = setLogFields(ctx, logFields)
-
 	log.WithFields(logFields).Info("calling unpublish")
 
 	if err = s.nodeMountLib.UnpublishVolume(ctx, req); err != nil {
@@ -246,6 +256,15 @@ func (s *service) NodeUnpublishVolume(
 		return nil, err
 	}
 	log.WithFields(logFields).Info("unpublish complete")
+	log.Debug("Checking for ephemeral after node unpublish")
+	if ephemeralVolume {
+		log.Info("Detected ephemeral")
+		err = s.ephemeralNodeUnpublish(ctx, req)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return &csi.NodeUnpublishVolumeResponse{}, nil
 }
 
@@ -283,10 +302,74 @@ func (s *service) NodeGetInfo(
 			return nil, err
 		}
 	}
-
-	return &csi.NodeGetInfoResponse{
+	// Create the topology keys
+	// <driver name>/<endpoint>-<protocol>: true
+	resp := &csi.NodeGetInfoResponse{
 		NodeId: s.nodeID,
-	}, nil
+		AccessibleTopology: &csi.Topology{
+			Segments: map[string]string{},
+		},
+	}
+
+	// NFS should be accessible if we got here
+	resp.AccessibleTopology.Segments[Name+"/"+s.endpointIP+"-"+"nfs"] = "true"
+
+	if s.opts.PreferredTransport != noneTransport {
+		if s.useFC {
+			// Check node initiators connection to array
+			nodeID := s.nodeID
+			if s.reusedHost {
+				ipList := getIPListFromString(nodeID)
+				if ipList == nil || len(ipList) == 0 {
+					return nil, errors.New("can't find ip in nodeID")
+				}
+				ip := ipList[0]
+
+				nodeID = strings.ReplaceAll(nodeID, "-"+ip, "")
+			}
+
+			host, err := s.adminClient.GetHostByName(ctx, nodeID)
+			if err != nil {
+				log.WithFields(log.Fields{
+					"hostName": nodeID,
+					"error":    err,
+				}).Error("Could not find host on PowerStore array")
+				return resp, status.Errorf(codes.Internal,
+					"Could not find host on PowerStore array: %s", err.Error())
+			}
+
+			if len(host.Initiators) == 0 {
+				log.Error("Host initiators array is empty")
+				return resp, nil // We don't really want to return an error
+			}
+
+			if len(host.Initiators[0].ActiveSessions) != 0 {
+				resp.AccessibleTopology.Segments[Name+"/"+s.endpointIP+"-"+"fc"] = "true"
+			} else {
+				log.WithFields(log.Fields{
+					"hostName":  host.Name,
+					"initiator": host.Initiators[0].PortName,
+				}).Error("There is no active FC sessions")
+			}
+		} else {
+			infoList, err := getISCSITargetsInfoFromStorage(s.adminClient)
+			if err != nil {
+				log.Error("Couldn't get targets from array", err.Error())
+				return resp, status.Errorf(codes.Internal,
+					"Couldn't get targets from array: %s", err.Error())
+			}
+
+			_, err = s.iscsiLib.DiscoverTargets(infoList[0].Portal, false)
+			if err != nil {
+				log.Error("Couldn't discover targets")
+				return resp, nil
+			}
+
+			resp.AccessibleTopology.Segments[Name+"/"+s.endpointIP+"-"+"iscsi"] = "true"
+		}
+	}
+
+	return resp, nil
 }
 
 func (s *service) NodeGetVolumeStats(
@@ -305,6 +388,7 @@ func (si *serviceIMPL) nodeProbe(ctx context.Context) (bool, error) {
 		return false, err
 	}
 	si.implProxy.initNodeFSLib()
+	si.implProxy.initISCSILib()
 	si.implProxy.initNodeMountLib()
 	si.implProxy.initNodeVolToDevMapper()
 	si.implProxy.initISCSIConnector()
@@ -323,9 +407,22 @@ func (si *serviceIMPL) updateNodeID() error {
 			return status.Errorf(codes.FailedPrecondition,
 				"Could not readNode ID file: %s", err.Error())
 		}
-		ip := getOutboundIP()
+
+		// Check connection to array and get ip
+		ip, err := getOutboundIP(si.service.endpointIP)
+		if err != nil {
+			log.WithFields(log.Fields{
+				"endpoint": si.service.endpointIP,
+				"error":    err,
+			}).Error("Could not connect to PowerStore array")
+			return status.Errorf(codes.FailedPrecondition,
+				"Could not to PowerStore array: %s", err.Error())
+		}
+
 		nodeID := fmt.Sprintf(
-			"%s-%s-%s", si.service.opts.NodeNamePrefix, strings.TrimSpace(string(hostID)), ip.String())
+			"%s-%s-%s", si.service.opts.NodeNamePrefix, strings.TrimSpace(string(hostID)), ip.String(),
+		)
+
 		if len(nodeID) > powerStoreMaxNodeNameLength {
 			err := errors.New("node name prefix is too long")
 			log.WithFields(log.Fields{
@@ -340,21 +437,30 @@ func (si *serviceIMPL) updateNodeID() error {
 }
 
 // Get preferred outbound ip of this machine
-func getOutboundIP() net.IP {
-	conn, err := net.Dial("udp", "192.168.100.1:80")
+func getOutboundIP(endpoint string) (net.IP, error) {
+	conn, err := net.Dial("udp", fmt.Sprintf("%s:80", endpoint))
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 	defer conn.Close()
 
 	localAddr := conn.LocalAddr().(*net.UDPAddr)
 
-	return localAddr.IP
+	return localAddr.IP, nil
 }
 
 func (si *serviceIMPL) initNodeFSLib() {
 	if si.service.nodeFSLib == nil {
 		si.service.nodeFSLib = &gofsutilWrapper{}
+	}
+}
+
+func (si *serviceIMPL) initISCSILib() {
+	if si.service.iscsiLib == nil {
+		iSCSIOpts := make(map[string]string)
+		iSCSIOpts["chrootDirectory"] = si.service.opts.NodeChrootPath
+
+		si.service.iscsiLib = goiscsi.NewLinuxISCSI(iSCSIOpts)
 	}
 }
 
@@ -368,7 +474,12 @@ func (si *serviceIMPL) initISCSIConnector() {
 	if si.service.iscsiConnector == nil {
 		setupGobrick(si.service)
 		si.service.iscsiConnector = gobrick.NewISCSIConnector(
-			gobrick.ISCSIConnectorParams{Chroot: si.service.opts.NodeChrootPath})
+			gobrick.ISCSIConnectorParams{
+				Chroot:       si.service.opts.NodeChrootPath,
+				ChapUser:     si.service.opts.CHAPUserName,
+				ChapPassword: si.service.opts.CHAPPassword,
+				ChapEnabled:  si.service.opts.EnableCHAP,
+			})
 	}
 }
 
@@ -435,11 +546,10 @@ func (si *serviceIMPL) readFCTargetsFromPublishContext(pc map[string]string) []F
 // nodeStartup performs a few necessary functions for the nodes to function properly
 // - validates that at least one iSCSI initiator is defined
 // - validates that a connection to PowerStore exists
-// - invokes nodeHostSetup in a thread
+// - invokes nodeHostSetup
 //
 // returns halt service if unable to register node
 func (si *serviceIMPL) nodeStartup(ctx context.Context, gs gracefulStopper) error {
-
 	if si.service.nodeIsInitialized {
 		return nil
 	}
@@ -501,13 +611,11 @@ func (si *serviceIMPL) nodeStartup(ctx context.Context, gs gracefulStopper) erro
 		}
 	}
 
-	go func() {
-		err := si.implProxy.nodeHostSetup(initiators, si.service.useFC, maximumStartupDelay)
-		if err != nil {
-			log.Errorf("error during nodeHostSetup: %s", err.Error())
-			gs.GracefulStop(ctx)
-		}
-	}()
+	err = si.implProxy.nodeHostSetup(initiators, si.service.useFC, maximumStartupDelay)
+	if err != nil {
+		log.Errorf("error during nodeHostSetup: %s", err.Error())
+		gs.GracefulStop(ctx)
+	}
 
 	return err
 }
@@ -519,27 +627,75 @@ func (si *serviceIMPL) nodeHostSetup(initiators []string, useFC bool, maximumSta
 	log.Info("**************************\nnodeHostSetup executing...\n*******************************")
 	defer log.Info("**************************\nnodeHostSetup completed...\n*******************************")
 
-	// we need to randomize a time before starting the interaction with PowerStore
-	// in order to reduce the concurrent workload on the system
-
-	// determine a random delay period (in
-	rand.Seed(time.Now().UTC().UnixNano())
-	period := rand.Int() % maximumStartupDelay // #nosec G404
-	// sleep ...
-	log.Printf("Waiting for %d seconds", period)
-	time.Sleep(time.Duration(period) * time.Second)
-
 	if si.service.nodeID == "" {
 		return fmt.Errorf("nodeID not set")
 	}
 
-	// register node on PowerStore
-	if len(initiators) > 0 {
+	reqInitiators := si.buildInitiatorsArray(useFC, initiators)
+	var host *gopowerstore.Host
+	updateCHAP := false
+
+	_, err := si.service.adminClient.GetHostByName(context.Background(), si.service.nodeID)
+	if err == nil {
+		si.service.nodeIsInitialized = true
+		return nil
+	}
+
+	hosts, err := si.service.adminClient.GetHosts(context.Background())
+	if err != nil {
+		log.Error(err.Error())
+		return err
+	}
+
+	for i, h := range hosts {
+		found := false
+		for _, hI := range h.Initiators {
+			for _, rI := range reqInitiators {
+				if hI.PortName == *rI.PortName && hI.PortType == *rI.PortType {
+					log.Info("Found existing host ", h.Name, hI.PortName, hI.PortType)
+					updateCHAP = si.service.opts.EnableCHAP && hI.ChapSingleUsername == ""
+					found = true
+					break
+				}
+			}
+			if found {
+				break
+			}
+		}
+		if found {
+			host = &hosts[i]
+			break
+		}
+	}
+
+	if host == nil {
+		// register node on PowerStore
 		err := si.implProxy.createOrUpdateHost(context.Background(), useFC, initiators)
 		if err != nil {
 			log.Error(err.Error())
 			return err
 		}
+	} else {
+		// node already registered
+		if updateCHAP { // add CHAP credentials if they aren't available
+			err := si.implProxy.modifyHostInitiators(context.Background(), host.ID, useFC, nil, nil, initiators)
+			if err != nil {
+				return fmt.Errorf("can't modify initiators CHAP credentials %s", err.Error())
+			}
+		}
+
+		ip, err := getOutboundIP(si.service.endpointIP)
+		if err != nil {
+			log.WithFields(log.Fields{
+				"endpoint": si.service.endpointIP,
+				"error":    err,
+			}).Error("Could not connect to PowerStore array")
+			return status.Errorf(codes.FailedPrecondition,
+				"Could not to PowerStore array: %s", err.Error())
+		}
+
+		si.service.nodeID = host.Name + "-" + ip.String()
+		si.service.reusedHost = true
 	}
 
 	si.service.nodeIsInitialized = true
@@ -559,13 +715,13 @@ func (si *serviceIMPL) createOrUpdateHost(ctx context.Context, useFC bool, initi
 		return err
 	}
 	initiatorsToAdd, initiatorsToDelete := checkIQNS(initiators, host)
-	return si.implProxy.modifyHostInitiators(ctx, host.ID, useFC, initiatorsToAdd, initiatorsToDelete)
+	return si.implProxy.modifyHostInitiators(ctx, host.ID, useFC, initiatorsToAdd, initiatorsToDelete, nil)
 }
 
 // register host
 func (si *serviceIMPL) createHost(ctx context.Context, useFC bool, initiators []string) (id string, err error) {
 	osType := gopowerstore.OSTypeEnumLinux
-	reqInitiators := buildInitiatorsArray(useFC, initiators)
+	reqInitiators := si.buildInitiatorsArray(useFC, initiators)
 	description := fmt.Sprintf("k8s node: %s", si.service.opts.KubeNodeName)
 	createParams := gopowerstore.HostCreate{Name: &si.service.nodeID, OsType: &osType, Initiators: &reqInitiators,
 		Description: &description}
@@ -578,7 +734,7 @@ func (si *serviceIMPL) createHost(ctx context.Context, useFC bool, initiators []
 
 // add or remove initiators from host
 func (si *serviceIMPL) modifyHostInitiators(ctx context.Context, hostID string, useFC bool,
-	initiatorsToAdd []string, initiatorsToDelete []string) error {
+	initiatorsToAdd []string, initiatorsToDelete []string, initiatorsToModify []string) error {
 	if len(initiatorsToDelete) > 0 {
 		modifyParams := gopowerstore.HostModify{}
 		modifyParams.RemoveInitiators = &initiatorsToDelete
@@ -589,8 +745,17 @@ func (si *serviceIMPL) modifyHostInitiators(ctx context.Context, hostID string, 
 	}
 	if len(initiatorsToAdd) > 0 {
 		modifyParams := gopowerstore.HostModify{}
-		initiators := buildInitiatorsArray(useFC, initiatorsToAdd)
+		initiators := si.buildInitiatorsArray(useFC, initiatorsToAdd)
 		modifyParams.AddInitiators = &initiators
+		_, err := si.service.adminClient.ModifyHost(ctx, &modifyParams, hostID)
+		if err != nil {
+			return err
+		}
+	}
+	if len(initiatorsToModify) > 0 {
+		modifyParams := gopowerstore.HostModify{}
+		initiators := si.buildInitiatorsArrayModify(useFC, initiatorsToModify)
+		modifyParams.ModifyInitiators = &initiators
 		_, err := si.service.adminClient.ModifyHost(ctx, &modifyParams, hostID)
 		if err != nil {
 			return err
@@ -626,7 +791,7 @@ func checkIQNS(IQNs []string, host gopowerstore.Host) (iqnToAdd, iqnToDelete []s
 	return
 }
 
-func buildInitiatorsArray(useFC bool, initiators []string) []gopowerstore.InitiatorCreateModify {
+func (si *serviceIMPL) buildInitiatorsArray(useFC bool, initiators []string) []gopowerstore.InitiatorCreateModify {
 	var portType gopowerstore.InitiatorProtocolTypeEnum
 	if useFC {
 		portType = gopowerstore.InitiatorProtocolTypeEnumFC
@@ -636,7 +801,38 @@ func buildInitiatorsArray(useFC bool, initiators []string) []gopowerstore.Initia
 	initiatorsReq := make([]gopowerstore.InitiatorCreateModify, len(initiators))
 	for i, iqn := range initiators {
 		iqn := iqn
-		initiatorsReq[i] = gopowerstore.InitiatorCreateModify{PortName: &iqn, PortType: &portType}
+		if !useFC && si.service.opts.EnableCHAP {
+			initiatorsReq[i] = gopowerstore.InitiatorCreateModify{
+				ChapSinglePassword: &si.service.opts.CHAPPassword,
+				ChapSingleUsername: &si.service.opts.CHAPUserName,
+				PortName:           &iqn,
+				PortType:           &portType,
+			}
+		} else {
+			initiatorsReq[i] = gopowerstore.InitiatorCreateModify{
+				PortName: &iqn,
+				PortType: &portType,
+			}
+		}
+	}
+	return initiatorsReq
+}
+
+func (si *serviceIMPL) buildInitiatorsArrayModify(useFC bool, initiators []string) []gopowerstore.UpdateInitiatorInHost {
+	initiatorsReq := make([]gopowerstore.UpdateInitiatorInHost, len(initiators))
+	for i, iqn := range initiators {
+		iqn := iqn
+		if !useFC && si.service.opts.EnableCHAP {
+			initiatorsReq[i] = gopowerstore.UpdateInitiatorInHost{
+				ChapSinglePassword: &si.service.opts.CHAPPassword,
+				ChapSingleUsername: &si.service.opts.CHAPUserName,
+				PortName:           &iqn,
+			}
+		} else {
+			initiatorsReq[i] = gopowerstore.UpdateInitiatorInHost{
+				PortName: &iqn,
+			}
+		}
 	}
 	return initiatorsReq
 }
@@ -729,7 +925,7 @@ func formatWWPN(data string) (string, error) {
 	return buffer.String(), nil
 }
 
-//NodeExpandVolume helps extending a volume size on a node
+// NodeExpandVolume helps extending a volume size on a node
 func (s *service) NodeExpandVolume(
 	ctx context.Context,
 	req *csi.NodeExpandVolumeRequest) (
@@ -771,14 +967,13 @@ func (s *service) NodeExpandVolume(
 	}
 	volumeWWN := vol.Wwn
 
-	//Locate and fetch all (multipath/regular) mounted paths using this volume
+	// Locate and fetch all (multipath/regular) mounted paths using this volume
 	var devMnt *gofsutil.DeviceMountInfo
 	var targetmount string
 	devMnt, err = gofsutil.GetMountInfoFromDevice(ctx, vol.Name)
 	if err != nil {
 		if isBlock {
-			log.WithField("CSIRequestID", reqID).Info("Block device detected- node expansion not required")
-			return &csi.NodeExpandVolumeResponse{}, nil
+			return nodeExpandRawBlockVolume(ctx, volumeWWN)
 		}
 		log.Infof("Failed to find mount info for (%s) with error (%s)", vol.Name, err.Error())
 		log.Info("Probably offline volume expansion. Will try to perform a temporary mount.")
@@ -836,7 +1031,7 @@ func (s *service) NodeExpandVolume(
 
 	// Rescan the device for the volume expanded on the array
 	for _, device := range devMnt.DeviceNames {
-		devicePath := "/sys/block/" + device
+		devicePath := sysBlock + device
 		err = gofsutil.DeviceRescan(context.Background(), devicePath)
 		if err != nil {
 			log.Errorf("Failed to rescan device (%s) with error (%s)", devicePath, err.Error())
@@ -852,11 +1047,14 @@ func (s *service) NodeExpandVolume(
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 	}
-	//For a regular device, get the device path (devMnt.DeviceNames[1]) where the filesystem is mounted
-	//PublishVolume creates devMnt.DeviceNames[0] but is left unused for regular devices
+	// For a regular device, get the device path (devMnt.DeviceNames[1]) where the filesystem is mounted
+	// PublishVolume creates devMnt.DeviceNames[0] but is left unused for regular devices
 	var devicePath string
 	if len(devMnt.DeviceNames) > 1 {
 		devicePath = "/dev/" + devMnt.DeviceNames[1]
+	} else if len(devMnt.DeviceNames) == 0 {
+		return nil, status.Error(codes.Internal,
+			fmt.Sprintf("Failed to find mount info for (%s) DeviceNames (%v)", vol.Name, devMnt.DeviceNames))
 	} else {
 		devicePath = "/dev/" + devMnt.DeviceNames[0]
 	}
@@ -866,15 +1064,92 @@ func (s *service) NodeExpandVolume(
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	log.Infof("Found %s filesystem mounted on volume %s", fsType, devMnt.MountPoint)
-	//Resize the filesystem
-	err = gofsutil.ResizeFS(context.Background(), devMnt.MountPoint, devicePath, devMnt.MPathName, fsType)
-	if err != nil {
-		log.Errorf("Failed to resize filesystem: mountpoint (%s) device (%s) with error (%s)",
-			devMnt.MountPoint, devicePath, err.Error())
+	// Resize the filesystem
+	var xfsNew bool
+	checkVersCmd := "xfs_growfs -V"
+	bufcheck, errcheck := exec.Command("bash", "-c", checkVersCmd).Output()
+	if errcheck != nil {
+		return nil, errcheck
+	}
+	outputcheck := string(bufcheck)
+	versionRegx := regexp.MustCompile(`version (?P<versmaj>\d+)\.(?P<versmin>\d+)\..+`)
+	match := versionRegx.FindStringSubmatch(outputcheck)
+	subMatchMap := make(map[string]string)
+	for i, name := range versionRegx.SubexpNames() {
+		if i != 0 {
+			subMatchMap[name] = match[i]
+		}
+	}
+
+	if s, err := strconv.ParseFloat(subMatchMap["versmaj"]+"."+subMatchMap["versmin"], 64); err == nil {
+		fmt.Println(s)
+		if s >= 5.0 { // need to check exact version
+			xfsNew = true
+		} else {
+			xfsNew = false
+		}
+	} else {
 		return nil, status.Error(codes.Internal, err.Error())
+	}
+	if fsType == "xfs" && xfsNew {
+		err = gofsutil.ResizeFS(context.Background(), devMnt.MountPoint, devicePath, "", fsType)
+		if err != nil {
+			log.Errorf("Failed to resize filesystem: mountpoint (%s) device (%s) with error (%s)",
+				devMnt.MountPoint, devicePath, err.Error())
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+	} else {
+		err = gofsutil.ResizeFS(context.Background(), devMnt.MountPoint, devicePath, devMnt.MPathName, fsType)
+		if err != nil {
+			log.Errorf("Failed to resize filesystem: mountpoint (%s) device (%s) with error (%s)",
+				devMnt.MountPoint, devicePath, err.Error())
+			return nil, status.Error(codes.Internal, err.Error())
+		}
 	}
 
 	return &csi.NodeExpandVolumeResponse{}, nil
+}
+
+func nodeExpandRawBlockVolume(ctx context.Context, volumeWWN string) (*csi.NodeExpandVolumeResponse, error) {
+	log.Info(" Block volume expansion. Will try to perform a rescan...")
+	wwnNum := strings.Replace(volumeWWN, "naa.", "", 1)
+	deviceNames, err := gofsutil.GetSysBlockDevicesForVolumeWWN(context.Background(), wwnNum)
+	if err != nil {
+		log.Errorf("Failed to get block devices with error (%s)", err.Error())
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	if len(deviceNames) > 0 {
+		var devName string
+		for _, deviceName := range deviceNames {
+			devicePath := sysBlock + deviceName
+			log.Infof("Rescanning unmounted (raw block) device %s to expand size", deviceName)
+			err = gofsutil.DeviceRescan(context.Background(), devicePath)
+			if err != nil {
+				log.Errorf("Failed to rescan device (%s) with error (%s)", devicePath, err.Error())
+				return nil, status.Error(codes.Internal, err.Error())
+			}
+			devName = deviceName
+		}
+
+		mpathDev, err := gofsutil.GetMpathNameFromDevice(ctx, devName)
+		fmt.Println("mpathDev: " + mpathDev)
+		if err != nil {
+			log.Errorf("Failed to get mpath name for device (%s) with error (%s)", devName, err.Error())
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+		if mpathDev != "" {
+			err = gofsutil.ResizeMultipath(context.Background(), mpathDev)
+			if err != nil {
+				log.Errorf("Failed to resize multipath of block device (%s) with error (%s)", mpathDev, err.Error())
+				return nil, status.Error(codes.Internal, err.Error())
+			}
+		}
+
+		log.Info("Block volume successfuly rescaned.")
+		return &csi.NodeExpandVolumeResponse{}, nil
+	}
+	log.Error("No raw block devices found")
+	return nil, status.Error(codes.NotFound, "No raw block devices found")
 }
 
 type volToDevFile struct {

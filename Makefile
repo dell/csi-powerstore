@@ -14,7 +14,7 @@ ifndef MAJOR
     MAJOR=1
 endif
 ifndef MINOR
-    MINOR=1
+    MINOR=2
 endif
 ifndef PATCH
     PATCH=0

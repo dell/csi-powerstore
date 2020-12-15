@@ -20,6 +20,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/gopowerstore"
@@ -54,14 +55,26 @@ func (s *SCSIPublisher) Publish(ctx context.Context, req *csi.ControllerPublishV
 	volume := &s.volume
 	publishContext := make(map[string]string)
 
+	var node gopowerstore.Host
 	node, err := client.GetHostByName(ctx, kubeNodeID)
 	if err != nil {
 		if apiError, ok := err.(gopowerstore.APIError); ok && apiError.HostIsNotExist() {
-			return nil, status.Errorf(codes.NotFound, "host with k8s node ID '%s' not found", kubeNodeID)
+			// We need additional check here since we can just have host without ip in it
+			ipList := getIPListFromString(kubeNodeID)
+			if ipList == nil || len(ipList) == 0 {
+				return nil, errors.New("can't find ip in nodeID")
+			}
+			ip := ipList[0]
+			nodeID := kubeNodeID[:len(kubeNodeID)-len(ip)-1]
+			node, err = client.GetHostByName(ctx, nodeID)
+			if err != nil {
+				return nil, status.Errorf(codes.NotFound, "host with k8s node ID '%s' not found", kubeNodeID)
+			}
+		} else {
+			return nil, status.Errorf(codes.Internal,
+				"failure checking host '%s' status for volume publishing: %s",
+				kubeNodeID, err.Error())
 		}
-		return nil, status.Errorf(codes.Internal,
-			"failure checking host '%s' status for volume publishing: %s",
-			kubeNodeID, err.Error())
 	}
 
 	mapping, err := client.GetHostVolumeMappingByVolumeID(ctx, volume.ID)
@@ -153,7 +166,7 @@ func (s *SCSIPublisher) addLUNIDToPublishContext(
 func (s *SCSIPublisher) addTargetsInfoToPublishContext(
 	publishContext map[string]string, client gopowerstore.Client) error {
 
-	iscsiTargetsInfo, err := s.getISCSITargetsInfoFromStorage(client)
+	iscsiTargetsInfo, err := getISCSITargetsInfoFromStorage(client)
 	if err != nil {
 		return err
 	}
@@ -161,7 +174,7 @@ func (s *SCSIPublisher) addTargetsInfoToPublishContext(
 		publishContext[fmt.Sprintf("%s%d", PublishContextISCSIPortalsPrefix, i)] = t.Portal
 		publishContext[fmt.Sprintf("%s%d", PublishContextISCSITargetsPrefix, i)] = t.Target
 	}
-	fcTargetsInfo, err := s.getFCTargetsInfoFromStorage(client)
+	fcTargetsInfo, err := getFCTargetsInfoFromStorage(client)
 	if err != nil {
 		return err
 	}
@@ -172,7 +185,7 @@ func (s *SCSIPublisher) addTargetsInfoToPublishContext(
 	return nil
 }
 
-func (s *SCSIPublisher) getISCSITargetsInfoFromStorage(client gopowerstore.Client) ([]ISCSITargetInfo, error) {
+func getISCSITargetsInfoFromStorage(client gopowerstore.Client) ([]ISCSITargetInfo, error) {
 	addrInfo, err := client.GetStorageISCSITargetAddresses(context.Background())
 	if err != nil {
 		log.Error(err.Error())
@@ -189,7 +202,7 @@ func (s *SCSIPublisher) getISCSITargetsInfoFromStorage(client gopowerstore.Clien
 	return result, nil
 }
 
-func (s *SCSIPublisher) getFCTargetsInfoFromStorage(client gopowerstore.Client) ([]FCTargetInfo, error) {
+func getFCTargetsInfoFromStorage(client gopowerstore.Client) ([]FCTargetInfo, error) {
 	fcPorts, err := client.GetFCPorts(context.Background())
 	if err != nil {
 		log.Error(err.Error())
@@ -220,21 +233,20 @@ func (n *NfsPublisher) Publish(ctx context.Context, req *csi.ControllerPublishVo
 	}
 	publishContext := make(map[string]string)
 
-	ip, err := getIPFromNodeID(kubeNodeID)
-	if err != nil {
-		return nil, err
+	ipList := getIPListFromString(kubeNodeID)
+	if ipList == nil || len(ipList) == 0 {
+		return nil, errors.New("can't find ip in nodeID")
 	}
+	ip := ipList[0]
 
 	// Create NFS export if it doesn't exist
-	var exportID string
-
-	export, err := client.GetNFSExportByFileSystemID(ctx, fs.ID)
+	_, err = client.GetNFSExportByFileSystemID(ctx, fs.ID)
 	if err != nil {
 		if apiError, ok := err.(gopowerstore.APIError); ok && apiError.VolumeIsNotExist() {
 			if err = apiThrottle.Acquire(ctx); err != nil {
 				return nil, status.Error(codes.Internal, err.Error())
 			}
-			resp, err := client.CreateNFSExport(ctx, &gopowerstore.NFSExportCreate{
+			_, err := client.CreateNFSExport(ctx, &gopowerstore.NFSExportCreate{
 				Name:         fs.Name,
 				FileSystemID: req.GetVolumeId(),
 				Path:         "/" + fs.Name,
@@ -245,14 +257,18 @@ func (n *NfsPublisher) Publish(ctx context.Context, req *csi.ControllerPublishVo
 					"failure creating nfs export: %s",
 					err.Error())
 			}
-			exportID = resp.ID
 		} else {
 			return nil, status.Errorf(codes.Internal,
 				"failure checking nfs export status for volume publishing: %s",
 				err.Error())
 		}
-	} else {
-		exportID = export.ID
+	}
+
+	export, err := client.GetNFSExportByFileSystemID(ctx, fs.ID)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal,
+			"failure getting nfs export: %s",
+			err.Error())
 	}
 
 	// Add host IP to existing nfs export
@@ -261,7 +277,7 @@ func (n *NfsPublisher) Publish(ctx context.Context, req *csi.ControllerPublishVo
 	}
 	_, err = client.ModifyNFSExport(ctx, &gopowerstore.NFSExportModify{
 		AddHosts: &[]string{ip},
-	}, exportID)
+	}, export.ID)
 	apiThrottle.Release(ctx)
 	if err != nil {
 		if apiError, ok := err.(gopowerstore.APIError); !(ok && apiError.VolumeIsNotExist()) {
@@ -280,8 +296,7 @@ func (n *NfsPublisher) Publish(ctx context.Context, req *csi.ControllerPublishVo
 		return nil, status.Errorf(codes.Internal, "failure getting file interface %s", err.Error())
 	}
 	publishContext[keyNasName] = nas.Name // we need to pass that to node part of the driver
-	publishContext[keyFsType] = "nfs"     // we in nfs publish
-	publishContext["NfsExportPath"] = fileInterface.IpAddress + ":/" + fs.Name
+	publishContext["NfsExportPath"] = fileInterface.IpAddress + ":/" + export.Name
 	return &csi.ControllerPublishVolumeResponse{PublishContext: publishContext}, nil
 }
 
@@ -296,13 +311,4 @@ func (n *NfsPublisher) CheckIfVolumeExists(ctx context.Context, client gopowerst
 			err.Error())
 	}
 	return nil
-}
-
-func getIPFromNodeID(kubeNodeID string) (string, error) {
-	list := strings.Split(kubeNodeID, "-")
-	if len(list) < 3 {
-		return "", status.Error(codes.Internal, "can't find the ip in volumeID")
-	}
-	ip := list[len(list)-1]
-	return ip, nil
 }

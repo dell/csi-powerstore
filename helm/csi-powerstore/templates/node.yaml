@@ -69,11 +69,14 @@ spec:
       labels:
         app: {{ .Release.Name }}-node
     spec:
-      {{- if .Values.nodeOnMaster }}
+      {{ if .Values.node.nodeSelector }}
+      nodeSelector:
+      {{- toYaml .Values.node.nodeSelector | nindent 8 }}
+      {{ end }}
+      {{ if .Values.node.tolerations }}
       tolerations:
-        - key: node-role.kubernetes.io/master
-          effect: NoSchedule
-      {{- end }}
+      {{- toYaml .Values.node.tolerations | nindent 6 }}
+      {{ end }}
       serviceAccount: {{ .Release.Name }}-node
       hostNetwork: true
       hostIPC: true
@@ -129,6 +132,25 @@ spec:
               value: {{ .Values.nodeFCPortsFilterFile }}
             - name: X_CSI_ENABLE_TRACING
               value: "false"
+            - name: X_CSI_DRIVER_NAME
+              value: {{ .Values.driverName }}
+            {{- if eq .Values.connection.enableCHAP  true }}
+            - name: X_CSI_POWERSTORE_ENABLE_CHAP
+              value: "true"
+            - name: X_CSI_POWERSTORE_CHAP_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-creds
+                  key: chapuser
+            - name: X_CSI_POWERSTORE_CHAP_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-creds
+                  key: chapsecret
+            {{- else }}
+            - name: X_CSI_POWERMAX_ISCSI_ENABLE_CHAP
+              value: "false"
+            {{- end }}
           volumeMounts:
             - name: driver-path
               mountPath: /var/lib/kubelet/plugins/{{ .Values.driverName }}
@@ -148,6 +170,8 @@ spec:
               mountPath: /node-id
             - name: etciscsi
               mountPath: /etc/iscsi
+            - name: mpath
+              mountPath: /etc/multipath.conf
             - name: noderoot
               mountPath: /noderoot
         - name: registrar
@@ -196,7 +220,11 @@ spec:
         - name: etciscsi
           hostPath:
             path: /etc/iscsi
-            type: Directory
+            type: DirectoryOrCreate
+        - name: mpath
+          hostPath:
+            path: /etc/multipath.conf
+            type: FileOrCreate
         - name: noderoot
           hostPath:
             path: /

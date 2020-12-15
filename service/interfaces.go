@@ -23,6 +23,7 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/gobrick"
 	"github.com/dell/gofsutil"
+	"github.com/dell/gopowerstore"
 	"github.com/rexray/gocsi"
 	"io"
 	"net"
@@ -50,11 +51,13 @@ type internalServiceAPI interface {
 	createOrUpdateHost(ctx context.Context, useFC bool, initiators []string) error
 	createHost(ctx context.Context, useFC bool, initiators []string) (string, error)
 	modifyHostInitiators(ctx context.Context, hostID string, useFC bool,
-		initiatorsToAdd []string, initiatorsToDelete []string) error
+		initiatorsToAdd []string, initiatorsToDelete []string, initiatorsToModify []string) error
+	buildInitiatorsArray(useFC bool, initiators []string) []gopowerstore.InitiatorCreateModify
 	detachVolumeFromAllHosts(ctx context.Context, volumeID string) error
 	detachVolumeFromHost(ctx context.Context, hostID string, volumeID string) error
 	initNodeFSLib()
 	initNodeMountLib()
+	initISCSILib()
 	initISCSIConnector()
 	initFCConnector()
 	initNodeVolToDevMapper()
@@ -156,9 +159,13 @@ type filePath interface {
 type limitedOSIFace interface {
 	OpenFile(name string, flag int, perm os.FileMode) (limitedFileIFace, error)
 	Stat(name string) (limitedFileInfoIFace, error)
+	Create(name string) (*os.File, error)
+	ReadFile(name string) ([]byte, error)
 	IsNotExist(err error) bool
 	Mkdir(name string, perm os.FileMode) error
+	MkdirAll(name string, perm os.FileMode) error
 	Remove(name string) error
+	WriteString(file *os.File, string string) (int, error)
 	ExecCommand(name string, args ...string) ([]byte, error)
 }
 

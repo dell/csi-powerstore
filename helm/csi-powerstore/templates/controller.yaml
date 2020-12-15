@@ -11,6 +11,9 @@ apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: {{ .Release.Name }}-controller
 rules:
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["get", "watch", "list", "delete", "update", "create"]
   - apiGroups: [""]
     resources: ["events"]
     verbs: ["list", "watch", "create", "update", "patch"]
@@ -44,6 +47,12 @@ rules:
   - apiGroups: ["snapshot.storage.k8s.io"]
     resources: ["volumesnapshots", "volumesnapshots/status"]
     verbs: ["get", "list", "watch", "update"]
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["volumeattachments/status"]
+    verbs: ["patch"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
   - apiGroups: ["apiextensions.k8s.io"]
     resources: ["customresourcedefinitions"]
     verbs: ["create", "list", "watch", "delete"]
@@ -72,7 +81,7 @@ roleRef:
 
 ---
 
-kind: StatefulSet
+kind: Deployment
 apiVersion: apps/v1
 metadata:
   name: {{ .Release.Name }}-controller
@@ -80,23 +89,42 @@ metadata:
 spec:
   selector:
     matchLabels:
-      app: {{ .Release.Name }}-controller
-  updateStrategy: 
-    type: RollingUpdate
-  serviceName: {{ .Release.Name }}-controller
-  replicas: 1
+      name: {{ .Release.Name }}-controller
+  replicas: {{ required "Must provide the number of controller replicas." .Values.controller.replicas }}
   template:
     metadata:
       labels:
-        app: {{ .Release.Name }}-controller
+        name: {{ .Release.Name }}-controller
     spec:
-      serviceAccount: {{ .Release.Name }}-controller
+      {{ if .Values.controller.nodeSelector }}
+      nodeSelector:
+      {{- toYaml .Values.controller.nodeSelector | nindent 8 }}
+      {{ end }}
+      {{ if .Values.controller.tolerations }}
+      tolerations:
+      {{- toYaml .Values.controller.tolerations | nindent 6 }}
+      {{ end }}
+      serviceAccountName: {{ .Release.Name }}-controller
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: "name"
+                    operator: In
+                    values:
+                      - {{ .Release.Name }}-controller
+              topologyKey: "kubernetes.io/hostname"
       containers:
         - name: attacher
           image: {{ required "Must provide the CSI attacher container image." .Values.images.attacher }}
           args:
             - "--csi-address=$(ADDRESS)"
             - "--v=5"
+            - "--leader-election"
+            - "--worker-threads=130"
+            - "--resync=10s"
+            - "--timeout=130s"
           env:
             - name: ADDRESS
               value: /var/run/csi/csi.sock
@@ -108,6 +136,7 @@ spec:
           args:
             - "--csi-address=$(ADDRESS)"
             - "--v=5"
+            - "--leader-election"
           env:
             - name: ADDRESS
               value: /var/run/csi/csi.sock
@@ -121,6 +150,8 @@ spec:
             - "--volume-name-prefix={{ required "Must provide a value to prefix to driver created volume names" .Values.volumeNamePrefix }}"
             - "--volume-name-uuid-length=10"
             - "--v=5"
+            - "--leader-election"
+            - "--default-fstype={{ .Values.defaultFsType | default "ext4" }}"
           env:
             - name: ADDRESS
               value: /var/run/csi/csi.sock
@@ -132,6 +163,7 @@ spec:
           args:
             - "--csi-address=$(ADDRESS)"
             - "--v=5"
+            - "--leader-election"
           env:
             - name: ADDRESS
               value: /var/run/csi/csi.sock
