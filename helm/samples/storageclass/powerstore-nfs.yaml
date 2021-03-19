@@ -5,9 +5,8 @@ metadata:
 provisioner: csi-powerstore.dellemc.com
 reclaimPolicy: Delete
 allowVolumeExpansion: true
-volumeBindingMode: WaitForFirstConsumer
-allowedTopologies:
-  - matchLabelExpressions:
-      - key: csi-powerstore.dellemc.com/127.0.0.1-nfs
-        values:
-          - "true"
+volumeBindingMode: Immediate
+parameters:
+  arrayIP: "12.34.56.78"
+  FsType: nfs
+

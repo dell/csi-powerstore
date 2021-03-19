@@ -1,0 +1,5 @@
+quiet: False
+all: True
+inpackage: False
+dir: ./pkg
+disable-version-string: True

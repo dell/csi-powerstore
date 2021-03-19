@@ -1,0 +1,14 @@
+arrays:
+  - endpoint: "https://127.0.0.1/api/rest"
+    username: "admin"
+    password: "password"
+    insecure: true
+    block-protocol: "iSCSI"
+    nas-name: "test-nas"
+    default: true
+
+  - endpoint: "https://127.0.0.2/api/rest"
+    username: "user"
+    password: "password"
+    insecure: true
+    block-protocol: ""

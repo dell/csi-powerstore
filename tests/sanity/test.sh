@@ -12,7 +12,7 @@ kubectl run csi-sanity --image=$IMAGE --overrides='
 			"stdinOnce": true,
 			"tty": true,
 			"command": ["/app/csi-sanity/csi-sanity"],
-			"args": ["--ginkgo.v", "--csi.endpoint=/node.sock", "--csi.controllerendpoint=/controller.sock"],
+			"args": ["--ginkgo.v", "--csi.endpoint=/node.sock", "--csi.controllerendpoint=/controller.sock", "--csi.mountdir=/dev/mnt", "--csi.stagingdir=/dev/stg"],
 			"volumeMounts": [{
 				"name": "controller",
 				"mountPath": "/controller.sock"
@@ -26,15 +26,13 @@ kubectl run csi-sanity --image=$IMAGE --overrides='
 		"volumes": [{
 			"name":"controller",
 			"hostPath":{
-				"path": "/var/run/csi/controller-csi.sock",
-				"type": "File"
+				"path": "/var/run/csi/controller-csi.sock"
 			}
 		},
 		{
 			"name":"node",
 			"hostPath":{
-				"path": "/var/run/csi/node-csi.sock",
-				"type": "File"
+				"path": "/var/run/csi/node-csi.sock"
 			}
 		}]
 	}

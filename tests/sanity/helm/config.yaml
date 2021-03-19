@@ -1,0 +1,9 @@
+# sed "s/CONFIG_YAML/`cat config.yaml|base64 -w0`/g" secret.yaml | kubectl apply -f -
+arrays:
+  - endpoint: "https://1.2.3.4/api/rest"
+    username: "username"
+    password: "password"
+    insecure: true
+    default: true
+    block-protocol: "auto"
+

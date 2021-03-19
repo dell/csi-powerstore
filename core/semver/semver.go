@@ -103,7 +103,7 @@ func main() {
 
 	gitdesc := chkErr(doExec("git", "describe", "--long", "--dirty"))
 	rx := regexp.MustCompile(
-		`^[^\d]*(\d+)\.(\d+)\.(\d+)\.(\d{3})(?:(-?[a-zA-Z]+))?(?:-(\d+)-g(.+?)(?:-(dirty))?)?\s*$`)
+		`^[^\d]*(\d+)\.(\d+)\.(\d+)\-?(?:(-?[a-zA-Z]+))?(?:-(\d+)-g(.+?)(?:-(dirty))?)?\s*$`)
 	m := rx.FindStringSubmatch(gitdesc)
 	if len(m) == 0 {
 		fmt.Fprintf(os.Stderr, "error: match git describe failed: %s\n", gitdesc)
@@ -127,11 +127,10 @@ func main() {
 		Major:  toInt(m[1]),
 		Minor:  toInt(m[2]),
 		Patch:  toInt(m[3]),
-		Notes:  m[5],
-		Build:  m[4],
-		Sha7:   m[6],
+		Notes:  m[4],
+		Sha7:   m[5],
 		Sha32:  chkErr(doExec("git", "log", "-n1", `--format=%H`)),
-		Dirty:  m[7] != "",
+		Dirty:  m[6] != "",
 		Epoch:  toInt64(chkErr(doExec("git", "log", "-n1", `--format=%ct`))),
 	}
 	ver.SemVer = ver.String()
@@ -216,7 +215,6 @@ type semver struct {
 	Major       int    `json:"major"`
 	Minor       int    `json:"minor"`
 	Patch       int    `json:"patch"`
-	Build       string `json:"build"`
 	Notes       string `json:"notes"`
 	Dirty       bool   `json:"dirty"`
 	Sha7        string `json:"sha7"`
@@ -233,9 +231,6 @@ func (v *semver) String() string {
 	fmt.Fprintf(buf, "%d.%d.%d", v.Major, v.Minor, v.Patch)
 	if len(v.Notes) > 0 {
 		fmt.Fprintf(buf, "%s", v.Notes)
-	}
-	if len(v.Build) > 0 {
-		fmt.Fprintf(buf, "%s", v.Build)
 	}
 	if v.Dirty {
 		fmt.Fprint(buf, "+dirty")
@@ -256,7 +251,6 @@ func (v *semver) EnvVars() []string {
 		fmt.Sprintf("MAJOR=%d", v.Major),
 		fmt.Sprintf("MINOR=%d", v.Minor),
 		fmt.Sprintf("PATCH=%d", v.Patch),
-		fmt.Sprintf("BUILD=%s", v.Build),
 		fmt.Sprintf("NOTES=\"%s\"", v.Notes),
 		fmt.Sprintf("DIRTY=%v", v.Dirty),
 		fmt.Sprintf("SHA7=%s", v.Sha7),
