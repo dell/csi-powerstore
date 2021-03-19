@@ -116,6 +116,9 @@ spec:
                       - {{ .Release.Name }}-controller
               topologyKey: "kubernetes.io/hostname"
       containers:
+        {{- if hasKey .Values "dev" }}
+        {{ if .Values.dev.enableTracing }}{{- include "pstore.tracing" . | nindent 8 }}{{ end }}
+        {{- end }}
         - name: attacher
           image: {{ required "Must provide the CSI attacher container image." .Values.images.attacher }}
           args:
@@ -152,6 +155,8 @@ spec:
             - "--v=5"
             - "--leader-election"
             - "--default-fstype={{ .Values.defaultFsType | default "ext4" }}"
+            - "--extra-create-metadata"
+            - "--feature-gates=Topology=true"
           env:
             - name: ADDRESS
               value: /var/run/csi/csi.sock
@@ -175,31 +180,31 @@ spec:
           imagePullPolicy: Always
           command: [ "/csi-powerstore" ]
           env:
+            {{- if hasKey .Values "dev" }}
+            - name: ENABLE_TRACING
+              value: {{ .Values.dev.enableTracing | quote }}
+            {{ if .Values.dev.enableTracing }}{{- include "pstore.tracingenvvars" . | nindent 12 }}{{ end }}
+            {{- end }}
             - name: CSI_ENDPOINT
               value: /var/run/csi/csi.sock
             - name: X_CSI_MODE
               value: controller
             - name: X_CSI_DEBUG
               value: "true"
-            - name: X_CSI_POWERSTORE_ENDPOINT
-              value: {{ required "Must provide a POWERSTORE HTTPS endpoint." .Values.powerStoreApi }}
-            - name: X_CSI_POWERSTORE_USER
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Release.Name }}-creds
-                  key: username
-            - name: X_CSI_POWERSTORE_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Release.Name }}-creds
-                  key: password
-            - name: X_CSI_POWERSTORE_INSECURE
-              value: "true"
             - name: X_CSI_DRIVER_NAME
               value: {{ .Values.driverName }}
+            - name: X_CSI_POWERSTORE_EXTERNAL_ACCESS
+              value: {{ .Values.externalAccess }}
+            - name: X_CSI_POWERSTORE_CONFIG_PATH
+              value: /powerstore-config/config
           volumeMounts:
             - name: socket-dir
               mountPath: /var/run/csi
+            - name: powerstore-config
+              mountPath: /powerstore-config
       volumes:
         - name: socket-dir
           emptyDir:
+        - name: powerstore-config
+          secret:
+            secretName: {{ .Release.Name }}-config

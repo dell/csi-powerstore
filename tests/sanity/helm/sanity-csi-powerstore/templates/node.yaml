@@ -32,6 +32,10 @@ rules:
   - apiGroups: ["storage.k8s.io"]
     resources: ["volumeattachments"]
     verbs: ["get", "list", "watch", "update"]
+  - apiGroups: ["security.openshift.io"]
+    resourceNames: ["privileged"]
+    resources: ["securitycontextconstraints"]
+    verbs: ["use"]
 
 
 ---
@@ -65,13 +69,18 @@ spec:
       labels:
         app: {{ .Release.Name }}-node
     spec:
+      {{ if .Values.node.nodeSelector }}
+      nodeSelector:
+      {{- toYaml .Values.node.nodeSelector | nindent 8 }}
+      {{ end }}
+      {{ if .Values.node.tolerations }}
       tolerations:
-        - key: node-role.kubernetes.io/master
-          effect: NoSchedule
+      {{- toYaml .Values.node.tolerations | nindent 6 }}
+      {{ end }}
       serviceAccount: {{ .Release.Name }}-node
       hostNetwork: true
       hostIPC: true
-      containers:  
+      containers:
         - name: driver
           securityContext:
             privileged: true
@@ -97,32 +106,27 @@ spec:
               value: {{ .Values.nodeNamePrefix }}
             - name: X_CSI_POWERSTORE_NODE_ID_PATH
               value: /node-id
-            - name: X_CSI_POWERSTORE_ENDPOINT
-              value: {{ required "Must provide a POWERSTORE HTTPS endpoint." .Values.powerStoreApi }}
-            - name: X_CSI_POWERSTORE_USER
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Release.Name }}-creds
-                  key: username
-            - name: X_CSI_POWERSTORE_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Release.Name }}-creds
-                  key: password
             - name: X_CSI_POWERSTORE_NODE_CHROOT_PATH
               value: /noderoot
-            - name: X_CSI_POWERSTORE_INSECURE
-              value: "true"
-            - name: GOPOWERSTORE_DEBUG
-              value: "true"
+            - name: X_CSI_POWERSTORE_TMP_DIR
+              value: /var/lib/kubelet/plugins/{{ .Values.driverName }}/tmp
             - name: X_CSI_DRIVER_NAME
               value: {{ .Values.driverName }}
-            - name: X_CSI_TRANSPORT_PROTOCOL
-              value: {{ .Values.transportProtocol }}
             - name: X_CSI_FC_PORTS_FILTER_FILE_PATH
               value: {{ .Values.nodeFCPortsFilterFile }}
             - name: X_CSI_ENABLE_TRACING
               value: "false"
+            - name: X_CSI_DRIVER_NAME
+              value: {{ .Values.driverName }}
+            {{- if eq .Values.connection.enableCHAP  true }}
+            - name: X_CSI_POWERSTORE_ENABLE_CHAP
+              value: "true"
+            {{- else }}
+            - name: X_CSI_POWERSTORE_ENABLE_CHAP
+              value: "false"
+            {{- end }}
+            - name: X_CSI_POWERSTORE_CONFIG_PATH
+              value: /powerstore-config/config
           volumeMounts:
             - name: driver-path
               mountPath: /var/lib/kubelet/plugins/{{ .Values.driverName }}
@@ -131,6 +135,12 @@ spec:
               mountPropagation: "Bidirectional"
             - name: pods-path
               mountPath: /var/lib/kubelet/pods
+              mountPropagation: "Bidirectional"
+            - name: stg
+              mountPath: /dev/stg
+              mountPropagation: "Bidirectional"
+            - name: mnt
+              mountPath: /dev/mnt
               mountPropagation: "Bidirectional"
             - name: dev
               mountPath: /dev
@@ -142,8 +152,12 @@ spec:
               mountPath: /node-id
             - name: etciscsi
               mountPath: /etc/iscsi
+            - name: mpath
+              mountPath: /etc/multipath.conf
             - name: noderoot
               mountPath: /noderoot
+            - name: powerstore-config
+              mountPath: /powerstore-config
       volumes:
         - name: registration-dir
           hostPath:
@@ -160,6 +174,14 @@ spec:
           hostPath:
             path: /var/lib/kubelet/pods
             type: Directory
+        - name: stg
+          hostPath:
+            path: /dev/stg
+            type: Directory
+        - name: mnt
+          hostPath:
+            path: /dev/mnt
+            type: Directory
         - name: dev
           hostPath:
             path: /dev
@@ -171,7 +193,11 @@ spec:
         - name: etciscsi
           hostPath:
             path: /etc/iscsi
-            type: Directory
+            type: DirectoryOrCreate
+        - name: mpath
+          hostPath:
+            path: /etc/multipath.conf
+            type: FileOrCreate
         - name: noderoot
           hostPath:
             path: /
@@ -184,4 +210,6 @@ spec:
           hostPath:
             path: /run
             type: Directory
-
+        - name: powerstore-config
+          secret:
+            secretName: powerstore-config

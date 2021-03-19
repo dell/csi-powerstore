@@ -11,6 +11,9 @@ apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: {{ .Release.Name }}-controller
 rules:
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["get", "watch", "list", "delete", "update", "create"]
   - apiGroups: [""]
     resources: ["events"]
     verbs: ["list", "watch", "create", "update", "patch"]
@@ -19,7 +22,7 @@ rules:
     verbs: ["get", "list", "watch"]
   - apiGroups: [""]
     resources: ["persistentvolumes"]
-    verbs: ["get", "list", "watch", "create", "delete", "update"]
+    verbs: ["get", "list", "watch", "create", "delete", "update", "patch"]
   - apiGroups: [""]
     resources: ["persistentvolumeclaims"]
     verbs: ["get", "list", "watch", "update"]
@@ -28,19 +31,38 @@ rules:
     verbs: ["get", "list", "watch"]
   - apiGroups: ["storage.k8s.io"]
     resources: ["volumeattachments"]
+    verbs: ["get", "list", "watch", "update", "patch"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list"]
+  - apiGroups: ["snapshot.storage.k8s.io"]
+    resources: ["volumesnapshotclasses"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["snapshot.storage.k8s.io"]
+    resources: ["volumesnapshotcontents"]
+    verbs: ["create", "get", "list", "watch", "update", "delete"]
+  - apiGroups: ["snapshot.storage.k8s.io"]
+    resources: ["volumesnapshotcontents/status"]
+    verbs: ["update"]
+  - apiGroups: ["snapshot.storage.k8s.io"]
+    resources: ["volumesnapshots", "volumesnapshots/status"]
     verbs: ["get", "list", "watch", "update"]
-  {{- if eq .Capabilities.KubeVersion.Minor "13" }}
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["volumeattachments/status"]
+    verbs: ["patch"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
   - apiGroups: ["apiextensions.k8s.io"]
     resources: ["customresourcedefinitions"]
     verbs: ["create", "list", "watch", "delete"]
-  - apiGroups: ["csi.storage.k8s.io"]
-    resources: ["csinodeinfos"]
-    verbs: ["get", "list", "watch"]
-  {{- else }}
   - apiGroups: ["storage.k8s.io"]
     resources: ["csinodes"]
     verbs: ["get", "list", "watch"]
-  {{- end }}
+  # below for resizer
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims/status"]
+    verbs: ["update", "patch"]
 
 ---
 
@@ -59,7 +81,7 @@ roleRef:
 
 ---
 
-kind: StatefulSet
+kind: Deployment
 apiVersion: apps/v1
 metadata:
   name: {{ .Release.Name }}-controller
@@ -67,17 +89,32 @@ metadata:
 spec:
   selector:
     matchLabels:
-      app: {{ .Release.Name }}-controller
-  updateStrategy: 
-    type: RollingUpdate
-  serviceName: {{ .Release.Name }}-controller
-  replicas: 1
+      name: {{ .Release.Name }}-controller
+  replicas: {{ required "Must provide the number of controller replicas." .Values.controller.replicas }}
   template:
     metadata:
       labels:
-        app: {{ .Release.Name }}-controller
+        name: {{ .Release.Name }}-controller
     spec:
-      serviceAccount: {{ .Release.Name }}-controller
+      {{ if .Values.controller.nodeSelector }}
+      nodeSelector:
+      {{- toYaml .Values.controller.nodeSelector | nindent 8 }}
+      {{ end }}
+      {{ if .Values.controller.tolerations }}
+      tolerations:
+      {{- toYaml .Values.controller.tolerations | nindent 6 }}
+      {{ end }}
+      serviceAccountName: {{ .Release.Name }}-controller
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: "name"
+                    operator: In
+                    values:
+                      - {{ .Release.Name }}-controller
+              topologyKey: "kubernetes.io/hostname"
       containers:
         - name: driver
           image: {{ required "Must provide the PowerStore driver container image." .Values.images.driver }}
@@ -90,29 +127,22 @@ spec:
               value: controller
             - name: X_CSI_DEBUG
               value: "true"
-            - name: X_CSI_POWERSTORE_ENDPOINT
-              value: {{ required "Must provide a POWERSTORE HTTPS endpoint." .Values.powerStoreApi }}
-            - name: X_CSI_POWERSTORE_USER
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Release.Name }}-creds
-                  key: username
-            - name: X_CSI_POWERSTORE_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Release.Name }}-creds
-                  key: password
-            - name: X_CSI_POWERSTORE_INSECURE
-              value: "true"
-            - name: GOPOWERSTORE_DEBUG
-              value: "true"
             - name: X_CSI_DRIVER_NAME
               value: {{ .Values.driverName }}
+            - name: X_CSI_DRIVER_EXTERNAL_ACCESS
+              value: {{ .Values.externalAccess }}
+            - name: X_CSI_POWERSTORE_CONFIG_PATH
+              value: /powerstore-config/config
           volumeMounts:
             - name: socket-dir
               mountPath: /var/run/csi
+            - name: powerstore-config
+              mountPath: /powerstore-config
       volumes:
         - name: socket-dir
           hostPath:
             path: /var/run/csi
             type: DirectoryOrCreate
+        - name: powerstore-config
+          secret:
+            secretName: powerstore-config

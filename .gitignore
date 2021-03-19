@@ -17,3 +17,12 @@ gosecresults.csv
 
 # reports
 *.csv
+*.xml
+
+# coverage
+*.out
+*.html
+
+# logs
+*.log
+

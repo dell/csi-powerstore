@@ -1,0 +1,7 @@
+arrays:
+  - endpoint: "https://512.542.143.0/api/rest"
+    username: "admin"
+    password: "password"
+    insecure: true
+    block-protocol: "auto"
+    default: true

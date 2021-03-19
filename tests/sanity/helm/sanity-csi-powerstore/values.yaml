@@ -48,5 +48,5 @@ storageClass:
 # IT IS RECOMMENDED YOU DO NOT CHANGE THE IMAGES TO BE DOWNLOADED.
 images:
   # "images.driver" defines the container images used for the driver container.
-  driver: dellemc/csi-powerstore:v1.0.0.000R
+  driver:
 

@@ -78,9 +78,13 @@ spec:
       {{- toYaml .Values.node.tolerations | nindent 6 }}
       {{ end }}
       serviceAccount: {{ .Release.Name }}-node
+      dnsPolicy: ClusterFirstWithHostNet
       hostNetwork: true
       hostIPC: true
-      containers:  
+      containers:
+        {{- if hasKey .Values "dev" }}
+        {{ if .Values.dev.enableTracing }}{{- include "pstore.tracing" . | nindent 8 }}{{ end }}
+        {{- end}}
         - name: driver
           securityContext:
             privileged: true
@@ -91,6 +95,11 @@ spec:
           imagePullPolicy: Always
           command: [ "/csi-powerstore" ]
           env:
+            {{- if hasKey .Values "dev" }}
+            - name: ENABLE_TRACING
+              value: {{ .Values.dev.enableTracing | quote}}
+            {{ if .Values.dev.enableTracing }}{{- include "pstore.tracingenvvars" . | nindent 12 }}{{ end }}
+            {{- end}}
             - name: CSI_ENDPOINT
               value: unix:///var/lib/kubelet/plugins/{{ .Values.driverName }}/csi_sock
             - name: X_CSI_MODE
@@ -106,51 +115,25 @@ spec:
               value: {{ .Values.nodeNamePrefix }}
             - name: X_CSI_POWERSTORE_NODE_ID_PATH
               value: /node-id
-            - name: X_CSI_POWERSTORE_ENDPOINT
-              value: {{ required "Must provide a POWERSTORE HTTPS endpoint." .Values.powerStoreApi }}
-            - name: X_CSI_POWERSTORE_USER
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Release.Name }}-creds
-                  key: username
-            - name: X_CSI_POWERSTORE_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Release.Name }}-creds
-                  key: password
             - name: X_CSI_POWERSTORE_NODE_CHROOT_PATH
               value: /noderoot
-            - name: X_CSI_POWERSTORE_INSECURE
-              value: "true"
             - name: X_CSI_POWERSTORE_TMP_DIR
               value: /var/lib/kubelet/plugins/{{ .Values.driverName }}/tmp
             - name: X_CSI_DRIVER_NAME
               value: {{ .Values.driverName }}
-            - name: X_CSI_TRANSPORT_PROTOCOL
-              value: {{ .Values.connection.scsiProtocol }}
             - name: X_CSI_FC_PORTS_FILTER_FILE_PATH
               value: {{ .Values.nodeFCPortsFilterFile }}
-            - name: X_CSI_ENABLE_TRACING
-              value: "false"
             - name: X_CSI_DRIVER_NAME
               value: {{ .Values.driverName }}
             {{- if eq .Values.connection.enableCHAP  true }}
             - name: X_CSI_POWERSTORE_ENABLE_CHAP
               value: "true"
-            - name: X_CSI_POWERSTORE_CHAP_USERNAME
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Release.Name }}-creds
-                  key: chapuser
-            - name: X_CSI_POWERSTORE_CHAP_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Release.Name }}-creds
-                  key: chapsecret
             {{- else }}
-            - name: X_CSI_POWERMAX_ISCSI_ENABLE_CHAP
+            - name: X_CSI_POWERSTORE_ENABLE_CHAP
               value: "false"
             {{- end }}
+            - name: X_CSI_POWERSTORE_CONFIG_PATH
+              value: /powerstore-config/config
           volumeMounts:
             - name: driver-path
               mountPath: /var/lib/kubelet/plugins/{{ .Values.driverName }}
@@ -174,6 +157,8 @@ spec:
               mountPath: /etc/multipath.conf
             - name: noderoot
               mountPath: /noderoot
+            - name: powerstore-config
+              mountPath: /powerstore-config
         - name: registrar
           image: {{ required "Must provide the CSI node registrar container image." .Values.images.registrar }}
           args:
@@ -237,4 +222,6 @@ spec:
           hostPath:
             path: /run
             type: Directory
-
+        - name: powerstore-config
+          secret:
+            secretName: {{ .Release.Name }}-config

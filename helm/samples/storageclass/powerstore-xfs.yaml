@@ -1,0 +1,12 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: powerstore-xfs
+provisioner: csi-powerstore.dellemc.com
+reclaimPolicy: Delete
+allowVolumeExpansion: true
+volumeBindingMode: Immediate
+parameters:
+  arrayIP: "12.34.56.78"
+  FsType: xfs
+
