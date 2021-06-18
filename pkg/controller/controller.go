@@ -26,12 +26,16 @@ import (
 	"strconv"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/dell/csi-powerstore/core"
 	"github.com/dell/csi-powerstore/pkg/array"
 	"github.com/dell/csi-powerstore/pkg/common"
 	"github.com/dell/csi-powerstore/pkg/common/fs"
+	csiext "github.com/dell/dell-csi-extensions/replication"
+	csictx "github.com/dell/gocsi/context"
 	"github.com/dell/gopowerstore"
-	csictx "github.com/rexray/gocsi/context"
+	"github.com/golang/protobuf/ptypes/wrappers"
 	log "github.com/sirupsen/logrus"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -53,12 +57,24 @@ type Service struct {
 	externalAccess string
 
 	array.Locker
+
+	replicationContextPrefix string
+	replicationPrefix        string
 }
 
 // Init is a method that initializes internal variables of controller service
 func (s *Service) Init() error {
-	if nat, ok := csictx.LookupEnv(context.Background(), common.EnvExternalAccess); ok {
+	ctx := context.Background()
+	if nat, ok := csictx.LookupEnv(ctx, common.EnvExternalAccess); ok {
 		s.externalAccess = nat
+	}
+
+	if replicationContextPrefix, ok := csictx.LookupEnv(ctx, common.EnvReplicationContextPrefix); ok {
+		s.replicationContextPrefix = replicationContextPrefix
+	}
+
+	if replicationPrefix, ok := csictx.LookupEnv(ctx, common.EnvReplicationPrefix); ok {
+		s.replicationPrefix = replicationPrefix
 	}
 
 	return nil
@@ -69,16 +85,21 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 	params := req.GetParameters()
 
 	// Get array from map
-	arrayIP, ok := params[common.KeyArrayIP]
+	arrayID, ok := params[common.KeyArrayID]
 
 	var arr *array.PowerStoreArray
-	// If no ArrayIP was provided in storage class we just use default array
+	// If no ArrayID was provided in storage class we just use default array
 	if !ok {
-		arr = s.DefaultArray()
+		if _, ok := params["arrayIP"]; ok {
+			return nil, status.Error(codes.Internal, "Array IP's been provided, however it is not supported in "+
+				"current version. Configure you storage classes according to the documentation")
+		} else {
+			arr = s.DefaultArray()
+		}
 	} else {
-		arr, ok = s.Arrays()[arrayIP]
+		arr, ok = s.Arrays()[arrayID]
 		if !ok {
-			return nil, status.Errorf(codes.Internal, "can't find array with provided ip %s", arrayIP)
+			return nil, status.Errorf(codes.Internal, "can't find array with provided ip %s", arrayID)
 		}
 	}
 
@@ -106,8 +127,15 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 
 	if useNFS {
 		protocol = "nfs"
-		creator = &NfsCreator{
-			nasName: arr.GetNasName(),
+		nasParamsName, ok := params[KeyNasName]
+		if ok {
+			creator = &NfsCreator{
+				nasName: nasParamsName,
+			}
+		} else {
+			creator = &NfsCreator{
+				nasName: arr.GetNasName(),
+			}
 		}
 	} else {
 		protocol = "scsi"
@@ -162,16 +190,84 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 		if volResp == nil {
 			return nil, err
 		}
-		volResp.VolumeId = volResp.VolumeId + "/" + arr.GetIP() + "/" + protocol
+		volResp.VolumeId = volResp.VolumeId + "/" + arr.GetGlobalID() + "/" + protocol
 		volResp.AccessibleTopology = topology
 		return &csi.CreateVolumeResponse{
 			Volume: volResp,
 		}, nil
 	}
+
+	var vg gopowerstore.VolumeGroup
+
+	// Check if replication is enabled
+	repEnabledKey := s.replicationPrefix + "/" + KeyReplicationEnabled
+	replicationEnabled := params[repEnabledKey]
+
+	if replicationEnabled == "true" && !useNFS {
+		log.Info("Preparing volume replication")
+		rpo, ok := params[KeyReplicationRPO]
+		if !ok {
+			return nil, status.Errorf(codes.InvalidArgument, "replication enabled but no RPO specified in storage class")
+		}
+		rpoEnum := gopowerstore.RPOEnum(rpo)
+		if err := rpoEnum.IsValid(); err != nil {
+			return nil, status.Errorf(codes.InvalidArgument, "invalid rpo value")
+		}
+		remoteSystemName, ok := params[KeyReplicationRemoteSystem]
+		if !ok {
+			return nil, status.Errorf(codes.InvalidArgument, "replication enabled but no remote system specified in storage class")
+		}
+		vgName := "csi-" + remoteSystemName + "-" + rpo
+
+		vg, err = arr.Client.GetVolumeGroupByName(ctx, vgName)
+		if err != nil {
+			if apiError, ok := err.(gopowerstore.APIError); ok && apiError.VolumeIsNotExist() {
+				log.Infof("Volume group with name %s not found, creating it", vgName)
+
+				// ensure protection policy exists
+				pp, err := EnsureProtectionPolicyExists(ctx, arr, vgName, remoteSystemName, rpoEnum)
+				if err != nil {
+					return nil, status.Errorf(codes.Internal, "can't ensure protection policy exists %s", err.Error())
+				}
+
+				group, err := arr.Client.CreateVolumeGroup(ctx, &gopowerstore.VolumeGroupCreate{
+					Name:               vgName,
+					ProtectionPolicyID: pp,
+				})
+				if err != nil {
+					return nil, status.Errorf(codes.Internal, "can't create volume group: %s", err.Error())
+				}
+
+				vg, err = arr.Client.GetVolumeGroup(ctx, group.ID)
+				if err != nil {
+					return nil, status.Errorf(codes.Internal, "can't query volume group by id %s : %s", group.ID, err.Error())
+				}
+
+			} else {
+				return nil, status.Errorf(codes.Internal, "can't query volume group by name %s : %s", vgName, err.Error())
+			}
+		} else {
+			// group exists, check that protection policy applied
+			if vg.ProtectionPolicyID == "" {
+				pp, err := EnsureProtectionPolicyExists(ctx, arr, vgName, remoteSystemName, rpoEnum)
+				if err != nil {
+					return nil, status.Errorf(codes.Internal, "can't ensure protection policy exists %s", err.Error())
+				}
+				policyUpdate := gopowerstore.VolumeGroupChangePolicy{ProtectionPolicyID: pp}
+				_, err = arr.Client.UpdateVolumeGroupProtectionPolicy(ctx, vg.ID, &policyUpdate)
+				if err != nil {
+					return nil, status.Errorf(codes.Internal, "can't update volume group policy %s", err.Error())
+				}
+			}
+		}
+
+		if c, ok := creator.(*SCSICreator); ok {
+			c.vg = &vg
+		}
+	}
+
 	var volumeResponse *csi.Volume
-
 	resp, err := creator.Create(ctx, req, sizeInBytes, arr.GetClient())
-
 	if err != nil {
 		if apiError, ok := err.(gopowerstore.APIError); ok && (apiError.VolumeNameIsAlreadyUse() || apiError.FSNameIsAlreadyUse()) {
 			volumeResponse, err = creator.CheckIfAlreadyExists(ctx, req.GetName(), sizeInBytes, arr.GetClient())
@@ -186,12 +282,67 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 	}
 
 	volumeResponse.VolumeContext = req.Parameters
-	volumeResponse.VolumeContext[common.KeyArrayIP] = arr.GetIP()
-	volumeResponse.VolumeId = volumeResponse.VolumeId + "/" + arr.GetIP() + "/" + protocol
+	volumeResponse.VolumeContext[common.KeyArrayID] = arr.GetGlobalID()
+	volumeResponse.VolumeContext[common.KeyArrayVolumeName] = req.Name
+	volumeResponse.VolumeContext[common.KeyProtocol] = protocol
+	volumeResponse.VolumeId = volumeResponse.VolumeId + "/" + arr.GetGlobalID() + "/" + protocol
 	volumeResponse.AccessibleTopology = topology
 	return &csi.CreateVolumeResponse{
 		Volume: volumeResponse,
 	}, nil
+}
+
+func EnsureProtectionPolicyExists(ctx context.Context, arr *array.PowerStoreArray,
+	vgName string, remoteSystemName string, rpoEnum gopowerstore.RPOEnum) (string, error) {
+
+	// Get id of specified remote system
+	rs, err := arr.Client.GetRemoteSystemByName(ctx, remoteSystemName)
+	if err != nil {
+		return "", status.Errorf(codes.Internal, "can't query remote system by name: %s", err.Error())
+	}
+
+	ppName := "pp-" + vgName
+
+	// Check that protection policy already exists
+	pp, err := arr.Client.GetProtectionPolicyByName(ctx, ppName)
+	if err == nil {
+		return pp.ID, nil
+	}
+
+	// ensure that replicationRule exists
+	rrId, err := EnsureReplicationRuleExists(ctx, arr, vgName, rs.ID, rpoEnum)
+	if err != nil {
+		return "", status.Errorf(codes.Internal, "can't ensure that replication rule exists")
+	}
+
+	newPp, err := arr.Client.CreateProtectionPolicy(ctx, &gopowerstore.ProtectionPolicyCreate{
+		Name:               ppName,
+		ReplicationRuleIds: []string{rrId},
+	})
+	if err != nil {
+		return "", status.Errorf(codes.Internal, "can't create protection policy: %s", err.Error())
+	}
+
+	return newPp.ID, nil
+}
+
+func EnsureReplicationRuleExists(ctx context.Context, arr *array.PowerStoreArray,
+	vgName string, remoteSystemId string, rpoEnum gopowerstore.RPOEnum) (string, error) {
+	rrName := "rr-" + vgName
+	rr, err := arr.Client.GetReplicationRuleByName(ctx, rrName)
+	if err != nil {
+		// Create new rule
+		newRr, err := arr.Client.CreateReplicationRule(ctx, &gopowerstore.ReplicationRuleCreate{
+			Name:           rrName,
+			Rpo:            rpoEnum,
+			RemoteSystemID: remoteSystemId,
+		})
+		if err != nil {
+			return "", status.Errorf(codes.Internal, "can't create replication rule: %s", err.Error())
+		}
+		return newRr.ID, nil
+	}
+	return rr.ID, nil
 }
 
 // DeleteVolume deletes either FileSystem or Volume from storage array.
@@ -201,7 +352,7 @@ func (s *Service) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest
 		return nil, status.Error(codes.InvalidArgument, "volume ID is required")
 	}
 
-	id, ip, protocol, err := array.ParseVolumeID(ctx, id, s.DefaultArray(), nil)
+	id, arrayID, protocol, err := array.ParseVolumeID(ctx, id, s.DefaultArray(), nil)
 	if err != nil {
 		if apiError, ok := err.(gopowerstore.APIError); ok && apiError.VolumeIsNotExist() {
 			return &csi.DeleteVolumeResponse{}, nil
@@ -209,7 +360,7 @@ func (s *Service) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest
 		return nil, err
 	}
 
-	arr := s.Arrays()[ip]
+	arr := s.Arrays()[arrayID]
 
 	if protocol == "nfs" {
 		listSnaps, err := arr.GetClient().GetFsSnapshotsByVolumeID(ctx, id)
@@ -233,15 +384,39 @@ func (s *Service) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest
 		}
 		return nil, err
 	} else if protocol == "scsi" {
-		listSnaps, err := arr.GetClient().GetSnapshotsByVolumeID(ctx, id)
+		// query volume groups?
+		vgs, err := arr.GetClient().GetVolumeGroupsByVolumeID(ctx, id)
 		if err != nil {
-			return nil, status.Errorf(codes.Unknown, "failure getting snapshot: %s", err.Error())
+			return nil, err
 		}
-		if len(listSnaps) > 0 {
-			return nil, status.Errorf(codes.FailedPrecondition,
-				"unable to delete volume -- snapshots based on this volume still exist: %v",
-				listSnaps)
+
+		if len(vgs.VolumeGroup) != 0 {
+			// Remove volume from volume group
+			// TODO: If volume has multiple volume group then how we should find ours?
+			// TODO: Maybe adding volumegroup id/name to volume id can help?
+			_, err := arr.GetClient().RemoveMembersFromVolumeGroup(ctx, &gopowerstore.VolumeGroupRemoveMember{VolumeIds: []string{id}}, vgs.VolumeGroup[0].ID)
+			if err != nil {
+				// TODO: check for idempotency cases
+				return nil, err
+			}
+
+			// Unassign protection policy
+			_, err = arr.GetClient().ModifyVolume(ctx, &gopowerstore.VolumeModify{ProtectionPolicyID: ""}, id)
+			if err != nil {
+				return nil, err
+			}
 		}
+		// TODO: if len(vgs.VolumeGroup == 1) && it is the last volume : delete volume group
+		// TODO: What to do with RPO snaps?
+		// listSnaps, err := arr.GetClient().GetSnapshotsByVolumeID(ctx, id)
+		// if err != nil {
+		// 	return nil, status.Errorf(codes.Unknown, "failure getting snapshot: %s", err.Error())
+		// }
+		// if len(listSnaps) > 0 {
+		// 	return nil, status.Errorf(codes.FailedPrecondition,
+		// 		"unable to delete volume -- snapshots based on this volume still exist: %v",
+		// 		listSnaps)
+		// }
 
 		_, err = arr.GetClient().DeleteVolume(ctx, nil, id)
 		if err == nil {
@@ -269,12 +444,12 @@ func (s *Service) ControllerPublishVolume(ctx context.Context, req *csi.Controll
 		return nil, status.Error(codes.InvalidArgument, "volume ID is required")
 	}
 
-	id, ip, protocol, err := array.ParseVolumeID(ctx, id, s.DefaultArray(), req.VolumeCapability)
+	id, arrayID, protocol, err := array.ParseVolumeID(ctx, id, s.DefaultArray(), req.VolumeCapability)
 	if err != nil {
 		log.Info(err)
 		return nil, err
 	}
-	arr, ok := s.Arrays()[ip]
+	arr, ok := s.Arrays()[arrayID]
 	if !ok {
 		log.Info("ip is nil")
 		return nil, status.Error(codes.InvalidArgument, "failed to find array with given IP")
@@ -327,7 +502,7 @@ func (s *Service) ControllerUnpublishVolume(ctx context.Context, req *csi.Contro
 		return nil, status.Error(codes.InvalidArgument, "node ID is required")
 	}
 
-	id, ip, protocol, err := array.ParseVolumeID(ctx, id, s.DefaultArray(), nil)
+	id, arrayID, protocol, err := array.ParseVolumeID(ctx, id, s.DefaultArray(), nil)
 	if err != nil {
 		if apiError, ok := err.(gopowerstore.APIError); ok && apiError.VolumeIsNotExist() {
 			return &csi.ControllerUnpublishVolumeResponse{}, nil
@@ -336,7 +511,10 @@ func (s *Service) ControllerUnpublishVolume(ctx context.Context, req *csi.Contro
 			"failure checking volume status for volume unpublishing: %s", err.Error())
 	}
 
-	arr := s.Arrays()[ip]
+	arr, ok := s.Arrays()[arrayID]
+	if !ok {
+		return nil, status.Errorf(codes.InvalidArgument, "cannot find array %s", arrayID)
+	}
 
 	if protocol == "scsi" {
 		node, err := arr.GetClient().GetHostByName(ctx, kubeNodeID)
@@ -389,7 +567,8 @@ func (s *Service) ControllerUnpublishVolume(ctx context.Context, req *csi.Contro
 
 		// Detach host from nfs export
 		_, err = arr.GetClient().ModifyNFSExport(ctx, &gopowerstore.NFSExportModify{
-			RemoveHosts: &[]string{ip + "/255.255.255.255"}, // You can't remove without netmask
+			RemoveRWRootHosts: []string{ip + "/255.255.255.255"}, // You can't remove without netmask
+			RemoveRWHosts:     []string{ip + "/255.255.255.255"},
 		}, export.ID)
 		if err != nil {
 			if apiError, ok := err.(gopowerstore.APIError); !(ok && apiError.HostAlreadyRemovedFromNFSExport()) {
@@ -450,12 +629,12 @@ func (s *Service) ValidateVolumeCapabilities(ctx context.Context, req *csi.Valid
 	}
 	// for sanity
 	id := req.GetVolumeId()
-	id, ip, proto, err := array.ParseVolumeID(ctx, id, s.DefaultArray(), nil)
+	id, arrayID, proto, err := array.ParseVolumeID(ctx, id, s.DefaultArray(), nil)
 	if err != nil {
 		return &csi.ValidateVolumeCapabilitiesResponse{}, status.Error(codes.NotFound, "No such volume")
 	}
 	if proto == "nfs" {
-		_, err := s.Arrays()[ip].Client.GetFS(ctx, id)
+		_, err := s.Arrays()[arrayID].Client.GetFS(ctx, id)
 		if err != nil {
 			return &csi.ValidateVolumeCapabilitiesResponse{
 				Confirmed: nil,
@@ -463,7 +642,7 @@ func (s *Service) ValidateVolumeCapabilities(ctx context.Context, req *csi.Valid
 			}, status.Error(codes.NotFound, "Failed to get volume")
 		}
 	} else {
-		_, err := s.Arrays()[ip].Client.GetVolume(ctx, id)
+		_, err := s.Arrays()[arrayID].Client.GetVolume(ctx, id)
 		if err != nil {
 			return &csi.ValidateVolumeCapabilitiesResponse{
 				Confirmed: nil,
@@ -529,16 +708,16 @@ func (s *Service) GetCapacity(ctx context.Context, req *csi.GetCapacityRequest) 
 	params := req.GetParameters()
 
 	// Get array from map
-	arrayIP, ok := params[common.KeyArrayIP]
+	arrayID, ok := params[common.KeyArrayID]
 
 	var arr *array.PowerStoreArray
 	// If no ArrayIP was provided in storage class we just use default array
 	if !ok {
 		arr = s.DefaultArray()
 	} else {
-		arr, ok = s.Arrays()[arrayIP]
+		arr, ok = s.Arrays()[arrayID]
 		if !ok {
-			return nil, status.Errorf(codes.Internal, "can't find array with provided ip %s", arrayIP)
+			return nil, status.Errorf(codes.Internal, "can't find array with provided id %s", arrayID)
 		}
 	}
 	resp, err := arr.Client.GetCapacity(ctx)
@@ -595,12 +774,12 @@ func (s *Service) CreateSnapshot(ctx context.Context, req *csi.CreateSnapshotReq
 		return nil, status.Errorf(codes.InvalidArgument, "volume ID to be snapped is required")
 	}
 
-	id, ip, protocol, err := array.ParseVolumeID(ctx, sourceVolID, s.DefaultArray(), nil)
+	id, arrayID, protocol, err := array.ParseVolumeID(ctx, sourceVolID, s.DefaultArray(), nil)
 	if err != nil {
 		return nil, err
 	}
 
-	arr := s.Arrays()[ip]
+	arr := s.Arrays()[arrayID]
 
 	var snapshotter VolumeSnapshotter
 	var sourceVolumeSize int64
@@ -652,7 +831,7 @@ func (s *Service) CreateSnapshot(ctx context.Context, req *csi.CreateSnapshotReq
 		}
 	}
 
-	snapResponse.SnapshotId = snapResponse.SnapshotId + "/" + ip + "/" + protocol
+	snapResponse.SnapshotId = snapResponse.SnapshotId + "/" + arrayID + "/" + protocol
 	return &csi.CreateSnapshotResponse{
 		Snapshot: snapResponse,
 	}, nil
@@ -665,7 +844,7 @@ func (s *Service) DeleteSnapshot(ctx context.Context, req *csi.DeleteSnapshotReq
 		return nil, status.Errorf(codes.InvalidArgument, "snapshot ID to be deleted is required")
 	}
 
-	id, ip, protocol, err := array.ParseVolumeID(ctx, snapID, s.DefaultArray(), nil)
+	id, arrayID, protocol, err := array.ParseVolumeID(ctx, snapID, s.DefaultArray(), nil)
 	if err != nil {
 		if apiError, ok := err.(gopowerstore.APIError); ok && apiError.VolumeIsNotExist() {
 			return &csi.DeleteSnapshotResponse{}, nil
@@ -673,7 +852,7 @@ func (s *Service) DeleteSnapshot(ctx context.Context, req *csi.DeleteSnapshotReq
 		return nil, err
 	}
 
-	arr := s.Arrays()[ip]
+	arr := s.Arrays()[arrayID]
 
 	if protocol == "nfs" {
 		_, err = arr.GetClient().GetFsSnapshot(ctx, id)
@@ -749,8 +928,13 @@ func (s *Service) ListSnapshots(ctx context.Context, req *csi.ListSnapshotsReque
 	// Process the source volumes and make CSI Volumes
 	entries := make([]*csi.ListSnapshotsResponse_Entry, len(source))
 	for i, snap := range source {
+		size := snap.GetSize()
+		// Correct size of filesystem snapshot
+		if snap.GetType() == FilesystemSnapshotType {
+			size = size - ReservedSize
+		}
 		entries[i] = &csi.ListSnapshotsResponse_Entry{
-			Snapshot: getCSISnapshot(snap.ID, snap.ProtectionData.SourceID, snap.Size),
+			Snapshot: getCSISnapshot(snap.GetID(), snap.GetSourceID(), size),
 		}
 	}
 
@@ -762,7 +946,7 @@ func (s *Service) ListSnapshots(ctx context.Context, req *csi.ListSnapshotsReque
 
 // ControllerExpandVolume resizes Volume or FileSystem by increasing available volume capacity in the storage array.
 func (s *Service) ControllerExpandVolume(ctx context.Context, req *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
-	id, ip, protocol, err := array.ParseVolumeID(ctx, req.VolumeId, s.DefaultArray(), nil)
+	id, arrayID, protocol, err := array.ParseVolumeID(ctx, req.VolumeId, s.DefaultArray(), nil)
 	if err != nil {
 		return nil, status.Errorf(codes.OutOfRange, "unable to parse the volume id")
 	}
@@ -773,12 +957,12 @@ func (s *Service) ControllerExpandVolume(ctx context.Context, req *csi.Controlle
 	}
 
 	if protocol == "scsi" {
-		vol, err := s.Arrays()[ip].Client.GetVolume(ctx, id)
+		vol, err := s.Arrays()[arrayID].Client.GetVolume(ctx, id)
 		if err != nil {
 			return nil, status.Errorf(codes.OutOfRange, "detected SCSI protocol but wasn't able to fetch the volume info")
 		}
 		if vol.Size < requiredBytes {
-			_, err = s.Arrays()[ip].Client.ModifyVolume(context.Background(), &gopowerstore.VolumeModify{Size: requiredBytes}, id)
+			_, err = s.Arrays()[arrayID].Client.ModifyVolume(context.Background(), &gopowerstore.VolumeModify{Size: requiredBytes}, id)
 			if err != nil {
 				return nil, err
 			}
@@ -786,10 +970,10 @@ func (s *Service) ControllerExpandVolume(ctx context.Context, req *csi.Controlle
 		}
 		return &csi.ControllerExpandVolumeResponse{}, nil
 	} else {
-		fs, err := s.Arrays()[ip].Client.GetFS(ctx, id)
+		fs, err := s.Arrays()[arrayID].Client.GetFS(ctx, id)
 		if err == nil {
 			if fs.SizeTotal < requiredBytes {
-				_, err = s.Arrays()[ip].Client.ModifyFS(context.Background(), &gopowerstore.FSModify{Size: int(requiredBytes + ReservedSize)}, id)
+				_, err = s.Arrays()[arrayID].Client.ModifyFS(context.Background(), &gopowerstore.FSModify{Size: int(requiredBytes + ReservedSize)}, id)
 				if err != nil {
 					return nil, err
 				}
@@ -797,6 +981,209 @@ func (s *Service) ControllerExpandVolume(ctx context.Context, req *csi.Controlle
 		}
 		return &csi.ControllerExpandVolumeResponse{CapacityBytes: requiredBytes, NodeExpansionRequired: false}, nil
 	}
+}
+
+func (s *Service) ControllerGetVolume(ctx context.Context, request *csi.ControllerGetVolumeRequest) (*csi.ControllerGetVolumeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not implemented yet")
+}
+
+// RegisterAdditionalServers registers replication extension
+func (s *Service) RegisterAdditionalServers(server *grpc.Server) {
+	csiext.RegisterReplicationServer(server, s)
+}
+
+func (s *Service) ProbeController(ctx context.Context, req *csiext.ProbeControllerRequest) (*csiext.ProbeControllerResponse, error) {
+	ready := new(wrappers.BoolValue)
+	ready.Value = true
+	rep := new(csiext.ProbeControllerResponse)
+	rep.Ready = ready
+	rep.Name = common.Name
+	rep.VendorVersion = core.SemVer
+	rep.Manifest = common.Manifest
+
+	log.Debug(fmt.Sprintf("ProbeController returning: %v", rep.Ready.GetValue()))
+	return rep, nil
+}
+
+func (s *Service) GetReplicationCapabilities(ctx context.Context, req *csiext.GetReplicationCapabilityRequest) (*csiext.GetReplicationCapabilityResponse, error) {
+	var rep = new(csiext.GetReplicationCapabilityResponse)
+	rep.Capabilities = []*csiext.ReplicationCapability{
+		{
+			Type: &csiext.ReplicationCapability_Rpc{
+				Rpc: &csiext.ReplicationCapability_RPC{
+					Type: csiext.ReplicationCapability_RPC_CREATE_REMOTE_VOLUME,
+				},
+			},
+		},
+		{
+			Type: &csiext.ReplicationCapability_Rpc{
+				Rpc: &csiext.ReplicationCapability_RPC{
+					Type: csiext.ReplicationCapability_RPC_CREATE_PROTECTION_GROUP,
+				},
+			},
+		},
+	}
+	return rep, nil
+}
+
+func (s *Service) CreateStorageProtectionGroup(ctx context.Context,
+	req *csiext.CreateStorageProtectionGroupRequest) (*csiext.CreateStorageProtectionGroupResponse, error) {
+	volID := req.GetVolumeHandle()
+	if volID == "" {
+		return nil, status.Error(codes.InvalidArgument, "volume ID is required")
+	}
+
+	id, arrayID, protocol, err := array.ParseVolumeID(ctx, volID, s.DefaultArray(), nil)
+	if err != nil {
+		log.Error(err)
+		return nil, err
+	}
+
+	arr, ok := s.Arrays()[arrayID]
+	if !ok {
+		log.Info("ip is nil")
+		return nil, status.Error(codes.InvalidArgument, "failed to find array with given IP")
+	}
+
+	if protocol == "nfs" {
+		return nil, status.Error(codes.InvalidArgument, "replication is not supported for NFS volumes")
+	}
+
+	vgs, err := arr.GetClient().GetVolumeGroupsByVolumeID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if len(vgs.VolumeGroup) == 0 {
+		return nil, status.Error(codes.Unimplemented, "replication of volumes that aren't assigned to group is not implemented yet")
+	}
+	vg := vgs.VolumeGroup[0]
+
+	rs, err := arr.Client.GetReplicationSessionByLocalResourceID(ctx, vg.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	localSystem, err := arr.Client.GetCluster(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	remoteSystem, err := arr.Client.GetRemoteSystem(ctx, rs.RemoteSystemId)
+	if err != nil {
+		return nil, err
+	}
+
+	localParams := map[string]string{
+		s.replicationContextPrefix + "systemName":              localSystem.Name,
+		s.replicationContextPrefix + "managementAddress":       localSystem.ManagementAddress,
+		s.replicationContextPrefix + "remoteSystemName":        remoteSystem.Name,
+		s.replicationContextPrefix + "remoteManagementAddress": remoteSystem.ManagementAddress,
+	}
+	remoteParams := map[string]string{
+		s.replicationContextPrefix + "systemName":              remoteSystem.Name,
+		s.replicationContextPrefix + "managementAddress":       remoteSystem.ManagementAddress,
+		s.replicationContextPrefix + "remoteSystemName":        localSystem.Name,
+		s.replicationContextPrefix + "remoteManagementAddress": localSystem.ManagementAddress,
+	}
+
+	return &csiext.CreateStorageProtectionGroupResponse{
+		LocalProtectionGroupId:          rs.LocalResourceId,
+		RemoteProtectionGroupId:         rs.RemoteResourceId,
+		LocalProtectionGroupAttributes:  localParams,
+		RemoteProtectionGroupAttributes: remoteParams,
+	}, nil
+}
+
+func (s *Service) CreateRemoteVolume(ctx context.Context,
+	req *csiext.CreateRemoteVolumeRequest) (*csiext.CreateRemoteVolumeResponse, error) {
+	volID := req.GetVolumeHandle()
+	if volID == "" {
+		return nil, status.Error(codes.InvalidArgument, "volume ID is required")
+	}
+
+	id, arrayID, protocol, err := array.ParseVolumeID(ctx, volID, s.DefaultArray(), nil)
+	if err != nil {
+		log.Error(err)
+		return nil, err
+	}
+
+	arr, ok := s.Arrays()[arrayID]
+	if !ok {
+		log.Info("ip is nil")
+		return nil, status.Error(codes.InvalidArgument, "failed to find array with given IP")
+	}
+
+	vgs, err := arr.GetClient().GetVolumeGroupsByVolumeID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if len(vgs.VolumeGroup) == 0 {
+		return nil, status.Error(codes.Unimplemented, "replication of volumes that aren't assigned to group is not implemented yet")
+	}
+	vg := vgs.VolumeGroup[0]
+
+	rs, err := arr.Client.GetReplicationSessionByLocalResourceID(ctx, vg.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	var remoteVolumeId string
+	for _, sp := range rs.StorageElementPairs {
+		if sp.LocalStorageElementId == id {
+			remoteVolumeId = sp.RemoteStorageElementId
+		}
+	}
+
+	if remoteVolumeId == "" {
+		return nil, status.Errorf(codes.Internal, "couldn't find volume id %s in storage element pairs of replication session", id)
+	}
+
+	vol, err := arr.Client.GetVolume(ctx, id)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "can't query volume: %s", err.Error())
+	}
+	localSystem, err := arr.Client.GetCluster(ctx)
+	if err != nil {
+		return nil, err
+	}
+	remoteSystem, err := arr.Client.GetRemoteSystem(ctx, rs.RemoteSystemId)
+	if err != nil {
+		return nil, err
+	}
+
+	remoteParams := map[string]string{
+		"remoteSystem": localSystem.Name,
+		s.replicationContextPrefix + "managementAddress": remoteSystem.ManagementAddress,
+	}
+	remoteVolume := getRemoteCSIVolume(remoteVolumeId+"/"+remoteParams[s.replicationContextPrefix+"managementAddress"]+"/"+protocol, vol.Size)
+	remoteVolume.VolumeContext = remoteParams
+	return &csiext.CreateRemoteVolumeResponse{
+		RemoteVolume: remoteVolume,
+	}, nil
+}
+
+func (s *Service) DeleteStorageProtectionGroup(ctx context.Context,
+	req *csiext.DeleteStorageProtectionGroupRequest) (*csiext.DeleteStorageProtectionGroupResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not implemented yet")
+}
+
+func (s *Service) ExecuteAction(ctx context.Context,
+	req *csiext.ExecuteActionRequest) (*csiext.ExecuteActionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not implemented yet")
+}
+
+func (s *Service) GetStorageProtectionGroupStatus(ctx context.Context,
+	req *csiext.GetStorageProtectionGroupStatusRequest) (*csiext.GetStorageProtectionGroupStatusResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not implemented yet")
+}
+
+func getRemoteCSIVolume(volumeID string, size int64) *csiext.Volume {
+	volume := &csiext.Volume{
+		CapacityBytes: size,
+		VolumeId:      volumeID,
+		VolumeContext: nil, // TODO: add values to volume context if needed
+	}
+	return volume
 }
 
 func (s *Service) listPowerStoreVolumes(ctx context.Context, startToken, maxEntries int) ([]gopowerstore.Volume, string, error) {
@@ -839,62 +1226,107 @@ func (s *Service) listPowerStoreVolumes(ctx context.Context, startToken, maxEntr
 	return volumes[startToken : startToken+maxEntries], nextTokenStr, nil
 }
 
-func (s *Service) listPowerStoreSnapshots(ctx context.Context, startToken, maxEntries int, snapID, srcID string) ([]gopowerstore.Volume, string, error) {
-	var volumes []gopowerstore.Volume
+func (s *Service) listPowerStoreSnapshots(ctx context.Context, startToken, maxEntries int, snapID, srcID string) ([]GeneralSnapshot, string, error) {
+	var generalSnapshots []GeneralSnapshot
 
 	if snapID == "" && srcID == "" {
+		log.Info("Requested all snapshots, iterating through arrays")
 		for _, arr := range s.Arrays() {
-			s, err := arr.GetClient().GetSnapshots(ctx)
+			// List block snapshots
+			snaps, err := arr.GetClient().GetSnapshots(ctx)
 			if err != nil {
-				return nil, "", status.Errorf(codes.Internal, "unable to list snapshots: %s", err.Error())
+				return nil, "", status.Errorf(codes.Internal, "unable to list block snapshots: %s", err.Error())
 			}
 
-			volumes = append(volumes, s...)
+			for _, snap := range snaps {
+				generalSnapshots = append(generalSnapshots, VolumeSnapshot(snap))
+			}
+
+			// List filesystem snapshots too
+			fsSnaps, err := arr.GetClient().GetFsSnapshots(ctx)
+			if err != nil {
+				return nil, "", status.Errorf(codes.Internal, "unable to list filesystem snapshots: %s", err.Error())
+			}
+
+			for _, snap := range fsSnaps {
+				generalSnapshots = append(generalSnapshots, FilesystemSnapshot(snap))
+			}
 		}
 	} else if snapID != "" {
-
-		id, ip, proto, err := array.ParseVolumeID(ctx, snapID, s.DefaultArray(), nil)
-
+		log.Infof("Requested snapshot via snapshot id %s", snapID)
+		id, arrayID, protocol, err := array.ParseVolumeID(ctx, snapID, s.DefaultArray(), nil)
 		if err != nil {
 			log.Error(err)
-			return []gopowerstore.Volume{}, "", nil
+			return []GeneralSnapshot{}, "", nil
 		}
 
-		arr, ok := s.Arrays()[ip]
+		arr, ok := s.Arrays()[arrayID]
 		if !ok {
-			return nil, "", status.Errorf(codes.Internal, "unable to get array with ip %s", ip)
+			return nil, "", status.Errorf(codes.Internal, "unable to get array with arrayID %s", arrayID)
 		}
 
-		volume, getErr := arr.GetClient().GetSnapshot(ctx, id)
-		if apiError, ok := getErr.(gopowerstore.APIError); ok && apiError.VolumeIsNotExist() {
-			// given snapshot id does not exist, should return empty response
-			return volumes, "", nil
+		if protocol == "nfs" {
+			fsSnapshot, getErr := arr.GetClient().GetFsSnapshot(ctx, id)
+			if apiError, ok := getErr.(gopowerstore.APIError); ok && apiError.VolumeIsNotExist() {
+				// given snapshot id does not exist, should return empty response
+				return generalSnapshots, "", nil
+			}
+			if getErr != nil {
+				return nil, "", status.Errorf(codes.Internal, "unable to get filesystem snapshot: %s", getErr.Error())
+			}
+
+			log.Info(fsSnapshot)
+
+			fsSnapshot.ID = fsSnapshot.ID + "/" + arrayID + "/" + protocol
+			generalSnapshots = append(generalSnapshots, FilesystemSnapshot(fsSnapshot))
+		} else {
+			blockSnap, getErr := arr.GetClient().GetSnapshot(ctx, id)
+			if apiError, ok := getErr.(gopowerstore.APIError); ok && apiError.VolumeIsNotExist() {
+				// given snapshot id does not exist, should return empty response
+				return generalSnapshots, "", nil
+			}
+			if getErr != nil {
+				return nil, "", status.Errorf(codes.Internal, "unable to get block snapshot: %s", getErr.Error())
+			}
+			blockSnap.ID = blockSnap.ID + "/" + arrayID + "/" + protocol
+			generalSnapshots = append(generalSnapshots, VolumeSnapshot(blockSnap))
 		}
-		volume.ID = volume.ID + "/" + ip + "/" + proto
-		volumes = append(volumes, volume)
 	} else {
-		id, ip, _, err := array.ParseVolumeID(ctx, srcID, s.DefaultArray(), nil)
+		log.Infof("Requested snapshot via source id %s", srcID)
+		id, arrayID, protocol, err := array.ParseVolumeID(ctx, srcID, s.DefaultArray(), nil)
 		if err != nil {
 			log.Error(err)
-			return []gopowerstore.Volume{}, "", nil
+			return []GeneralSnapshot{}, "", nil
 		}
 
-		arr, ok := s.Arrays()[ip]
+		arr, ok := s.Arrays()[arrayID]
 		if !ok {
-			return nil, "", status.Errorf(codes.Internal, "unable to get array with ip %s", ip)
+			return nil, "", status.Errorf(codes.Internal, "unable to get array with arrayID %s", arrayID)
 		}
-
-		volumes, err = arr.GetClient().GetSnapshotsByVolumeID(ctx, id)
-		if err != nil {
-			return nil, "", status.Errorf(codes.Internal, "unable to list snapshots: %s", err.Error())
+		if protocol == "nfs" {
+			snaps, err := arr.GetClient().GetFsSnapshotsByVolumeID(ctx, id)
+			if err != nil {
+				return nil, "", status.Errorf(codes.Internal, "unable to list filesystem snapshots: %s", err.Error())
+			}
+			for _, snap := range snaps {
+				generalSnapshots = append(generalSnapshots, FilesystemSnapshot(snap))
+			}
+		} else {
+			snaps, err := arr.GetClient().GetSnapshotsByVolumeID(ctx, id)
+			if err != nil {
+				return nil, "", status.Errorf(codes.Internal, "unable to list block snapshots: %s", err.Error())
+			}
+			for _, snap := range snaps {
+				generalSnapshots = append(generalSnapshots, VolumeSnapshot(snap))
+			}
 		}
 	}
 
-	if startToken > len(volumes) {
-		return nil, "", status.Errorf(codes.Aborted, "startingToken=%d > len(volumes)=%d", startToken, len(volumes))
+	if startToken > len(generalSnapshots) {
+		return nil, "", status.Errorf(codes.Aborted, "startingToken=%d > len(generalSnapshots)=%d", startToken, len(generalSnapshots))
 	}
 	// Discern the number of remaining entries.
-	rem := len(volumes) - startToken
+	rem := len(generalSnapshots) - startToken
 
 	// If maxEntries is 0 or greater than the number of remaining entries then
 	// set max entries to the number of remaining entries.
@@ -914,5 +1346,5 @@ func (s *Service) listPowerStoreSnapshots(ctx context.Context, startToken, maxEn
 		nextTokenStr = fmt.Sprintf("%d", nextToken)
 	}
 
-	return volumes[startToken : startToken+maxEntries], nextTokenStr, nil
+	return generalSnapshots[startToken : startToken+maxEntries], nextTokenStr, nil
 }

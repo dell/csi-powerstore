@@ -36,9 +36,9 @@ import (
 	"github.com/dell/csi-powerstore/core"
 	"github.com/dell/csi-powerstore/pkg/common/fs"
 	"github.com/dell/gobrick"
+	csictx "github.com/dell/gocsi/context"
+	"github.com/dell/gocsi/utils"
 	"github.com/dell/gopowerstore"
-	csictx "github.com/rexray/gocsi/context"
-	"github.com/rexray/gocsi/utils"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -47,7 +47,7 @@ var Name = "csi-powerstore.dellemc.com"
 
 // Manifest contains additional information about the driver
 var Manifest = map[string]string{
-	"url":    "http://github.com/dell/csi-powerstore",
+	"url":    "https://github.com/dell/csi-powerstore",
 	"semver": core.SemVer,
 	"commit": core.CommitSha32,
 	"formed": core.CommitTime.Format(time.RFC1123),
@@ -56,8 +56,22 @@ var Manifest = map[string]string{
 type key int
 
 const (
-	// KeyArrayIP key value to check in request parameters for array ip
-	KeyArrayIP = "arrayIP"
+	// KeyAllowRoot key value to check if driver should enable root squashing for nfs volumes
+	KeyAllowRoot = "allowRoot"
+	// KeyNfsExportPath key value to pass in publish context
+	KeyNfsExportPath = "NfsExportPath"
+	// KeyHostIP key value to pass in publish context
+	KeyHostIP = "HostIP"
+	// KeyExportID key value to pass in publish context
+	KeyExportID = "ExportID"
+	// KeyNatIP key value to pass in publish context
+	KeyNatIP = "NatIP"
+	// KeyArrayID key value to check in request parameters for array ip
+	KeyArrayID = "arrayID"
+	// KeyArrayVolumeName key value to check in request parameters for volume name
+	KeyArrayVolumeName = "Name"
+	// KeyProtocol key value to check in request parameters for volume name
+	KeyProtocol = "Protocol"
 	// VerboseName longer description of the driver
 	VerboseName = "CSI Driver for Dell EMC PowerStore"
 	// FcTransport indicates that FC is chosen as a SCSI transport protocol

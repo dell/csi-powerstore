@@ -67,4 +67,10 @@ const (
 
 	// EnvArrayConfigFilePath is filepath to powerstore arrays config file
 	EnvDebugEnableTracing = "ENABLE_TRACING"
+
+	// EnvReplicationContextPrefix enables sidecars to read required information from volume context
+	EnvReplicationContextPrefix = "X_CSI_REPLICATION_CONTEXT_PREFIX"
+
+	// EnvReplicationPrefix is used as a prefix to find out if replication is enabled
+	EnvReplicationPrefix = "X_CSI_REPLICATION_PREFIX"
 )

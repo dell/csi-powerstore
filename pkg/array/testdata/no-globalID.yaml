@@ -1,7 +1,6 @@
 arrays:
-  - endpoint: "https://512.542.143.0/api/rest"
+  - endpoint: "https://10.10.10.10/api/rest"
     username: "admin"
-    globalID: "gid1"
     password: "password"
     skipCertificateValidation: true
     blockProtocol: "auto"

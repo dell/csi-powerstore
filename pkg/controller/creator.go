@@ -67,6 +67,7 @@ type VolumeCreator interface {
 
 // SCSICreator implementation of VolumeCreator for SCSI based (FC, iSCSI) volumes
 type SCSICreator struct {
+	vg *gopowerstore.VolumeGroup
 }
 
 func setMetaData(reqParams map[string]string, createParams interface{}) {
@@ -128,10 +129,13 @@ func (*SCSICreator) CheckIfAlreadyExists(ctx context.Context, name string, sizeI
 }
 
 // Create creates new block volume on storage array
-func (*SCSICreator) Create(ctx context.Context, req *csi.CreateVolumeRequest, sizeInBytes int64, client gopowerstore.Client) (gopowerstore.CreateResponse, error) {
+func (sc *SCSICreator) Create(ctx context.Context, req *csi.CreateVolumeRequest, sizeInBytes int64, client gopowerstore.Client) (gopowerstore.CreateResponse, error) {
 	storageType := gopowerstore.StorageTypeEnumBlock
 	name := req.GetName()
 	reqParams := &gopowerstore.VolumeCreate{Name: &name, Size: &sizeInBytes, StorageType: &storageType}
+	if sc.vg != nil {
+		reqParams.VolumeGroupID = sc.vg.ID
+	}
 	setMetaData(req.Parameters, reqParams)
 	return client.CreateVolume(ctx, reqParams)
 }

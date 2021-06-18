@@ -24,7 +24,7 @@ import (
 	"fmt"
 	"github.com/akutz/gosync"
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/rexray/gocsi/middleware/serialvolume"
+	"github.com/dell/gocsi/middleware/serialvolume"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -33,8 +33,8 @@ import (
 	"sync"
 	"time"
 
-	csictx "github.com/rexray/gocsi/context"
-	mwtypes "github.com/rexray/gocsi/middleware/serialvolume/types"
+	csictx "github.com/dell/gocsi/context"
+	mwtypes "github.com/dell/gocsi/middleware/serialvolume/types"
 	xctx "golang.org/x/net/context"
 )
 

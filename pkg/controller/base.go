@@ -43,9 +43,12 @@ const (
 	ErrUnknownAccessMode = "access mode cannot be UNKNOWN"
 	ErrNoMultiNodeWriter = "multi-node with writer(s) only supported for block access type"
 
-	KeyFsType           = "csi.storage.k8s.io/fstype"
-	KeyFsTypeOld        = "FsType"
-	keyNasName   string = "nasName"
+	KeyFsType                  = "csi.storage.k8s.io/fstype"
+	KeyFsTypeOld               = "FsType"
+	KeyReplicationEnabled      = "isReplicationEnabled"
+	KeyReplicationRPO          = "rpo"
+	KeyReplicationRemoteSystem = "remoteSystem"
+	KeyNasName                 = "nasName"
 )
 
 func volumeNameValidation(volumeName string) error {

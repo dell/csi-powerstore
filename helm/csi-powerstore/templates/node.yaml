@@ -134,6 +134,8 @@ spec:
             {{- end }}
             - name: X_CSI_POWERSTORE_CONFIG_PATH
               value: /powerstore-config/config
+            - name: GOPOWERSTORE_DEBUG
+              value: "true"
           volumeMounts:
             - name: driver-path
               mountPath: /var/lib/kubelet/plugins/{{ .Values.driverName }}

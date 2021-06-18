@@ -55,9 +55,8 @@ connection:
 # If file not exist or empty or in invalid format, then the driver will use all available FC ports
 nodeFCPortsFilterFile: /etc/fc-ports-filter
 
-snapshotClass:
-  # "snapshotClass.name" defines the name of the snapshot class to be defined.
-  name: powerstore-snapshot
+snapshot:
+  enabled: false
 
 # allows to specify additional entries for hostAccess of NFS volumes. Both single IP address and subnet are valid entries.
 # valid entries: x.x.x.x/xx or x.x.x.x

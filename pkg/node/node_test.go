@@ -27,6 +27,7 @@ import (
 	"github.com/dell/csi-powerstore/pkg/common"
 	"github.com/dell/csi-powerstore/pkg/controller"
 	"github.com/dell/gobrick"
+	csictx "github.com/dell/gocsi/context"
 	"github.com/dell/gofsutil"
 	"github.com/dell/goiscsi"
 	"github.com/dell/gopowerstore"
@@ -35,7 +36,6 @@ import (
 	. "github.com/onsi/ginkgo"
 	"github.com/onsi/ginkgo/reporters"
 	. "github.com/onsi/gomega"
-	csictx "github.com/rexray/gocsi/context"
 	"github.com/stretchr/testify/mock"
 	"net"
 	"net/http"
@@ -58,8 +58,8 @@ var (
 
 const (
 	validBaseVolumeID   = "39bb1b5f-5624-490d-9ece-18f7b28a904e"
-	validBlockVolumeID  = "39bb1b5f-5624-490d-9ece-18f7b28a904e/192.168.0.1/scsi"
-	validNfsVolumeID    = "39bb1b5f-5624-490d-9ece-18f7b28a904e/192.168.0.2/nfs"
+	validBlockVolumeID  = "39bb1b5f-5624-490d-9ece-18f7b28a904e/gid1/scsi"
+	validNfsVolumeID    = "39bb1b5f-5624-490d-9ece-18f7b28a904e/gid2/nfs"
 	validVolSize        = 16 * 1024 * 1024 * 1024
 	validLUNID          = "3"
 	validLUNIDINT       = 3
@@ -76,11 +76,11 @@ const (
 		"volumes/kubernetes.io~csi/csi-d91431aba3/mount"
 	validStagingPath = "/var/lib/kubelet/plugins/kubernetes.io/csi/volumeDevices/" +
 		"staging/csi-44b46e98ae/c875b4f0-172e-4238-aec7-95b379eb55db"
-	firstValidIP       = "192.168.0.1"
-	secondValidIP      = "192.168.0.2"
+	firstValidIP       = "gid1"
+	secondValidIP      = "gid2"
 	validNasName       = "my-nas-name"
-	validEphemeralName = "ephemeral-39bb1b5f-5624-490d-9ece-18f7b28a904e/192.168.0.1/scsi"
-	ephemerallockfile  = "/var/lib/kubelet/plugins/kubernetes.io/csi/pv/ephemeral/39bb1b5f-5624-490d-9ece-18f7b28a904e/192.168.0.1/scsi/id"
+	validEphemeralName = "ephemeral-39bb1b5f-5624-490d-9ece-18f7b28a904e/gid1/scsi"
+	ephemerallockfile  = "/var/lib/kubelet/plugins/kubernetes.io/csi/pv/ephemeral/39bb1b5f-5624-490d-9ece-18f7b28a904e/gid1/scsi/id"
 )
 
 var (
@@ -515,10 +515,13 @@ var _ = Describe("CSINodeService", func() {
 
 		When("using NFS", func() {
 			It("should successfully stage NFS volume", func() {
-				utilMock.On("Mount", mock.Anything, validNfsExportPath, filepath.Join(nodeStagePrivateDir, validBaseVolumeID), "").Return(nil)
+				stagingPath := filepath.Join(nodeStagePrivateDir, validBaseVolumeID)
+				utilMock.On("Mount", mock.Anything, validNfsExportPath, stagingPath, "").Return(nil)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
 				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
-				fsMock.On("MkdirAll", filepath.Join(nodeStagePrivateDir, validBaseVolumeID), mock.Anything).Return(nil)
+				fsMock.On("MkdirAll", stagingPath, mock.Anything).Return(nil).Once()
+				fsMock.On("MkdirAll", filepath.Join(stagingPath, commonNfsVolumeFolder), mock.Anything).Return(nil).Once()
+				fsMock.On("Chmod", filepath.Join(stagingPath, commonNfsVolumeFolder), os.ModeSticky|os.ModePerm).Return(nil)
 				fsMock.On("GetUtil").Return(utilMock)
 
 				publishContext := getValidPublishContext()
@@ -1257,6 +1260,8 @@ var _ = Describe("CSINodeService", func() {
 				fsMock.On("GetUtil").Return(utilMock)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
 				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
+				fsMock.On("Stat", filepath.Join(stagingPath, commonNfsVolumeFolder)).Return(&mocks.FileInfo{}, nil)
+				stagingPath := filepath.Join(stagingPath, commonNfsVolumeFolder)
 
 				fsMock.On("MkdirAll", validTargetPath, mock.Anything).Return(nil)
 				utilMock.On("BindMount", mock.Anything, stagingPath, validTargetPath).Return(nil)
@@ -1334,6 +1339,8 @@ var _ = Describe("CSINodeService", func() {
 				fsMock.On("GetUtil").Return(utilMock)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
 				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
+				fsMock.On("Stat", filepath.Join(stagingPath, commonNfsVolumeFolder)).Return(&mocks.FileInfo{}, nil)
+				stagingPath := filepath.Join(stagingPath, commonNfsVolumeFolder)
 
 				fsMock.On("MkdirAll", validTargetPath, mock.Anything).Return(errors.New("fail"))
 				utilMock.On("BindMount", mock.Anything, stagingPath, validTargetPath).Return(nil)
@@ -1354,6 +1361,8 @@ var _ = Describe("CSINodeService", func() {
 				fsMock.On("GetUtil").Return(utilMock)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
 				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
+				fsMock.On("Stat", filepath.Join(stagingPath, commonNfsVolumeFolder)).Return(&mocks.FileInfo{}, nil)
+				stagingPath := filepath.Join(stagingPath, commonNfsVolumeFolder)
 
 				fsMock.On("MkdirAll", validTargetPath, mock.Anything).Return(nil)
 				utilMock.On("BindMount", mock.Anything, stagingPath, validTargetPath, "ro").Return(nil)
@@ -1375,6 +1384,8 @@ var _ = Describe("CSINodeService", func() {
 				fsMock.On("GetUtil").Return(utilMock)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
 				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
+				fsMock.On("Stat", filepath.Join(stagingPath, commonNfsVolumeFolder)).Return(&mocks.FileInfo{}, nil)
+				stagingPath := filepath.Join(stagingPath, commonNfsVolumeFolder)
 
 				fsMock.On("MkdirAll", validTargetPath, mock.Anything).Return(nil)
 				utilMock.On("BindMount", mock.Anything, stagingPath, validTargetPath, "ro").Return(errors.New("bind failed"))
@@ -1707,7 +1718,7 @@ var _ = Describe("CSINodeService", func() {
 					Wwn:         "naa.6090a038f0cd4e5bdaa8248e6856d4fe:3",
 				}, nil)
 				_, err := nodeSvc.NodeExpandVolume(context.Background(), getNodeVolumeExpandValidRequest("", true))
-				Ω(err.Error()).To(ContainSubstring("volume ID is required"))
+				Ω(err.Error()).To(ContainSubstring("incorrect volume id"))
 
 			})
 		})
@@ -1747,17 +1758,10 @@ var _ = Describe("CSINodeService", func() {
 					Name:        "name",
 					Size:        controller.MaxVolumeSizeBytes / 200,
 					Wwn:         "naa.6090a038f0cd4e5bdaa8248e6856d4fe:3",
-				}, nil).Times(1)
-				clientMock.On("GetVolume", mock.Anything, mock.Anything).Return(gopowerstore.Volume{
-					Description: "",
-					ID:          validBlockVolumeID,
-					Name:        "name",
-					Size:        controller.MaxVolumeSizeBytes / 200,
-					Wwn:         "naa.6090a038f0cd4e5bdaa8248e6856d4fe:3",
 				}, errors.New("err")).Times(1)
 
 				_, err := nodeSvc.NodeExpandVolume(context.Background(), &csi.NodeExpandVolumeRequest{
-					VolumeId:   "volid",
+					VolumeId:   validBlockVolumeID,
 					VolumePath: validTargetPath,
 					CapacityRange: &csi.CapacityRange{
 						RequiredBytes: 2234234,
@@ -1956,7 +1960,7 @@ var _ = Describe("CSINodeService", func() {
 						CapacityBytes: validVolSize,
 						VolumeId:      filepath.Join(validBaseVolumeID, firstValidIP, "scsi"),
 						VolumeContext: map[string]string{
-							common.KeyArrayIP: firstValidIP,
+							common.KeyArrayID: firstValidIP,
 						},
 					},
 				}, nil)
@@ -2021,7 +2025,7 @@ var _ = Describe("CSINodeService", func() {
 						CapacityBytes: validVolSize,
 						VolumeId:      filepath.Join(validBaseVolumeID, firstValidIP, "scsi"),
 						VolumeContext: map[string]string{
-							common.KeyArrayIP: firstValidIP,
+							common.KeyArrayID: firstValidIP,
 						},
 					},
 				}, nil)
@@ -2029,7 +2033,7 @@ var _ = Describe("CSINodeService", func() {
 					VolumeId: validBlockVolumeID,
 					NodeId:   validNodeID,
 					VolumeContext: map[string]string{
-						common.KeyArrayIP: firstValidIP,
+						common.KeyArrayID: firstValidIP,
 					},
 					VolumeCapability: getCapabilityWithVoltypeAccessFstype("mount", "single-writer", "ext4"),
 				}).Return(&csi.ControllerPublishVolumeResponse{
@@ -2084,7 +2088,7 @@ var _ = Describe("CSINodeService", func() {
 						CapacityBytes: validVolSize,
 						VolumeId:      filepath.Join(validBaseVolumeID, firstValidIP, "scsi"),
 						VolumeContext: map[string]string{
-							common.KeyArrayIP: firstValidIP,
+							common.KeyArrayID: firstValidIP,
 						},
 					},
 				}, nil)
@@ -2189,7 +2193,7 @@ var _ = Describe("CSINodeService", func() {
 						CapacityBytes: validVolSize,
 						VolumeId:      filepath.Join(validBaseVolumeID, firstValidIP, "scsi"),
 						VolumeContext: map[string]string{
-							common.KeyArrayIP: firstValidIP,
+							common.KeyArrayID: firstValidIP,
 						},
 					},
 				}, errors.New("Failed"))
@@ -2219,7 +2223,7 @@ var _ = Describe("CSINodeService", func() {
 						CapacityBytes: validVolSize,
 						VolumeId:      filepath.Join(validBaseVolumeID, firstValidIP, "scsi"),
 						VolumeContext: map[string]string{
-							common.KeyArrayIP: firstValidIP,
+							common.KeyArrayID: firstValidIP,
 						},
 					},
 				}, nil)
@@ -2249,7 +2253,7 @@ var _ = Describe("CSINodeService", func() {
 						CapacityBytes: validVolSize,
 						VolumeId:      filepath.Join(validBaseVolumeID, firstValidIP, "scsi"),
 						VolumeContext: map[string]string{
-							common.KeyArrayIP: firstValidIP,
+							common.KeyArrayID: firstValidIP,
 						},
 					},
 				}, nil)
@@ -2280,7 +2284,7 @@ var _ = Describe("CSINodeService", func() {
 					CapacityBytes: validVolSize,
 					VolumeId:      filepath.Join(validBaseVolumeID, firstValidIP, "scsi"),
 					VolumeContext: map[string]string{
-						common.KeyArrayIP: firstValidIP,
+						common.KeyArrayID: firstValidIP,
 					},
 				},
 			}, nil)
@@ -2606,7 +2610,7 @@ var _ = Describe("CSINodeService", func() {
 				It("should properly deal with additional IPs", func() {
 					nodeSvc.useFC = true
 					nodeID := nodeSvc.nodeID
-					nodeSvc.nodeID = nodeID + "-" + firstValidIP
+					nodeSvc.nodeID = nodeID + "-" + "192.168.0.1"
 					nodeSvc.reusedHost = true
 					conn, _ := net.Dial("udp", "127.0.0.1:80")
 					fsMock.On("NetDial", mock.Anything).Return(

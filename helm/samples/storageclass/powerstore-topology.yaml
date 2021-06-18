@@ -8,7 +8,7 @@ reclaimPolicy: Delete
 allowVolumeExpansion: true
 volumeBindingMode: WaitForFirstConsumer # we need to use delayed binding mode for the topology to be honored
 parameters:
-  arrayIP: "12.34.56.78"
+  arrayID: "Unique"
 allowedTopologies:
   - matchLabelExpressions: 
       - key: csi-powerstore.dellemc.com/12.34.56.78-iscsi # replace "-iscsi" with "-fc" or "-nfs" at the end to use FC or NFS enabled hosts

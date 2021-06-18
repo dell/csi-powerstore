@@ -10,7 +10,7 @@
 ## Description
 CSI Driver for Dell EMC PowerStore is a Container Storage Interface [(CSI)](https://github.com/container-storage-interface/spec) driver that provides support for provisioning persistent storage using Dell EMC PowerStore storage array.
 
-It supports CSI specification version 1.2.
+It supports CSI specification version 1.3.
 
 This project may be compiled as a stand-alone binary using Golang that, when run, provides a valid CSI endpoint.
 It also can be used as a precompiled container image.
@@ -44,7 +44,7 @@ If you want to use iSCSI as a transport protocol be sure that `iscsi-initiator-u
 
 If you want to use FC be sure that zoning of Host Bus Adapters to the FC port directors was done. 
 
-If you want to use NFS be sure to enable it in `myvalues.yaml`, configure NAS server on PowerStore and have client-side NFS utilities (e.g. nfs-utils on RHEL/CentOS) installed on your nodes.
+If you want to use NFS be sure to enable it in `myvalues.yaml` or in your storage classes, and configure corresponding NAS servers on PowerStore.
 
 ## Driver Installation
 Please consult the [Installation Guide](https://dell.github.io/storage-plugin-docs/docs/installation/)
@@ -54,26 +54,27 @@ Below is a brief description of installation procedure using Helm. For more deta
 As referenced in the guide, installation in a Kubernetes cluster should be done using the scripts within the `dell-csi-helm-installer` directory. For more detailed information on the scripts, consult the [README.md](dell-csi-helm-installer/README.md)
 
 ### Prerequisites
-- Upstream Kubernetes versions 1.18, 1.19 or 1.20 or OpenShift versions 4.6, 4.7
+- Upstream Kubernetes versions 1.19, 1.20 or 1.21 or OpenShift versions 4.6 (EUS), 4.7
 - You can access your cluster with `kubectl` and `helm`
-- Ensure that you have both [Volume Snapshot CRDs](https://github.com/kubernetes-csi/external-snapshotter/tree/v4.0.0/client/config/crd)
- and [common snapshot controller](https://github.com/kubernetes-csi/external-snapshotter/tree/v4.0.0/deploy/kubernetes/snapshot-controller) installed in your Kubernetes cluster
+- Optionally ensure that you have both [Volume Snapshot CRDs](https://github.com/kubernetes-csi/external-snapshotter/tree/v4.0.0/client/config/crd)
+ and [common snapshot controller](https://github.com/kubernetes-csi/external-snapshotter/tree/v4.0.0/deploy/kubernetes/snapshot-controller) installed in your Kubernetes cluster and Snaphot feature is enabled in your copy of `values.yaml` if you want to use the feature.
 
 ### Procedure
 1. Run `git clone https://github.com/dell/csi-powerstore.git` to clone the git repository
 2. Ensure that you've created namespace where you want to install the driver. You can run `kubectl create namespace csi-powerstore` to create a new one. 
 3. Edit `helm/secret.yaml`, correct namespace field to point to your desired namespace
 4. Edit `helm/config.yaml` file and configure connection information for your PowerStore arrays changing following parameters:
-    - *endpoint*: defines the full URL path to the PowerStore API
-    - *username*, *password*: defines credentials for connecting to array
-    - *insecure*: defines if we should use insecure connection or not
-    - *default*: defines if we should treat the current array as a default
-    - *block-protocol*: defines what SCSI transport protocol we should use (FC, ISCSI, None, or auto)
-    - *nas-name*: defines what NAS should be used for NFS volumes
-    
+    - *endpoint*: defines the full URL path to the PowerStore API.
+    - *globalID*: specifies what storage cluster the driver should use
+    - *username*, *password*: defines credentials for connecting to array.
+    - *skipCertificateValidation*: defines if we should use insecure connection or not.
+    - *isDefault*: defines if we should treat the current array as a default.
+    - *blockProtocol*: defines what SCSI transport protocol we should use (FC, ISCSI, None, or auto).
+    - *nasName*: defines what NAS should be used for NFS volumes.
+ 
     Add more blocks similar to above for each PowerStore array if necessary. 
 5. Create storage classes using ones from `helm/samples/storageclass` folder as an example and apply them to the Kubernetes cluster by running `kubectl create -f <path_to_storageclass_file>`
-    > If you don't specify `arrayIP` parameter in the storage class then the array that was specified as the default would be used for provisioning volumes
+    > If you don't specify `arrayID` parameter in the storage class then the array that was specified as the default would be used for provisioning volumes. `arrayID` corresponds to `globalID` of storage cluster.
 6. Create the secret by running ```sed "s/CONFIG_YAML/`cat helm/config.yaml | base64 -w0`/g" helm/secret.yaml | kubectl apply -f -```
 7. Copy the default values.yaml file `cd dell-csi-helm-installer && cp ../helm/csi-powerstore/values.yaml ./my-powerstore-settings.yaml`
 8. Edit the newly created file and provide values for the following parameters:

@@ -25,6 +25,13 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+const (
+	FilesystemSnapshotType SnapshotType = "filesystem"
+	BlockSnapshotType      SnapshotType = "block"
+)
+
+type SnapshotType string
+
 // VolumeSnapshot represents snapshot of the block Volume
 type VolumeSnapshot gopowerstore.Volume
 
@@ -39,6 +46,8 @@ type GeneralSnapshot interface {
 	GetSourceID() string
 	// GetSize returns current size of the snapshot
 	GetSize() int64
+	// GetType returns type of general snapshot (either filesystem or block)
+	GetType() SnapshotType
 }
 
 // GetID returns ID of the snapshot
@@ -56,6 +65,11 @@ func (v VolumeSnapshot) GetSize() int64 {
 	return v.Size
 }
 
+// GetType returns type of general snapshot (either filesystem or block)
+func (v VolumeSnapshot) GetType() SnapshotType {
+	return BlockSnapshotType
+}
+
 // GetID returns ID of the snapshot
 func (f FilesystemSnapshot) GetID() string {
 	return f.ID
@@ -69,6 +83,11 @@ func (f FilesystemSnapshot) GetSourceID() string {
 // GetSize returns current size of the snapshot
 func (f FilesystemSnapshot) GetSize() int64 {
 	return f.SizeTotal
+}
+
+// GetType returns type of general snapshot (either filesystem or block)
+func (f FilesystemSnapshot) GetType() SnapshotType {
+	return FilesystemSnapshotType
 }
 
 // VolumeSnapshotter allow to create snapshot of the volume/fs

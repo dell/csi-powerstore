@@ -27,8 +27,8 @@ import (
 	"github.com/dell/csi-powerstore/pkg/common"
 	"github.com/dell/csi-powerstore/pkg/common/fs"
 	"github.com/dell/gobrick"
+	csictx "github.com/dell/gocsi/context"
 	"github.com/dell/gofsutil"
-	csictx "github.com/rexray/gocsi/context"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -49,6 +49,8 @@ const (
 	defaultTmpDir = "tmp"
 
 	ephemeralStagingMountPath = "/var/lib/kubelet/plugins/kubernetes.io/csi/pv/ephemeral/"
+
+	commonNfsVolumeFolder = "common_folder"
 )
 
 // ISCSIConnector is wrapper of gobrcik.ISCSIConnector interface.

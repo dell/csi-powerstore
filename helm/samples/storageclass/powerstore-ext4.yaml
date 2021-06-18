@@ -8,5 +8,5 @@ reclaimPolicy: Delete
 allowVolumeExpansion: true
 volumeBindingMode: Immediate
 parameters:
-  arrayIP: "12.34.56.78"
+  arrayID: "Unique"
 

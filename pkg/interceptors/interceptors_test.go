@@ -22,7 +22,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	csictx "github.com/rexray/gocsi/context"
+	csictx "github.com/dell/gocsi/context"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
