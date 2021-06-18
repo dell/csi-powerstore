@@ -1,7 +1,8 @@
 arrays:
   - endpoint: "https://127.0.0.1/api/rest"
     username: "admin"
+    globalID: "gid1"
     password: "password"
-    insecure: true
-    block-protocol: "auto"
-    default: true
+    skipCertificateValidation: true
+    blockProtocol: "auto"
+    isDefault: true

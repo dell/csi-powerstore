@@ -34,7 +34,7 @@ import (
 
 // VolumePublisher allows to publish a volume
 type VolumePublisher interface {
-	// CheckIfAlreadyExists queries storage array if given volume already exists
+	// CheckIfVolumeExists queries storage array if given volume already exists
 	CheckIfVolumeExists(ctx context.Context, client gopowerstore.Client, volID string) error
 	// Publish does the steps necessary for volume to be available on the node
 	Publish(ctx context.Context, req *csi.ControllerPublishVolumeRequest, client gopowerstore.Client,
@@ -129,8 +129,14 @@ func (s *SCSIPublisher) Publish(ctx context.Context, req *csi.ControllerPublishV
 		return nil, status.Errorf(codes.Internal,
 			"failed to get mapping for volume with ID '%s' after attaching: %s", volume.ID, err.Error())
 	}
-	s.addLUNIDToPublishContext(publishContext, mapping[0], volume)
-	return &csi.ControllerPublishVolumeResponse{PublishContext: publishContext}, nil
+	for _, m := range mapping {
+		if m.HostID == node.ID {
+			s.addLUNIDToPublishContext(publishContext, m, volume)
+			return &csi.ControllerPublishVolumeResponse{PublishContext: publishContext}, nil
+		}
+	}
+	return nil, status.Errorf(codes.Internal,
+		"failed to find mapping of volume with ID '%s' to host '%s'", volume.ID, node.ID)
 }
 
 // CheckIfVolumeExists queries storage array if Volume with given name exists
@@ -234,7 +240,7 @@ func (n *NfsPublisher) Publish(ctx context.Context, req *csi.ControllerPublishVo
 
 	// Add host IP to existing nfs export
 	_, err = client.ModifyNFSExport(ctx, &gopowerstore.NFSExportModify{
-		AddHosts: &ipWithNat,
+		AddRWRootHosts: ipWithNat,
 	}, export.ID)
 	if err != nil {
 		if apiError, ok := err.(gopowerstore.APIError); !(ok && apiError.VolumeIsNotExist()) {
@@ -250,8 +256,14 @@ func (n *NfsPublisher) Publish(ctx context.Context, req *csi.ControllerPublishVo
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failure getting file interface %s", err.Error())
 	}
-	publishContext[keyNasName] = nas.Name // we need to pass that to node part of the driver
-	publishContext["NfsExportPath"] = fileInterface.IpAddress + ":/" + export.Name
+	publishContext[KeyNasName] = nas.Name // we need to pass that to node part of the driver
+	publishContext[common.KeyNfsExportPath] = fileInterface.IpAddress + ":/" + export.Name
+	publishContext[common.KeyHostIP] = ipWithNat[0]
+	if n.ExternalAccess != "" {
+		publishContext[common.KeyNatIP] = ipWithNat[1]
+	}
+	publishContext[common.KeyExportID] = export.ID
+	publishContext[common.KeyAllowRoot] = req.VolumeContext[common.KeyAllowRoot]
 	return &csi.ControllerPublishVolumeResponse{PublishContext: publishContext}, nil
 }
 

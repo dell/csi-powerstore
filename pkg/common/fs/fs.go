@@ -54,6 +54,7 @@ type FsInterface interface {
 	IsNotExist(err error) bool
 	Mkdir(name string, perm os.FileMode) error
 	MkdirAll(name string, perm os.FileMode) error
+	Chmod(name string, perm os.FileMode) error
 	Remove(name string) error
 	RemoveAll(name string) error
 	WriteString(file *os.File, str string) (int, error)
@@ -119,6 +120,10 @@ func (fs *Fs) WriteString(file *os.File, string string) (int, error) {
 // Create is a wrapper of os.Create
 func (fs *Fs) Create(name string) (*os.File, error) {
 	return os.Create(name) // #nosec G304
+}
+
+func (fs *Fs) Chmod(name string, perm os.FileMode) error {
+	return os.Chmod(name, perm)
 }
 
 // ReadFile is a wrapper of ioutil.ReadFile

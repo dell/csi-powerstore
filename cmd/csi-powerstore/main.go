@@ -2,6 +2,9 @@ package main
 
 import (
 	"context"
+	"strings"
+	"time"
+
 	"github.com/dell/csi-powerstore/core"
 	"github.com/dell/csi-powerstore/pkg/common"
 	"github.com/dell/csi-powerstore/pkg/common/fs"
@@ -10,18 +13,16 @@ import (
 	"github.com/dell/csi-powerstore/pkg/interceptors"
 	"github.com/dell/csi-powerstore/pkg/node"
 	"github.com/dell/csi-powerstore/pkg/tracer"
+	"github.com/dell/gocsi"
+	csictx "github.com/dell/gocsi/context"
 	"github.com/dell/gofsutil"
 	"github.com/fsnotify/fsnotify"
 	grpc_opentracing "github.com/grpc-ecosystem/go-grpc-middleware/tracing/opentracing"
 	"github.com/opentracing/opentracing-go"
-	"github.com/rexray/gocsi"
-	csictx "github.com/rexray/gocsi/context"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"github.com/uber/jaeger-client-go/config"
 	"google.golang.org/grpc"
-	"strings"
-	"time"
 )
 
 //go:generate go generate ../../core
@@ -122,10 +123,11 @@ func main() {
 		"A PowerStore Container Storage Interface (CSI) Driver",
 		usage,
 		&gocsi.StoragePlugin{
-			Controller:   controllerService,
-			Identity:     identityService,
-			Node:         nodeService,
-			Interceptors: interList,
+			Controller:                controllerService,
+			Identity:                  identityService,
+			Node:                      nodeService,
+			Interceptors:              interList,
+			RegisterAdditionalServers: controllerService.RegisterAdditionalServers,
 
 			EnvVars: []string{
 				// Enable request validation.
@@ -182,4 +184,10 @@ const usage = `
 	X_CSI_POWERSTORE_CONFIG_PATH
 		Specifies the filepath to PowerStore arrays config file which will be used
 		for connection to PowerStore arrays
+
+	X_CSI_REPLICATION_CONTEXT_PREFIX
+		Enables sidecars to read required information from volume context
+
+	X_CSI_REPLICATION_PREFIX
+		Used as a prefix to find out if replication is enabled
 `

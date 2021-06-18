@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -186,12 +187,19 @@ func (s *Service) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeR
 		return nil, status.Error(codes.InvalidArgument, "staging target path is required")
 	}
 
-	id, _, protocol, _ := array.ParseVolumeID(ctx, id, s.DefaultArray(), req.VolumeCapability)
+	id, arrayID, protocol, _ := array.ParseVolumeID(ctx, id, s.DefaultArray(), req.VolumeCapability)
 
 	var stager NodeVolumeStager
 
+	arr, ok := s.Arrays()[arrayID]
+	if !ok {
+		return nil, status.Errorf(codes.Internal, "can't find array with provided arrayID %s", arrayID)
+	}
+
 	if protocol == "nfs" {
-		stager = &NFSStager{}
+		stager = &NFSStager{
+			array: arr,
+		}
 	} else {
 		stager = &SCSIStager{
 			useFC:          s.useFC,
@@ -346,6 +354,7 @@ func (s *Service) NodePublishVolume(ctx context.Context, req *csi.NodePublishVol
 
 	// append additional path to be able to do bind mounts
 	stagingPath := getStagingPath(ctx, req.GetStagingTargetPath(), id)
+
 	isRO := req.GetReadonly()
 	volumeCapability := req.GetVolumeCapability()
 
@@ -360,6 +369,11 @@ func (s *Service) NodePublishVolume(ctx context.Context, req *csi.NodePublishVol
 	var publisher NodeVolumePublisher
 
 	if protocol == "nfs" {
+		if s.fileExists(filepath.Join(stagingPath, commonNfsVolumeFolder)) {
+			// Assume root squashing is enabled
+			stagingPath = filepath.Join(stagingPath, commonNfsVolumeFolder)
+		}
+
 		publisher = &NFSPublisher{}
 	} else {
 		publisher = &SCSIPublisher{
@@ -449,11 +463,15 @@ func (s *Service) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolum
 	}
 
 	// Get the VolumeID and validate against the volume
-	id, ip, _, err := array.ParseVolumeID(ctx, req.VolumeId, s.DefaultArray(), nil)
-	if id == "" {
-		return nil, status.Error(codes.InvalidArgument, "volume ID is required")
+	id, arrayID, _, err := array.ParseVolumeID(ctx, req.VolumeId, s.DefaultArray(), nil)
+	if err != nil {
+		if apiError, ok := err.(gopowerstore.APIError); ok && apiError.VolumeIsNotExist() {
+			return nil, err
+		}
+		return nil, err
 	}
 
+	arr := s.Arrays()[arrayID]
 	targetPath := req.GetVolumePath()
 	if targetPath == "" {
 		return nil, status.Error(codes.InvalidArgument, "targetPath is required")
@@ -461,7 +479,7 @@ func (s *Service) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolum
 	isBlock := strings.Contains(targetPath, blockVolumePathMarker)
 
 	// Parse the CSI VolumeId and validate against the volume
-	vol, err := s.Arrays()[ip].Client.GetVolume(ctx, id)
+	vol, err := arr.Client.GetVolume(ctx, id)
 	if err != nil {
 		// If the volume isn't found, we cannot stage it
 		return nil, status.Error(codes.NotFound, "Volume not found")

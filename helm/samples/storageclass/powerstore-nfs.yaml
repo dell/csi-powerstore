@@ -7,6 +7,7 @@ reclaimPolicy: Delete
 allowVolumeExpansion: true
 volumeBindingMode: Immediate
 parameters:
-  arrayIP: "12.34.56.78"
+  arrayID: "Unique"
   FsType: nfs
-
+  nasName: nas-server # (Optional) If not specified, value from config.yaml will be used
+  allowRoot: "false"  # enables or disables root squashing

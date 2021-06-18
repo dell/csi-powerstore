@@ -21,6 +21,7 @@ package array
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"path/filepath"
@@ -32,12 +33,16 @@ import (
 	"github.com/dell/csi-powerstore/core"
 	"github.com/dell/csi-powerstore/pkg/common"
 	"github.com/dell/csi-powerstore/pkg/common/fs"
+	csictx "github.com/dell/gocsi/context"
 	"github.com/dell/gopowerstore"
-	csictx "github.com/rexray/gocsi/context"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"gopkg.in/yaml.v3"
+)
+
+var (
+	IpToArray map[string]string
 )
 
 // Consumer provides methods for safe management of arrays
@@ -83,11 +88,12 @@ func (s *Locker) SetDefaultArray(array *PowerStoreArray) {
 
 func (s *Locker) UpdateArrays(configPath string, fs fs.FsInterface) error {
 	log.Info("updating array info")
-	arrays, defaultArray, err := GetPowerStoreArrays(fs, configPath)
+	arrays, matcher, defaultArray, err := GetPowerStoreArrays(fs, configPath)
 	if err != nil {
 		return fmt.Errorf("can't get config for arrays: %s", err.Error())
 	}
 	s.SetArrays(arrays)
+	IpToArray = matcher
 	s.SetDefaultArray(defaultArray)
 	return nil
 }
@@ -97,12 +103,13 @@ func (s *Locker) UpdateArrays(configPath string, fs fs.FsInterface) error {
 // This structure is supposed to be parsed from config and mainly is created by GetPowerStoreArrays function.
 type PowerStoreArray struct {
 	Endpoint      string               `yaml:"endpoint"`
+	GlobalId      string               `yaml:"globalID"`
 	Username      string               `yaml:"username"`
 	Password      string               `yaml:"password"`
-	NasName       string               `yaml:"nas-name"`
-	BlockProtocol common.TransportType `yaml:"block-protocol"`
-	Insecure      bool                 `yaml:"insecure"`
-	IsDefault     bool                 `yaml:"default"`
+	NasName       string               `yaml:"nasName"`
+	BlockProtocol common.TransportType `yaml:"blockProtocol"`
+	Insecure      bool                 `yaml:"skipCertificateValidation"`
+	IsDefault     bool                 `yaml:"isDefault"`
 
 	Client gopowerstore.Client
 	IP     string
@@ -123,10 +130,15 @@ func (psa *PowerStoreArray) GetIP() string {
 	return psa.IP
 }
 
+// GetGlobalId is a getter that returns GlobalID address of the array
+func (psa *PowerStoreArray) GetGlobalID() string {
+	return psa.GlobalId
+}
+
 // GetPowerStoreArrays parses config.yaml file, initializes gopowerstore Clients and composes map of arrays for ease of access.
 // It will return array that can be used as default as a second return parameter.
 // If config does not have any array as a default then the first will be returned as a default.
-func GetPowerStoreArrays(fs fs.FsInterface, filePath string) (map[string]*PowerStoreArray, *PowerStoreArray, error) {
+func GetPowerStoreArrays(fs fs.FsInterface, filePath string) (map[string]*PowerStoreArray, map[string]string, *PowerStoreArray, error) {
 	type config struct {
 		Arrays []*PowerStoreArray `yaml:"arrays"`
 	}
@@ -134,22 +146,23 @@ func GetPowerStoreArrays(fs fs.FsInterface, filePath string) (map[string]*PowerS
 	data, err := fs.ReadFile(filepath.Clean(filePath))
 	if err != nil {
 		log.Errorf("cannot read file %s : %s", filePath, err.Error())
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	var cfg config
 	err = yaml.Unmarshal(data, &cfg)
 	if err != nil {
 		log.Errorf("cannot unmarshal data: %s", err.Error())
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	arrayMap := make(map[string]*PowerStoreArray)
+	mapper := make(map[string]string)
 	var defaultArray *PowerStoreArray
 	foundDefault := false
 
 	if len(cfg.Arrays) == 0 {
-		return arrayMap, defaultArray, nil
+		return arrayMap, mapper, defaultArray, nil
 	}
 
 	// Safeguard if user doesn't set any array as default, we just use first one
@@ -159,9 +172,11 @@ func GetPowerStoreArrays(fs fs.FsInterface, filePath string) (map[string]*PowerS
 	for _, array := range cfg.Arrays {
 		array := array
 		if array == nil {
-			return arrayMap, defaultArray, nil
+			return arrayMap, mapper, defaultArray, nil
 		}
-
+		if array.GlobalId == "" {
+			return nil, nil, nil, errors.New("No GlobalID field found in config.yaml. Update config.yaml according to the documentation.")
+		}
 		clientOptions := gopowerstore.NewClientOptions()
 		clientOptions.SetInsecure(array.Insecure)
 
@@ -177,7 +192,7 @@ func GetPowerStoreArrays(fs fs.FsInterface, filePath string) (map[string]*PowerS
 		c, err := gopowerstore.NewClientWithArgs(
 			array.Endpoint, array.Username, array.Password, clientOptions)
 		if err != nil {
-			return nil, nil, status.Errorf(codes.FailedPrecondition,
+			return nil, nil, nil, status.Errorf(codes.FailedPrecondition,
 				"unable to create PowerStore client: %s", err.Error())
 		}
 		c.SetCustomHTTPHeaders(http.Header{
@@ -192,20 +207,21 @@ func GetPowerStoreArrays(fs fs.FsInterface, filePath string) (map[string]*PowerS
 
 		ips := common.GetIPListFromString(array.Endpoint)
 		if ips == nil {
-			return nil, nil, fmt.Errorf("can't get ips from endpoint: %s", array.Endpoint)
+			return nil, nil, nil, fmt.Errorf("can't get ips from endpoint: %s", array.Endpoint)
 		}
 
 		ip := ips[0]
 		array.IP = ip
-		arrayMap[ip] = array
-
+		log.Info(array)
+		arrayMap[array.GlobalId] = array
+		mapper[ip] = array.GlobalId
 		if array.IsDefault && !foundDefault {
 			defaultArray = array
 			foundDefault = true
 		}
 	}
 
-	return arrayMap, defaultArray, nil
+	return arrayMap, mapper, defaultArray, nil
 }
 
 // ParseVolumeID parses volume id in from CO (Kubernetes) and tries to understand what in it are PowerStore volume id, and what is ip, protocol.
@@ -218,14 +234,14 @@ func GetPowerStoreArrays(fs fs.FsInterface, filePath string) (map[string]*PowerS
 //			protocol = "scsi"
 // This function is backwards compatible and will try to understand volume protocol even if there is no such information in volume id.
 // It will do that by querying default powerstore array passed as one of the arguments
-func ParseVolumeID(ctx context.Context, volumeID string, defaultArray *PowerStoreArray /*optional*/, cap *csi.VolumeCapability) (id string, ip string, protocol string, e error) {
+func ParseVolumeID(ctx context.Context, volumeID string, defaultArray *PowerStoreArray /*optional*/, cap *csi.VolumeCapability) (id string, arrayID string, protocol string, e error) {
 	if volumeID == "" {
 		return "", "", "", status.Errorf(codes.FailedPrecondition,
 			"incorrect volume id ")
 	}
 	volID := strings.Split(volumeID, "/")
 	id = volID[0]
-
+	log.Infof("volid %s", volID)
 	if len(volID) == 1 {
 		// We've got volume from previous version
 		// We assume that we should use default array for that
@@ -238,8 +254,8 @@ func ParseVolumeID(ctx context.Context, volumeID string, defaultArray *PowerStor
 			} else {
 				protocol = "scsi"
 			}
-			ip = defaultArray.GetIP()
-			return id, ip, protocol, nil
+			arrayID = defaultArray.GetGlobalID()
+			return id, arrayID, protocol, nil
 		}
 
 		// Try to just find out volume type by querying it's id from array
@@ -252,17 +268,21 @@ func ParseVolumeID(ctx context.Context, volumeID string, defaultArray *PowerStor
 				protocol = "nfs"
 			} else {
 				if apiError, ok := err.(gopowerstore.APIError); ok && apiError.VolumeIsNotExist() {
-					return id, ip, protocol, apiError
+					return id, arrayID, protocol, apiError
 				}
-				return id, ip, protocol, status.Errorf(codes.Unknown,
+				return id, arrayID, protocol, status.Errorf(codes.Unknown,
 					"failure checking volume status: %s", err.Error())
 			}
 		}
-		ip = defaultArray.GetIP()
+		arrayID = defaultArray.GetGlobalID()
 	} else {
-		ip = volID[1]
+		if ips := common.GetIPListFromString(volID[1]); ips != nil {
+			arrayID = IpToArray[ips[0]]
+		} else {
+			arrayID = volID[1]
+		}
 		protocol = volID[2]
 	}
-
-	return id, ip, protocol, nil
+	log.Infof("id %s arrayID %s proto %s", id, arrayID, protocol)
+	return id, arrayID, protocol, nil
 }

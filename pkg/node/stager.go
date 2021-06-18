@@ -22,13 +22,17 @@ import (
 	"context"
 	"fmt"
 	"github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/dell/csi-powerstore/pkg/array"
 	"github.com/dell/csi-powerstore/pkg/common"
 	"github.com/dell/csi-powerstore/pkg/common/fs"
 	"github.com/dell/gobrick"
+	"github.com/dell/gopowerstore"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"os"
 	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -110,6 +114,7 @@ func (s *SCSIStager) Stage(ctx context.Context, req *csi.NodeStageVolumeRequest,
 
 // NFSStager implementation of NodeVolumeStager for NFS volumes
 type NFSStager struct {
+	array *array.PowerStoreArray
 }
 
 // Stage stages volume by mounting volumes as nfs to the staging path
@@ -118,10 +123,23 @@ func (n *NFSStager) Stage(ctx context.Context, req *csi.NodeStageVolumeRequest,
 	// append additional path to be able to do bind mounts
 	stagingPath := getStagingPath(ctx, req.GetStagingTargetPath(), id)
 
-	nfsExport := req.PublishContext["NfsExportPath"]
+	hostIP := req.PublishContext[common.KeyHostIP]
+	exportID := req.PublishContext[common.KeyExportID]
+	nfsExport := req.PublishContext[common.KeyNfsExportPath]
+	allowRoot := req.PublishContext[common.KeyAllowRoot]
+
+	natIP := ""
+	if ip, ok := req.PublishContext[common.KeyNatIP]; ok {
+		natIP = ip
+	}
+
 	logFields["NfsExportPath"] = nfsExport
 	logFields["StagingPath"] = req.GetStagingTargetPath()
 	logFields["ID"] = id
+	logFields["AllowRoot"] = allowRoot
+	logFields["ExportID"] = exportID
+	logFields["HostIP"] = hostIP
+	logFields["NatIP"] = natIP
 	ctx = common.SetLogFields(ctx, logFields)
 
 	found, err := isReadyToPublishNFS(ctx, stagingPath, fs)
@@ -143,6 +161,43 @@ func (n *NFSStager) Stage(ctx context.Context, req *csi.NodeStageVolumeRequest,
 	if err := fs.GetUtil().Mount(ctx, nfsExport, stagingPath, ""); err != nil {
 		return nil, status.Errorf(codes.Internal,
 			"error mount nfs share %s to target path: %s", nfsExport, err.Error())
+	}
+
+	// Create folder with 1777 in nfs share so every user can use it
+	log.WithFields(logFields).Info("creating common folder")
+	if err := fs.MkdirAll(filepath.Join(stagingPath, commonNfsVolumeFolder), 0750); err != nil {
+		return nil, status.Errorf(codes.Internal,
+			"can't create common folder %s: %s", filepath.Join(stagingPath, "volume"), err.Error())
+	}
+
+	if err := fs.Chmod(filepath.Join(stagingPath, commonNfsVolumeFolder), os.ModeSticky|os.ModePerm); err != nil {
+		return nil, status.Errorf(codes.Internal,
+			"can't change permissions of folder %s: %s", filepath.Join(stagingPath, "volume"), err.Error())
+	}
+
+	if allowRoot == "false" {
+		log.WithFields(logFields).Info("removing allow root from nfs export")
+		var hostsToRemove []string
+		var hostsToAdd []string
+
+		hostsToRemove = append(hostsToRemove, hostIP+"/255.255.255.255")
+		hostsToAdd = append(hostsToAdd, hostIP)
+
+		if natIP != "" {
+			hostsToRemove = append(hostsToRemove, natIP)
+			hostsToAdd = append(hostsToAdd, natIP)
+		}
+
+		// Modify NFS export to RW with `root_squashing`
+		_, err = n.array.GetClient().ModifyNFSExport(ctx, &gopowerstore.NFSExportModify{
+			RemoveRWRootHosts: hostsToRemove,
+			AddRWHosts:        hostsToAdd,
+		}, exportID)
+		if err != nil {
+			if apiError, ok := err.(gopowerstore.APIError); !(ok && apiError.VolumeIsNotExist()) {
+				return nil, status.Errorf(codes.Internal, "failure when modifying nfs export: %s", err.Error())
+			}
+		}
 	}
 
 	log.WithFields(logFields).Info("nfs share successfully mounted")

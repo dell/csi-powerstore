@@ -51,7 +51,7 @@ func TestGetPowerStoreArrays(t *testing.T) {
 			args:    args{data: "./testdata/two-arr.yaml", fs: &fs.Fs{Util: &gofsutil.FS{}}},
 			wantErr: false,
 			want: map[string]*array.PowerStoreArray{
-				"127.0.0.1": {
+				"gid1": {
 					Endpoint:      "https://127.0.0.1/api/rest",
 					Username:      "admin",
 					Password:      "password",
@@ -59,7 +59,7 @@ func TestGetPowerStoreArrays(t *testing.T) {
 					IsDefault:     true,
 					BlockProtocol: common.ISCSITransport,
 				},
-				"127.0.0.2": {
+				"gid2": {
 					Endpoint:      "https://127.0.0.2/api/rest",
 					Username:      "user",
 					Password:      "password",
@@ -74,7 +74,7 @@ func TestGetPowerStoreArrays(t *testing.T) {
 			args:    args{data: "./testdata/one-arr.yaml", fs: &fs.Fs{Util: &gofsutil.FS{}}},
 			wantErr: false,
 			want: map[string]*array.PowerStoreArray{
-				"127.0.0.1": {
+				"gid1": {
 					Endpoint:      "https://127.0.0.1/api/rest",
 					Username:      "admin",
 					Password:      "password",
@@ -94,7 +94,7 @@ func TestGetPowerStoreArrays(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, _, err := array.GetPowerStoreArrays(tt.args.fs, tt.args.data)
+			got, _, _, err := array.GetPowerStoreArrays(tt.args.fs, tt.args.data)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("getPowerStoreArrays() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -117,7 +117,7 @@ func TestGetPowerStoreArrays(t *testing.T) {
 		fsMock := new(mocks.FsInterface)
 		fsMock.On("ReadFile", path).Return([]byte{}, e)
 
-		_, _, err := array.GetPowerStoreArrays(fsMock, path)
+		_, _, _, err := array.GetPowerStoreArrays(fsMock, path)
 		assert.Error(t, err)
 		assert.Equal(t, e, err)
 	})
@@ -127,22 +127,28 @@ func TestGetPowerStoreArrays(t *testing.T) {
 		fsMock := new(mocks.FsInterface)
 		fsMock.On("ReadFile", path).Return([]byte("some12frandomgtqxt\nhere"), nil)
 
-		_, _, err := array.GetPowerStoreArrays(fsMock, path)
+		_, _, _, err := array.GetPowerStoreArrays(fsMock, path)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "cannot unmarshal")
 	})
 
 	t.Run("incorrect endpoint", func(t *testing.T) {
 		f := &fs.Fs{Util: &gofsutil.FS{}}
-		_, _, err := array.GetPowerStoreArrays(f, "./testdata/incorrect-endpoint.yaml")
+		_, _, _, err := array.GetPowerStoreArrays(f, "./testdata/incorrect-endpoint.yaml")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "can't get ips from endpoint")
+	})
+	t.Run("no global ID", func(t *testing.T) {
+		f := &fs.Fs{Util: &gofsutil.FS{}}
+		_, _, _, err := array.GetPowerStoreArrays(f, "./testdata/no-globalID.yaml")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "No GlobalID field found in config.yaml")
 	})
 
 	t.Run("incorrect throttling limit", func(t *testing.T) {
 		_ = os.Setenv(common.EnvThrottlingRateLimit, "abc")
 		f := &fs.Fs{Util: &gofsutil.FS{}}
-		_, _, err := array.GetPowerStoreArrays(f, "./testdata/one-arr.yaml")
+		_, _, _, err := array.GetPowerStoreArrays(f, "./testdata/one-arr.yaml")
 		assert.NoError(t, err)
 	})
 }
@@ -155,7 +161,7 @@ func TestParseVolumeID(t *testing.T) {
 
 	t.Run("volume capability", func(t *testing.T) {
 		id := "1cd254s"
-		ip := "192.168.0.1"
+		ip := "gid1"
 		getVolCap := func() *csi.VolumeCapability {
 			accessMode := new(csi.VolumeCapability_AccessMode)
 			accessMode.Mode = csi.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER
@@ -170,7 +176,7 @@ func TestParseVolumeID(t *testing.T) {
 		}
 
 		volCap := getVolCap()
-		gotId, gotIp, protocol, err := array.ParseVolumeID(context.Background(), id, &array.PowerStoreArray{IP: ip}, volCap)
+		gotId, gotIp, protocol, err := array.ParseVolumeID(context.Background(), id, &array.PowerStoreArray{IP: ip, GlobalId: "gid1"}, volCap)
 		assert.NoError(t, err)
 		assert.Equal(t, id, gotId)
 		assert.Equal(t, ip, gotIp)

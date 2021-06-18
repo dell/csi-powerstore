@@ -1,14 +1,16 @@
 arrays:
   - endpoint: "https://127.0.0.1/api/rest"
+    globalID: "gid1"
     username: "admin"
     password: "password"
-    insecure: true
-    block-protocol: "iSCSI"
-    nas-name: "test-nas"
-    default: true
+    skipCertificateValidation: true
+    blockProtocol: "iSCSI"
+    nasName: "test-nas"
+    isDefault: true
 
   - endpoint: "https://127.0.0.2/api/rest"
+    globalID: "gid2"
     username: "user"
     password: "password"
-    insecure: true
-    block-protocol: ""
+    skipCertificateValidation: true
+    blockProtocol: ""
