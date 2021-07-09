@@ -64,6 +64,7 @@ rules:
     resources: ["persistentvolumeclaims/status"]
     verbs: ["update", "patch"]
   # below for dell-csi-replicator
+  {{- if hasKey .Values "replication" }}
   {{- if eq .Values.replication.enabled true}}
   - apiGroups: ["replication.storage.dell.com"]
     resources: ["dellcsireplicationgroups"]
@@ -74,6 +75,7 @@ rules:
   - apiGroups: [""]
     resources: ["configmaps"]
     verbs: ["create", "delete", "get", "list", "watch", "update", "patch"]
+  {{- end}}
   {{- end}}
 ---
 
@@ -190,6 +192,7 @@ spec:
               mountPath: /var/run/csi
         {{end}}
         {{end}}
+        {{- if hasKey .Values "replication" }}
         {{- if eq .Values.replication.enabled true}}
         - name: dell-csi-replicator
           image: {{ required "Must provide the Dell CSI Replicator image." .Values.replication.image}}
@@ -209,6 +212,7 @@ spec:
           volumeMounts:
             - name: socket-dir
               mountPath: /var/run/csi
+        {{- end }}
         {{- end }}
         - name: driver
           image: {{ required "Must provide the PowerStore driver container image." .Values.images.driver }}
@@ -232,11 +236,13 @@ spec:
               value: {{ .Values.externalAccess }}
             - name: X_CSI_POWERSTORE_CONFIG_PATH
               value: /powerstore-config/config
+            {{- if hasKey .Values "replication" }}
             {{- if eq .Values.replication.enabled true}}
             - name: X_CSI_REPLICATION_CONTEXT_PREFIX
               value: {{ .Values.replication.replicationContextPrefix | default "powerstore"}}
             - name: X_CSI_REPLICATION_PREFIX
               value: {{ .Values.replication.replicationPrefix | default "replication.storage.dell.com"}}
+            {{- end }}
             {{- end }}
             - name: GOPOWERSTORE_DEBUG
               value: "true"
