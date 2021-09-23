@@ -10,7 +10,7 @@ else
 endif
 
 ifndef DOCKER_REGISTRY
-    DOCKER_REGISTRY=dellemc
+	DOCKER_REGISTRY=dellemc
 endif
 
 ifndef DOCKER_IMAGE_NAME
@@ -18,7 +18,7 @@ ifndef DOCKER_IMAGE_NAME
 endif
 
 ifndef BASEIMAGE
-	BASEIMAGE=centos:8
+	BASEIMAGE=ubi-minimal:8.4-208
 endif
 
 # figure out if podman or docker should be used (use podman if found)

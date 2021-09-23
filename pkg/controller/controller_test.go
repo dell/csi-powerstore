@@ -45,32 +45,36 @@ import (
 )
 
 const (
-	validBaseVolID         = "39bb1b5f-5624-490d-9ece-18f7b28a904e"
-	validBlockVolumeID     = "39bb1b5f-5624-490d-9ece-18f7b28a904e/globalvolid1/scsi"
-	validNfsVolumeID       = "39bb1b5f-5624-490d-9ece-18f7b28a904e/globalvolid2/nfs"
-	invalidBlockVolumeID   = "39bb1b5f-5624-490d-9ece-18f7b28a904e/globalvolid3/scsi"
-	validNasID             = "24aefac2-a796-47dc-886a-c73ff8c1a671"
-	validVolSize           = 16 * 1024 * 1024 * 1024
-	firstValidIP           = "globalvolid1"
-	secondValidIP          = "globalvolid2"
-	validNasName           = "my-nas-name"
-	validSnapName          = "my-snap"
-	validNodeID            = "csi-node-1a47a1b91c444a8a90193d8066669603-127.0.0.1"
-	validHostName          = "csi-node-1a47a1b91c444a8a90193d8066669603"
-	validHostID            = "24aefac2-a796-47dc-886a-c73ff8c1a671"
-	validClusterName       = "localSystemName"
-	validRemoteVolId       = "9f840c56-96e6-4de9-b5a3-27e7c20eaa77"
-	validRemoteSystemName  = "remoteName"
-	validRemoteSystemID    = "df7f804c-6373-4659-b197-36654d17979c"
-	validRPO               = "Five_Minutes"
-	validGroupID           = "610adaef-4f0a-4dff-9812-29ffa5daf185"
-	validRemoteGroupID     = "62ed932b-329b-4ba6-b0e0-3f51c34c4701"
-	validGroupName         = "csi-" + validRemoteSystemName + "-" + validRPO
-	validPolicyID          = "e74f6cfd-ae2a-4cde-ad6b-529b40edee5e"
-	validPolicyName        = "pp-" + validGroupName
-	validRuleID            = "c721f30b-0b37-4aaf-a3a2-ef99caba2100"
-	validRuleName          = "rr-" + validGroupName
-	validReplicationPrefix = "/" + controller.KeyReplicationEnabled
+	validBaseVolID            = "39bb1b5f-5624-490d-9ece-18f7b28a904e"
+	validBlockVolumeID        = "39bb1b5f-5624-490d-9ece-18f7b28a904e/globalvolid1/scsi"
+	validNfsVolumeID          = "39bb1b5f-5624-490d-9ece-18f7b28a904e/globalvolid2/nfs"
+	invalidBlockVolumeID      = "39bb1b5f-5624-490d-9ece-18f7b28a904e/globalvolid3/scsi"
+	validNasID                = "24aefac2-a796-47dc-886a-c73ff8c1a671"
+	validVolSize              = 16 * 1024 * 1024 * 1024
+	firstValidID              = "globalvolid1"
+	secondValidID             = "globalvolid2"
+	validNasName              = "my-nas-name"
+	validSnapName             = "my-snap"
+	validNodeID               = "csi-node-1a47a1b91c444a8a90193d8066669603-127.0.0.1"
+	validHostName             = "csi-node-1a47a1b91c444a8a90193d8066669603"
+	validHostID               = "24aefac2-a796-47dc-886a-c73ff8c1a671"
+	validClusterName          = "localSystemName"
+	validRemoteVolId          = "9f840c56-96e6-4de9-b5a3-27e7c20eaa77"
+	validRemoteSystemName     = "remoteName"
+	validRemoteSystemID       = "df7f804c-6373-4659-b197-36654d17979c"
+	validRPO                  = "Five_Minutes"
+	validGroupID              = "610adaef-4f0a-4dff-9812-29ffa5daf185"
+	validRemoteGroupID        = "62ed932b-329b-4ba6-b0e0-3f51c34c4701"
+	validNamespaceName        = "default"
+	validGroupName            = "csi-" + validRemoteSystemName + "-" + validRPO
+	validNamespacedGroupName  = "csi-" + validNamespaceName + "-" + validRemoteSystemName + "-" + validRPO
+	validPolicyID             = "e74f6cfd-ae2a-4cde-ad6b-529b40edee5e"
+	validPolicyName           = "pp-" + validGroupName
+	validRuleID               = "c721f30b-0b37-4aaf-a3a2-ef99caba2100"
+	validRuleName             = "rr-" + validGroupName
+	validReplicationPrefix    = "/" + controller.KeyReplicationEnabled
+	validVolumeGroupName      = "VGName"
+	validRemoteSystemGlobalID = "PS111111111111"
 )
 
 var (
@@ -93,32 +97,33 @@ func setVariables() {
 	first := &array.PowerStoreArray{
 		Endpoint:      "https://192.168.0.1/api/rest",
 		Username:      "admin",
-		GlobalId:      "globalvolid1",
+		GlobalId:      firstValidID,
 		Password:      "pass",
 		BlockProtocol: common.ISCSITransport,
 		Insecure:      true,
 		IsDefault:     true,
 		Client:        clientMock,
-		IP:            firstValidIP,
 	}
 	second := &array.PowerStoreArray{
 		Endpoint:      "https://192.168.0.2/api/rest",
 		Username:      "admin",
-		GlobalId:      "globalvolid2",
+		GlobalId:      secondValidID,
 		Password:      "pass",
 		NasName:       validNasName,
 		BlockProtocol: common.NoneTransport,
 		Insecure:      true,
 		Client:        clientMock,
-		IP:            secondValidIP,
 	}
 
-	arrays[firstValidIP] = first
-	arrays[secondValidIP] = second
+	arrays[firstValidID] = first
+	arrays[secondValidID] = second
+
+	csictx.Setenv(context.Background(), common.EnvReplicationPrefix, "replication.storage.dell.com")
 
 	ctrlSvc = &controller.Service{Fs: fsMock}
 	ctrlSvc.SetArrays(arrays)
 	ctrlSvc.SetDefaultArray(first)
+	ctrlSvc.Init()
 }
 
 func addMetaData(createParams interface{}) {
@@ -144,16 +149,16 @@ var _ = Describe("CSIControllerService", func() {
 				clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
 
 				req := getTypicalCreateVolumeRequest("my-vol", validVolSize)
-				req.Parameters[common.KeyArrayID] = firstValidIP
+				req.Parameters[common.KeyArrayID] = firstValidID
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
 
 				Expect(err).To(BeNil())
 				Expect(res).To(Equal(&csi.CreateVolumeResponse{
 					Volume: &csi.Volume{
 						CapacityBytes: validVolSize,
-						VolumeId:      filepath.Join(validBaseVolID, firstValidIP, "scsi"),
+						VolumeId:      filepath.Join(validBaseVolID, firstValidID, "scsi"),
 						VolumeContext: map[string]string{
-							common.KeyArrayID:         firstValidIP,
+							common.KeyArrayID:         firstValidID,
 							common.KeyArrayVolumeName: "my-vol",
 							common.KeyProtocol:        "scsi",
 						},
@@ -166,17 +171,18 @@ var _ = Describe("CSIControllerService", func() {
 			var req *csi.CreateVolumeRequest
 			BeforeEach(func() {
 				req = getTypicalCreateVolumeRequest("my-vol", validVolSize)
-				req.Parameters[common.KeyArrayID] = firstValidIP
-
-				req.Parameters[validReplicationPrefix] = "true"
-				req.Parameters[controller.KeyReplicationRPO] = validRPO
-				req.Parameters[controller.KeyReplicationRemoteSystem] = validRemoteSystemName
+				req.Parameters[common.KeyArrayID] = firstValidID
+				req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationEnabled)] = "true"
+				req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationRPO)] = validRPO
+				req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationRemoteSystem)] = validRemoteSystemName
+				req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationIgnoreNamespaces)] = "true"
+				req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationVGPrefix)] = "csi"
 			})
 
 			It("should create volume and volumeGroup if policy exists", func() {
 				// all entities not exists
 				clientMock.On("GetVolumeGroupByName", mock.Anything, validGroupName).
-					Return(gopowerstore.VolumeGroup{}, gopowerstore.NewVolumeIsNotExistError())
+					Return(gopowerstore.VolumeGroup{}, gopowerstore.NewNotFoundError())
 
 				EnsureProtectionPolicyExistsMock()
 
@@ -191,14 +197,63 @@ var _ = Describe("CSIControllerService", func() {
 				Expect(res).To(Equal(&csi.CreateVolumeResponse{
 					Volume: &csi.Volume{
 						CapacityBytes: validVolSize,
-						VolumeId:      filepath.Join(validBaseVolID, firstValidIP, "scsi"),
+						VolumeId:      filepath.Join(validBaseVolID, firstValidID, "scsi"),
 						VolumeContext: map[string]string{
-							common.KeyArrayVolumeName:             "my-vol",
-							common.KeyProtocol:                    "scsi",
-							common.KeyArrayID:                     firstValidIP,
-							validReplicationPrefix:                "true",
-							controller.KeyReplicationRPO:          validRPO,
-							controller.KeyReplicationRemoteSystem: validRemoteSystemName,
+							common.KeyArrayVolumeName:                                 "my-vol",
+							common.KeyProtocol:                                        "scsi",
+							common.KeyArrayID:                                         firstValidID,
+							ctrlSvc.WithRP(controller.KeyReplicationEnabled):          "true",
+							ctrlSvc.WithRP(controller.KeyReplicationRPO):              validRPO,
+							ctrlSvc.WithRP(controller.KeyReplicationRemoteSystem):     validRemoteSystemName,
+							ctrlSvc.WithRP(controller.KeyReplicationIgnoreNamespaces): "true",
+							ctrlSvc.WithRP(controller.KeyReplicationVGPrefix):         "csi",
+						},
+					},
+				}))
+			})
+
+			It("should create vg with namespace if namespaces not ignored", func() {
+				req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationIgnoreNamespaces)] = "false"
+				req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
+
+				defer func() {
+					req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationIgnoreNamespaces)] = "true"
+					req.Parameters[controller.KeyCSIPVCNamespace] = ""
+				}()
+
+				clientMock.On("GetVolumeGroupByName", mock.Anything, validNamespacedGroupName).
+					Return(gopowerstore.VolumeGroup{}, gopowerstore.NewNotFoundError())
+
+				clientMock.On("GetRemoteSystemByName", mock.Anything, validRemoteSystemName).Return(gopowerstore.RemoteSystem{
+					Name: validRemoteSystemName,
+					ID:   validRemoteSystemID,
+				}, nil)
+
+				clientMock.On("GetProtectionPolicyByName", mock.Anything, "pp-"+validNamespacedGroupName).
+					Return(gopowerstore.ProtectionPolicy{ID: validPolicyID}, nil)
+
+				createGroupRequest := &gopowerstore.VolumeGroupCreate{Name: validNamespacedGroupName, ProtectionPolicyID: validPolicyID}
+				clientMock.On("CreateVolumeGroup", mock.Anything, createGroupRequest).Return(gopowerstore.CreateResponse{ID: validGroupID}, nil)
+				clientMock.On("GetVolumeGroup", mock.Anything, validGroupID).Return(gopowerstore.VolumeGroup{ID: validGroupID, ProtectionPolicyID: validPolicyID}, nil)
+
+				clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
+
+				res, err := ctrlSvc.CreateVolume(context.Background(), req)
+				Expect(err).To(BeNil())
+				Expect(res).To(Equal(&csi.CreateVolumeResponse{
+					Volume: &csi.Volume{
+						CapacityBytes: validVolSize,
+						VolumeId:      filepath.Join(validBaseVolID, firstValidID, "scsi"),
+						VolumeContext: map[string]string{
+							common.KeyArrayVolumeName:                                 "my-vol",
+							common.KeyProtocol:                                        "scsi",
+							common.KeyArrayID:                                         firstValidID,
+							ctrlSvc.WithRP(controller.KeyReplicationEnabled):          "true",
+							ctrlSvc.WithRP(controller.KeyReplicationRPO):              validRPO,
+							ctrlSvc.WithRP(controller.KeyReplicationRemoteSystem):     validRemoteSystemName,
+							ctrlSvc.WithRP(controller.KeyReplicationIgnoreNamespaces): "false",
+							ctrlSvc.WithRP(controller.KeyReplicationVGPrefix):         "csi",
+							controller.KeyCSIPVCNamespace:                             validNamespaceName,
 						},
 					},
 				}))
@@ -215,14 +270,16 @@ var _ = Describe("CSIControllerService", func() {
 				Expect(res).To(Equal(&csi.CreateVolumeResponse{
 					Volume: &csi.Volume{
 						CapacityBytes: validVolSize,
-						VolumeId:      filepath.Join(validBaseVolID, firstValidIP, "scsi"),
+						VolumeId:      filepath.Join(validBaseVolID, firstValidID, "scsi"),
 						VolumeContext: map[string]string{
-							common.KeyArrayVolumeName:             "my-vol",
-							common.KeyProtocol:                    "scsi",
-							common.KeyArrayID:                     firstValidIP,
-							validReplicationPrefix:                "true",
-							controller.KeyReplicationRPO:          validRPO,
-							controller.KeyReplicationRemoteSystem: validRemoteSystemName,
+							common.KeyArrayVolumeName:                                 "my-vol",
+							common.KeyProtocol:                                        "scsi",
+							common.KeyArrayID:                                         firstValidID,
+							ctrlSvc.WithRP(controller.KeyReplicationEnabled):          "true",
+							ctrlSvc.WithRP(controller.KeyReplicationRPO):              validRPO,
+							ctrlSvc.WithRP(controller.KeyReplicationRemoteSystem):     validRemoteSystemName,
+							ctrlSvc.WithRP(controller.KeyReplicationIgnoreNamespaces): "true",
+							ctrlSvc.WithRP(controller.KeyReplicationVGPrefix):         "csi",
 						},
 					},
 				}))
@@ -242,14 +299,16 @@ var _ = Describe("CSIControllerService", func() {
 				Expect(res).To(Equal(&csi.CreateVolumeResponse{
 					Volume: &csi.Volume{
 						CapacityBytes: validVolSize,
-						VolumeId:      filepath.Join(validBaseVolID, firstValidIP, "scsi"),
+						VolumeId:      filepath.Join(validBaseVolID, firstValidID, "scsi"),
 						VolumeContext: map[string]string{
-							common.KeyArrayVolumeName:             "my-vol",
-							common.KeyProtocol:                    "scsi",
-							common.KeyArrayID:                     firstValidIP,
-							validReplicationPrefix:                "true",
-							controller.KeyReplicationRPO:          validRPO,
-							controller.KeyReplicationRemoteSystem: validRemoteSystemName,
+							common.KeyArrayVolumeName:                                 "my-vol",
+							common.KeyProtocol:                                        "scsi",
+							common.KeyArrayID:                                         firstValidID,
+							ctrlSvc.WithRP(controller.KeyReplicationEnabled):          "true",
+							ctrlSvc.WithRP(controller.KeyReplicationRPO):              validRPO,
+							ctrlSvc.WithRP(controller.KeyReplicationRemoteSystem):     validRemoteSystemName,
+							ctrlSvc.WithRP(controller.KeyReplicationIgnoreNamespaces): "true",
+							ctrlSvc.WithRP(controller.KeyReplicationVGPrefix):         "csi",
 						},
 					},
 				}))
@@ -257,7 +316,7 @@ var _ = Describe("CSIControllerService", func() {
 
 			It("should fail create volume and update volumeGroup if we can't ensure that policy exists", func() {
 				clientMock.On("GetVolumeGroupByName", mock.Anything, validGroupName).
-					Return(gopowerstore.VolumeGroup{}, gopowerstore.NewVolumeIsNotExistError())
+					Return(gopowerstore.VolumeGroup{}, gopowerstore.NewNotFoundError())
 
 				clientMock.On("GetRemoteSystemByName", mock.Anything, validRemoteSystemName).
 					Return(gopowerstore.RemoteSystem{}, gopowerstore.NewHostIsNotExistError())
@@ -272,7 +331,7 @@ var _ = Describe("CSIControllerService", func() {
 			It("should fail when rpo incorrect", func() {
 				clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
 
-				req.Parameters[controller.KeyReplicationRPO] = "invalidRpo"
+				req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationRPO)] = "invalidRpo"
 
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
 				Expect(res).To(BeNil())
@@ -283,7 +342,7 @@ var _ = Describe("CSIControllerService", func() {
 
 			It("should fail when rpo not declared in parameters", func() {
 
-				delete(req.Parameters, controller.KeyReplicationRPO)
+				delete(req.Parameters, ctrlSvc.WithRP(controller.KeyReplicationRPO))
 
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
 				Expect(res).To(BeNil())
@@ -293,13 +352,21 @@ var _ = Describe("CSIControllerService", func() {
 			})
 
 			It("should fail when remote system not declared in parameters", func() {
-
-				delete(req.Parameters, controller.KeyReplicationRemoteSystem)
+				delete(req.Parameters, ctrlSvc.WithRP(controller.KeyReplicationRemoteSystem))
 
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
 				Expect(res).To(BeNil())
 				Expect(err).NotTo(BeNil())
 				Expect(err.Error()).To(ContainSubstring("replication enabled but no remote system specified in storage class"))
+			})
+
+			It("should fail when volume group prefix not declared in parameters", func() {
+				delete(req.Parameters, ctrlSvc.WithRP(controller.KeyReplicationVGPrefix))
+
+				res, err := ctrlSvc.CreateVolume(context.Background(), req)
+				Expect(res).To(BeNil())
+				Expect(err).NotTo(BeNil())
+				Expect(err.Error()).To(ContainSubstring("replication enabled but no volume group prefix specified in storage class"))
 			})
 		})
 
@@ -309,18 +376,18 @@ var _ = Describe("CSIControllerService", func() {
 				clientMock.On("CreateFS", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
 
 				req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
-				req.Parameters[common.KeyArrayID] = secondValidIP
+				req.Parameters[common.KeyArrayID] = secondValidID
 
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
 				Expect(err).To(BeNil())
 				Expect(res).To(Equal(&csi.CreateVolumeResponse{
 					Volume: &csi.Volume{
 						CapacityBytes: validVolSize,
-						VolumeId:      filepath.Join(validBaseVolID, secondValidIP, "nfs"),
+						VolumeId:      filepath.Join(validBaseVolID, secondValidID, "nfs"),
 						VolumeContext: map[string]string{
 							common.KeyArrayVolumeName: "my-vol",
 							common.KeyProtocol:        "nfs",
-							common.KeyArrayID:         secondValidIP,
+							common.KeyArrayID:         secondValidID,
 						},
 					},
 				}))
@@ -345,18 +412,18 @@ var _ = Describe("CSIControllerService", func() {
 				}, nil)
 
 				req := getTypicalCreateVolumeRequest(volName, validVolSize)
-				req.Parameters[common.KeyArrayID] = firstValidIP
+				req.Parameters[common.KeyArrayID] = firstValidID
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
 
 				Expect(err).To(BeNil())
 				Expect(res).To(Equal(&csi.CreateVolumeResponse{
 					Volume: &csi.Volume{
 						CapacityBytes: validVolSize,
-						VolumeId:      filepath.Join(validBaseVolID, firstValidIP, "scsi"),
+						VolumeId:      filepath.Join(validBaseVolID, firstValidID, "scsi"),
 						VolumeContext: map[string]string{
 							common.KeyArrayVolumeName: "my-vol",
 							common.KeyProtocol:        "scsi",
-							common.KeyArrayID:         firstValidIP,
+							common.KeyArrayID:         firstValidID,
 						},
 					},
 				}))
@@ -380,18 +447,18 @@ var _ = Describe("CSIControllerService", func() {
 				}, nil)
 
 				req := getTypicalCreateVolumeNFSRequest(volName, validVolSize)
-				req.Parameters[common.KeyArrayID] = secondValidIP
+				req.Parameters[common.KeyArrayID] = secondValidID
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
 
 				Expect(err).To(BeNil())
 				Expect(res).To(Equal(&csi.CreateVolumeResponse{
 					Volume: &csi.Volume{
 						CapacityBytes: validVolSize,
-						VolumeId:      filepath.Join(validBaseVolID, secondValidIP, "nfs"),
+						VolumeId:      filepath.Join(validBaseVolID, secondValidID, "nfs"),
 						VolumeContext: map[string]string{
 							common.KeyArrayVolumeName: "my-vol",
 							common.KeyProtocol:        "nfs",
-							common.KeyArrayID:         secondValidIP,
+							common.KeyArrayID:         secondValidID,
 						},
 					},
 				}))
@@ -415,7 +482,7 @@ var _ = Describe("CSIControllerService", func() {
 					}, nil)
 
 					req := getTypicalCreateVolumeRequest(volName, validVolSize)
-					req.Parameters[common.KeyArrayID] = firstValidIP
+					req.Parameters[common.KeyArrayID] = firstValidID
 					res, err := ctrlSvc.CreateVolume(context.Background(), req)
 
 					Expect(res).To(BeNil())
@@ -443,7 +510,7 @@ var _ = Describe("CSIControllerService", func() {
 					}, nil)
 
 					req := getTypicalCreateVolumeNFSRequest(volName, validVolSize)
-					req.Parameters[common.KeyArrayID] = secondValidIP
+					req.Parameters[common.KeyArrayID] = secondValidID
 					res, err := ctrlSvc.CreateVolume(context.Background(), req)
 
 					Expect(res).To(BeNil())
@@ -475,7 +542,7 @@ var _ = Describe("CSIControllerService", func() {
 
 				req := getTypicalCreateVolumeRequest("my-vol", validVolSize)
 				req.VolumeContentSource = contentSource
-				req.Parameters[common.KeyArrayID] = firstValidIP
+				req.Parameters[common.KeyArrayID] = firstValidID
 
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
 
@@ -483,9 +550,9 @@ var _ = Describe("CSIControllerService", func() {
 				Expect(res).To(Equal(&csi.CreateVolumeResponse{
 					Volume: &csi.Volume{
 						CapacityBytes: validVolSize,
-						VolumeId:      filepath.Join(validBaseVolID, firstValidIP, "scsi"),
+						VolumeId:      filepath.Join(validBaseVolID, firstValidID, "scsi"),
 						VolumeContext: map[string]string{
-							common.KeyArrayID: firstValidIP,
+							common.KeyArrayID: firstValidID,
 						},
 						ContentSource: contentSource,
 					},
@@ -516,7 +583,7 @@ var _ = Describe("CSIControllerService", func() {
 
 				req := getTypicalCreateVolumeNFSRequest(volName, validVolSize)
 				req.VolumeContentSource = contentSource
-				req.Parameters[common.KeyArrayID] = secondValidIP
+				req.Parameters[common.KeyArrayID] = secondValidID
 
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
 
@@ -524,9 +591,9 @@ var _ = Describe("CSIControllerService", func() {
 				Expect(res).To(Equal(&csi.CreateVolumeResponse{
 					Volume: &csi.Volume{
 						CapacityBytes: validVolSize,
-						VolumeId:      filepath.Join(validBaseVolID, secondValidIP, "nfs"),
+						VolumeId:      filepath.Join(validBaseVolID, secondValidID, "nfs"),
 						VolumeContext: map[string]string{
-							common.KeyArrayID: secondValidIP,
+							common.KeyArrayID: secondValidID,
 						},
 						ContentSource: contentSource,
 					},
@@ -559,7 +626,7 @@ var _ = Describe("CSIControllerService", func() {
 
 				req := getTypicalCreateVolumeRequest(volName, validVolSize)
 				req.VolumeContentSource = contentSource
-				req.Parameters[common.KeyArrayID] = firstValidIP
+				req.Parameters[common.KeyArrayID] = firstValidID
 
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
 
@@ -567,9 +634,9 @@ var _ = Describe("CSIControllerService", func() {
 				Expect(res).To(Equal(&csi.CreateVolumeResponse{
 					Volume: &csi.Volume{
 						CapacityBytes: validVolSize,
-						VolumeId:      filepath.Join(validBaseVolID, firstValidIP, "scsi"),
+						VolumeId:      filepath.Join(validBaseVolID, firstValidID, "scsi"),
 						VolumeContext: map[string]string{
-							common.KeyArrayID: firstValidIP,
+							common.KeyArrayID: firstValidID,
 						},
 						ContentSource: contentSource,
 					},
@@ -600,7 +667,7 @@ var _ = Describe("CSIControllerService", func() {
 
 				req := getTypicalCreateVolumeNFSRequest(volName, validVolSize)
 				req.VolumeContentSource = contentSource
-				req.Parameters[common.KeyArrayID] = secondValidIP
+				req.Parameters[common.KeyArrayID] = secondValidID
 
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
 
@@ -608,9 +675,9 @@ var _ = Describe("CSIControllerService", func() {
 				Expect(res).To(Equal(&csi.CreateVolumeResponse{
 					Volume: &csi.Volume{
 						CapacityBytes: validVolSize,
-						VolumeId:      filepath.Join(validBaseVolID, secondValidIP, "nfs"),
+						VolumeId:      filepath.Join(validBaseVolID, secondValidID, "nfs"),
 						VolumeContext: map[string]string{
-							common.KeyArrayID: secondValidIP,
+							common.KeyArrayID: secondValidID,
 						},
 						ContentSource: contentSource,
 					},
@@ -629,11 +696,11 @@ var _ = Describe("CSIControllerService", func() {
 				Expect(res).To(Equal(&csi.CreateVolumeResponse{
 					Volume: &csi.Volume{
 						CapacityBytes: validVolSize,
-						VolumeId:      filepath.Join(validBaseVolID, firstValidIP, "scsi"),
+						VolumeId:      filepath.Join(validBaseVolID, firstValidID, "scsi"),
 						VolumeContext: map[string]string{
 							common.KeyArrayVolumeName: "my-vol",
 							common.KeyProtocol:        "scsi",
-							common.KeyArrayID:         firstValidIP,
+							common.KeyArrayID:         firstValidID,
 						},
 					},
 				}))
@@ -648,7 +715,7 @@ var _ = Describe("CSIControllerService", func() {
 
 				Expect(res).To(BeNil())
 				Expect(err).ToNot(BeNil())
-				Expect(err.Error()).To(ContainSubstring("can't find array with provided ip"))
+				Expect(err.Error()).To(ContainSubstring("can't find array with provided id"))
 			})
 		})
 
@@ -658,7 +725,7 @@ var _ = Describe("CSIControllerService", func() {
 				req.VolumeCapabilities[0].AccessType = &csi.VolumeCapability_Block{
 					Block: &csi.VolumeCapability_BlockVolume{},
 				}
-				req.Parameters[common.KeyArrayID] = secondValidIP
+				req.Parameters[common.KeyArrayID] = secondValidID
 				req.Parameters[controller.KeyFsType] = "nfs"
 
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
@@ -672,7 +739,7 @@ var _ = Describe("CSIControllerService", func() {
 				req.VolumeCapabilities[0].AccessType = &csi.VolumeCapability_Block{
 					Block: &csi.VolumeCapability_BlockVolume{},
 				}
-				req.Parameters[common.KeyArrayID] = secondValidIP
+				req.Parameters[common.KeyArrayID] = secondValidID
 				req.Parameters[controller.KeyFsTypeOld] = "nfs"
 
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
@@ -812,14 +879,14 @@ var _ = Describe("CSIControllerService", func() {
 				clientMock.On("GetVolume", context.Background(), validBaseVolID).
 					Return(gopowerstore.Volume{}, gopowerstore.APIError{
 						ErrorMsg: &api.ErrorMsg{
-							StatusCode: http.StatusUnprocessableEntity,
+							StatusCode: http.StatusNotFound,
 							ErrorCode:  gopowerstore.InstanceWasNotFound,
 						},
 					})
 				clientMock.On("GetFS", context.Background(), validBaseVolID).
 					Return(gopowerstore.FileSystem{}, gopowerstore.APIError{
 						ErrorMsg: &api.ErrorMsg{
-							StatusCode: http.StatusUnprocessableEntity,
+							StatusCode: http.StatusNotFound,
 							ErrorCode:  gopowerstore.InstanceWasNotFound,
 						},
 					})
@@ -973,7 +1040,7 @@ var _ = Describe("CSIControllerService", func() {
 
 		When("volume id contains unsupported protocol", func() {
 			It("should fail", func() {
-				req := &csi.DeleteVolumeRequest{VolumeId: validBaseVolID + "/" + firstValidIP + "/smb"}
+				req := &csi.DeleteVolumeRequest{VolumeId: validBaseVolID + "/" + firstValidID + "/smb"}
 
 				res, err := ctrlSvc.DeleteVolume(context.Background(), req)
 
@@ -1184,7 +1251,7 @@ var _ = Describe("CSIControllerService", func() {
 				clientMock.On("DeleteSnapshot", mock.Anything,
 					mock.AnythingOfType("*gopowerstore.VolumeDelete"), validBaseVolID).Return(gopowerstore.EmptyResponse(""), gopowerstore.APIError{
 					ErrorMsg: &api.ErrorMsg{
-						StatusCode: http.StatusUnprocessableEntity,
+						StatusCode: http.StatusNotFound,
 						ErrorCode:  gopowerstore.InstanceWasNotFound,
 					},
 				})
@@ -1204,7 +1271,7 @@ var _ = Describe("CSIControllerService", func() {
 
 				clientMock.On("DeleteFsSnapshot", mock.Anything, validBaseVolID).Return(gopowerstore.EmptyResponse(""), gopowerstore.APIError{
 					ErrorMsg: &api.ErrorMsg{
-						StatusCode: http.StatusUnprocessableEntity,
+						StatusCode: http.StatusNotFound,
 						ErrorCode:  gopowerstore.InstanceWasNotFound,
 					},
 				})
@@ -1224,7 +1291,7 @@ var _ = Describe("CSIControllerService", func() {
 			It("should return no error", func() {
 				clientMock.On("GetSnapshot", mock.Anything, validBaseVolID).Return(gopowerstore.Volume{}, gopowerstore.APIError{
 					ErrorMsg: &api.ErrorMsg{
-						StatusCode: http.StatusUnprocessableEntity,
+						StatusCode: http.StatusNotFound,
 						ErrorCode:  gopowerstore.InstanceWasNotFound,
 					},
 				})
@@ -1460,7 +1527,7 @@ var _ = Describe("CSIControllerService", func() {
 					}, nil)
 
 				clientMock.On("GetFileInterface", mock.Anything, interfaceID).
-					Return(gopowerstore.FileInterface{IpAddress: secondValidIP}, nil)
+					Return(gopowerstore.FileInterface{IpAddress: secondValidID}, nil)
 
 				req := getTypicalControllerPublishVolumeRequest("multiple-writer", validNodeID, validNfsVolumeID)
 				req.VolumeCapability = getVolumeCapabilityNFS()
@@ -1472,7 +1539,7 @@ var _ = Describe("CSIControllerService", func() {
 				Expect(res).To(Equal(&csi.ControllerPublishVolumeResponse{
 					PublishContext: map[string]string{
 						"nasName":       validNasName,
-						"NfsExportPath": secondValidIP + ":/",
+						"NfsExportPath": secondValidID + ":/",
 						"ExportID":      nfsID,
 						"allowRoot":     "",
 						"HostIP":        "127.0.0.1",
@@ -1582,7 +1649,7 @@ var _ = Describe("CSIControllerService", func() {
 					}, nil)
 
 				clientMock.On("GetFileInterface", mock.Anything, interfaceID).
-					Return(gopowerstore.FileInterface{IpAddress: secondValidIP}, nil)
+					Return(gopowerstore.FileInterface{IpAddress: secondValidID}, nil)
 
 				req := getTypicalControllerPublishVolumeRequest("multi-writer", validNodeID, validNfsVolumeID)
 				req.VolumeCapability = getVolumeCapabilityNFS()
@@ -1594,7 +1661,7 @@ var _ = Describe("CSIControllerService", func() {
 				Expect(res).To(Equal(&csi.ControllerPublishVolumeResponse{
 					PublishContext: map[string]string{
 						"nasName":       validNasName,
-						"NfsExportPath": secondValidIP + ":/",
+						"NfsExportPath": secondValidID + ":/",
 						"ExportID":      nfsID,
 						"allowRoot":     "",
 						"HostIP":        "127.0.0.1",
@@ -1889,7 +1956,7 @@ var _ = Describe("CSIControllerService", func() {
 				_, err := ctrlSvc.ControllerPublishVolume(context.Background(), req)
 
 				Expect(err).ToNot(BeNil())
-				Expect(err.Error()).To(ContainSubstring("failed to find array with given IP"))
+				Expect(err.Error()).To(ContainSubstring("failed to find array with given ID"))
 			})
 		})
 	})
@@ -2856,19 +2923,25 @@ var _ = Describe("CSIControllerService", func() {
 	Describe("calling DiscoverStorageProtectionGroup", func() {
 		When("get info about protection group", func() {
 			getLocalAndRemoteParams := func(localSystemName string, localAddress string,
-				remoteSystemName string, remoteAddress string) (map[string]string, map[string]string) {
+				remoteSystemName string, remoteAddress string,
+				remoteSerialNumber string, volumeGroupName string) (map[string]string, map[string]string) {
 				localParams := map[string]string{
+					"globalID":                localAddress,
 					"systemName":              localSystemName,
 					"managementAddress":       localAddress,
 					"remoteSystemName":        remoteSystemName,
 					"remoteManagementAddress": remoteAddress,
+					"remoteGlobalID":          remoteSerialNumber,
+					"VolumeGroupName":         volumeGroupName,
 				}
 
 				remoteParams := map[string]string{
+					"globalID":                remoteSerialNumber,
 					"systemName":              remoteSystemName,
 					"managementAddress":       remoteAddress,
 					"remoteSystemName":        localSystemName,
 					"remoteManagementAddress": localAddress,
+					"VolumeGroupName":         volumeGroupName,
 				}
 
 				return localParams, remoteParams
@@ -2876,7 +2949,7 @@ var _ = Describe("CSIControllerService", func() {
 
 			It("should successfully discover protection group if everything is ok", func() {
 				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).
-					Return(gopowerstore.VolumeGroups{VolumeGroup: []gopowerstore.VolumeGroup{{ID: validGroupID}}}, nil)
+					Return(gopowerstore.VolumeGroups{VolumeGroup: []gopowerstore.VolumeGroup{{ID: validGroupID, Name: validVolumeGroupName}}}, nil)
 
 				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, validGroupID).
 					Return(gopowerstore.ReplicationSession{
@@ -2889,24 +2962,26 @@ var _ = Describe("CSIControllerService", func() {
 						}}}, nil)
 
 				clientMock.On("GetCluster", mock.Anything).
-					Return(gopowerstore.Cluster{Name: validClusterName, ManagementAddress: firstValidIP}, nil)
+					Return(gopowerstore.Cluster{Name: validClusterName, ManagementAddress: firstValidID}, nil)
 
 				clientMock.On("GetRemoteSystem", mock.Anything, validRemoteSystemID).
 					Return(gopowerstore.RemoteSystem{
 						Name:              validRemoteSystemName,
-						ManagementAddress: secondValidIP}, nil)
+						ManagementAddress: secondValidID,
+						SerialNumber:      validRemoteSystemGlobalID}, nil)
 
 				req := &csiext.CreateStorageProtectionGroupRequest{
-					VolumeHandle: validBaseVolID + "/" + firstValidIP + "/" + "iscsi",
+					VolumeHandle: validBaseVolID + "/" + firstValidID + "/" + "iscsi",
 				}
 
 				res, err := ctrlSvc.CreateStorageProtectionGroup(context.Background(), req)
 
-				localParams, remoteParams := getLocalAndRemoteParams(validClusterName, firstValidIP,
-					validRemoteSystemName, secondValidIP)
+				localParams, remoteParams := getLocalAndRemoteParams(validClusterName, firstValidID,
+					validRemoteSystemName, secondValidID, validRemoteSystemGlobalID, validVolumeGroupName)
 
 				Expect(err).To(BeNil())
 				Expect(res).To(Equal(&csiext.CreateStorageProtectionGroupResponse{
+
 					LocalProtectionGroupId:          validGroupID,
 					RemoteProtectionGroupId:         validRemoteGroupID,
 					LocalProtectionGroupAttributes:  localParams,
@@ -2932,7 +3007,7 @@ var _ = Describe("CSIControllerService", func() {
 					Return(gopowerstore.VolumeGroups{}, gopowerstore.APIError{})
 
 				req := &csiext.CreateStorageProtectionGroupRequest{
-					VolumeHandle: validBaseVolID + "/" + firstValidIP + "/" + "iscsi",
+					VolumeHandle: validBaseVolID + "/" + firstValidID + "/" + "iscsi",
 				}
 
 				res, err := ctrlSvc.CreateStorageProtectionGroup(context.Background(), req)
@@ -2950,7 +3025,7 @@ var _ = Describe("CSIControllerService", func() {
 					Return(gopowerstore.ReplicationSession{}, gopowerstore.APIError{})
 
 				req := &csiext.CreateStorageProtectionGroupRequest{
-					VolumeHandle: validBaseVolID + "/" + firstValidIP + "/" + "iscsi",
+					VolumeHandle: validBaseVolID + "/" + firstValidID + "/" + "iscsi",
 				}
 
 				res, err := ctrlSvc.CreateStorageProtectionGroup(context.Background(), req)
@@ -2987,10 +3062,10 @@ var _ = Describe("CSIControllerService", func() {
 					Return(gopowerstore.Cluster{Name: validClusterName}, nil)
 
 				clientMock.On("GetRemoteSystem", mock.Anything, validRemoteSystemID).
-					Return(gopowerstore.RemoteSystem{Name: validRemoteSystemName, ManagementAddress: secondValidIP}, nil)
+					Return(gopowerstore.RemoteSystem{Name: validRemoteSystemName, ManagementAddress: secondValidID}, nil)
 
 				req := &csiext.CreateRemoteVolumeRequest{
-					VolumeHandle: validBaseVolID + "/" + firstValidIP + "/" + "iscsi",
+					VolumeHandle: validBaseVolID + "/" + firstValidID + "/" + "iscsi",
 				}
 
 				res, err := ctrlSvc.CreateRemoteVolume(context.Background(), req)
@@ -2999,10 +3074,10 @@ var _ = Describe("CSIControllerService", func() {
 				Expect(res).To(Equal(
 					&csiext.CreateRemoteVolumeResponse{RemoteVolume: &csiext.Volume{
 						CapacityBytes: validVolSize,
-						VolumeId:      validRemoteVolId + "/" + secondValidIP + "/" + "iscsi",
+						VolumeId:      validRemoteVolId + "/" + secondValidID + "/" + "iscsi",
 						VolumeContext: map[string]string{
 							"remoteSystem":      validClusterName,
-							"managementAddress": secondValidIP,
+							"managementAddress": secondValidID,
 						},
 					}}))
 
@@ -3024,7 +3099,7 @@ var _ = Describe("CSIControllerService", func() {
 					Return(gopowerstore.VolumeGroups{}, gopowerstore.APIError{})
 
 				req := &csiext.CreateRemoteVolumeRequest{
-					VolumeHandle: validBaseVolID + "/" + firstValidIP + "/" + "iscsi",
+					VolumeHandle: validBaseVolID + "/" + firstValidID + "/" + "iscsi",
 				}
 
 				res, err := ctrlSvc.CreateRemoteVolume(context.Background(), req)
@@ -3041,7 +3116,7 @@ var _ = Describe("CSIControllerService", func() {
 					Return(gopowerstore.ReplicationSession{}, gopowerstore.APIError{})
 
 				req := &csiext.CreateRemoteVolumeRequest{
-					VolumeHandle: validBaseVolID + "/" + firstValidIP + "/" + "iscsi",
+					VolumeHandle: validBaseVolID + "/" + firstValidID + "/" + "iscsi",
 				}
 				res, err := ctrlSvc.CreateRemoteVolume(context.Background(), req)
 
@@ -3062,7 +3137,7 @@ var _ = Describe("CSIControllerService", func() {
 					}, nil)
 
 				req := &csiext.CreateRemoteVolumeRequest{
-					VolumeHandle: validBaseVolID + "/" + firstValidIP + "/" + "iscsi",
+					VolumeHandle: validBaseVolID + "/" + firstValidID + "/" + "iscsi",
 				}
 				res, err := ctrlSvc.CreateRemoteVolume(context.Background(), req)
 

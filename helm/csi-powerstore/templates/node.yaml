@@ -92,7 +92,7 @@ spec:
               add: ["SYS_ADMIN"]
             allowPrivilegeEscalation: true
           image: {{ required "Must provide the PowerStore driver container image." .Values.images.driver }}
-          imagePullPolicy: Always
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
           command: [ "/csi-powerstore" ]
           env:
             {{- if hasKey .Values "dev" }}
@@ -101,24 +101,22 @@ spec:
             {{ if .Values.dev.enableTracing }}{{- include "pstore.tracingenvvars" . | nindent 12 }}{{ end }}
             {{- end}}
             - name: CSI_ENDPOINT
-              value: unix:///var/lib/kubelet/plugins/{{ .Values.driverName }}/csi_sock
+              value: unix://{{ .Values.kubeletConfigDir }}/plugins/{{ .Values.driverName }}/csi_sock
             - name: X_CSI_MODE
               value: node
-            - name: X_CSI_DEBUG
-              value: "true"
             - name: X_CSI_POWERSTORE_KUBE_NODE_NAME
               valueFrom:
                 fieldRef:
                   apiVersion: v1
                   fieldPath: spec.nodeName
             - name: X_CSI_POWERSTORE_NODE_NAME_PREFIX
-              value: {{ .Values.nodeNamePrefix }}
+              value: {{ .Values.node.nodeNamePrefix }}
             - name: X_CSI_POWERSTORE_NODE_ID_PATH
               value: /node-id
             - name: X_CSI_POWERSTORE_NODE_CHROOT_PATH
               value: /noderoot
             - name: X_CSI_POWERSTORE_TMP_DIR
-              value: /var/lib/kubelet/plugins/{{ .Values.driverName }}/tmp
+              value: {{ .Values.kubeletConfigDir }}/plugins/{{ .Values.driverName }}/tmp
             - name: X_CSI_DRIVER_NAME
               value: {{ .Values.driverName }}
             - name: X_CSI_FC_PORTS_FILTER_FILE_PATH
@@ -134,16 +132,18 @@ spec:
             {{- end }}
             - name: X_CSI_POWERSTORE_CONFIG_PATH
               value: /powerstore-config/config
+            - name: X_CSI_POWERSTORE_CONFIG_PARAMS_PATH
+              value: /powerstore-config-params/driver-config-params.yaml
             - name: GOPOWERSTORE_DEBUG
               value: "true"
           volumeMounts:
             - name: driver-path
-              mountPath: /var/lib/kubelet/plugins/{{ .Values.driverName }}
+              mountPath: {{ .Values.kubeletConfigDir }}/plugins/{{ .Values.driverName }}
             - name: csi-path
-              mountPath: /var/lib/kubelet/plugins/kubernetes.io/csi
+              mountPath: {{ .Values.kubeletConfigDir }}/plugins/kubernetes.io/csi
               mountPropagation: "Bidirectional"
             - name: pods-path
-              mountPath: /var/lib/kubelet/pods
+              mountPath: {{ .Values.kubeletConfigDir }}/pods
               mountPropagation: "Bidirectional"
             - name: dev
               mountPath: /dev
@@ -161,12 +161,15 @@ spec:
               mountPath: /noderoot
             - name: powerstore-config
               mountPath: /powerstore-config
+            - name: powerstore-config-params
+              mountPath: /powerstore-config-params
         - name: registrar
           image: {{ required "Must provide the CSI node registrar container image." .Values.images.registrar }}
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
           args:
             - "--v=5"
             - "--csi-address=$(ADDRESS)"
-            - --kubelet-registration-path=/var/lib/kubelet/plugins/{{ .Values.driverName }}/csi_sock
+            - --kubelet-registration-path={{ .Values.kubeletConfigDir }}/plugins/{{ .Values.driverName }}/csi_sock
           env:
             - name: ADDRESS
               value: /csi/csi_sock
@@ -183,18 +186,18 @@ spec:
       volumes:
         - name: registration-dir
           hostPath:
-            path: /var/lib/kubelet/plugins_registry/
+            path: {{ .Values.kubeletConfigDir }}/plugins_registry/
             type: DirectoryOrCreate
         - name: driver-path
           hostPath:
-            path: /var/lib/kubelet/plugins/{{ .Values.driverName }}
+            path: {{ .Values.kubeletConfigDir }}/plugins/{{ .Values.driverName }}
             type: DirectoryOrCreate
         - name: csi-path
           hostPath:
-            path: /var/lib/kubelet/plugins/kubernetes.io/csi
+            path: {{ .Values.kubeletConfigDir }}/plugins/kubernetes.io/csi
         - name: pods-path
           hostPath:
-            path: /var/lib/kubelet/pods
+            path: {{ .Values.kubeletConfigDir }}/pods
             type: Directory
         - name: dev
           hostPath:
@@ -202,7 +205,7 @@ spec:
             type: Directory
         - name: node-id
           hostPath:
-            path: {{ required "Must provide the path to file with node identifier." .Values.nodeIDPath }}
+            path: {{ required "Must provide the path to file with node identifier." .Values.node.nodeIDPath }}
             type: File
         - name: etciscsi
           hostPath:
@@ -224,6 +227,9 @@ spec:
           hostPath:
             path: /run
             type: Directory
+        - name: powerstore-config-params
+          configMap:
+            name: {{ .Release.Name }}-config-params
         - name: powerstore-config
           secret:
             secretName: {{ .Release.Name }}-config

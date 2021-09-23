@@ -1736,7 +1736,7 @@ var _ = Describe("CSINodeService", func() {
 				}, nil)
 
 				_, err := nodeSvc.NodeExpandVolume(context.Background(), &csi.NodeExpandVolumeRequest{
-					VolumeId:   "volid",
+					VolumeId:   validBlockVolumeID,
 					VolumePath: "",
 					CapacityRange: &csi.CapacityRange{
 						RequiredBytes: 2234234,

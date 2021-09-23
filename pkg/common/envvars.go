@@ -65,7 +65,10 @@ const (
 	// EnvArrayConfigFilePath is filepath to powerstore arrays config file
 	EnvArrayConfigFilePath = "X_CSI_POWERSTORE_CONFIG_PATH"
 
-	// EnvArrayConfigFilePath is filepath to powerstore arrays config file
+	// EnvConfigParamsFilePath is filepath to powerstore driver params config file
+	EnvConfigParamsFilePath = "X_CSI_POWERSTORE_CONFIG_PARAMS_PATH"
+
+	// EnvDebugEnableTracing allow to enable tracing in driver
 	EnvDebugEnableTracing = "ENABLE_TRACING"
 
 	// EnvReplicationContextPrefix enables sidecars to read required information from volume context
@@ -73,4 +76,7 @@ const (
 
 	// EnvReplicationPrefix is used as a prefix to find out if replication is enabled
 	EnvReplicationPrefix = "X_CSI_REPLICATION_PREFIX"
+
+	// EnvGOCSIDebug indicates whether to print REQUESTs and RESPONSEs of all CSI method calls(from gocsi)
+	EnvGOCSIDebug = "X_CSI_DEBUG"
 )

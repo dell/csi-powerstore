@@ -50,7 +50,7 @@ func (s *SCSIPublisher) Publish(ctx context.Context, req *csi.ControllerPublishV
 	kubeNodeID string, volumeID string) (*csi.ControllerPublishVolumeResponse, error) {
 	volume, err := client.GetVolume(ctx, volumeID)
 	if err != nil {
-		if apiError, ok := err.(gopowerstore.APIError); ok && apiError.VolumeIsNotExist() {
+		if apiError, ok := err.(gopowerstore.APIError); ok && apiError.NotFound() {
 			return nil, status.Errorf(codes.NotFound, "volume with ID '%s' not found", volumeID)
 		}
 		return nil, status.Errorf(codes.Internal, "failure checking volume status for volume publishing: %s", err.Error())
@@ -143,7 +143,7 @@ func (s *SCSIPublisher) Publish(ctx context.Context, req *csi.ControllerPublishV
 func (s *SCSIPublisher) CheckIfVolumeExists(ctx context.Context, client gopowerstore.Client, volID string) error {
 	_, err := client.GetVolume(ctx, volID)
 	if err != nil {
-		if apiError, ok := err.(gopowerstore.APIError); ok && apiError.VolumeIsNotExist() {
+		if apiError, ok := err.(gopowerstore.APIError); ok && apiError.NotFound() {
 			return status.Errorf(codes.NotFound, "volume with ID '%s' not found", volID)
 		}
 		return status.Errorf(codes.Internal, "failure checking volume status for volume publishing: %s", err.Error())
@@ -192,7 +192,7 @@ func (n *NfsPublisher) Publish(ctx context.Context, req *csi.ControllerPublishVo
 	kubeNodeID string, volumeID string) (*csi.ControllerPublishVolumeResponse, error) {
 	fs, err := client.GetFS(ctx, volumeID)
 	if err != nil {
-		if apiError, ok := err.(gopowerstore.APIError); ok && apiError.VolumeIsNotExist() {
+		if apiError, ok := err.(gopowerstore.APIError); ok && apiError.NotFound() {
 			return nil, status.Errorf(codes.NotFound, "volume with ID '%s' not found", volumeID)
 		}
 		return nil, status.Errorf(codes.Internal, "failure checking volume status for volume publishing: %s", err.Error())
@@ -218,7 +218,7 @@ func (n *NfsPublisher) Publish(ctx context.Context, req *csi.ControllerPublishVo
 	// Create NFS export if it doesn't exist
 	_, err = client.GetNFSExportByFileSystemID(ctx, fs.ID)
 	if err != nil {
-		if apiError, ok := err.(gopowerstore.APIError); ok && apiError.VolumeIsNotExist() {
+		if apiError, ok := err.(gopowerstore.APIError); ok && apiError.NotFound() {
 			_, err := client.CreateNFSExport(ctx, &gopowerstore.NFSExportCreate{
 				Name:         fs.Name,
 				FileSystemID: volumeID,
@@ -243,7 +243,7 @@ func (n *NfsPublisher) Publish(ctx context.Context, req *csi.ControllerPublishVo
 		AddRWRootHosts: ipWithNat,
 	}, export.ID)
 	if err != nil {
-		if apiError, ok := err.(gopowerstore.APIError); !(ok && apiError.VolumeIsNotExist()) {
+		if apiError, ok := err.(gopowerstore.APIError); !(ok && apiError.NotFound()) {
 			return nil, status.Errorf(codes.Internal, "failure when adding new host to nfs export: %s", err.Error())
 		}
 	}
@@ -271,7 +271,7 @@ func (n *NfsPublisher) Publish(ctx context.Context, req *csi.ControllerPublishVo
 func (n *NfsPublisher) CheckIfVolumeExists(ctx context.Context, client gopowerstore.Client, volID string) error {
 	_, err := client.GetFS(ctx, volID)
 	if err != nil {
-		if apiError, ok := err.(gopowerstore.APIError); ok && apiError.VolumeIsNotExist() {
+		if apiError, ok := err.(gopowerstore.APIError); ok && apiError.NotFound() {
 			return status.Errorf(codes.NotFound, "volume with ID '%s' not found", volID)
 		}
 		return status.Errorf(codes.Internal, "failure checking volume status for volume publishing: %s", err.Error())

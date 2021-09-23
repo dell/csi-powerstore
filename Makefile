@@ -6,15 +6,15 @@ all: clean build
 # Dockerfile defines which base image to use [Dockerfile.centos, Dockerfile.ubi, Dockerfile.ubi.min, Dockerfile.ubi.alt]
 # e.g.:$ make docker DOCKER_FILE=Dockerfile.ubi.alt
 ifndef DOCKER_FILE
-    DOCKER_FILE = Dockerfile.centos
+    DOCKER_FILE = Dockerfile.ubi.min
 endif
 
 # Tag parameters
 ifndef MAJOR
-    MAJOR=1
+    MAJOR=2
 endif
 ifndef MINOR
-    MINOR=4
+    MINOR=0
 endif
 ifndef PATCH
     PATCH=0
@@ -23,7 +23,7 @@ ifndef NOTES
 	NOTES=
 endif
 ifndef TAGMSG
-    TAGMSG="CSI Spec 1.2"
+    TAGMSG="CSI Spec 1.3"
 endif
 
 clean:

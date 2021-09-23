@@ -227,7 +227,7 @@ func (s *Service) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVol
 
 	id, _, protocol, err := array.ParseVolumeID(ctx, id, s.DefaultArray(), nil)
 	if err != nil {
-		if apiError, ok := err.(gopowerstore.APIError); ok && apiError.VolumeIsNotExist() {
+		if apiError, ok := err.(gopowerstore.APIError); ok && apiError.NotFound() {
 			return &csi.NodeUnstageVolumeResponse{}, nil
 		}
 		return nil, status.Errorf(codes.Unknown,
@@ -465,13 +465,17 @@ func (s *Service) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolum
 	// Get the VolumeID and validate against the volume
 	id, arrayID, _, err := array.ParseVolumeID(ctx, req.VolumeId, s.DefaultArray(), nil)
 	if err != nil {
-		if apiError, ok := err.(gopowerstore.APIError); ok && apiError.VolumeIsNotExist() {
+		if apiError, ok := err.(gopowerstore.APIError); ok && apiError.NotFound() {
 			return nil, err
 		}
 		return nil, err
 	}
 
-	arr := s.Arrays()[arrayID]
+	arr, ok := s.Arrays()[arrayID]
+	if !ok {
+		return nil, status.Error(codes.InvalidArgument, "failed to find array with given ID")
+	}
+
 	targetPath := req.GetVolumePath()
 	if targetPath == "" {
 		return nil, status.Error(codes.InvalidArgument, "targetPath is required")
@@ -817,7 +821,7 @@ func (s *Service) getInitiators() ([]string, []string, error) {
 	} else if len(iscsiInitiators) == 0 {
 		log.Error("iscsi initiators not found on node")
 	} else {
-		log.Error("iscsi initiators found on node")
+		log.Debug("iscsi initiators found on node")
 		iscsiAvailable = true
 	}
 

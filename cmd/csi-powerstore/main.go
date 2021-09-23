@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -27,11 +29,47 @@ import (
 
 //go:generate go generate ../../core
 
-func main() {
-	log.SetFormatter(&log.JSONFormatter{
-		TimestampFormat: time.RFC3339Nano,
+func init() {
+	// We set X_CSI_DEBUG to false, because we don't want gocsi to override our logging level
+	_ = os.Setenv(common.EnvGOCSIDebug, "false")
+	// Enable X_CSI_REQ_LOGGING and X_CSI_REP_LOGGING to see gRPC request information
+	_ = os.Setenv(gocsi.EnvVarReqLogging, "true")
+	_ = os.Setenv(gocsi.EnvVarRepLogging, "true")
+
+	paramsPath, ok := csictx.LookupEnv(context.Background(), common.EnvConfigParamsFilePath)
+	if !ok {
+		log.Warnf("config path X_CSI_POWERSTORE_CONFIG_PARAMS_PATH is not specified")
+	}
+
+	if name, ok := csictx.LookupEnv(context.Background(), common.EnvDriverName); ok {
+		common.Name = name
+	}
+
+	paramsViper := viper.New()
+	paramsViper.SetConfigFile(paramsPath)
+	paramsViper.SetConfigType("yaml")
+
+	err := paramsViper.ReadInConfig()
+	// if unable to read configuration file, default values will be used in updateDriverConfigParams
+	if err != nil {
+		log.WithError(err).Error("unable to read config file, using default values")
+	}
+	paramsViper.WatchConfig()
+	paramsViper.OnConfigChange(func(e fsnotify.Event) {
+		fmt.Println("Params config file changed:", e.Name)
+		updateDriverConfigParams(paramsViper)
 	})
 
+	updateDriverConfigParams(paramsViper)
+
+	// If we don't set this env gocsi will overwrite log level with default Info level
+	err = os.Setenv(gocsi.EnvVarLogLevel, log.GetLevel().String())
+	if err != nil {
+		log.WithError(err).Errorf("unable to set env variable %s", gocsi.EnvVarDebug)
+	}
+}
+
+func main() {
 	f := &fs.Fs{Util: &gofsutil.FS{}}
 
 	common.RmSockFile(f)
@@ -136,6 +174,40 @@ func main() {
 				gocsi.EnvVarSerialVolAccess + "=true",
 			},
 		})
+}
+
+func updateDriverConfigParams(v *viper.Viper) {
+	logLevelParam := "CSI_LOG_LEVEL"
+	logFormatParam := "CSI_LOG_FORMAT"
+	logFormat := strings.ToLower(v.GetString(logFormatParam))
+	fmt.Printf("Read CSI_LOG_FORMAT from log configuration file, format: %s\n", logFormat)
+
+	// Use JSON logger as default
+	if !strings.EqualFold(logFormat, "text") {
+		log.SetFormatter(&log.JSONFormatter{
+			TimestampFormat: time.RFC3339Nano,
+		})
+	} else {
+		log.SetFormatter(&log.TextFormatter{})
+	}
+
+	level := log.DebugLevel
+	if v.IsSet(logLevelParam) {
+		logLevel := v.GetString(logLevelParam)
+		if logLevel != "" {
+			logLevel = strings.ToLower(logLevel)
+			fmt.Printf("Read CSI_LOG_LEVEL from log configuration file, level: %s\n", logLevel)
+			var err error
+
+			l, err := log.ParseLevel(logLevel)
+			if err != nil {
+				log.WithError(err).Errorf("LOG_LEVEL %s value not recognized, setting to default error: %s ", logLevel, err.Error())
+			} else {
+				level = l
+			}
+		}
+	}
+	log.SetLevel(level)
 }
 
 const usage = `

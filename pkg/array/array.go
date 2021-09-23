@@ -212,7 +212,7 @@ func GetPowerStoreArrays(fs fs.FsInterface, filePath string) (map[string]*PowerS
 
 		ip := ips[0]
 		array.IP = ip
-		log.Info(array)
+		log.Infof("%s,%s,%s,%s,%t,%t,%s", array.Endpoint, array.GlobalId, array.Username, array.NasName, array.Insecure, array.IsDefault, array.BlockProtocol)
 		arrayMap[array.GlobalId] = array
 		mapper[ip] = array.GlobalId
 		if array.IsDefault && !foundDefault {
@@ -267,7 +267,7 @@ func ParseVolumeID(ctx context.Context, volumeID string, defaultArray *PowerStor
 			if err == nil {
 				protocol = "nfs"
 			} else {
-				if apiError, ok := err.(gopowerstore.APIError); ok && apiError.VolumeIsNotExist() {
+				if apiError, ok := err.(gopowerstore.APIError); ok && apiError.NotFound() {
 					return id, arrayID, protocol, apiError
 				}
 				return id, arrayID, protocol, status.Errorf(codes.Unknown,

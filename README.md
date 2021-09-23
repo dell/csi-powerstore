@@ -8,23 +8,14 @@
 **Repository for CSI Driver for Dell EMC PowerStore**
 
 ## Description
-CSI Driver for Dell EMC PowerStore is a Container Storage Interface [(CSI)](https://github.com/container-storage-interface/spec) driver that provides support for provisioning persistent storage using Dell EMC PowerStore storage array.
+CSI Driver for PowerStore is part of the [CSM (Container Storage Modules)](https://github.com/dell/csm) open-source suite of Kubernetes storage enablers for Dell EMC products. CSI Driver for PowerStore is a Container Storage Interface (CSI) driver that provides support for provisioning persistent storage using Dell EMC PowerStore storage array. 
 
 It supports CSI specification version 1.3.
 
-This project may be compiled as a stand-alone binary using Golang that, when run, provides a valid CSI endpoint.
-It also can be used as a precompiled container image.
-
-For Documentation, please go to [Dell CSI Driver Documentation](https://dell.github.io/storage-plugin-docs).
+This project may be compiled as a stand-alone binary using Golang that, when run, provides a valid CSI endpoint. It also can be used as a precompiled container image.
 
 ## Support
-The CSI Driver for Dell EMC PowerStore image, which is the built driver code, is available on DockerHub and is officially supported by Dell EMC.
-
-The source code for CSI Driver for Dell EMC PowerStore available on GitHub is unsupported and provided solely under the terms of the license attached to the source code. 
-
-For clarity, Dell EMC does not provide support for any source code modifications.
-
-For any CSI driver issues, questions or feedback, join the [Dell EMC Container community](https://www.dell.com/community/Containers/bd-p/Containers).
+For any CSI driver issues, questions or feedback, please follow our [support process](https://github.com/dell/csm/blob/main/docs/SUPPORT.md)
 
 ## Building
 This project is a Go module (see golang.org Module information for explanation).
@@ -47,11 +38,7 @@ If you want to use FC be sure that zoning of Host Bus Adapters to the FC port di
 If you want to use NFS be sure to enable it in `myvalues.yaml` or in your storage classes, and configure corresponding NAS servers on PowerStore.
 
 ## Driver Installation
-Please consult the [Installation Guide](https://dell.github.io/storage-plugin-docs/docs/installation/)
-
-Below is a brief description of installation procedure using Helm. For more detailed installation instructions go to [Helm Installation](https://dell.github.io/storage-plugin-docs/docs/installation/helm/powerstore/) page of documentation. 
-
-As referenced in the guide, installation in a Kubernetes cluster should be done using the scripts within the `dell-csi-helm-installer` directory. For more detailed information on the scripts, consult the [README.md](dell-csi-helm-installer/README.md)
+Please consult the [Installation Guide](https://dell.github.io/csm-docs/docs/csidriver/installation)
 
 ### Prerequisites
 - Upstream Kubernetes versions 1.19, 1.20 or 1.21 or OpenShift versions 4.6 (EUS), 4.7
@@ -85,9 +72,7 @@ As referenced in the guide, installation in a Kubernetes cluster should be done 
 9. Install the driver using `csi-install.sh` bash script by running `./csi-install.sh --namespace csi-powerstore --values ./my-powerstore-settings.yaml` 
 
 ## Using Driver
-Please refer to the section `Testing Drivers` in the [Documentation](https://dell.github.io/storage-plugin-docs/docs/installation/test/) for more info.
+Please refer to the section `Testing Drivers` in the [Documentation](https://dell.github.io/csm-docs/docs/csidriver/installation/test/) for more info.
 
 ## Documentation
-For more detailed information on the driver, please refer to [Dell Storage Documentation](https://dell.github.io/storage-plugin-docs/docs/) 
-
-For a detailed set of information on supported platforms and driver capabilities, please refer to the [Features and Capabilities Documentation](https://dell.github.io/storage-plugin-docs/docs/dell-csi-driver/) 
+For more detailed information on the driver, please refer to [Container Storage Modules documentation](https://dell.github.io/csm-docs/).

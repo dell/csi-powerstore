@@ -1,0 +1,62 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: "powerstore-replication"
+provisioner: "csi-powerstore.dellemc.com"
+reclaimPolicy: Retain
+volumeBindingMode: Immediate
+parameters:
+  # replicationPrefix paramater in values.yaml must be used as prefix for all replication parameters in storage class
+  # for e.g., all replication parameters have prefix: replication.storage.dell.com here
+
+  # replication.storage.dell.com/isReplicationEnabled: 
+  # Allowed values:
+  #   true: enable replication sidecar
+  #   false: disable replication sidecar 
+  # Optional: true
+  # Default value: false
+  replication.storage.dell.com/isReplicationEnabled: true
+
+  # replication.storage.dell.com/remoteStorageClassName: 
+  # Allowed values: string
+  # Optional: true
+  # Default value: None
+  replication.storage.dell.com/remoteStorageClassName: "powerstore-replication"
+
+  # replication.storage.dell.com/remoteClusterID: point to correct remote cluster id
+  # Allowed values: string 
+  # Optional: true
+  # Default value: None
+  replication.storage.dell.com/remoteClusterID: "tgt-cluster-id"
+
+  # replication.storage.dell.com/remoteSystem: point to correct remote PowerStore system
+  # Allowed values: string
+  # Optional: true
+  # Default value: None
+  replication.storage.dell.com/remoteSystem: "RT-0000"
+
+  # replication.storage.dell.com/rpo: change to any other RPOs supported by PowerStore
+  # Allowed values: "Five_Minutes", "Fifteen_Minutes", "Thirty_Minutes", "One_Hour", "Six_Hours", "Twelve_Hours", "One_Day"
+  # Optional: true
+  # Default value: None
+  replication.storage.dell.com/rpo: Five_Minutes
+
+  # replication.storage.dell.com/ignoreNamespaces: set to 'true' if you want to ignore namespaces and use one volume group
+  # Allowed values:
+  #   true: ignore namespaces and use one volume group
+  #   false: create separate volume group per namespace
+  # Optional: true
+  # Default value: None
+  replication.storage.dell.com/ignoreNamespaces: false
+  
+  # replication.storage.dell.com/volumeGroupPrefix: volume group prefix
+  # Allowed values: string
+  # Optional: true
+  # Default value: None
+  replication.storage.dell.com/volumeGroupPrefix: "csi"
+
+  # arrayID: id of array to be used for volumes
+  # Allowed values: arrayID corresponding to array's globalID specified in secret.yaml
+  # Optional: false
+  # Default value: None
+  arrayID: "Unique"
