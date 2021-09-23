@@ -194,7 +194,7 @@ func (n *NFSStager) Stage(ctx context.Context, req *csi.NodeStageVolumeRequest,
 			AddRWHosts:        hostsToAdd,
 		}, exportID)
 		if err != nil {
-			if apiError, ok := err.(gopowerstore.APIError); !(ok && apiError.VolumeIsNotExist()) {
+			if apiError, ok := err.(gopowerstore.APIError); !(ok && apiError.NotFound()) {
 				return nil, status.Errorf(codes.Internal, "failure when modifying nfs export: %s", err.Error())
 			}
 		}

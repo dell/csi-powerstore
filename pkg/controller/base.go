@@ -43,12 +43,15 @@ const (
 	ErrUnknownAccessMode = "access mode cannot be UNKNOWN"
 	ErrNoMultiNodeWriter = "multi-node with writer(s) only supported for block access type"
 
-	KeyFsType                  = "csi.storage.k8s.io/fstype"
-	KeyFsTypeOld               = "FsType"
-	KeyReplicationEnabled      = "isReplicationEnabled"
-	KeyReplicationRPO          = "rpo"
-	KeyReplicationRemoteSystem = "remoteSystem"
-	KeyNasName                 = "nasName"
+	KeyFsType                      = "csi.storage.k8s.io/fstype"
+	KeyFsTypeOld                   = "FsType"
+	KeyReplicationEnabled          = "isReplicationEnabled"
+	KeyReplicationRPO              = "rpo"
+	KeyReplicationRemoteSystem     = "remoteSystem"
+	KeyReplicationIgnoreNamespaces = "ignoreNamespaces"
+	KeyReplicationVGPrefix         = "volumeGroupPrefix"
+	KeyNasName                     = "nasName"
+	KeyCSIPVCNamespace             = "csi.storage.k8s.io/pvc/namespace"
 )
 
 func volumeNameValidation(volumeName string) error {
@@ -116,7 +119,7 @@ func detachVolumeFromHost(ctx context.Context, hostID string, volumeID string, c
 		if apiError.HostIsNotExist() {
 			return status.Errorf(codes.NotFound, "host with ID '%s' not found", hostID)
 		}
-		if !apiError.VolumeIsNotAttachedToHost() && !apiError.HostIsNotAttachedToVolume() && !apiError.VolumeIsNotExist() {
+		if !apiError.VolumeIsNotAttachedToHost() && !apiError.HostIsNotAttachedToVolume() && !apiError.NotFound() {
 			return status.Errorf(codes.Unknown, "unexpected api error when detaching volume from host:%s", err.Error())
 		}
 
