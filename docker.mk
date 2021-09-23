@@ -10,7 +10,7 @@ else
 endif
 
 ifndef DOCKER_REGISTRY
-	DOCKER_REGISTRY=amaas-eos-drm1.cec.lab.emc.com:5017
+	DOCKER_REGISTRY=dellemc
 endif
 
 ifndef DOCKER_IMAGE_NAME
