@@ -434,7 +434,7 @@ func (s *Service) DeleteStorageProtectionGroup(ctx context.Context,
 
 	vg, err := arr.GetClient().GetVolumeGroup(ctx, groupID)
 	if apiErr, ok := err.(gopowerstore.APIError); ok && !apiErr.NotFound() {
-		return nil, status.Errorf(codes.Internal, "Error: %s: Unable to get Volume Group", apiErr.ErrorCode)
+		return nil, status.Errorf(codes.Internal, "Error: Unable to get Volume Group")
 	}
 	if vg.ID != "" {
 		if vg.ProtectionPolicyID != "" {
@@ -442,7 +442,7 @@ func (s *Service) DeleteStorageProtectionGroup(ctx context.Context,
 				ProtectionPolicyId: "",
 			}, groupID)
 			if apiErr, ok := err.(gopowerstore.APIError); ok && !apiErr.NotFound() {
-				return nil, status.Errorf(codes.Internal, "Error: %s: Unable to unassign PP from Volume Group", apiErr.ErrorCode)
+				return nil, status.Errorf(codes.Internal, "Error: Unable to un-assign PP from Volume Group")
 			}
 		}
 		_, err = arr.Client.DeleteVolumeGroup(ctx, groupID)
@@ -459,12 +459,12 @@ func (s *Service) DeleteStorageProtectionGroup(ctx context.Context,
 	}
 	pp, err := arr.GetClient().GetProtectionPolicyByName(ctx, "pp-"+vgName)
 	if apiErr, ok := err.(gopowerstore.APIError); ok && !apiErr.NotFound() {
-		return nil, status.Errorf(codes.Internal, "Error: %s: Unable to get the PP", apiErr.ErrorCode)
+		return nil, status.Errorf(codes.Internal, "Error: Unable to get the PP")
 	}
 	if pp.ID != "" && len(pp.Volumes) == 0 && len(pp.VolumeGroups) == 0 {
 		_, err := arr.Client.DeleteProtectionPolicy(ctx, pp.ID)
 		if apiErr, ok := err.(gopowerstore.APIError); ok && !apiErr.NotFound() {
-			return nil, status.Errorf(codes.Internal, "Error: %s: Unable to delete PP", apiErr.ErrorCode)
+			return nil, status.Errorf(codes.Internal, "Error: Unable to delete PP")
 		}
 	}
 
@@ -472,12 +472,12 @@ func (s *Service) DeleteStorageProtectionGroup(ctx context.Context,
 
 	rr, err := arr.GetClient().GetReplicationRuleByName(ctx, "rr-"+vgName)
 	if apiErr, ok := err.(gopowerstore.APIError); ok && !apiErr.NotFound() {
-		return nil, status.Errorf(codes.Internal, "Error: %s: RR not found", apiErr.ErrorCode)
+		return nil, status.Errorf(codes.Internal, "Error: RR not found")
 	}
 	if rr.ID != "" && len(rr.ProtectionPolicies) == 0 {
 		_, err = arr.GetClient().DeleteReplicationRule(ctx, rr.ID)
 		if apiErr, ok := err.(gopowerstore.APIError); ok && !apiErr.NotFound() {
-			return nil, status.Errorf(codes.Internal, "Error: %s: Unable to delete replication rule", apiErr.ErrorCode)
+			return nil, status.Errorf(codes.Internal, "Error: Unable to delete replication rule")
 		}
 	}
 
