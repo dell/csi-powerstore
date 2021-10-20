@@ -23,6 +23,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -43,6 +44,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+	k8sutilfs "k8s.io/kubernetes/pkg/volume/util/fs"
 )
 
 // Opts defines service configuration options.
@@ -448,7 +450,98 @@ func (s *Service) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublis
 
 // NodeGetVolumeStats returns volume usage stats
 func (s *Service) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "not implemented yet")
+	volumeID := req.GetVolumeId()
+	if len(volumeID) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "no volume ID provided")
+	}
+
+	volumePath := req.GetVolumePath()
+	if len(volumePath) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "no volume Path provided")
+	}
+
+	// parse volume Id
+	id, arrayID, protocol, err := array.ParseVolumeID(ctx, volumeID, s.DefaultArray(), nil)
+	if err != nil {
+		if apiError, ok := err.(gopowerstore.APIError); ok && apiError.NotFound() {
+			return nil, err
+		}
+		return nil, err
+	}
+
+	arr, ok := s.Arrays()[arrayID]
+	if !ok {
+		return nil, status.Error(codes.InvalidArgument, "failed to find array with given ID")
+	}
+
+	// Validate if volume exists
+	if protocol == "nfs" {
+		_, err = arr.Client.GetFS(ctx, id)
+		if err != nil {
+			return nil, status.Errorf(codes.NotFound, "volume with ID '%s' not found", id)
+		}
+	} else {
+		_, err := arr.Client.GetVolume(ctx, id)
+		if err != nil {
+			return nil, status.Errorf(codes.NotFound, "volume with ID '%s' not found", id)
+		}
+	}
+
+	// Check if target path is mounted
+	_, found, err := getTargetMount(ctx, volumePath, s.Fs)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "can't check mounts for path %s: %s", volumePath, err.Error())
+	}
+	if !found {
+		resp := &csi.NodeGetVolumeStatsResponse{
+			VolumeCondition: &csi.VolumeCondition{
+				Abnormal: true,
+				Message:  "volume path not mounted",
+			},
+		}
+		return resp, nil
+	}
+
+	// check if volume path is accessible
+	_, err = ioutil.ReadDir(volumePath)
+	if err != nil {
+		resp := &csi.NodeGetVolumeStatsResponse{
+			VolumeCondition: &csi.VolumeCondition{
+				Abnormal: true,
+				Message:  "volume path not accessible",
+			},
+		}
+		return resp, nil
+	}
+
+	// get volume metrics for mounted volume path
+	availableBytes, totalBytes, usedBytes, totalInodes, freeInodes, usedInodes, err := k8sutilfs.Info(volumePath)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to get metrics for volume with error: %v", err)
+	}
+
+	resp := &csi.NodeGetVolumeStatsResponse{
+		Usage: []*csi.VolumeUsage{
+			{
+				Available: availableBytes,
+				Total:     totalBytes,
+				Used:      usedBytes,
+				Unit:      csi.VolumeUsage_BYTES,
+			},
+			{
+				Available: freeInodes,
+				Total:     totalInodes,
+				Used:      usedInodes,
+				Unit:      csi.VolumeUsage_INODES,
+			},
+		},
+		VolumeCondition: &csi.VolumeCondition{
+			Abnormal: false,
+			Message:  "",
+		},
+	}
+
+	return resp, nil
 }
 
 // NodeExpandVolume expands the volume by re-scanning and resizes filesystem if needed
@@ -689,6 +782,20 @@ func (s *Service) NodeGetCapabilities(context context.Context, request *csi.Node
 				Type: &csi.NodeServiceCapability_Rpc{
 					Rpc: &csi.NodeServiceCapability_RPC{
 						Type: csi.NodeServiceCapability_RPC_EXPAND_VOLUME,
+					},
+				},
+			},
+			{
+				Type: &csi.NodeServiceCapability_Rpc{
+					Rpc: &csi.NodeServiceCapability_RPC{
+						Type: csi.NodeServiceCapability_RPC_GET_VOLUME_STATS,
+					},
+				},
+			},
+			{
+				Type: &csi.NodeServiceCapability_Rpc{
+					Rpc: &csi.NodeServiceCapability_RPC{
+						Type: csi.NodeServiceCapability_RPC_VOLUME_CONDITION,
 					},
 				},
 			},

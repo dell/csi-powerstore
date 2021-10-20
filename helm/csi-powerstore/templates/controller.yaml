@@ -233,6 +233,21 @@ spec:
               mountPath: /powerstore-config-params
         {{- end }}
         {{- end }}
+        - name: csi-external-health-monitor-controller
+          image: {{ required "Must provide the CSI external health monitor controller image." .Values.images.externalhealthmonitorcontroller}}
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
+          args:
+            - "--v=5"
+            - "--csi-address=$(ADDRESS)"
+            - "--leader-election"
+            - "--http-endpoint=:8080"
+            - "--enable-node-watcher=true"
+          env:
+            - name: ADDRESS
+              value: /var/run/csi/csi.sock
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /var/run/csi
         - name: driver
           image: {{ required "Must provide the PowerStore driver container image." .Values.images.driver }}
           imagePullPolicy: {{ .Values.imagePullPolicy }}

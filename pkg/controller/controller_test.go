@@ -2875,13 +2875,6 @@ var _ = Describe("CSIControllerService", func() {
 						{
 							Type: &csi.ControllerServiceCapability_Rpc{
 								Rpc: &csi.ControllerServiceCapability_RPC{
-									Type: csi.ControllerServiceCapability_RPC_LIST_VOLUMES,
-								},
-							},
-						},
-						{
-							Type: &csi.ControllerServiceCapability_Rpc{
-								Rpc: &csi.ControllerServiceCapability_RPC{
 									Type: csi.ControllerServiceCapability_RPC_GET_CAPACITY,
 								},
 							},
@@ -2911,6 +2904,27 @@ var _ = Describe("CSIControllerService", func() {
 							Type: &csi.ControllerServiceCapability_Rpc{
 								Rpc: &csi.ControllerServiceCapability_RPC{
 									Type: csi.ControllerServiceCapability_RPC_EXPAND_VOLUME,
+								},
+							},
+						},
+						{
+							Type: &csi.ControllerServiceCapability_Rpc{
+								Rpc: &csi.ControllerServiceCapability_RPC{
+									Type: csi.ControllerServiceCapability_RPC_GET_VOLUME,
+								},
+							},
+						},
+						{
+							Type: &csi.ControllerServiceCapability_Rpc{
+								Rpc: &csi.ControllerServiceCapability_RPC{
+									Type: csi.ControllerServiceCapability_RPC_LIST_VOLUMES_PUBLISHED_NODES,
+								},
+							},
+						},
+						{
+							Type: &csi.ControllerServiceCapability_Rpc{
+								Rpc: &csi.ControllerServiceCapability_RPC{
+									Type: csi.ControllerServiceCapability_RPC_VOLUME_CONDITION,
 								},
 							},
 						},
@@ -3231,6 +3245,144 @@ var _ = Describe("CSIControllerService", func() {
 			})
 		})
 
+	})
+
+	Describe("calling ControllerGetVolume", func() {
+		When("normal block volume exists on array", func() {
+			It("should successfully get the volume", func() {
+				clientMock.On("GetVolume", mock.Anything, validBaseVolID).
+					Return(gopowerstore.Volume{ID: validBaseVolID, State: gopowerstore.VolumeStateEnumReady}, nil)
+
+				clientMock.On("GetHost", mock.Anything, validHostID).Return(gopowerstore.Host{ID: validHostID, Name: validHostName}, nil)
+
+				clientMock.On("GetHostVolumeMappingByVolumeID", mock.Anything, validBaseVolID).
+					Return([]gopowerstore.HostVolumeMapping{{HostID: validHostID}}, nil).Once()
+
+				clientMock.On("GetFS", mock.Anything, validBaseVolID).
+					Return(gopowerstore.FileSystem{ID: validBaseVolID}, nil)
+
+				clientMock.On("GetNFSExportByFileSystemID", mock.Anything, validBaseVolID).
+					Return(gopowerstore.NFSExport{}, nil)
+
+				req := &csi.ControllerGetVolumeRequest{VolumeId: validBlockVolumeID}
+
+				res, err := ctrlSvc.ControllerGetVolume(context.Background(), req)
+
+				Expect(err).To(BeNil())
+				Expect(res).To(Equal(&csi.ControllerGetVolumeResponse{
+					Volume: &csi.Volume{
+						VolumeId: validBaseVolID,
+					},
+					Status: &csi.ControllerGetVolumeResponse_VolumeStatus{
+						PublishedNodeIds: []string{validHostName},
+						VolumeCondition: &csi.VolumeCondition{
+							Abnormal: false,
+							Message:  "",
+						},
+					},
+				}))
+			})
+		})
+		When("normal block volume does not exists on array", func() {
+			It("should fail", func() {
+				clientMock.On("GetVolume", mock.Anything, mock.Anything).
+					Return(gopowerstore.Volume{}, gopowerstore.APIError{
+						ErrorMsg: &api.ErrorMsg{
+							StatusCode: http.StatusNotFound,
+							ErrorCode:  gopowerstore.InstanceWasNotFound,
+						},
+					})
+
+				clientMock.On("GetHost", mock.Anything, validHostID).Return(gopowerstore.Host{ID: validHostID, Name: validHostName}, nil)
+
+				clientMock.On("GetHostVolumeMappingByVolumeID", mock.Anything, validBaseVolID).
+					Return([]gopowerstore.HostVolumeMapping{{HostID: validHostID}}, nil).Once()
+
+				clientMock.On("GetFS", mock.Anything, validBaseVolID).
+					Return(gopowerstore.FileSystem{ID: validBaseVolID}, nil)
+
+				clientMock.On("GetNFSExportByFileSystemID", mock.Anything, validBaseVolID).
+					Return(gopowerstore.NFSExport{}, nil)
+
+				req := &csi.ControllerGetVolumeRequest{VolumeId: validBlockVolumeID}
+
+				res, err := ctrlSvc.ControllerGetVolume(context.Background(), req)
+
+				Expect(res).To(BeNil())
+				Expect(err).ToNot(BeNil())
+				Expect(err.Error()).To(
+					ContainSubstring("failed to find volume"),
+				)
+			})
+		})
+		When("normal filesystem exists on array", func() {
+			It("should successfully get the filesystem", func() {
+				var hosts []string
+				clientMock.On("GetVolume", mock.Anything, validBaseVolID).
+					Return(gopowerstore.Volume{ID: validBaseVolID, State: gopowerstore.VolumeStateEnumReady}, nil)
+
+				clientMock.On("GetHost", mock.Anything, validHostID).Return(gopowerstore.Host{ID: validHostID, Name: validHostName}, nil)
+
+				clientMock.On("GetHostVolumeMappingByVolumeID", mock.Anything, validBaseVolID).
+					Return([]gopowerstore.HostVolumeMapping{{HostID: validHostID}}, nil).Once()
+
+				clientMock.On("GetFS", mock.Anything, validBaseVolID).
+					Return(gopowerstore.FileSystem{ID: validBaseVolID}, nil)
+
+				clientMock.On("GetNFSExportByFileSystemID", mock.Anything, validBaseVolID).
+					Return(gopowerstore.NFSExport{}, nil)
+
+				req := &csi.ControllerGetVolumeRequest{VolumeId: validNfsVolumeID}
+
+				res, err := ctrlSvc.ControllerGetVolume(context.Background(), req)
+
+				Expect(err).To(BeNil())
+				Expect(res).To(Equal(&csi.ControllerGetVolumeResponse{
+					Volume: &csi.Volume{
+						VolumeId: validBaseVolID,
+					},
+					Status: &csi.ControllerGetVolumeResponse_VolumeStatus{
+						PublishedNodeIds: hosts,
+						VolumeCondition: &csi.VolumeCondition{
+							Abnormal: false,
+							Message:  "",
+						},
+					},
+				}))
+			})
+		})
+		When("filesystem does not exists on array", func() {
+			It("should fail", func() {
+				clientMock.On("GetVolume", mock.Anything, validBaseVolID).
+					Return(gopowerstore.Volume{ID: validBaseVolID, State: gopowerstore.VolumeStateEnumReady}, nil)
+
+				clientMock.On("GetHost", mock.Anything, validHostID).Return(gopowerstore.Host{ID: validHostID, Name: validHostName}, nil)
+
+				clientMock.On("GetHostVolumeMappingByVolumeID", mock.Anything, validBaseVolID).
+					Return([]gopowerstore.HostVolumeMapping{{HostID: validHostID}}, nil).Once()
+
+				clientMock.On("GetFS", mock.Anything, validBaseVolID).
+					Return(gopowerstore.FileSystem{}, gopowerstore.APIError{
+						ErrorMsg: &api.ErrorMsg{
+							StatusCode: http.StatusNotFound,
+							ErrorCode:  gopowerstore.InstanceWasNotFound,
+						},
+					})
+
+				clientMock.On("GetNFSExportByFileSystemID", mock.Anything, validBaseVolID).
+					Return(gopowerstore.NFSExport{}, nil)
+
+				req := &csi.ControllerGetVolumeRequest{VolumeId: validNfsVolumeID}
+
+				res, err := ctrlSvc.ControllerGetVolume(context.Background(), req)
+
+				Expect(res).To(BeNil())
+				Expect(err).ToNot(BeNil())
+				Expect(err.Error()).To(
+					ContainSubstring("failed to find filesystem"),
+				)
+			})
+		})
 	})
 })
 
