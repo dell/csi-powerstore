@@ -2,8 +2,6 @@ module github.com/dell/csi-powerstore
 
 go 1.16
 
-replace github.com/dell/gopowerstore => ../gopowerstore
-
 require (
 	github.com/HdrHistogram/hdrhistogram-go v1.0.1 // indirect
 	github.com/akutz/gosync v0.1.0

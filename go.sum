@@ -158,8 +158,6 @@ github.com/dell/gofsutil v1.6.0/go.mod h1:98Wpcg7emz4iGgY16fd4MKpnal2SX2hBiwP5gh
 github.com/dell/goiscsi v1.1.0/go.mod h1:MfuMjbKWsh/MOb0VDW20C+LFYRIOfWKGiAxWkeM5TKo=
 github.com/dell/goiscsi v1.2.0 h1:ocQs4pz2Fw2vr73RVAQBKwpN468SK4TZHPLhU7/FB9A=
 github.com/dell/goiscsi v1.2.0/go.mod h1:MfuMjbKWsh/MOb0VDW20C+LFYRIOfWKGiAxWkeM5TKo=
-github.com/dell/gopowerstore v1.5.0 h1:Hm4uRaNcCugaWItly38BOlOIxEql28Z8VqC7VIAio7s=
-github.com/dell/gopowerstore v1.5.0/go.mod h1:0ziQJ1iuZYDV+P53ua+VeH+rIylYT9WNjGSI/7aPly0=
 github.com/dell/gopowerstore v1.5.1-0.20211020064959-bac86b9b64f9 h1:A+8m9n2nx0Dd0IgZdBj5+4gFMdD0uOvsnQgNR0YxMEc=
 github.com/dell/gopowerstore v1.5.1-0.20211020064959-bac86b9b64f9/go.mod h1:0ziQJ1iuZYDV+P53ua+VeH+rIylYT9WNjGSI/7aPly0=
 github.com/dgrijalva/jwt-go v3.2.0+incompatible/go.mod h1:E3ru+11k8xSBh+hMPgOLZmtrrCbhqsmaPHjLKYnJCaQ=
