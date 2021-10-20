@@ -126,7 +126,6 @@ func TestDetachVolumeFromHost(t *testing.T) {
 			Return(gopowerstore.EmptyResponse(""), gopowerstore.APIError{
 				ErrorMsg: &api.ErrorMsg{
 					StatusCode: http.StatusNotFound,
-					ErrorCode:  gopowerstore.NoHostObjectFoundCode,
 				},
 			})
 
@@ -145,7 +144,6 @@ func TestDetachVolumeFromHost(t *testing.T) {
 			Return(gopowerstore.EmptyResponse(""), gopowerstore.APIError{
 				ErrorMsg: &api.ErrorMsg{
 					StatusCode: 0,
-					ErrorCode:  "",
 					Severity:   "",
 					Message:    "",
 					Arguments:  nil,

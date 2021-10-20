@@ -59,7 +59,6 @@ func TestVolumePublisher_Publish(t *testing.T) {
 				Return(gopowerstore.Volume{}, gopowerstore.APIError{
 					ErrorMsg: &api.ErrorMsg{
 						StatusCode: http.StatusNotFound,
-						ErrorCode:  gopowerstore.UnknownVolumeErrorCode,
 					},
 				})
 			_, err := sp.Publish(context.Background(), nil, clientMock, validNodeID, validBaseVolID)
@@ -77,7 +76,6 @@ func TestVolumePublisher_Publish(t *testing.T) {
 				Return(gopowerstore.Host{}, gopowerstore.APIError{
 					ErrorMsg: &api.ErrorMsg{
 						StatusCode: http.StatusNotFound,
-						ErrorCode:  gopowerstore.NoHostObjectFoundCode,
 					},
 				}).Once()
 
@@ -167,7 +165,6 @@ func TestVolumePublisher_Publish(t *testing.T) {
 				Return(gopowerstore.FileSystem{}, gopowerstore.APIError{
 					ErrorMsg: &api.ErrorMsg{
 						StatusCode: http.StatusNotFound,
-						ErrorCode:  gopowerstore.UnknownVolumeErrorCode,
 					},
 				})
 			_, err := np.Publish(context.Background(), nil, clientMock, validNodeID, validBaseVolID)
