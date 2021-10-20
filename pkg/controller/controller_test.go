@@ -3258,7 +3258,6 @@ var _ = Describe("CSIControllerService", func() {
 					Return(gopowerstore.Volume{}, gopowerstore.APIError{
 						ErrorMsg: &api.ErrorMsg{
 							StatusCode: http.StatusNotFound,
-							ErrorCode:  gopowerstore.InstanceWasNotFound,
 						},
 					})
 
@@ -3334,7 +3333,6 @@ var _ = Describe("CSIControllerService", func() {
 					Return(gopowerstore.FileSystem{}, gopowerstore.APIError{
 						ErrorMsg: &api.ErrorMsg{
 							StatusCode: http.StatusNotFound,
-							ErrorCode:  gopowerstore.InstanceWasNotFound,
 						},
 					})
 
