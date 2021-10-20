@@ -401,7 +401,6 @@ var _ = Describe("CSIControllerService", func() {
 					Return(gopowerstore.CreateResponse{}, gopowerstore.APIError{
 						ErrorMsg: &api.ErrorMsg{
 							StatusCode: http.StatusUnprocessableEntity,
-							ErrorCode:  gopowerstore.VolumeNameAlreadyUseErrorCode,
 						},
 					})
 
@@ -436,7 +435,6 @@ var _ = Describe("CSIControllerService", func() {
 				clientMock.On("CreateFS", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{}, gopowerstore.APIError{
 					ErrorMsg: &api.ErrorMsg{
 						StatusCode: http.StatusUnprocessableEntity,
-						ErrorCode:  gopowerstore.FilesystemNameAlreadyUseErrorCode,
 					},
 				})
 
@@ -471,7 +469,6 @@ var _ = Describe("CSIControllerService", func() {
 						Return(gopowerstore.CreateResponse{}, gopowerstore.APIError{
 							ErrorMsg: &api.ErrorMsg{
 								StatusCode: http.StatusUnprocessableEntity,
-								ErrorCode:  gopowerstore.VolumeNameAlreadyUseErrorCode,
 							},
 						})
 
@@ -499,7 +496,6 @@ var _ = Describe("CSIControllerService", func() {
 					clientMock.On("CreateFS", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{}, gopowerstore.APIError{
 						ErrorMsg: &api.ErrorMsg{
 							StatusCode: http.StatusUnprocessableEntity,
-							ErrorCode:  gopowerstore.FilesystemNameAlreadyUseErrorCode,
 						},
 					})
 
@@ -880,14 +876,12 @@ var _ = Describe("CSIControllerService", func() {
 					Return(gopowerstore.Volume{}, gopowerstore.APIError{
 						ErrorMsg: &api.ErrorMsg{
 							StatusCode: http.StatusNotFound,
-							ErrorCode:  gopowerstore.InstanceWasNotFound,
 						},
 					})
 				clientMock.On("GetFS", context.Background(), validBaseVolID).
 					Return(gopowerstore.FileSystem{}, gopowerstore.APIError{
 						ErrorMsg: &api.ErrorMsg{
 							StatusCode: http.StatusNotFound,
-							ErrorCode:  gopowerstore.InstanceWasNotFound,
 						},
 					})
 
@@ -949,7 +943,6 @@ var _ = Describe("CSIControllerService", func() {
 					Return(gopowerstore.EmptyResponse(""), gopowerstore.APIError{
 						ErrorMsg: &api.ErrorMsg{
 							StatusCode: http.StatusNotFound,
-							ErrorCode:  gopowerstore.InstanceWasNotFound,
 						},
 					})
 
@@ -969,7 +962,6 @@ var _ = Describe("CSIControllerService", func() {
 					Return(gopowerstore.EmptyResponse(""), gopowerstore.APIError{
 						ErrorMsg: &api.ErrorMsg{
 							StatusCode: http.StatusNotFound,
-							ErrorCode:  gopowerstore.InstanceWasNotFound,
 						},
 					})
 
@@ -993,7 +985,6 @@ var _ = Describe("CSIControllerService", func() {
 					Return(gopowerstore.EmptyResponse(""), gopowerstore.APIError{
 						ErrorMsg: &api.ErrorMsg{
 							StatusCode: http.StatusUnprocessableEntity,
-							ErrorCode:  gopowerstore.VolumeAttachedToHost,
 						},
 					})
 
@@ -1191,7 +1182,6 @@ var _ = Describe("CSIControllerService", func() {
 				}, validBaseVolID).Return(gopowerstore.CreateResponse{}, gopowerstore.APIError{
 					ErrorMsg: &api.ErrorMsg{
 						StatusCode: http.StatusGatewayTimeout,
-						ErrorCode:  gopowerstore.UnknownVolumeErrorCode,
 						Message:    "something went wrong",
 					},
 				})
@@ -1252,7 +1242,6 @@ var _ = Describe("CSIControllerService", func() {
 					mock.AnythingOfType("*gopowerstore.VolumeDelete"), validBaseVolID).Return(gopowerstore.EmptyResponse(""), gopowerstore.APIError{
 					ErrorMsg: &api.ErrorMsg{
 						StatusCode: http.StatusNotFound,
-						ErrorCode:  gopowerstore.InstanceWasNotFound,
 					},
 				})
 
@@ -1272,7 +1261,6 @@ var _ = Describe("CSIControllerService", func() {
 				clientMock.On("DeleteFsSnapshot", mock.Anything, validBaseVolID).Return(gopowerstore.EmptyResponse(""), gopowerstore.APIError{
 					ErrorMsg: &api.ErrorMsg{
 						StatusCode: http.StatusNotFound,
-						ErrorCode:  gopowerstore.InstanceWasNotFound,
 					},
 				})
 
@@ -1292,7 +1280,6 @@ var _ = Describe("CSIControllerService", func() {
 				clientMock.On("GetSnapshot", mock.Anything, validBaseVolID).Return(gopowerstore.Volume{}, gopowerstore.APIError{
 					ErrorMsg: &api.ErrorMsg{
 						StatusCode: http.StatusNotFound,
-						ErrorCode:  gopowerstore.InstanceWasNotFound,
 					},
 				})
 
@@ -1499,7 +1486,6 @@ var _ = Describe("CSIControllerService", func() {
 					}, nil)
 
 				apiError := gopowerstore.NewAPIError()
-				apiError.ErrorCode = gopowerstore.UnknownVolumeErrorCode
 				apiError.StatusCode = http.StatusNotFound
 
 				clientMock.On("GetNFSExportByFileSystemID", mock.Anything, mock.Anything).
@@ -1558,7 +1544,6 @@ var _ = Describe("CSIControllerService", func() {
 						Return(gopowerstore.Host{}, gopowerstore.APIError{
 							ErrorMsg: &api.ErrorMsg{
 								StatusCode: http.StatusNotFound,
-								ErrorCode:  gopowerstore.NoHostObjectFoundCode,
 							},
 						}).Once()
 
@@ -1621,7 +1606,6 @@ var _ = Describe("CSIControllerService", func() {
 					}, nil)
 
 				apiError := gopowerstore.NewAPIError()
-				apiError.ErrorCode = gopowerstore.UnknownVolumeErrorCode
 				apiError.StatusCode = http.StatusNotFound
 
 				clientMock.On("GetNFSExportByFileSystemID", mock.Anything, mock.Anything).
@@ -1868,7 +1852,6 @@ var _ = Describe("CSIControllerService", func() {
 					Return(gopowerstore.Volume{}, gopowerstore.APIError{
 						ErrorMsg: &api.ErrorMsg{
 							StatusCode: http.StatusNotFound,
-							ErrorCode:  gopowerstore.UnknownVolumeErrorCode,
 						},
 					})
 
@@ -1885,7 +1868,6 @@ var _ = Describe("CSIControllerService", func() {
 					Return(gopowerstore.FileSystem{}, gopowerstore.APIError{
 						ErrorMsg: &api.ErrorMsg{
 							StatusCode: http.StatusNotFound,
-							ErrorCode:  gopowerstore.UnknownVolumeErrorCode,
 						},
 					})
 
@@ -1924,7 +1906,6 @@ var _ = Describe("CSIControllerService", func() {
 					Return(gopowerstore.Host{}, gopowerstore.APIError{
 						ErrorMsg: &api.ErrorMsg{
 							StatusCode: http.StatusNotFound,
-							ErrorCode:  gopowerstore.NoHostObjectFoundCode,
 						},
 					}).Once()
 
@@ -1932,7 +1913,6 @@ var _ = Describe("CSIControllerService", func() {
 					Return(gopowerstore.Host{}, gopowerstore.APIError{
 						ErrorMsg: &api.ErrorMsg{
 							StatusCode: http.StatusNotFound,
-							ErrorCode:  gopowerstore.NoHostObjectFoundCode,
 						},
 					}).Once()
 
@@ -1968,7 +1948,6 @@ var _ = Describe("CSIControllerService", func() {
 					Return(gopowerstore.Host{}, gopowerstore.APIError{
 						ErrorMsg: &api.ErrorMsg{
 							StatusCode: http.StatusNotFound,
-							ErrorCode:  gopowerstore.NoHostObjectFoundCode,
 						},
 					}).Once()
 
@@ -2013,7 +1992,6 @@ var _ = Describe("CSIControllerService", func() {
 					Return(gopowerstore.FileSystem{}, gopowerstore.APIError{
 						ErrorMsg: &api.ErrorMsg{
 							StatusCode: http.StatusNotFound,
-							ErrorCode:  gopowerstore.InstanceWasNotFound,
 						},
 					})
 
@@ -2066,7 +2044,6 @@ var _ = Describe("CSIControllerService", func() {
 					Return(gopowerstore.Host{}, gopowerstore.APIError{
 						ErrorMsg: &api.ErrorMsg{
 							StatusCode: http.StatusNotFound,
-							ErrorCode:  gopowerstore.NoHostObjectFoundCode,
 						},
 					}).Once()
 
@@ -2089,7 +2066,6 @@ var _ = Describe("CSIControllerService", func() {
 						Return(gopowerstore.Volume{}, gopowerstore.APIError{
 							ErrorMsg: &api.ErrorMsg{
 								StatusCode: http.StatusNotFound,
-								ErrorCode:  gopowerstore.InstanceWasNotFound,
 							},
 						})
 
@@ -2124,7 +2100,6 @@ var _ = Describe("CSIControllerService", func() {
 							Return(gopowerstore.Volume{}, gopowerstore.APIError{
 								ErrorMsg: &api.ErrorMsg{
 									StatusCode: http.StatusNotFound,
-									ErrorCode:  gopowerstore.InstanceWasNotFound,
 								},
 							})
 
@@ -2132,7 +2107,6 @@ var _ = Describe("CSIControllerService", func() {
 							Return(gopowerstore.FileSystem{}, gopowerstore.APIError{
 								ErrorMsg: &api.ErrorMsg{
 									StatusCode: http.StatusNotFound,
-									ErrorCode:  gopowerstore.InstanceWasNotFound,
 								},
 							}).Once()
 					})
@@ -2155,7 +2129,6 @@ var _ = Describe("CSIControllerService", func() {
 						Return(gopowerstore.Host{}, gopowerstore.APIError{
 							ErrorMsg: &api.ErrorMsg{
 								StatusCode: http.StatusNotFound,
-								ErrorCode:  gopowerstore.NoHostObjectFoundCode,
 							},
 						}).Once()
 
@@ -2186,7 +2159,6 @@ var _ = Describe("CSIControllerService", func() {
 						Return(gopowerstore.Host{}, gopowerstore.APIError{
 							ErrorMsg: &api.ErrorMsg{
 								StatusCode: http.StatusNotFound,
-								ErrorCode:  gopowerstore.NoHostObjectFoundCode,
 							},
 						}).Once()
 
@@ -2194,7 +2166,6 @@ var _ = Describe("CSIControllerService", func() {
 						Return(gopowerstore.Host{}, gopowerstore.APIError{
 							ErrorMsg: &api.ErrorMsg{
 								StatusCode: http.StatusNotFound,
-								ErrorCode:  gopowerstore.NoHostObjectFoundCode,
 							},
 						}).Once()
 
@@ -2436,7 +2407,6 @@ var _ = Describe("CSIControllerService", func() {
 				Return(gopowerstore.Volume{}, gopowerstore.APIError{
 					ErrorMsg: &api.ErrorMsg{
 						StatusCode: http.StatusNotFound,
-						ErrorCode:  gopowerstore.InstanceWasNotFound,
 					},
 				}).Once()
 
@@ -2444,7 +2414,6 @@ var _ = Describe("CSIControllerService", func() {
 				Return(gopowerstore.FileSystem{}, gopowerstore.APIError{
 					ErrorMsg: &api.ErrorMsg{
 						StatusCode: http.StatusNotFound,
-						ErrorCode:  gopowerstore.InstanceWasNotFound,
 					},
 				}).Once()
 		}

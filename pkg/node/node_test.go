@@ -195,7 +195,6 @@ var _ = Describe("CSINodeService", func() {
 					Return(gopowerstore.Host{}, gopowerstore.APIError{
 						ErrorMsg: &api.ErrorMsg{
 							StatusCode: http.StatusNotFound,
-							ErrorCode:  gopowerstore.NoHostObjectFoundCode,
 						},
 					})
 				clientMock.On("GetHosts", mock.Anything).Return(
@@ -243,7 +242,6 @@ var _ = Describe("CSINodeService", func() {
 					Return(gopowerstore.Host{}, gopowerstore.APIError{
 						ErrorMsg: &api.ErrorMsg{
 							StatusCode: http.StatusNotFound,
-							ErrorCode:  gopowerstore.NoHostObjectFoundCode,
 						},
 					})
 				clientMock.On("GetHosts", mock.Anything).Return(
@@ -281,7 +279,6 @@ var _ = Describe("CSINodeService", func() {
 					Return(gopowerstore.Host{}, gopowerstore.APIError{
 						ErrorMsg: &api.ErrorMsg{
 							StatusCode: http.StatusNotFound,
-							ErrorCode:  gopowerstore.NoHostObjectFoundCode,
 						},
 					})
 				clientMock.On("GetHosts", mock.Anything).Return(
@@ -368,7 +365,6 @@ var _ = Describe("CSINodeService", func() {
 						Return(gopowerstore.Host{}, gopowerstore.APIError{
 							ErrorMsg: &api.ErrorMsg{
 								StatusCode: http.StatusNotFound,
-								ErrorCode:  gopowerstore.NoHostObjectFoundCode,
 							},
 						})
 					clientMock.On("GetHosts", mock.Anything).Return(
@@ -404,7 +400,6 @@ var _ = Describe("CSINodeService", func() {
 						Return(gopowerstore.Host{}, gopowerstore.APIError{
 							ErrorMsg: &api.ErrorMsg{
 								StatusCode: http.StatusNotFound,
-								ErrorCode:  gopowerstore.NoHostObjectFoundCode,
 							},
 						})
 					clientMock.On("GetHosts", mock.Anything).Return(
@@ -449,7 +444,6 @@ var _ = Describe("CSINodeService", func() {
 					Return(gopowerstore.Host{}, gopowerstore.APIError{
 						ErrorMsg: &api.ErrorMsg{
 							StatusCode: http.StatusNotFound,
-							ErrorCode:  gopowerstore.NoHostObjectFoundCode,
 						},
 					})
 				clientMock.On("GetHosts", mock.Anything).Return(
