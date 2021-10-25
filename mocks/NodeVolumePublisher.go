@@ -19,11 +19,11 @@ type NodeVolumePublisher struct {
 }
 
 // Publish provides a mock function with given fields: ctx, logFields, _a2, cap, isRO, targetPath, stagingPath
-func (_m *NodeVolumePublisher) Publish(ctx context.Context, logFields logrus.Fields, _a2 fs.FsInterface, cap *csi.VolumeCapability, isRO bool, targetPath string, stagingPath string) (*csi.NodePublishVolumeResponse, error) {
+func (_m *NodeVolumePublisher) Publish(ctx context.Context, logFields logrus.Fields, _a2 fs.Interface, cap *csi.VolumeCapability, isRO bool, targetPath string, stagingPath string) (*csi.NodePublishVolumeResponse, error) {
 	ret := _m.Called(ctx, logFields, _a2, cap, isRO, targetPath, stagingPath)
 
 	var r0 *csi.NodePublishVolumeResponse
-	if rf, ok := ret.Get(0).(func(context.Context, logrus.Fields, fs.FsInterface, *csi.VolumeCapability, bool, string, string) *csi.NodePublishVolumeResponse); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, logrus.Fields, fs.Interface, *csi.VolumeCapability, bool, string, string) *csi.NodePublishVolumeResponse); ok {
 		r0 = rf(ctx, logFields, _a2, cap, isRO, targetPath, stagingPath)
 	} else {
 		if ret.Get(0) != nil {
@@ -32,7 +32,7 @@ func (_m *NodeVolumePublisher) Publish(ctx context.Context, logFields logrus.Fie
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, logrus.Fields, fs.FsInterface, *csi.VolumeCapability, bool, string, string) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, logrus.Fields, fs.Interface, *csi.VolumeCapability, bool, string, string) error); ok {
 		r1 = rf(ctx, logFields, _a2, cap, isRO, targetPath, stagingPath)
 	} else {
 		r1 = ret.Error(1)

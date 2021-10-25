@@ -40,9 +40,9 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// ControllerInterface provides most important controller methods.
+// Interface provides most important controller methods.
 // This essentially serves as a wrapper for controller service that is used in ephemeral volumes.
-type ControllerInterface interface {
+type Interface interface {
 	CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error)
 	DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error)
 	ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error)
@@ -52,7 +52,7 @@ type ControllerInterface interface {
 
 // Service is a controller service that contains array connection information and implements ControllerServer API
 type Service struct {
-	Fs fs.FsInterface
+	Fs fs.Interface
 
 	externalAccess string
 

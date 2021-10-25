@@ -35,7 +35,7 @@ import (
 
 func TestGetPowerStoreArrays(t *testing.T) {
 	type args struct {
-		fs   fs.FsInterface
+		fs   fs.Interface
 		data string
 	}
 	_ = os.Setenv(common.EnvThrottlingRateLimit, "1000")
@@ -142,7 +142,7 @@ func TestGetPowerStoreArrays(t *testing.T) {
 		f := &fs.Fs{Util: &gofsutil.FS{}}
 		_, _, _, err := array.GetPowerStoreArrays(f, "./testdata/no-globalID.yaml")
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "No GlobalID field found in config.yaml")
+		assert.Contains(t, err.Error(), "no GlobalID field found in config.yaml")
 	})
 
 	t.Run("incorrect throttling limit", func(t *testing.T) {

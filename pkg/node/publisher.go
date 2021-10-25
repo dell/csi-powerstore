@@ -28,9 +28,9 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// NodeVolumePublisher allows to publish a volume
-type NodeVolumePublisher interface {
-	Publish(ctx context.Context, logFields log.Fields, fs fs.FsInterface,
+// VolumePublisher allows to node publish a volume
+type VolumePublisher interface {
+	Publish(ctx context.Context, logFields log.Fields, fs fs.Interface,
 		cap *csi.VolumeCapability, isRO bool, targetPath string, stagingPath string) (*csi.NodePublishVolumeResponse, error)
 }
 
@@ -40,7 +40,7 @@ type SCSIPublisher struct {
 }
 
 // Publish publishes volume as either raw block or mount by mounting it to the target path
-func (sp *SCSIPublisher) Publish(ctx context.Context, logFields log.Fields, fs fs.FsInterface, cap *csi.VolumeCapability, isRO bool, targetPath string, stagingPath string) (*csi.NodePublishVolumeResponse, error) {
+func (sp *SCSIPublisher) Publish(ctx context.Context, logFields log.Fields, fs fs.Interface, cap *csi.VolumeCapability, isRO bool, targetPath string, stagingPath string) (*csi.NodePublishVolumeResponse, error) {
 	published, err := isAlreadyPublished(ctx, targetPath, getRWModeString(isRO), fs)
 	if err != nil {
 		return nil, err
@@ -56,7 +56,7 @@ func (sp *SCSIPublisher) Publish(ctx context.Context, logFields log.Fields, fs f
 	return sp.publishMount(ctx, logFields, fs, cap, isRO, targetPath, stagingPath)
 }
 
-func (sp *SCSIPublisher) publishBlock(ctx context.Context, logFields log.Fields, fs fs.FsInterface, cap *csi.VolumeCapability, isRO bool, targetPath string, stagingPath string) (*csi.NodePublishVolumeResponse, error) {
+func (sp *SCSIPublisher) publishBlock(ctx context.Context, logFields log.Fields, fs fs.Interface, cap *csi.VolumeCapability, isRO bool, targetPath string, stagingPath string) (*csi.NodePublishVolumeResponse, error) {
 	log.WithFields(logFields).Info("start publishing as block device")
 
 	if isRO {
@@ -78,7 +78,7 @@ func (sp *SCSIPublisher) publishBlock(ctx context.Context, logFields log.Fields,
 	return &csi.NodePublishVolumeResponse{}, nil
 }
 
-func (sp *SCSIPublisher) publishMount(ctx context.Context, logFields log.Fields, fs fs.FsInterface, cap *csi.VolumeCapability, isRO bool, targetPath string, stagingPath string) (*csi.NodePublishVolumeResponse, error) {
+func (sp *SCSIPublisher) publishMount(ctx context.Context, logFields log.Fields, fs fs.Interface, cap *csi.VolumeCapability, isRO bool, targetPath string, stagingPath string) (*csi.NodePublishVolumeResponse, error) {
 	if cap.GetAccessMode().GetMode() == csi.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER {
 		// MULTI_WRITER not supported for mount volumes
 		return nil, status.Error(codes.Unimplemented, "Mount volumes do not support AccessMode MULTI_NODE_MULTI_WRITER")
@@ -145,7 +145,7 @@ type NFSPublisher struct {
 }
 
 // Publish publishes nfs volume by mounting it to the target path
-func (np *NFSPublisher) Publish(ctx context.Context, logFields log.Fields, fs fs.FsInterface,
+func (np *NFSPublisher) Publish(ctx context.Context, logFields log.Fields, fs fs.Interface,
 	cap *csi.VolumeCapability, isRO bool, targetPath string, stagingPath string) (*csi.NodePublishVolumeResponse, error) {
 	published, err := isAlreadyPublished(ctx, targetPath, getRWModeString(isRO), fs)
 	if err != nil {

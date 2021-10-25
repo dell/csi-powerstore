@@ -44,9 +44,9 @@ type FileInfo interface {
 	Sys() interface{}   // underlying data source (can return nil)
 }
 
-// FsInterface wraps usual os and fs related calls so they can be mocked.
-// Also FsInterface provides access to the gofsutil wrapper UtilInterface with GetUtil() method.
-type FsInterface interface {
+// Interface wraps usual os and fs related calls so they can be mocked.
+// Also Interface provides access to the gofsutil wrapper UtilInterface with GetUtil() method.
+type Interface interface {
 	OpenFile(name string, flag int, perm os.FileMode) (*os.File, error)
 	Stat(name string) (FileInfo, error)
 	Create(name string) (*os.File, error)

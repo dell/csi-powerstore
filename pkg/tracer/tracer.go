@@ -28,13 +28,13 @@ import (
 	jprom "github.com/uber/jaeger-lib/metrics/prometheus"
 )
 
-// TracerConfigurator represents tracer configurator
-type TracerConfigurator interface {
+// Configurator represents tracer configurator
+type Configurator interface {
 	FromEnv() (*config.Configuration, error)
 }
 
 // NewTracer returns a new tracer object
-func NewTracer(configurator TracerConfigurator) (opentracing.Tracer, io.Closer, error) {
+func NewTracer(configurator Configurator) (opentracing.Tracer, io.Closer, error) {
 	// load config from environment variables
 	cfg, err := configurator.FromEnv()
 

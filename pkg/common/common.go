@@ -102,7 +102,7 @@ const (
 type TransportType string
 
 // RmSockFile removes socket files that left after previous installation
-func RmSockFile(f fs.FsInterface) {
+func RmSockFile(f fs.Interface) {
 	proto, addr, err := utils.GetCSIEndpoint()
 	if err != nil {
 		log.Errorf("Error: failed to get CSI endpoint: %s\n", err.Error())

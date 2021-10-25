@@ -62,9 +62,9 @@ type Opts struct {
 
 // Service is a controller service that contains scsi connectors and implements NodeServer API
 type Service struct {
-	Fs fs.FsInterface
+	Fs fs.Interface
 
-	ctrlSvc        controller.ControllerInterface
+	ctrlSvc        controller.Interface
 	iscsiConnector ISCSIConnector
 	fcConnector    FcConnector
 	iscsiLib       goiscsi.ISCSIinterface
@@ -191,7 +191,7 @@ func (s *Service) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeR
 
 	id, arrayID, protocol, _ := array.ParseVolumeID(ctx, id, s.DefaultArray(), req.VolumeCapability)
 
-	var stager NodeVolumeStager
+	var stager VolumeStager
 
 	arr, ok := s.Arrays()[arrayID]
 	if !ok {
@@ -285,7 +285,7 @@ func (s *Service) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVol
 	return &csi.NodeUnstageVolumeResponse{}, nil
 }
 
-func unstageVolume(ctx context.Context, stagingPath, id string, logFields log.Fields, err error, fs fs.FsInterface) (string, error) {
+func unstageVolume(ctx context.Context, stagingPath, id string, logFields log.Fields, err error, fs fs.Interface) (string, error) {
 	logFields["ID"] = id
 	logFields["StagingPath"] = stagingPath
 	ctx = common.SetLogFields(ctx, logFields)
@@ -368,7 +368,7 @@ func (s *Service) NodePublishVolume(ctx context.Context, req *csi.NodePublishVol
 
 	log.WithFields(logFields).Info("calling publish")
 
-	var publisher NodeVolumePublisher
+	var publisher VolumePublisher
 
 	if protocol == "nfs" {
 		if s.fileExists(filepath.Join(stagingPath, commonNfsVolumeFolder)) {

@@ -800,8 +800,8 @@ var _ = Describe("CSIControllerService", func() {
 					mock.AnythingOfType("*gopowerstore.VolumeDelete"),
 					validBaseVolID).
 					Return(gopowerstore.EmptyResponse(""), nil)
-				array.IpToArray = make(map[string]string)
-				array.IpToArray["192.168.0.1"] = "globalvolid1"
+				array.IPToArray = make(map[string]string)
+				array.IPToArray["192.168.0.1"] = "globalvolid1"
 				req := &csi.DeleteVolumeRequest{VolumeId: "39bb1b5f-5624-490d-9ece-18f7b28a904e/192.168.0.1/scsi"}
 
 				res, err := ctrlSvc.DeleteVolume(context.Background(), req)

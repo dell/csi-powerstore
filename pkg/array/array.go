@@ -42,8 +42,8 @@ import (
 )
 
 var (
-	// IpToArray - Store Array IPs
-	IpToArray map[string]string
+	// IPToArray - Store Array IPs
+	IPToArray map[string]string
 )
 
 // Consumer provides methods for safe management of arrays
@@ -52,7 +52,7 @@ type Consumer interface {
 	SetArrays(map[string]*PowerStoreArray)
 	DefaultArray() *PowerStoreArray
 	SetDefaultArray(*PowerStoreArray)
-	UpdateArrays(string, fs.FsInterface) error
+	UpdateArrays(string, fs.Interface) error
 }
 
 // Locker provides implementation for safe management of arrays
@@ -92,14 +92,14 @@ func (s *Locker) SetDefaultArray(array *PowerStoreArray) {
 }
 
 // UpdateArrays updates array info
-func (s *Locker) UpdateArrays(configPath string, fs fs.FsInterface) error {
+func (s *Locker) UpdateArrays(configPath string, fs fs.Interface) error {
 	log.Info("updating array info")
 	arrays, matcher, defaultArray, err := GetPowerStoreArrays(fs, configPath)
 	if err != nil {
 		return fmt.Errorf("can't get config for arrays: %s", err.Error())
 	}
 	s.SetArrays(arrays)
-	IpToArray = matcher
+	IPToArray = matcher
 	s.SetDefaultArray(defaultArray)
 	return nil
 }
@@ -144,7 +144,7 @@ func (psa *PowerStoreArray) GetGlobalID() string {
 // GetPowerStoreArrays parses config.yaml file, initializes gopowerstore Clients and composes map of arrays for ease of access.
 // It will return array that can be used as default as a second return parameter.
 // If config does not have any array as a default then the first will be returned as a default.
-func GetPowerStoreArrays(fs fs.FsInterface, filePath string) (map[string]*PowerStoreArray, map[string]string, *PowerStoreArray, error) {
+func GetPowerStoreArrays(fs fs.Interface, filePath string) (map[string]*PowerStoreArray, map[string]string, *PowerStoreArray, error) {
 	type config struct {
 		Arrays []*PowerStoreArray `yaml:"arrays"`
 	}
@@ -181,7 +181,7 @@ func GetPowerStoreArrays(fs fs.FsInterface, filePath string) (map[string]*PowerS
 			return arrayMap, mapper, defaultArray, nil
 		}
 		if array.GlobalID == "" {
-			return nil, nil, nil, errors.New("no GlobalID field found in config.yaml. update config.yaml according to the documentation.")
+			return nil, nil, nil, errors.New("no GlobalID field found in config.yaml - update config.yaml according to the documentation")
 		}
 		clientOptions := gopowerstore.NewClientOptions()
 		clientOptions.SetInsecure(array.Insecure)
@@ -283,7 +283,7 @@ func ParseVolumeID(ctx context.Context, volumeID string, defaultArray *PowerStor
 		arrayID = defaultArray.GetGlobalID()
 	} else {
 		if ips := common.GetIPListFromString(volID[1]); ips != nil {
-			arrayID = IpToArray[ips[0]]
+			arrayID = IPToArray[ips[0]]
 		} else {
 			arrayID = volID[1]
 		}
