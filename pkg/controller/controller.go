@@ -93,9 +93,8 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 		if _, ok := params["arrayIP"]; ok {
 			return nil, status.Error(codes.Internal, "Array IP's been provided, however it is not supported in "+
 				"current version. Configure you storage classes according to the documentation")
-		} else {
-			arr = s.DefaultArray()
 		}
+		arr = s.DefaultArray()
 	} else {
 		arr, ok = s.Arrays()[arrayID]
 		if !ok {
@@ -948,18 +947,17 @@ func (s *Service) ControllerExpandVolume(ctx context.Context, req *csi.Controlle
 			return &csi.ControllerExpandVolumeResponse{CapacityBytes: requiredBytes, NodeExpansionRequired: true}, nil
 		}
 		return &csi.ControllerExpandVolumeResponse{}, nil
-	} else {
-		fs, err := s.Arrays()[arrayID].Client.GetFS(ctx, id)
-		if err == nil {
-			if fs.SizeTotal < requiredBytes {
-				_, err = s.Arrays()[arrayID].Client.ModifyFS(context.Background(), &gopowerstore.FSModify{Size: int(requiredBytes + ReservedSize)}, id)
-				if err != nil {
-					return nil, err
-				}
+	}
+	fs, err := s.Arrays()[arrayID].Client.GetFS(ctx, id)
+	if err == nil {
+		if fs.SizeTotal < requiredBytes {
+			_, err = s.Arrays()[arrayID].Client.ModifyFS(context.Background(), &gopowerstore.FSModify{Size: int(requiredBytes + ReservedSize)}, id)
+			if err != nil {
+				return nil, err
 			}
 		}
-		return &csi.ControllerExpandVolumeResponse{CapacityBytes: requiredBytes, NodeExpansionRequired: false}, nil
 	}
+	return &csi.ControllerExpandVolumeResponse{CapacityBytes: requiredBytes, NodeExpansionRequired: false}, nil
 }
 
 // ControllerGetVolume fetch current information about a volume
@@ -1038,6 +1036,7 @@ func (s *Service) RegisterAdditionalServers(server *grpc.Server) {
 	csiext.RegisterReplicationServer(server, s)
 }
 
+// ProbeController probes the controller service
 func (s *Service) ProbeController(ctx context.Context, req *csiext.ProbeControllerRequest) (*csiext.ProbeControllerResponse, error) {
 	ready := new(wrappers.BoolValue)
 	ready.Value = true

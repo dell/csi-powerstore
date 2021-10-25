@@ -176,7 +176,7 @@ func TestParseVolumeID(t *testing.T) {
 		}
 
 		volCap := getVolCap()
-		gotId, gotIp, protocol, err := array.ParseVolumeID(context.Background(), id, &array.PowerStoreArray{IP: ip, GlobalId: "gid1"}, volCap)
+		gotId, gotIp, protocol, err := array.ParseVolumeID(context.Background(), id, &array.PowerStoreArray{IP: ip, GlobalID: "gid1"}, volCap)
 		assert.NoError(t, err)
 		assert.Equal(t, id, gotId)
 		assert.Equal(t, ip, gotIp)

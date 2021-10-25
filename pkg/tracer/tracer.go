@@ -20,17 +20,20 @@
 package tracer
 
 import (
-	"github.com/opentracing/opentracing-go"
 	"io"
+
+	"github.com/opentracing/opentracing-go"
 
 	"github.com/uber/jaeger-client-go/config"
 	jprom "github.com/uber/jaeger-lib/metrics/prometheus"
 )
 
+// TracerConfigurator represents tracer configurator
 type TracerConfigurator interface {
 	FromEnv() (*config.Configuration, error)
 }
 
+// NewTracer returns a new tracer object
 func NewTracer(configurator TracerConfigurator) (opentracing.Tracer, io.Closer, error) {
 	// load config from environment variables
 	cfg, err := configurator.FromEnv()

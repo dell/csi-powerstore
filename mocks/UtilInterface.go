@@ -307,20 +307,20 @@ func (_m *UtilInterface) Mount(ctx context.Context, source string, target string
 	return r0
 }
 
-// MultipathCommand provides a mock function with given fields: ctx, timeoutSeconds, chroot, arguments
-func (_m *UtilInterface) MultipathCommand(ctx context.Context, timeoutSeconds time.Duration, chroot string, arguments ...string) ([]byte, error) {
+// MultipathCommand provides a mock function with given fields: ctx, timeout, chroot, arguments
+func (_m *UtilInterface) MultipathCommand(ctx context.Context, timeout time.Duration, chroot string, arguments ...string) ([]byte, error) {
 	_va := make([]interface{}, len(arguments))
 	for _i := range arguments {
 		_va[_i] = arguments[_i]
 	}
 	var _ca []interface{}
-	_ca = append(_ca, ctx, timeoutSeconds, chroot)
+	_ca = append(_ca, ctx, timeout, chroot)
 	_ca = append(_ca, _va...)
 	ret := _m.Called(_ca...)
 
 	var r0 []byte
 	if rf, ok := ret.Get(0).(func(context.Context, time.Duration, string, ...string) []byte); ok {
-		r0 = rf(ctx, timeoutSeconds, chroot, arguments...)
+		r0 = rf(ctx, timeout, chroot, arguments...)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]byte)
@@ -329,7 +329,7 @@ func (_m *UtilInterface) MultipathCommand(ctx context.Context, timeoutSeconds ti
 
 	var r1 error
 	if rf, ok := ret.Get(1).(func(context.Context, time.Duration, string, ...string) error); ok {
-		r1 = rf(ctx, timeoutSeconds, chroot, arguments...)
+		r1 = rf(ctx, timeout, chroot, arguments...)
 	} else {
 		r1 = ret.Error(1)
 	}

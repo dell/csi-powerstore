@@ -20,16 +20,20 @@ package controller
 
 import (
 	"context"
+
 	"github.com/dell/gopowerstore"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
 const (
+	// FilesystemSnapshotType represents filesystem snapshot type
 	FilesystemSnapshotType SnapshotType = "filesystem"
-	BlockSnapshotType      SnapshotType = "block"
+	// BlockSnapshotType represents block snapshot type
+	BlockSnapshotType SnapshotType = "block"
 )
 
+// SnapshotType represents type of snapshot
 type SnapshotType string
 
 // VolumeSnapshot represents snapshot of the block Volume

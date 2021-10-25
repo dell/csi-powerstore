@@ -97,7 +97,7 @@ func setVariables() {
 	first := &array.PowerStoreArray{
 		Endpoint:      "https://192.168.0.1/api/rest",
 		Username:      "admin",
-		GlobalId:      firstValidID,
+		GlobalID:      firstValidID,
 		Password:      "pass",
 		BlockProtocol: common.ISCSITransport,
 		Insecure:      true,
@@ -107,7 +107,7 @@ func setVariables() {
 	second := &array.PowerStoreArray{
 		Endpoint:      "https://192.168.0.2/api/rest",
 		Username:      "admin",
-		GlobalId:      secondValidID,
+		GlobalID:      secondValidID,
 		Password:      "pass",
 		NasName:       validNasName,
 		BlockProtocol: common.NoneTransport,

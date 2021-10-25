@@ -22,8 +22,6 @@ package fs
 import (
 	"context"
 	"fmt"
-	"github.com/dell/gofsutil"
-	log "github.com/sirupsen/logrus"
 	"io"
 	"io/ioutil"
 	"net"
@@ -31,6 +29,9 @@ import (
 	"os/exec"
 	"path/filepath"
 	"time"
+
+	"github.com/dell/gofsutil"
+	log "github.com/sirupsen/logrus"
 )
 
 // A FileInfo describes a file and is returned by Stat and Lstat.
@@ -85,7 +86,7 @@ type UtilInterface interface {
 	RescanSCSIHost(ctx context.Context, targets []string, lun string) error
 	RemoveBlockDevice(ctx context.Context, blockDevicePath string) error
 	TargetIPLUNToDevicePath(ctx context.Context, targetIP string, lunID int) (map[string]string, error)
-	MultipathCommand(ctx context.Context, timeoutSeconds time.Duration, chroot string, arguments ...string) ([]byte, error)
+	MultipathCommand(ctx context.Context, timeout time.Duration, chroot string, arguments ...string) ([]byte, error)
 	GetFCHostPortWWNs(ctx context.Context) ([]string, error)
 	IssueLIPToAllFCHosts(ctx context.Context) error
 	GetSysBlockDevicesForVolumeWWN(ctx context.Context, volumeWWN string) ([]string, error)
@@ -122,6 +123,7 @@ func (fs *Fs) Create(name string) (*os.File, error) {
 	return os.Create(name) // #nosec G304
 }
 
+// Chmod is a wrapper of os.Chmod
 func (fs *Fs) Chmod(name string, perm os.FileMode) error {
 	return os.Chmod(name, perm)
 }
