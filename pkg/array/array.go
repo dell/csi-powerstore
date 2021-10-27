@@ -42,7 +42,8 @@ import (
 )
 
 var (
-	IpToArray map[string]string
+	// IPToArray - Store Array IPs
+	IPToArray map[string]string
 )
 
 // Consumer provides methods for safe management of arrays
@@ -51,7 +52,7 @@ type Consumer interface {
 	SetArrays(map[string]*PowerStoreArray)
 	DefaultArray() *PowerStoreArray
 	SetDefaultArray(*PowerStoreArray)
-	UpdateArrays(string, fs.FsInterface) error
+	UpdateArrays(string, fs.Interface) error
 }
 
 // Locker provides implementation for safe management of arrays
@@ -62,38 +63,43 @@ type Locker struct {
 	defaultArray     *PowerStoreArray
 }
 
+// Arrays is a getter for list of arrays
 func (s *Locker) Arrays() map[string]*PowerStoreArray {
 	s.arraysLock.Lock()
 	defer s.arraysLock.Unlock()
 	return s.arrays
 }
 
+// SetArrays adds an array
 func (s *Locker) SetArrays(arrays map[string]*PowerStoreArray) {
 	s.arraysLock.Lock()
 	defer s.arraysLock.Unlock()
 	s.arrays = arrays
 }
 
+// DefaultArray is a getter for default array
 func (s *Locker) DefaultArray() *PowerStoreArray {
 	s.defaultArrayLock.Lock()
 	defer s.defaultArrayLock.Unlock()
 	return s.defaultArray
 }
 
+// SetDefaultArray sets default array
 func (s *Locker) SetDefaultArray(array *PowerStoreArray) {
 	s.defaultArrayLock.Lock()
 	defer s.defaultArrayLock.Unlock()
 	s.defaultArray = array
 }
 
-func (s *Locker) UpdateArrays(configPath string, fs fs.FsInterface) error {
+// UpdateArrays updates array info
+func (s *Locker) UpdateArrays(configPath string, fs fs.Interface) error {
 	log.Info("updating array info")
 	arrays, matcher, defaultArray, err := GetPowerStoreArrays(fs, configPath)
 	if err != nil {
 		return fmt.Errorf("can't get config for arrays: %s", err.Error())
 	}
 	s.SetArrays(arrays)
-	IpToArray = matcher
+	IPToArray = matcher
 	s.SetDefaultArray(defaultArray)
 	return nil
 }
@@ -103,7 +109,7 @@ func (s *Locker) UpdateArrays(configPath string, fs fs.FsInterface) error {
 // This structure is supposed to be parsed from config and mainly is created by GetPowerStoreArrays function.
 type PowerStoreArray struct {
 	Endpoint      string               `yaml:"endpoint"`
-	GlobalId      string               `yaml:"globalID"`
+	GlobalID      string               `yaml:"globalID"`
 	Username      string               `yaml:"username"`
 	Password      string               `yaml:"password"`
 	NasName       string               `yaml:"nasName"`
@@ -130,15 +136,15 @@ func (psa *PowerStoreArray) GetIP() string {
 	return psa.IP
 }
 
-// GetGlobalId is a getter that returns GlobalID address of the array
+// GetGlobalID is a getter that returns GlobalID address of the array
 func (psa *PowerStoreArray) GetGlobalID() string {
-	return psa.GlobalId
+	return psa.GlobalID
 }
 
 // GetPowerStoreArrays parses config.yaml file, initializes gopowerstore Clients and composes map of arrays for ease of access.
 // It will return array that can be used as default as a second return parameter.
 // If config does not have any array as a default then the first will be returned as a default.
-func GetPowerStoreArrays(fs fs.FsInterface, filePath string) (map[string]*PowerStoreArray, map[string]string, *PowerStoreArray, error) {
+func GetPowerStoreArrays(fs fs.Interface, filePath string) (map[string]*PowerStoreArray, map[string]string, *PowerStoreArray, error) {
 	type config struct {
 		Arrays []*PowerStoreArray `yaml:"arrays"`
 	}
@@ -174,8 +180,8 @@ func GetPowerStoreArrays(fs fs.FsInterface, filePath string) (map[string]*PowerS
 		if array == nil {
 			return arrayMap, mapper, defaultArray, nil
 		}
-		if array.GlobalId == "" {
-			return nil, nil, nil, errors.New("No GlobalID field found in config.yaml. Update config.yaml according to the documentation.")
+		if array.GlobalID == "" {
+			return nil, nil, nil, errors.New("no GlobalID field found in config.yaml - update config.yaml according to the documentation")
 		}
 		clientOptions := gopowerstore.NewClientOptions()
 		clientOptions.SetInsecure(array.Insecure)
@@ -212,9 +218,9 @@ func GetPowerStoreArrays(fs fs.FsInterface, filePath string) (map[string]*PowerS
 
 		ip := ips[0]
 		array.IP = ip
-		log.Infof("%s,%s,%s,%s,%t,%t,%s", array.Endpoint, array.GlobalId, array.Username, array.NasName, array.Insecure, array.IsDefault, array.BlockProtocol)
-		arrayMap[array.GlobalId] = array
-		mapper[ip] = array.GlobalId
+		log.Infof("%s,%s,%s,%s,%t,%t,%s", array.Endpoint, array.GlobalID, array.Username, array.NasName, array.Insecure, array.IsDefault, array.BlockProtocol)
+		arrayMap[array.GlobalID] = array
+		mapper[ip] = array.GlobalID
 		if array.IsDefault && !foundDefault {
 			defaultArray = array
 			foundDefault = true
@@ -277,7 +283,7 @@ func ParseVolumeID(ctx context.Context, volumeID string, defaultArray *PowerStor
 		arrayID = defaultArray.GetGlobalID()
 	} else {
 		if ips := common.GetIPListFromString(volID[1]); ips != nil {
-			arrayID = IpToArray[ips[0]]
+			arrayID = IPToArray[ips[0]]
 		} else {
 			arrayID = volID[1]
 		}

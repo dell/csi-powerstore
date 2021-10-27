@@ -38,20 +38,30 @@ const (
 	VolumeSizeMultiple = 8192
 	// MaxVolumeNameLength max length for the volume name
 	MaxVolumeNameLength = 128
-
+	// ErrUnknownAccessType represents error message for unknown access type
 	ErrUnknownAccessType = "unknown access type is not Block or Mount"
+	// ErrUnknownAccessMode represents error message for unknown access mode
 	ErrUnknownAccessMode = "access mode cannot be UNKNOWN"
+	// ErrNoMultiNodeWriter represents error message for multi node access
 	ErrNoMultiNodeWriter = "multi-node with writer(s) only supported for block access type"
-
-	KeyFsType                      = "csi.storage.k8s.io/fstype"
-	KeyFsTypeOld                   = "FsType"
-	KeyReplicationEnabled          = "isReplicationEnabled"
-	KeyReplicationRPO              = "rpo"
-	KeyReplicationRemoteSystem     = "remoteSystem"
+	// KeyFsType represents key for Fs Type
+	KeyFsType = "csi.storage.k8s.io/fstype"
+	// KeyFsTypeOld represents old key for Fs Type
+	KeyFsTypeOld = "FsType"
+	// KeyReplicationEnabled represents key for replication enabled
+	KeyReplicationEnabled = "isReplicationEnabled"
+	// KeyReplicationRPO represents key for replication RPO
+	KeyReplicationRPO = "rpo"
+	// KeyReplicationRemoteSystem represents key for replication remote system
+	KeyReplicationRemoteSystem = "remoteSystem"
+	// KeyReplicationIgnoreNamespaces represents key for replication ignore namespaces
 	KeyReplicationIgnoreNamespaces = "ignoreNamespaces"
-	KeyReplicationVGPrefix         = "volumeGroupPrefix"
-	KeyNasName                     = "nasName"
-	KeyCSIPVCNamespace             = "csi.storage.k8s.io/pvc/namespace"
+	// KeyReplicationVGPrefix represents key for replication vg prefix
+	KeyReplicationVGPrefix = "volumeGroupPrefix"
+	// KeyNasName represents key for nas name
+	KeyNasName = "nasName"
+	// KeyCSIPVCNamespace represents key for csi pvc namespace
+	KeyCSIPVCNamespace = "csi.storage.k8s.io/pvc/namespace"
 )
 
 func volumeNameValidation(volumeName string) error {

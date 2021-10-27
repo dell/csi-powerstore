@@ -82,13 +82,18 @@ const (
 	AutoDetectTransport TransportType = "AUTO"
 	// NoneTransport indicates that no SCSI transport protocol needed
 	NoneTransport TransportType = "NONE"
-
-	PublishContextDeviceWWN          = "DEVICE_WWN"
-	PublishContextLUNAddress         = "LUN_ADDRESS"
+	// PublishContextDeviceWWN indicates publish context device wwn
+	PublishContextDeviceWWN = "DEVICE_WWN"
+	// PublishContextLUNAddress indicates publish context LUN address
+	PublishContextLUNAddress = "LUN_ADDRESS"
+	// PublishContextISCSIPortalsPrefix indicates publish context iSCSI portals prefix
 	PublishContextISCSIPortalsPrefix = "PORTAL"
+	// PublishContextISCSITargetsPrefix indicates publish context iSCSI targets prefix
 	PublishContextISCSITargetsPrefix = "TARGET"
-	PublishContextFCWWPNPrefix       = "FCWWPN"
-	WWNPrefix                        = "naa."
+	// PublishContextFCWWPNPrefix indicates publish context FC WWPN prefix
+	PublishContextFCWWPNPrefix = "FCWWPN"
+	// WWNPrefix indicates WWN prefix
+	WWNPrefix = "naa."
 
 	contextLogFieldsKey key = iota
 )
@@ -97,7 +102,7 @@ const (
 type TransportType string
 
 // RmSockFile removes socket files that left after previous installation
-func RmSockFile(f fs.FsInterface) {
+func RmSockFile(f fs.Interface) {
 	proto, addr, err := utils.GetCSIEndpoint()
 	if err != nil {
 		log.Errorf("Error: failed to get CSI endpoint: %s\n", err.Error())
@@ -151,7 +156,7 @@ func parseMask(ipaddr string) (mask string, err error) {
 	return resultMask, nil
 }
 
-// GetIPListFromString returns ip and mask in string form found in input string
+// GetIPListWithMaskFromString returns ip and mask in string form found in input string
 // A return value of nil indicates no match
 func GetIPListWithMaskFromString(input string) (string, error) {
 	re := regexp.MustCompile(`^([01]?\d\d?|2[0-4]\d|25[0-5])(?:\.(?:[01]?\d\d?|2[0-4]\d|25[0-5])){3}(?:/[0-2]\d|/3[0-2])?$`)

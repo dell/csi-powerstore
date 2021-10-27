@@ -40,9 +40,9 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// ControllerInterface provides most important controller methods.
+// Interface provides most important controller methods.
 // This essentially serves as a wrapper for controller service that is used in ephemeral volumes.
-type ControllerInterface interface {
+type Interface interface {
 	CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error)
 	DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error)
 	ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error)
@@ -52,7 +52,7 @@ type ControllerInterface interface {
 
 // Service is a controller service that contains array connection information and implements ControllerServer API
 type Service struct {
-	Fs fs.FsInterface
+	Fs fs.Interface
 
 	externalAccess string
 
@@ -93,9 +93,8 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 		if _, ok := params["arrayIP"]; ok {
 			return nil, status.Error(codes.Internal, "Array IP's been provided, however it is not supported in "+
 				"current version. Configure you storage classes according to the documentation")
-		} else {
-			arr = s.DefaultArray()
 		}
+		arr = s.DefaultArray()
 	} else {
 		arr, ok = s.Arrays()[arrayID]
 		if !ok {
@@ -717,12 +716,14 @@ func (s *Service) ControllerGetCapabilities(ctx context.Context, request *csi.Co
 	for _, capability := range []csi.ControllerServiceCapability_RPC_Type{
 		csi.ControllerServiceCapability_RPC_CREATE_DELETE_VOLUME,
 		csi.ControllerServiceCapability_RPC_PUBLISH_UNPUBLISH_VOLUME,
-		csi.ControllerServiceCapability_RPC_LIST_VOLUMES,
 		csi.ControllerServiceCapability_RPC_GET_CAPACITY,
 		csi.ControllerServiceCapability_RPC_CREATE_DELETE_SNAPSHOT,
 		csi.ControllerServiceCapability_RPC_LIST_SNAPSHOTS,
 		csi.ControllerServiceCapability_RPC_CLONE_VOLUME,
 		csi.ControllerServiceCapability_RPC_EXPAND_VOLUME,
+		csi.ControllerServiceCapability_RPC_GET_VOLUME,
+		csi.ControllerServiceCapability_RPC_LIST_VOLUMES_PUBLISHED_NODES,
+		csi.ControllerServiceCapability_RPC_VOLUME_CONDITION,
 	} {
 		capabilities = append(capabilities, newCap(capability))
 	}
@@ -946,22 +947,88 @@ func (s *Service) ControllerExpandVolume(ctx context.Context, req *csi.Controlle
 			return &csi.ControllerExpandVolumeResponse{CapacityBytes: requiredBytes, NodeExpansionRequired: true}, nil
 		}
 		return &csi.ControllerExpandVolumeResponse{}, nil
-	} else {
-		fs, err := s.Arrays()[arrayID].Client.GetFS(ctx, id)
-		if err == nil {
-			if fs.SizeTotal < requiredBytes {
-				_, err = s.Arrays()[arrayID].Client.ModifyFS(context.Background(), &gopowerstore.FSModify{Size: int(requiredBytes + ReservedSize)}, id)
-				if err != nil {
-					return nil, err
-				}
+	}
+	fs, err := s.Arrays()[arrayID].Client.GetFS(ctx, id)
+	if err == nil {
+		if fs.SizeTotal < requiredBytes {
+			_, err = s.Arrays()[arrayID].Client.ModifyFS(context.Background(), &gopowerstore.FSModify{Size: int(requiredBytes + ReservedSize)}, id)
+			if err != nil {
+				return nil, err
 			}
 		}
-		return &csi.ControllerExpandVolumeResponse{CapacityBytes: requiredBytes, NodeExpansionRequired: false}, nil
 	}
+	return &csi.ControllerExpandVolumeResponse{CapacityBytes: requiredBytes, NodeExpansionRequired: false}, nil
 }
 
-func (s *Service) ControllerGetVolume(ctx context.Context, request *csi.ControllerGetVolumeRequest) (*csi.ControllerGetVolumeResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "not implemented yet")
+// ControllerGetVolume fetch current information about a volume
+func (s *Service) ControllerGetVolume(ctx context.Context, req *csi.ControllerGetVolumeRequest) (*csi.ControllerGetVolumeResponse, error) {
+	id, arrayID, protocol, err := array.ParseVolumeID(ctx, req.VolumeId, s.DefaultArray(), nil)
+	if err != nil {
+		return nil, status.Errorf(codes.OutOfRange, "unable to parse the volume id")
+	}
+	var hosts []string
+	abnormal := false
+	message := ""
+	if protocol == "nfs" {
+		// check if filesystem exists
+		fs, err := s.Arrays()[arrayID].Client.GetFS(ctx, id)
+		if err != nil {
+			return nil, status.Errorf(codes.NotFound, "failed to find filesystem: %s with error: %v", id, err.Error())
+		}
+
+		// get exports for filesystem if exists
+		nfsExport, err := s.Arrays()[arrayID].Client.GetNFSExportByFileSystemID(ctx, fs.ID)
+		if err != nil {
+			if apiError, ok := err.(gopowerstore.APIError); !ok || !apiError.NotFound() {
+				return nil, status.Errorf(codes.NotFound, "failed to find nfs export for filesystem with error: %v", err.Error())
+			}
+		} else {
+			// get hosts publish to export
+			hosts = append(nfsExport.ROHosts, nfsExport.RORootHosts...)
+			hosts = append(hosts, nfsExport.RWHosts...)
+			hosts = append(hosts, nfsExport.RWRootHosts...)
+		}
+
+	} else {
+		// check if volume exists
+		vol, err := s.Arrays()[arrayID].Client.GetVolume(ctx, id)
+		if err != nil {
+			return nil, status.Errorf(codes.NotFound, "failed to find volume: %s with error: %v", id, err.Error())
+		}
+
+		// get hosts published to volume
+		hostMappings, err := s.Arrays()[arrayID].Client.GetHostVolumeMappingByVolumeID(ctx, id)
+		if err != nil {
+			return nil, status.Errorf(codes.NotFound, "failed to get host volume mapping for volume: %s with error: %v", id, err.Error())
+		}
+		for _, hostMapping := range hostMappings {
+			host, err := s.Arrays()[arrayID].Client.GetHost(ctx, hostMapping.HostID)
+			if err != nil {
+				return nil, status.Errorf(codes.NotFound, "failed to get host: %s with error: %v", hostMapping.HostID, err.Error())
+			}
+			hosts = append(hosts, host.Name)
+		}
+
+		// check if volume is in ready state
+		if vol.State != gopowerstore.VolumeStateEnumReady {
+			abnormal = true
+			message = fmt.Sprintf("Volume is in %s state", string(vol.State))
+		}
+	}
+
+	resp := &csi.ControllerGetVolumeResponse{
+		Volume: &csi.Volume{
+			VolumeId: id,
+		},
+		Status: &csi.ControllerGetVolumeResponse_VolumeStatus{
+			PublishedNodeIds: hosts,
+			VolumeCondition: &csi.VolumeCondition{
+				Abnormal: abnormal,
+				Message:  message,
+			},
+		},
+	}
+	return resp, nil
 }
 
 // RegisterAdditionalServers registers replication extension
@@ -969,6 +1036,7 @@ func (s *Service) RegisterAdditionalServers(server *grpc.Server) {
 	csiext.RegisterReplicationServer(server, s)
 }
 
+// ProbeController probes the controller service
 func (s *Service) ProbeController(ctx context.Context, req *csiext.ProbeControllerRequest) (*csiext.ProbeControllerResponse, error) {
 	ready := new(wrappers.BoolValue)
 	ready.Value = true

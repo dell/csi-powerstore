@@ -21,6 +21,13 @@ package node
 import (
 	"context"
 	"errors"
+	"net"
+	"net/http"
+	"os"
+	"path"
+	"path/filepath"
+	"testing"
+
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-powerstore/mocks"
 	"github.com/dell/csi-powerstore/pkg/array"
@@ -37,12 +44,6 @@ import (
 	"github.com/onsi/ginkgo/reporters"
 	. "github.com/onsi/gomega"
 	"github.com/stretchr/testify/mock"
-	"net"
-	"net/http"
-	"os"
-	"path"
-	"path/filepath"
-	"testing"
 )
 
 var (
@@ -2812,6 +2813,20 @@ var _ = Describe("CSINodeService", func() {
 							},
 						},
 					},
+					{
+						Type: &csi.NodeServiceCapability_Rpc{
+							Rpc: &csi.NodeServiceCapability_RPC{
+								Type: csi.NodeServiceCapability_RPC_GET_VOLUME_STATS,
+							},
+						},
+					},
+					{
+						Type: &csi.NodeServiceCapability_Rpc{
+							Rpc: &csi.NodeServiceCapability_RPC{
+								Type: csi.NodeServiceCapability_RPC_VOLUME_CONDITION,
+							},
+						},
+					},
 				},
 			}))
 		})
@@ -2864,6 +2879,27 @@ var _ = Describe("CSINodeService", func() {
 					"58:cc:f0:93:48:a0:03:a3",
 					"58:cc:f0:93:48:a0:02:a3"}))
 				Ω(err).To(BeNil())
+			})
+		})
+	})
+	Describe("calling Node Get Volume Stats", func() {
+		When("volume path missing", func() {
+			It("should fail", func() {
+				clientMock.On("GetVolume", mock.Anything, validBaseVolumeID).
+					Return(gopowerstore.Volume{ID: validBaseVolumeID, State: gopowerstore.VolumeStateEnumReady}, nil)
+
+				clientMock.On("GetFS", mock.Anything, validBaseVolumeID).
+					Return(gopowerstore.FileSystem{ID: validBaseVolumeID}, nil)
+
+				req := &csi.NodeGetVolumeStatsRequest{VolumeId: validBlockVolumeID, VolumePath: ""}
+
+				res, err := nodeSvc.NodeGetVolumeStats(context.Background(), req)
+
+				Expect(res).To(BeNil())
+				Expect(err).ToNot(BeNil())
+				Expect(err.Error()).To(
+					ContainSubstring("no volume Path provided"),
+				)
 			})
 		})
 	})

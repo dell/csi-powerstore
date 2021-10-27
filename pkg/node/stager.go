@@ -21,6 +21,13 @@ package node
 import (
 	"context"
 	"fmt"
+	"os"
+	"path"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-powerstore/pkg/array"
 	"github.com/dell/csi-powerstore/pkg/common"
@@ -30,12 +37,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"os"
-	"path"
-	"path/filepath"
-	"strconv"
-	"strings"
-	"time"
 )
 
 const (
@@ -43,9 +44,9 @@ const (
 	procMountsRetries = 15
 )
 
-// NodeVolumeStager allows to stage a volume
-type NodeVolumeStager interface {
-	Stage(ctx context.Context, req *csi.NodeStageVolumeRequest, logFields log.Fields, fs fs.FsInterface, id string) (*csi.NodeStageVolumeResponse, error)
+// VolumeStager allows to node stage a volume
+type VolumeStager interface {
+	Stage(ctx context.Context, req *csi.NodeStageVolumeRequest, logFields log.Fields, fs fs.Interface, id string) (*csi.NodeStageVolumeResponse, error)
 }
 
 // SCSIStager implementation of NodeVolumeStager for SCSI based (FC, iSCSI) volumes
@@ -57,7 +58,7 @@ type SCSIStager struct {
 
 // Stage stages volume by connecting it through either FC or iSCSI and creating bind mount to staging path
 func (s *SCSIStager) Stage(ctx context.Context, req *csi.NodeStageVolumeRequest,
-	logFields log.Fields, fs fs.FsInterface, id string) (*csi.NodeStageVolumeResponse, error) {
+	logFields log.Fields, fs fs.Interface, id string) (*csi.NodeStageVolumeResponse, error) {
 	// append additional path to be able to do bind mounts
 	stagingPath := getStagingPath(ctx, req.GetStagingTargetPath(), id)
 
@@ -119,7 +120,7 @@ type NFSStager struct {
 
 // Stage stages volume by mounting volumes as nfs to the staging path
 func (n *NFSStager) Stage(ctx context.Context, req *csi.NodeStageVolumeRequest,
-	logFields log.Fields, fs fs.FsInterface, id string) (*csi.NodeStageVolumeResponse, error) {
+	logFields log.Fields, fs fs.Interface, id string) (*csi.NodeStageVolumeResponse, error) {
 	// append additional path to be able to do bind mounts
 	stagingPath := getStagingPath(ctx, req.GetStagingTargetPath(), id)
 
@@ -331,7 +332,7 @@ func (s *SCSIStager) connectFCDevice(ctx context.Context,
 	})
 }
 
-func isReadyToPublish(ctx context.Context, stagingPath string, fs fs.FsInterface) (bool, bool, error) {
+func isReadyToPublish(ctx context.Context, stagingPath string, fs fs.Interface) (bool, bool, error) {
 	logFields := common.GetLogFields(ctx)
 	stageInfo, found, err := getTargetMount(ctx, stagingPath, fs)
 	if err != nil {
@@ -354,7 +355,7 @@ func isReadyToPublish(ctx context.Context, stagingPath string, fs fs.FsInterface
 	return found, devFS != "mpath_member", nil
 }
 
-func isReadyToPublishNFS(ctx context.Context, stagingPath string, fs fs.FsInterface) (bool, error) {
+func isReadyToPublishNFS(ctx context.Context, stagingPath string, fs fs.Interface) (bool, error) {
 	logFields := common.GetLogFields(ctx)
 	stageInfo, found, err := getTargetMount(ctx, stagingPath, fs)
 	if err != nil {

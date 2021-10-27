@@ -23,6 +23,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
+	"path"
+	"path/filepath"
+	"strconv"
+
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-powerstore/pkg/common"
 	"github.com/dell/csi-powerstore/pkg/common/fs"
@@ -32,10 +37,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"net"
-	"path"
-	"path/filepath"
-	"strconv"
 )
 
 const (
@@ -151,7 +152,7 @@ func formatWWPN(data string) (string, error) {
 }
 
 // Get preferred outbound ip of this machine
-func getOutboundIP(endpoint string, fs fs.FsInterface) (net.IP, error) {
+func getOutboundIP(endpoint string, fs fs.Interface) (net.IP, error) {
 	conn, err := fs.NetDial(endpoint)
 	if err != nil {
 		return nil, err
@@ -163,7 +164,7 @@ func getOutboundIP(endpoint string, fs fs.FsInterface) (net.IP, error) {
 	return localAddr.IP, nil
 }
 
-func getStagedDev(ctx context.Context, stagePath string, fs fs.FsInterface) (string, error) {
+func getStagedDev(ctx context.Context, stagePath string, fs fs.Interface) (string, error) {
 	mountInfo, found, err := getTargetMount(ctx, stagePath, fs)
 	if err != nil {
 		return "", status.Errorf(codes.Internal,
@@ -190,7 +191,7 @@ func getStagingPath(ctx context.Context, sp string, volID string) string {
 	return path.Join(sp, volID)
 }
 
-func getTargetMount(ctx context.Context, target string, fs fs.FsInterface) (gofsutil.Info, bool, error) {
+func getTargetMount(ctx context.Context, target string, fs fs.Interface) (gofsutil.Info, bool, error) {
 	logFields := common.GetLogFields(ctx)
 	var targetMount gofsutil.Info
 	var found bool
@@ -212,7 +213,7 @@ func getTargetMount(ctx context.Context, target string, fs fs.FsInterface) (gofs
 	return targetMount, found, nil
 }
 
-func getMounts(ctx context.Context, fs fs.FsInterface) ([]gofsutil.Info, error) {
+func getMounts(ctx context.Context, fs fs.Interface) ([]gofsutil.Info, error) {
 	data, err := consistentRead(procMountsPath, procMountsRetries, fs)
 	if err != nil {
 		return []gofsutil.Info{}, err
@@ -225,7 +226,7 @@ func getMounts(ctx context.Context, fs fs.FsInterface) ([]gofsutil.Info, error) 
 	return info, nil
 }
 
-func consistentRead(filename string, retry int, fs fs.FsInterface) ([]byte, error) {
+func consistentRead(filename string, retry int, fs fs.Interface) ([]byte, error) {
 	oldContent, err := fs.ReadFile(filepath.Clean(filename))
 	if err != nil {
 		return nil, err
@@ -245,11 +246,11 @@ func consistentRead(filename string, retry int, fs fs.FsInterface) ([]byte, erro
 	return nil, fmt.Errorf("could not get consistent content of %s after %d attempts", filename, retry)
 }
 
-func createMapping(volID, deviceName, tmpDir string, fs fs.FsInterface) error {
+func createMapping(volID, deviceName, tmpDir string, fs fs.Interface) error {
 	return fs.WriteFile(path.Join(tmpDir, volID), []byte(deviceName), 0640)
 }
 
-func getMapping(volID, tmpDir string, fs fs.FsInterface) (string, error) {
+func getMapping(volID, tmpDir string, fs fs.Interface) (string, error) {
 	data, err := fs.ReadFile(path.Join(tmpDir, volID))
 	if err != nil {
 		return "", err
@@ -260,7 +261,7 @@ func getMapping(volID, tmpDir string, fs fs.FsInterface) (string, error) {
 	return string(data), nil
 }
 
-func deleteMapping(volID, tmpDir string, fs fs.FsInterface) error {
+func deleteMapping(volID, tmpDir string, fs fs.Interface) error {
 	err := fs.Remove(path.Join(tmpDir, volID))
 	if fs.IsNotExist(err) {
 		return nil
@@ -273,7 +274,7 @@ func isBlock(cap *csi.VolumeCapability) bool {
 	return isBlock
 }
 
-func isAlreadyPublished(ctx context.Context, targetPath, rwMode string, fs fs.FsInterface) (bool, error) {
+func isAlreadyPublished(ctx context.Context, targetPath, rwMode string, fs fs.Interface) (bool, error) {
 	mount, found, err := getTargetMount(ctx, targetPath, fs)
 	if err != nil {
 		return false, status.Errorf(codes.Internal,
@@ -306,7 +307,7 @@ func getRWModeString(isRO bool) string {
 	return "rw"
 }
 
-func format(ctx context.Context, source, fsType string, fs fs.FsInterface, opts ...string) error {
+func format(ctx context.Context, source, fsType string, fs fs.Interface, opts ...string) error {
 	f := log.Fields{
 		"source":  source,
 		"fsType":  fsType,

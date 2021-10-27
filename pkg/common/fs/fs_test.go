@@ -19,15 +19,16 @@
 package fs
 
 import (
-	"github.com/dell/gofsutil"
-	"github.com/stretchr/testify/suite"
 	"os"
 	"testing"
+
+	"github.com/dell/gofsutil"
+	"github.com/stretchr/testify/suite"
 )
 
 type FsTestSuite struct {
 	suite.Suite
-	fs  FsInterface
+	fs  Interface
 	tmp string
 }
 
