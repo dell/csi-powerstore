@@ -242,6 +242,8 @@ spec:
             - "--leader-election"
             - "--http-endpoint=:8080"
             - "--enable-node-watcher=true"
+            - "--monitor-interval={{ .Values.volumeHealthMonitorInterval | default "60s" }}"
+            - "--timeout=180s"
           env:
             - name: ADDRESS
               value: /var/run/csi/csi.sock

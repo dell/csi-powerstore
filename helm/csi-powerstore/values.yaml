@@ -34,6 +34,13 @@ externalAccess:
 # Default value: None
 imagePullPolicy: IfNotPresent
 
+# healthMonitorInterval: Interval of monitoring volume health condition
+# Allowed values: Number followed by unit (s,m,h)
+# Examples: 60s, 5m, 1h
+# Default value: None
+# Default value: 60s
+volumeHealthMonitorInterval: 60s
+
 # controller: configure controller specific parameters
 controller:
   # controllerCount: defines the number of csi-powerscale controller pods to deploy to
