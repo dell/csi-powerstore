@@ -24,7 +24,6 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
-	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-powerstore/core"
@@ -975,7 +974,7 @@ func (s *Service) ControllerGetVolume(ctx context.Context, req *csi.ControllerGe
 		fs, err := s.Arrays()[arrayID].Client.GetFS(ctx, id)
 		if err != nil {
 			abnormal = true
-			message = fmt.Sprintf("Filesystem %s is not found by controller at %s", id, time.Now().Format("2006-01-02 15:04:05"))
+			message = fmt.Sprintf("Filesystem %s is not found", id)
 		} else {
 			// get exports for filesystem if exists
 			nfsExport, err := s.Arrays()[arrayID].Client.GetNFSExportByFileSystemID(ctx, fs.ID)
@@ -995,7 +994,7 @@ func (s *Service) ControllerGetVolume(ctx context.Context, req *csi.ControllerGe
 		vol, err := s.Arrays()[arrayID].Client.GetVolume(ctx, id)
 		if err != nil {
 			abnormal = true
-			message = fmt.Sprintf("Volume %s is not found by controller at %s", id, time.Now().Format("2006-01-02 15:04:05"))
+			message = fmt.Sprintf("Volume %s is not found", id)
 		} else {
 			// get hosts published to volume
 			hostMappings, err := s.Arrays()[arrayID].Client.GetHostVolumeMappingByVolumeID(ctx, id)
