@@ -23,6 +23,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"strconv"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
@@ -338,6 +339,16 @@ func (s *Service) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest
 				listSnaps)
 		}
 
+		// Validate if filesystem has any NFS or SMB shares or snapshots attached
+		nfsExportResp, _ := arr.GetClient().GetNFSExportByFileSystemID(ctx, id)
+		if len(nfsExportResp.ROHosts) > 0 ||
+			len(nfsExportResp.RORootHosts) > 0 ||
+			len(nfsExportResp.RWHosts) > 0 ||
+			len(nfsExportResp.RWRootHosts) > 0 {
+			return nil, status.Errorf(codes.FailedPrecondition,
+				"filesystem %s cannot be deleted as it has associated NFS or SMB shares.",
+				id)
+		}
 		_, err = arr.GetClient().DeleteFS(ctx, id)
 		if err == nil {
 			return &csi.DeleteVolumeResponse{}, nil
@@ -348,6 +359,7 @@ func (s *Service) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest
 			}
 		}
 		return nil, err
+
 	} else if protocol == "scsi" {
 		// query volume groups?
 		vgs, err := arr.GetClient().GetVolumeGroupsByVolumeID(ctx, id)
@@ -535,11 +547,42 @@ func (s *Service) ControllerUnpublishVolume(ctx context.Context, req *csi.Contro
 				"failure checking nfs export status for volume unpublishing: %s", err.Error())
 		}
 
+		// we need to construct the payload dynamically otherwise 400 error will be thrown
+		var modifyHostPayload gopowerstore.NFSExportModify
+		sort.Strings(export.ROHosts)
+		index := sort.SearchStrings(export.ROHosts, ip)
+		if len(export.ROHosts) > 0 {
+			if index >= 0 {
+				modifyHostPayload.RemoveROHosts = []string{ip + "/255.255.255.255"} // we can't remove without netmask
+			}
+		}
+
+		sort.Strings(export.RORootHosts)
+		index = sort.SearchStrings(export.RORootHosts, ip)
+		if len(export.RORootHosts) > 0 {
+			if index >= 0 {
+				modifyHostPayload.RemoveRORootHosts = []string{ip + "/255.255.255.255"} // we can't remove without netmask
+			}
+		}
+
+		sort.Strings(export.RWHosts)
+		index = sort.SearchStrings(export.RWHosts, ip)
+		if len(export.RWHosts) > 0 {
+			if index >= 0 {
+				modifyHostPayload.RemoveRWHosts = []string{ip + "/255.255.255.255"} // we can't remove without netmask
+			}
+		}
+
+		sort.Strings(export.RWRootHosts)
+		index = sort.SearchStrings(export.RWRootHosts, ip)
+		if len(export.RWRootHosts) > 0 {
+			if index >= 0 {
+				modifyHostPayload.RemoveRWRootHosts = []string{ip + "/255.255.255.255"} // we can't remove without netmask
+			}
+		}
+
 		// Detach host from nfs export
-		_, err = arr.GetClient().ModifyNFSExport(ctx, &gopowerstore.NFSExportModify{
-			RemoveRWRootHosts: []string{ip + "/255.255.255.255"}, // You can't remove without netmask
-			RemoveRWHosts:     []string{ip + "/255.255.255.255"},
-		}, export.ID)
+		_, err = arr.GetClient().ModifyNFSExport(ctx, &modifyHostPayload, export.ID)
 		if err != nil {
 			if apiError, ok := err.(gopowerstore.APIError); !(ok && apiError.HostAlreadyRemovedFromNFSExport()) {
 				return nil, status.Errorf(codes.Internal,
