@@ -849,6 +849,8 @@ var _ = Describe("CSIControllerService", func() {
 					mock.AnythingOfType("*context.emptyCtx"),
 					validBaseVolID).
 					Return(gopowerstore.EmptyResponse(""), nil)
+				clientMock.On("GetNFSExportByFileSystemID", mock.Anything, validBaseVolID).
+					Return(gopowerstore.NFSExport{}, nil)
 
 				req := &csi.DeleteVolumeRequest{VolumeId: validNfsVolumeID}
 
@@ -956,6 +958,8 @@ var _ = Describe("CSIControllerService", func() {
 
 			It("should succeed [NFS]", func() {
 				clientMock.On("GetFsSnapshotsByVolumeID", mock.Anything, validBaseVolID).Return([]gopowerstore.FileSystem{}, nil)
+				clientMock.On("GetNFSExportByFileSystemID", mock.Anything, validBaseVolID).
+					Return(gopowerstore.NFSExport{}, nil)
 				clientMock.On("DeleteFS",
 					mock.AnythingOfType("*context.emptyCtx"),
 					validBaseVolID).
