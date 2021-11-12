@@ -213,6 +213,35 @@ func getTargetMount(ctx context.Context, target string, fs fs.Interface) (gofsut
 	return targetMount, found, nil
 }
 
+func getPublishTargetMount(ctx context.Context, targetPath, stagingPath string, fs fs.Interface, volCap *csi.VolumeCapability) (gofsutil.Info, bool, error) {
+	logFields := common.GetLogFields(ctx)
+	var targetMount gofsutil.Info
+	var found bool
+	accMode := volCap.GetAccessMode()
+	mounts, err := getMounts(ctx, fs)
+	if err != nil {
+		log.Error("could not reliably determine existing mount status")
+		return targetMount, false, status.Error(codes.Internal,
+			"could not reliably determine existing mount status")
+	}
+	for _, mount := range mounts {
+		if mount.Path == targetPath {
+			targetMount = mount
+			log.WithFields(logFields).Infof("matching targetMount %s target %s",
+				targetPath, mount.Path)
+			found = true
+			break
+		} else if mount.Path != stagingPath && accMode.Mode == csi.VolumeCapability_AccessMode_SINGLE_NODE_SINGLE_WRITER {
+			targetMount = mount
+			log.Error("volume has been mounted outside staging and target path and not supported with the provided access mode Single Node Single Writer")
+			return targetMount, false, status.Error(codes.Internal,
+				"volume has been mounted outside staging and target path and not supported with the provided access mode Single Node Single Writer")
+		}
+
+	}
+	return targetMount, found, nil
+}
+
 func getMounts(ctx context.Context, fs fs.Interface) ([]gofsutil.Info, error) {
 	data, err := consistentRead(procMountsPath, procMountsRetries, fs)
 	if err != nil {
@@ -274,8 +303,8 @@ func isBlock(cap *csi.VolumeCapability) bool {
 	return isBlock
 }
 
-func isAlreadyPublished(ctx context.Context, targetPath, rwMode string, fs fs.Interface) (bool, error) {
-	mount, found, err := getTargetMount(ctx, targetPath, fs)
+func isAlreadyPublished(ctx context.Context, targetPath, stagingPath, rwMode string, fs fs.Interface, cap *csi.VolumeCapability) (bool, error) {
+	mount, found, err := getPublishTargetMount(ctx, targetPath, stagingPath, fs, cap)
 	if err != nil {
 		return false, status.Errorf(codes.Internal,
 			"can't check mounts for path %s: %s", targetPath, err.Error())

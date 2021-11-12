@@ -620,7 +620,12 @@ func (s *Service) ValidateVolumeCapabilities(ctx context.Context, req *csi.Valid
 			supported = false
 			reason = ErrUnknownAccessMode
 			break
+		// SINGLE_NODE_WRITER to be deprecated in future
 		case csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER:
+			break
+		case csi.VolumeCapability_AccessMode_SINGLE_NODE_SINGLE_WRITER:
+			break
+		case csi.VolumeCapability_AccessMode_SINGLE_NODE_MULTI_WRITER:
 			break
 		case csi.VolumeCapability_AccessMode_SINGLE_NODE_READER_ONLY:
 			break
