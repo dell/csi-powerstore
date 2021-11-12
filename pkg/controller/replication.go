@@ -337,10 +337,8 @@ func (s *Service) ExecuteAction(ctx context.Context,
 	}
 	resErr := ExecuteAction(&rs, client, execAction, params)
 	if resErr != nil {
-		if apiError, ok := resErr.(gopowerstore.APIError); ok && !apiError.UnableToFailoverFromDestination() {
-			return nil, resErr
-		}
-		log.Debug("Looks like already failed over")
+
+		return nil, resErr
 	}
 
 	statusResp, err := s.GetStorageProtectionGroupStatus(ctx, &csiext.GetStorageProtectionGroupStatusRequest{
@@ -377,8 +375,10 @@ func ExecuteAction(session *gopowerstore.ReplicationSession, pstoreClient gopowe
 			failoverParams)
 
 		if err != nil {
-			log.Error(fmt.Sprintf("Fail over: Failed to modify RS (%s) - Error (%s)", session.ID, err.Error()))
-			return status.Errorf(codes.Internal, "Execute action: Failed to modify RS (%s) - Error (%s)", session.ID, err.Error())
+			if apiError, ok := err.(gopowerstore.APIError); ok && !apiError.UnableToFailoverFromDestination() {
+				log.Error(fmt.Sprintf("Fail over: Failed to modify RS (%s) - Error (%s)", session.ID, err.Error()))
+				return status.Errorf(codes.Internal, "Execute action: Failed to modify RS (%s) - Error (%s)", session.ID, err.Error())
+			}
 		}
 		log.Debugf("Action (%s) successful on RS(%s)", string(action), session.ID)
 	}
@@ -423,6 +423,7 @@ func (s *Service) DeleteStorageProtectionGroup(ctx context.Context,
 	localParams := req.GetProtectionGroupAttributes()
 	groupID := req.GetProtectionGroupId()
 	globalID, ok := localParams[s.replicationContextPrefix+"globalID"]
+
 	if !ok {
 		return nil, status.Error(codes.InvalidArgument, "missing globalID in protection group attributes")
 	}
