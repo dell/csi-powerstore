@@ -1016,46 +1016,52 @@ func (s *Service) ControllerGetVolume(ctx context.Context, req *csi.ControllerGe
 		// check if filesystem exists
 		fs, err := s.Arrays()[arrayID].Client.GetFS(ctx, id)
 		if err != nil {
-			return nil, status.Errorf(codes.NotFound, "failed to find filesystem: %s with error: %v", id, err.Error())
-		}
-
-		// get exports for filesystem if exists
-		nfsExport, err := s.Arrays()[arrayID].Client.GetNFSExportByFileSystemID(ctx, fs.ID)
-		if err != nil {
 			if apiError, ok := err.(gopowerstore.APIError); !ok || !apiError.NotFound() {
-				return nil, status.Errorf(codes.NotFound, "failed to find nfs export for filesystem with error: %v", err.Error())
+				return nil, status.Errorf(codes.NotFound, "failed to find filesystem %s with error: %v", id, err.Error())
 			}
+			abnormal = true
+			message = fmt.Sprintf("Filesystem %s is not found", id)
 		} else {
-			// get hosts publish to export
-			hosts = append(nfsExport.ROHosts, nfsExport.RORootHosts...)
-			hosts = append(hosts, nfsExport.RWHosts...)
-			hosts = append(hosts, nfsExport.RWRootHosts...)
+			// get exports for filesystem if exists
+			nfsExport, err := s.Arrays()[arrayID].Client.GetNFSExportByFileSystemID(ctx, fs.ID)
+			if err != nil {
+				if apiError, ok := err.(gopowerstore.APIError); !ok || !apiError.NotFound() {
+					return nil, status.Errorf(codes.NotFound, "failed to find nfs export for filesystem with error: %v", err.Error())
+				}
+			} else {
+				// get hosts publish to export
+				hosts = append(nfsExport.ROHosts, nfsExport.RORootHosts...)
+				hosts = append(hosts, nfsExport.RWHosts...)
+				hosts = append(hosts, nfsExport.RWRootHosts...)
+			}
 		}
-
 	} else {
 		// check if volume exists
 		vol, err := s.Arrays()[arrayID].Client.GetVolume(ctx, id)
 		if err != nil {
-			return nil, status.Errorf(codes.NotFound, "failed to find volume: %s with error: %v", id, err.Error())
-		}
-
-		// get hosts published to volume
-		hostMappings, err := s.Arrays()[arrayID].Client.GetHostVolumeMappingByVolumeID(ctx, id)
-		if err != nil {
-			return nil, status.Errorf(codes.NotFound, "failed to get host volume mapping for volume: %s with error: %v", id, err.Error())
-		}
-		for _, hostMapping := range hostMappings {
-			host, err := s.Arrays()[arrayID].Client.GetHost(ctx, hostMapping.HostID)
-			if err != nil {
-				return nil, status.Errorf(codes.NotFound, "failed to get host: %s with error: %v", hostMapping.HostID, err.Error())
+			if apiError, ok := err.(gopowerstore.APIError); !ok || !apiError.NotFound() {
+				return nil, status.Errorf(codes.NotFound, "failed to find volume %s with error: %v", id, err.Error())
 			}
-			hosts = append(hosts, host.Name)
-		}
-
-		// check if volume is in ready state
-		if vol.State != gopowerstore.VolumeStateEnumReady {
 			abnormal = true
-			message = fmt.Sprintf("Volume is in %s state", string(vol.State))
+			message = fmt.Sprintf("Volume %s is not found", id)
+		} else {
+			// get hosts published to volume
+			hostMappings, err := s.Arrays()[arrayID].Client.GetHostVolumeMappingByVolumeID(ctx, id)
+			if err != nil {
+				return nil, status.Errorf(codes.NotFound, "failed to get host volume mapping for volume: %s with error: %v", id, err.Error())
+			}
+			for _, hostMapping := range hostMappings {
+				host, err := s.Arrays()[arrayID].Client.GetHost(ctx, hostMapping.HostID)
+				if err != nil {
+					return nil, status.Errorf(codes.NotFound, "failed to get host: %s with error: %v", hostMapping.HostID, err.Error())
+				}
+				hosts = append(hosts, host.Name)
+			}
+			// check if volume is in ready state
+			if vol.State != gopowerstore.VolumeStateEnumReady {
+				abnormal = true
+				message = fmt.Sprintf("Volume is in %s state", string(vol.State))
+			}
 		}
 	}
 
