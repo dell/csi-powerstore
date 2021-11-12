@@ -973,6 +973,9 @@ func (s *Service) ControllerGetVolume(ctx context.Context, req *csi.ControllerGe
 		// check if filesystem exists
 		fs, err := s.Arrays()[arrayID].Client.GetFS(ctx, id)
 		if err != nil {
+			if apiError, ok := err.(gopowerstore.APIError); !ok || !apiError.NotFound() {
+				return nil, status.Errorf(codes.NotFound, "failed to find filesystem %s with error: %v", id, err.Error())
+			}
 			abnormal = true
 			message = fmt.Sprintf("Filesystem %s is not found", id)
 		} else {
@@ -993,6 +996,9 @@ func (s *Service) ControllerGetVolume(ctx context.Context, req *csi.ControllerGe
 		// check if volume exists
 		vol, err := s.Arrays()[arrayID].Client.GetVolume(ctx, id)
 		if err != nil {
+			if apiError, ok := err.(gopowerstore.APIError); !ok || !apiError.NotFound() {
+				return nil, status.Errorf(codes.NotFound, "failed to find volume %s with error: %v", id, err.Error())
+			}
 			abnormal = true
 			message = fmt.Sprintf("Volume %s is not found", id)
 		} else {
