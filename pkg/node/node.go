@@ -491,16 +491,18 @@ func (s *Service) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolume
 		}
 	} else {
 		_, err := arr.Client.GetVolume(ctx, id)
-		if apiError, ok := err.(gopowerstore.APIError); !ok || !apiError.NotFound() {
-			return nil, status.Errorf(codes.NotFound, "failed to find volume %s with error: %v", id, err.Error())
+		if err != nil {
+			if apiError, ok := err.(gopowerstore.APIError); !ok || !apiError.NotFound() {
+				return nil, status.Errorf(codes.NotFound, "failed to find volume %s with error: %v", id, err.Error())
+			}
+			resp := &csi.NodeGetVolumeStatsResponse{
+				VolumeCondition: &csi.VolumeCondition{
+					Abnormal: true,
+					Message:  fmt.Sprintf("Volume %s is not found", id),
+				},
+			}
+			return resp, nil
 		}
-		resp := &csi.NodeGetVolumeStatsResponse{
-			VolumeCondition: &csi.VolumeCondition{
-				Abnormal: true,
-				Message:  fmt.Sprintf("Volume %s is not found", id),
-			},
-		}
-		return resp, nil
 	}
 
 	// Check if target path is mounted
