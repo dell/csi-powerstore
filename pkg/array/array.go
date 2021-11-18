@@ -205,6 +205,7 @@ func GetPowerStoreArrays(fs fs.Interface, filePath string) (map[string]*PowerSto
 			"Application-Type": {fmt.Sprintf("%s/%s", common.VerboseName, core.SemVer)}})
 		c.SetLogger(&common.CustomLogger{})
 		array.Client = c
+		log.Errorf(fmt.Sprintf("%s/%s", common.VerboseName, core.SemVer))
 
 		if array.BlockProtocol == "" {
 			array.BlockProtocol = common.AutoDetectTransport
