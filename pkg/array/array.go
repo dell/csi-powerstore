@@ -202,10 +202,10 @@ func GetPowerStoreArrays(fs fs.Interface, filePath string) (map[string]*PowerSto
 				"unable to create PowerStore client: %s", err.Error())
 		}
 		c.SetCustomHTTPHeaders(http.Header{
-			"Application-Type": {fmt.Sprintf("%s/%s", common.VerboseName, core.SemVer)}})
+			"Application-Type": {common.VerboseName}})
 		c.SetLogger(&common.CustomLogger{})
 		array.Client = c
-		log.Errorf(fmt.Sprintf("%s/%s", common.VerboseName, core.SemVer))
+		log.Errorf(common.VerboseName)
 
 		if array.BlockProtocol == "" {
 			array.BlockProtocol = common.AutoDetectTransport
