@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright (c) 2020 Dell Inc., or its subsidiaries. All Rights Reserved.
+# Copyright (c) 2021 Dell Inc., or its subsidiaries. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -70,7 +70,7 @@ function validate_params() {
 function check_for_driver() {
     NUM=$(run_command helm list --namespace "${NAMESPACE}" | grep "^${RELEASE}\b" | wc -l)
     if [ "${NUM}" == "0" ]; then
-        log error "The CSI Driver is not installed."
+        log uninstall_error "The CSI Driver is not installed."
         exit 1
     fi
 }

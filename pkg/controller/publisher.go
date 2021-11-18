@@ -105,7 +105,9 @@ func (s *SCSIPublisher) Publish(ctx context.Context, req *csi.ControllerPublishV
 	if mappingCount != 0 {
 		switch req.VolumeCapability.AccessMode.Mode {
 		case csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
-			csi.VolumeCapability_AccessMode_SINGLE_NODE_READER_ONLY:
+			csi.VolumeCapability_AccessMode_SINGLE_NODE_READER_ONLY,
+			csi.VolumeCapability_AccessMode_SINGLE_NODE_SINGLE_WRITER,
+			csi.VolumeCapability_AccessMode_SINGLE_NODE_MULTI_WRITER:
 			log.Error(fmt.Sprintf(
 				"ControllerPublishVolume: Volume present in a different lun mapping - '%s'",
 				mapping[0].HostID))

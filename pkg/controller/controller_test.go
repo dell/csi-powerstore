@@ -849,6 +849,8 @@ var _ = Describe("CSIControllerService", func() {
 					mock.AnythingOfType("*context.emptyCtx"),
 					validBaseVolID).
 					Return(gopowerstore.EmptyResponse(""), nil)
+				clientMock.On("GetNFSExportByFileSystemID", mock.Anything, validBaseVolID).
+					Return(gopowerstore.NFSExport{}, nil)
 
 				req := &csi.DeleteVolumeRequest{VolumeId: validNfsVolumeID}
 
@@ -956,6 +958,8 @@ var _ = Describe("CSIControllerService", func() {
 
 			It("should succeed [NFS]", func() {
 				clientMock.On("GetFsSnapshotsByVolumeID", mock.Anything, validBaseVolID).Return([]gopowerstore.FileSystem{}, nil)
+				clientMock.On("GetNFSExportByFileSystemID", mock.Anything, validBaseVolID).
+					Return(gopowerstore.NFSExport{}, nil)
 				clientMock.On("DeleteFS",
 					mock.AnythingOfType("*context.emptyCtx"),
 					validBaseVolID).
@@ -3254,6 +3258,7 @@ var _ = Describe("CSIControllerService", func() {
 		})
 		When("normal block volume does not exists on array", func() {
 			It("should fail", func() {
+				var hosts []string
 				clientMock.On("GetVolume", mock.Anything, mock.Anything).
 					Return(gopowerstore.Volume{}, gopowerstore.APIError{
 						ErrorMsg: &api.ErrorMsg{
@@ -3276,11 +3281,19 @@ var _ = Describe("CSIControllerService", func() {
 
 				res, err := ctrlSvc.ControllerGetVolume(context.Background(), req)
 
-				Expect(res).To(BeNil())
-				Expect(err).ToNot(BeNil())
-				Expect(err.Error()).To(
-					ContainSubstring("failed to find volume"),
-				)
+				Expect(err).To(BeNil())
+				Expect(res).To(Equal(&csi.ControllerGetVolumeResponse{
+					Volume: &csi.Volume{
+						VolumeId: validBaseVolID,
+					},
+					Status: &csi.ControllerGetVolumeResponse_VolumeStatus{
+						PublishedNodeIds: hosts,
+						VolumeCondition: &csi.VolumeCondition{
+							Abnormal: true,
+							Message:  fmt.Sprintf("Volume %s is not found", validBaseVolID),
+						},
+					},
+				}))
 			})
 		})
 		When("normal filesystem exists on array", func() {
@@ -3321,6 +3334,7 @@ var _ = Describe("CSIControllerService", func() {
 		})
 		When("filesystem does not exists on array", func() {
 			It("should fail", func() {
+				var hosts []string
 				clientMock.On("GetVolume", mock.Anything, validBaseVolID).
 					Return(gopowerstore.Volume{ID: validBaseVolID, State: gopowerstore.VolumeStateEnumReady}, nil)
 
@@ -3343,11 +3357,19 @@ var _ = Describe("CSIControllerService", func() {
 
 				res, err := ctrlSvc.ControllerGetVolume(context.Background(), req)
 
-				Expect(res).To(BeNil())
-				Expect(err).ToNot(BeNil())
-				Expect(err.Error()).To(
-					ContainSubstring("failed to find filesystem"),
-				)
+				Expect(err).To(BeNil())
+				Expect(res).To(Equal(&csi.ControllerGetVolumeResponse{
+					Volume: &csi.Volume{
+						VolumeId: validBaseVolID,
+					},
+					Status: &csi.ControllerGetVolumeResponse_VolumeStatus{
+						PublishedNodeIds: hosts,
+						VolumeCondition: &csi.VolumeCondition{
+							Abnormal: true,
+							Message:  fmt.Sprintf("Filesystem %s is not found", validBaseVolID),
+						},
+					},
+				}))
 			})
 		})
 	})

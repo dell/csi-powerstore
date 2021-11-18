@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright (c) 2020 Dell Inc., or its subsidiaries. All Rights Reserved.
+# Copyright (c) 2021 Dell Inc., or its subsidiaries. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -40,6 +40,14 @@ function log() {
     printf "${RED}Installation cannot continue${NC}\n"
     debuglog_only "Error: $2"
     debuglog_only "Installation cannot continue"
+    exit 1
+    ;;
+  uninstall_error)
+    log separator
+    printf "${RED}Error: $2\n"
+    printf "${RED}Uninstallation cannot continue${NC}\n"
+    debuglog_only "Error: $2"
+    debuglog_only "Uninstallation cannot continue"
     exit 1
     ;;
   step)

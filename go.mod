@@ -2,6 +2,8 @@ module github.com/dell/csi-powerstore
 
 go 1.16
 
+// update gocsi to v1.5 post release
+
 require (
 	github.com/HdrHistogram/hdrhistogram-go v1.0.1 // indirect
 	github.com/akutz/gosync v0.1.0
