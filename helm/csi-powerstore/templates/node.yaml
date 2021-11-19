@@ -136,6 +136,12 @@ spec:
               value: /powerstore-config-params/driver-config-params.yaml
             - name: GOPOWERSTORE_DEBUG
               value: "true"
+            {{- if hasKey .Values.node "healthMonitor" }}
+            {{- if eq .Values.node.healthMonitor.enabled true}}
+            - name: X_CSI_HEALTH_MONITOR_ENABLED
+              value: "{{ .Values.controller.healthMonitor.enabled }}"
+            {{- end }}
+            {{- end }}
           volumeMounts:
             - name: driver-path
               mountPath: {{ .Values.kubeletConfigDir }}/plugins/{{ .Values.driverName }}

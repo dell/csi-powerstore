@@ -79,4 +79,7 @@ const (
 
 	// EnvGOCSIDebug indicates whether to print REQUESTs and RESPONSEs of all CSI method calls(from gocsi)
 	EnvGOCSIDebug = "X_CSI_DEBUG"
+
+	// EnvIsHealthMonitorEnabled specifies if health monitor is enabled.
+	EnvIsHealthMonitorEnabled = "X_CSI_HEALTH_MONITOR_ENABLED"
 )
