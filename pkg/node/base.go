@@ -239,7 +239,7 @@ func getPublishTargetMount(ctx context.Context, targetPath, stagingPath string, 
 	// make sure device is valid
 	sysDevice, err := GetDevice(ctx, symlinkPath)
 	if err != nil {
-		return targetMount, false, status.Errorf(codes.Internal, fmt.Sprintf("error getting block device for volume: %s, err: %s", id, err.Error()))
+		return targetMount, false, status.Errorf(codes.Internal, fmt.Sprintf("error getting block device for volumepath: %s, err: %s", symlinkPath, err.Error()))
 	}
 
 	// Check if target is not mounted
