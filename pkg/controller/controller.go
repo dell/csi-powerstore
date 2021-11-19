@@ -774,6 +774,7 @@ func (s *Service) ControllerGetCapabilities(ctx context.Context, request *csi.Co
 		csi.ControllerServiceCapability_RPC_LIST_SNAPSHOTS,
 		csi.ControllerServiceCapability_RPC_CLONE_VOLUME,
 		csi.ControllerServiceCapability_RPC_EXPAND_VOLUME,
+		csi.ControllerServiceCapability_RPC_SINGLE_NODE_MULTI_WRITER,
 	} {
 		capabilities = append(capabilities, newCap(capability))
 	}
