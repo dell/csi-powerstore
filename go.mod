@@ -30,7 +30,7 @@ require (
 	golang.org/x/net v0.0.0-20210520170846-37e1c6afe023
 	google.golang.org/grpc v1.38.0
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
-	k8s.io/kubernetes v1.21.1
+	k8s.io/kubernetes v1.21.5
 )
 
 replace (
