@@ -2885,6 +2885,13 @@ var _ = Describe("CSIControllerService", func() {
 						{
 							Type: &csi.ControllerServiceCapability_Rpc{
 								Rpc: &csi.ControllerServiceCapability_RPC{
+									Type: csi.ControllerServiceCapability_RPC_SINGLE_NODE_MULTI_WRITER,
+								},
+							},
+						},
+						{
+							Type: &csi.ControllerServiceCapability_Rpc{
+								Rpc: &csi.ControllerServiceCapability_RPC{
 									Type: csi.ControllerServiceCapability_RPC_GET_VOLUME,
 								},
 							},
@@ -2961,6 +2968,13 @@ var _ = Describe("CSIControllerService", func() {
 							Type: &csi.ControllerServiceCapability_Rpc{
 								Rpc: &csi.ControllerServiceCapability_RPC{
 									Type: csi.ControllerServiceCapability_RPC_EXPAND_VOLUME,
+								},
+							},
+						},
+						{
+							Type: &csi.ControllerServiceCapability_Rpc{
+								Rpc: &csi.ControllerServiceCapability_RPC{
+									Type: csi.ControllerServiceCapability_RPC_SINGLE_NODE_MULTI_WRITER,
 								},
 							},
 						},

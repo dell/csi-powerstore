@@ -2795,7 +2795,42 @@ var _ = Describe("CSINodeService", func() {
 	})
 
 	Describe("Calling NodeGetCapabilities()", func() {
-		It("should return predefined parameters", func() {
+		It("should return predefined parameters with health monitor", func() {
+			csictx.Setenv(context.Background(), common.EnvIsHealthMonitorEnabled, "true")
+
+			nodeSvc.nodeID = ""
+
+			fsMock.On("ReadFile", mock.Anything).Return([]byte("my-host-id"), nil)
+			conn, _ := net.Dial("udp", "127.0.0.1:80")
+			fsMock.On("NetDial", mock.Anything).Return(
+				conn,
+				nil,
+			)
+			iscsiConnectorMock.On("GetInitiatorName", mock.Anything).
+				Return(validISCSIInitiators, nil)
+			fcConnectorMock.On("GetInitiatorPorts", mock.Anything).
+				Return(validFCTargetsWWPN, nil)
+
+			clientMock.On("GetHostByName", mock.Anything, mock.AnythingOfType("string")).
+				Return(gopowerstore.Host{}, gopowerstore.APIError{
+					ErrorMsg: &api.ErrorMsg{
+						StatusCode: http.StatusNotFound,
+					},
+				})
+			clientMock.On("GetHosts", mock.Anything).Return(
+				[]gopowerstore.Host{{
+					ID: "host-id",
+					Initiators: []gopowerstore.InitiatorInstance{{
+						PortName: "not-matching-port-name",
+						PortType: gopowerstore.InitiatorProtocolTypeEnumISCSI,
+					}},
+					Name: "host-name",
+				}}, nil)
+			clientMock.On("CreateHost", mock.Anything, mock.Anything).
+				Return(gopowerstore.CreateResponse{ID: validHostID}, nil)
+			nodeSvc.opts.NodeNamePrefix = ""
+			nodeSvc.Init()
+
 			res, err := nodeSvc.NodeGetCapabilities(context.Background(), &csi.NodeGetCapabilitiesRequest{})
 			Ω(err).To(BeNil())
 			Ω(res).To(Equal(&csi.NodeGetCapabilitiesResponse{
@@ -2810,6 +2845,13 @@ var _ = Describe("CSINodeService", func() {
 						Type: &csi.NodeServiceCapability_Rpc{
 							Rpc: &csi.NodeServiceCapability_RPC{
 								Type: csi.NodeServiceCapability_RPC_EXPAND_VOLUME,
+							},
+						},
+					},
+					{
+						Type: &csi.NodeServiceCapability_Rpc{
+							Rpc: &csi.NodeServiceCapability_RPC{
+								Type: csi.NodeServiceCapability_RPC_SINGLE_NODE_MULTI_WRITER,
 							},
 						},
 					},
