@@ -232,6 +232,12 @@ func getPublishTargetMount(ctx context.Context, targetPath, stagingPath string, 
 			found = true
 			break
 		} else if mount.Path != stagingPath && accMode.Mode == csi.VolumeCapability_AccessMode_SINGLE_NODE_SINGLE_WRITER {
+			log.Error("-------")
+			log.Error(mount.Path)
+			log.Error(mount.Device)
+			log.Error(mount.Source)
+			log.Error(mount.Type)
+			log.Error(mount.Opts)
 			targetMount = mount
 			log.Error("volume has been mounted outside staging and target path and not supported with the provided access mode Single Node Single Writer")
 			return targetMount, false, status.Error(codes.Internal,
