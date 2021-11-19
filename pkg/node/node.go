@@ -460,11 +460,6 @@ func (s *Service) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolume
 		return nil, status.Error(codes.InvalidArgument, "no volume Path provided")
 	}
 
-	stagingPath := req.GetStagingTargetPath()
-	if len(stagingPath) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "no staging Path provided")
-	}
-
 	// parse volume Id
 	id, arrayID, protocol, err := array.ParseVolumeID(ctx, volumeID, s.DefaultArray(), nil)
 	if err != nil {
@@ -575,23 +570,26 @@ func (s *Service) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolume
 		}
 	}
 
-	// Check if staging target path is mounted
-	_, found, err := getTargetMount(ctx, stagingPath, s.Fs)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "can't check mounts for path %s: %s", volumePath, err.Error())
-	}
-	if !found {
-		resp := &csi.NodeGetVolumeStatsResponse{
-			VolumeCondition: &csi.VolumeCondition{
-				Abnormal: true,
-				Message:  fmt.Sprintf("staging target path %s not mounted for volume %s", stagingPath, id),
-			},
+	stagingPath := req.GetStagingTargetPath()
+	if len(stagingPath) != 0 {
+		// Check if staging target path is mounted
+		_, found, err := getTargetMount(ctx, stagingPath, s.Fs)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "can't check mounts for path %s: %s", volumePath, err.Error())
 		}
-		return resp, nil
+		if !found {
+			resp := &csi.NodeGetVolumeStatsResponse{
+				VolumeCondition: &csi.VolumeCondition{
+					Abnormal: true,
+					Message:  fmt.Sprintf("staging target path %s not mounted for volume %s", stagingPath, id),
+				},
+			}
+			return resp, nil
+		}
 	}
 
 	// Check if target path is mounted
-	_, found, err = getTargetMount(ctx, volumePath, s.Fs)
+	_, found, err := getTargetMount(ctx, volumePath, s.Fs)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "can't check mounts for path %s: %s", volumePath, err.Error())
 	}
