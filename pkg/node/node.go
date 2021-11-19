@@ -488,40 +488,38 @@ func (s *Service) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolume
 				},
 			}
 			return resp, nil
-		} else {
-			nfsExport, err := s.Arrays()[arrayID].Client.GetNFSExportByFileSystemID(ctx, fs.ID)
-			if err != nil {
-				if apiError, ok := err.(gopowerstore.APIError); !ok || !apiError.NotFound() {
-					return nil, status.Errorf(codes.NotFound, "failed to find nfs export for filesystem with error: %v", err.Error())
-				}
-				resp := &csi.NodeGetVolumeStatsResponse{
-					VolumeCondition: &csi.VolumeCondition{
-						Abnormal: true,
-						Message:  fmt.Sprintf("NFS export for volume %s is not found", id),
-					},
-				}
-				return resp, nil
-			} else {
-				// get hosts publish to export
-				hosts := append(nfsExport.ROHosts, nfsExport.RORootHosts...)
-				hosts = append(hosts, nfsExport.RWHosts...)
-				hosts = append(hosts, nfsExport.RWRootHosts...)
-				attached := false
-				for _, host := range hosts {
-					if s.nodeID == host {
-						attached = true
-					}
-				}
-				if !attached {
-					resp := &csi.NodeGetVolumeStatsResponse{
-						VolumeCondition: &csi.VolumeCondition{
-							Abnormal: true,
-							Message:  fmt.Sprintf("host %s is not attached to NFS export for filesystem %s", s.nodeID, id),
-						},
-					}
-					return resp, nil
-				}
+		}
+		nfsExport, err := s.Arrays()[arrayID].Client.GetNFSExportByFileSystemID(ctx, fs.ID)
+		if err != nil {
+			if apiError, ok := err.(gopowerstore.APIError); !ok || !apiError.NotFound() {
+				return nil, status.Errorf(codes.NotFound, "failed to find nfs export for filesystem with error: %v", err.Error())
 			}
+			resp := &csi.NodeGetVolumeStatsResponse{
+				VolumeCondition: &csi.VolumeCondition{
+					Abnormal: true,
+					Message:  fmt.Sprintf("NFS export for volume %s is not found", id),
+				},
+			}
+			return resp, nil
+		}
+		// get hosts publish to export
+		hosts := append(nfsExport.ROHosts, nfsExport.RORootHosts...)
+		hosts = append(hosts, nfsExport.RWHosts...)
+		hosts = append(hosts, nfsExport.RWRootHosts...)
+		attached := false
+		for _, host := range hosts {
+			if s.nodeID == host {
+				attached = true
+			}
+		}
+		if !attached {
+			resp := &csi.NodeGetVolumeStatsResponse{
+				VolumeCondition: &csi.VolumeCondition{
+					Abnormal: true,
+					Message:  fmt.Sprintf("host %s is not attached to NFS export for filesystem %s", s.nodeID, id),
+				},
+			}
+			return resp, nil
 		}
 	} else {
 		_, err := arr.Client.GetVolume(ctx, id)
@@ -536,36 +534,34 @@ func (s *Service) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolume
 				},
 			}
 			return resp, nil
-		} else {
-			// get hosts published to volume
-			hostMappings, err := s.Arrays()[arrayID].Client.GetHostVolumeMappingByVolumeID(ctx, id)
+		}
+		// get hosts published to volume
+		hostMappings, err := s.Arrays()[arrayID].Client.GetHostVolumeMappingByVolumeID(ctx, id)
+		if err != nil {
+			return nil, status.Errorf(codes.NotFound, "failed to get host volume mapping for volume: %s with error: %v", id, err.Error())
+		}
+		for _, hostMapping := range hostMappings {
+			host, err := s.Arrays()[arrayID].Client.GetHost(ctx, hostMapping.HostID)
 			if err != nil {
-				return nil, status.Errorf(codes.NotFound, "failed to get host volume mapping for volume: %s with error: %v", id, err.Error())
-			}
-			for _, hostMapping := range hostMappings {
-				host, err := s.Arrays()[arrayID].Client.GetHost(ctx, hostMapping.HostID)
-				if err != nil {
-					if apiError, ok := err.(gopowerstore.APIError); !ok || !apiError.NotFound() {
-						return nil, status.Errorf(codes.NotFound, "failed to get host: %s with error: %v", hostMapping.HostID, err.Error())
-					}
-					resp := &csi.NodeGetVolumeStatsResponse{
-						VolumeCondition: &csi.VolumeCondition{
-							Abnormal: true,
-							Message:  fmt.Sprintf("host %s is not attached to volume %s", s.nodeID, id),
-						},
-					}
-					return resp, nil
-				} else {
-					if host.Name != s.nodeID {
-						resp := &csi.NodeGetVolumeStatsResponse{
-							VolumeCondition: &csi.VolumeCondition{
-								Abnormal: true,
-								Message:  fmt.Sprintf("host %s is not attached to volume %s", s.nodeID, id),
-							},
-						}
-						return resp, nil
-					}
+				if apiError, ok := err.(gopowerstore.APIError); !ok || !apiError.NotFound() {
+					return nil, status.Errorf(codes.NotFound, "failed to get host: %s with error: %v", hostMapping.HostID, err.Error())
 				}
+				resp := &csi.NodeGetVolumeStatsResponse{
+					VolumeCondition: &csi.VolumeCondition{
+						Abnormal: true,
+						Message:  fmt.Sprintf("host %s is not attached to volume %s", s.nodeID, id),
+					},
+				}
+				return resp, nil
+			}
+			if host.Name != s.nodeID {
+				resp := &csi.NodeGetVolumeStatsResponse{
+					VolumeCondition: &csi.VolumeCondition{
+						Abnormal: true,
+						Message:  fmt.Sprintf("host %s is not attached to volume %s", s.nodeID, id),
+					},
+				}
+				return resp, nil
 			}
 		}
 	}
