@@ -37,11 +37,12 @@ type VolumePublisher interface {
 // SCSIPublisher implementation of NodeVolumePublisher for SCSI based (FC, iSCSI) volumes
 type SCSIPublisher struct {
 	isBlock bool
+	wwn     string
 }
 
 // Publish publishes volume as either raw block or mount by mounting it to the target path
 func (sp *SCSIPublisher) Publish(ctx context.Context, logFields log.Fields, fs fs.Interface, cap *csi.VolumeCapability, isRO bool, targetPath string, stagingPath string, chroot string) (*csi.NodePublishVolumeResponse, error) {
-	published, err := isAlreadyPublished(ctx, targetPath, stagingPath, getRWModeString(isRO), fs, cap, chroot)
+	published, err := isAlreadyPublished(ctx, targetPath, stagingPath, getRWModeString(isRO), fs, cap, chroot, sp.wwn)
 	if err != nil {
 		return nil, err
 	}
@@ -147,7 +148,7 @@ type NFSPublisher struct {
 // Publish publishes nfs volume by mounting it to the target path
 func (np *NFSPublisher) Publish(ctx context.Context, logFields log.Fields, fs fs.Interface,
 	cap *csi.VolumeCapability, isRO bool, targetPath string, stagingPath string, chroot string) (*csi.NodePublishVolumeResponse, error) {
-	published, err := isAlreadyPublished(ctx, targetPath, stagingPath, getRWModeString(isRO), fs, cap, chroot)
+	published, err := isAlreadyPublished(ctx, targetPath, stagingPath, getRWModeString(isRO), fs, cap, chroot, "passexporthere")
 	if err != nil {
 		return nil, err
 	}

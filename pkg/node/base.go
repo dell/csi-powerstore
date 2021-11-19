@@ -23,10 +23,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net"
+	"os"
 	"path"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-powerstore/pkg/common"
@@ -52,7 +55,15 @@ const (
 	ephemeralStagingMountPath = "/var/lib/kubelet/plugins/kubernetes.io/csi/pv/ephemeral/"
 
 	commonNfsVolumeFolder = "common_folder"
+	ubuntuNodeRoot        = "/noderoot"
 )
+
+// Device is a struct for holding details about a block device
+type Device struct {
+	FullPath string
+	Name     string
+	RealDev  string
+}
 
 // ISCSIConnector is wrapper of gobrcik.ISCSIConnector interface.
 // It allows to connect iSCSI volumes to the node.
@@ -213,18 +224,37 @@ func getTargetMount(ctx context.Context, target string, fs fs.Interface) (gofsut
 	return targetMount, found, nil
 }
 
-func getPublishTargetMount(ctx context.Context, targetPath, stagingPath string, fs fs.Interface, volCap *csi.VolumeCapability, chroot string) (gofsutil.Info, bool, error) {
+func getPublishTargetMount(ctx context.Context, targetPath, stagingPath string, fs fs.Interface, volCap *csi.VolumeCapability, chroot, deviceWwn string) (gofsutil.Info, bool, error) {
 	logFields := common.GetLogFields(ctx)
 	var targetMount gofsutil.Info
 	var found bool
 	accMode := volCap.GetAccessMode()
-	mounts, err := getMounts(ctx, fs)
+
+	symlinkPath, _, err := gofsutil.WWNToDevicePathX(ctx, deviceWwn)
 	if err != nil {
-		log.Error("could not reliably determine existing mount status")
-		return targetMount, false, status.Error(codes.Internal,
-			"could not reliably determine existing mount status")
+		return targetMount, false, status.Errorf(codes.NotFound, "Disk path not found. Error: %s", err.Error())
+
 	}
-	for _, mount := range mounts {
+
+	// make sure device is valid
+	sysDevice, err := GetDevice(ctx, symlinkPath)
+	if err != nil {
+		return targetMount, false, status.Errorf(codes.Internal, fmt.Sprintf("error getting block device for volume: %s, err: %s", id, err.Error()))
+	}
+
+	// Check if target is not mounted
+	devMnts, err := getDevMounts(ctx, sysDevice)
+	if err != nil {
+		return targetMount, false, status.Errorf(codes.NotFound, "could not reliably determine existing mount status: %s", err.Error())
+	}
+
+	/*	mounts, err := getMounts(ctx, fs)
+		if err != nil {
+			log.Error("could not reliably determine existing mount status")
+			return targetMount, false, status.Error(codes.Internal,
+				"could not reliably determine existing mount status")
+		}*/
+	for _, mount := range devMnts {
 		if mount.Path == targetPath {
 			targetMount = mount
 			log.WithFields(logFields).Infof("matching targetMount %s target %s",
@@ -233,7 +263,7 @@ func getPublishTargetMount(ctx context.Context, targetPath, stagingPath string, 
 			break
 		} else if mount.Path == stagingPath || mount.Path == chroot+stagingPath {
 			continue
-		} else if accMode.Mode == csi.VolumeCapability_AccessMode_SINGLE_NODE_SINGLE_WRITER && mount.Path != chroot {
+		} else if accMode.Mode == csi.VolumeCapability_AccessMode_SINGLE_NODE_SINGLE_WRITER {
 			log.Error("-------")
 			log.Error(mount.Path)
 			log.Error(mount.Device)
@@ -311,8 +341,8 @@ func isBlock(cap *csi.VolumeCapability) bool {
 	return isBlock
 }
 
-func isAlreadyPublished(ctx context.Context, targetPath, stagingPath, rwMode string, fs fs.Interface, cap *csi.VolumeCapability, chroot string) (bool, error) {
-	mount, found, err := getPublishTargetMount(ctx, targetPath, stagingPath, fs, cap, chroot)
+func isAlreadyPublished(ctx context.Context, targetPath, stagingPath, rwMode string, fs fs.Interface, cap *csi.VolumeCapability, chroot string, deviceWwn string) (bool, error) {
+	mount, found, err := getPublishTargetMount(ctx, targetPath, stagingPath, fs, cap, chroot, deviceWwn)
 	if err != nil {
 		return false, status.Errorf(codes.Internal,
 			"can't check mounts for path %s: %s", targetPath, err.Error())
@@ -372,4 +402,63 @@ func format(ctx context.Context, source, fsType string, fs fs.Interface, opts ..
 	}
 
 	return nil
+}
+
+// GetDevice returns a Device struct with info about the given device, or
+// an error if it doesn't exist or is not a block device
+func GetDevice(ctx context.Context, path string) (*Device, error) {
+	fi, err := os.Lstat(path)
+	if err != nil {
+		return nil, status.Error(codes.Internal, fmt.Sprintf("Could not lstat path: %s ", path))
+	}
+
+	// eval any symlinks and make sure it points to a device
+	d, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		return nil, status.Error(codes.Internal, fmt.Sprintf("Could not evaluate symlinks path: %s ", path))
+	}
+
+	ds, _ := os.Stat(d)
+	dm := ds.Mode()
+
+	if dm&os.ModeDevice == 0 {
+		return nil, status.Error(codes.Internal, fmt.Sprintf("%s is not a block device", path))
+	}
+
+	dev := &Device{
+		Name:     fi.Name(),
+		FullPath: path,
+		RealDev:  strings.Replace(d, "\\", "/", -1),
+	}
+	log.Debugf("Device: %#v", dev)
+	return dev, nil
+}
+
+func getDevMounts(ctx context.Context, sysDevice *Device) ([]gofsutil.Info, error) {
+	devMnts := make([]gofsutil.Info, 0)
+	mnts, err := gofsutil.GetMounts(ctx)
+	if err != nil {
+		return devMnts, err
+	}
+	for _, m := range mnts {
+		if m.Device == sysDevice.RealDev || m.Device == sysDevice.FullPath || (m.Device == "devtmpfs" && m.Source == sysDevice.RealDev) {
+			devMnts = append(devMnts, m)
+		} else if (m.Source == ubuntuNodeRoot+sysDevice.RealDev || m.Source == sysDevice.RealDev) && m.Device == "udev" {
+			devMnts = append(devMnts, m)
+		} else {
+			//Find the multipath device mapper from the device obtained
+			mpDevName := strings.TrimPrefix(sysDevice.RealDev, "/dev/")
+			filename := fmt.Sprintf("/sys/devices/virtual/block/%s/dm/name", mpDevName)
+			if name, err := ioutil.ReadFile(filename); err != nil {
+				log.Warn("Could not read mp dev name file ", filename, err)
+			} else {
+				mpathDev := strings.TrimSpace(string(name))
+				mapperDevice := fmt.Sprintf("/dev/mapper/%s", mpathDev)
+				if m.Source == mapperDevice || m.Device == mapperDevice || m.Path == mapperDevice {
+					devMnts = append(devMnts, m)
+				}
+			}
+		}
+	}
+	return devMnts, nil
 }

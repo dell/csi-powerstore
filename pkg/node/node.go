@@ -352,7 +352,7 @@ func (s *Service) NodePublishVolume(ctx context.Context, req *csi.NodePublishVol
 		return nil, status.Error(codes.InvalidArgument, "stagingPath is required")
 	}
 
-	id, _, protocol, _ := array.ParseVolumeID(ctx, id, s.DefaultArray(), req.VolumeCapability)
+	id, arrayID, protocol, _ := array.ParseVolumeID(ctx, id, s.DefaultArray(), req.VolumeCapability)
 
 	// append additional path to be able to do bind mounts
 	stagingPath := getStagingPath(ctx, req.GetStagingTargetPath(), id)
@@ -370,6 +370,12 @@ func (s *Service) NodePublishVolume(ctx context.Context, req *csi.NodePublishVol
 
 	var publisher VolumePublisher
 
+	arr, ok := s.Arrays()[arrayID]
+	if !ok {
+		log.Info("ip is nil")
+		return nil, status.Error(codes.InvalidArgument, "failed to find array with given ID")
+	}
+
 	if protocol == "nfs" {
 		if s.fileExists(filepath.Join(stagingPath, commonNfsVolumeFolder)) {
 			// Assume root squashing is enabled
@@ -378,8 +384,16 @@ func (s *Service) NodePublishVolume(ctx context.Context, req *csi.NodePublishVol
 
 		publisher = &NFSPublisher{}
 	} else {
+		volume, err := arr.GetClient().GetVolume(ctx, id)
+		if err != nil {
+			if apiError, ok := err.(gopowerstore.APIError); ok && apiError.NotFound() {
+				return nil, status.Errorf(codes.NotFound, "volume with ID '%s' not found", id)
+			}
+			return nil, status.Errorf(codes.Internal, "failure checking volume status for volume publishing: %s", err.Error())
+		}
 		publisher = &SCSIPublisher{
 			isBlock: isBlock(req.VolumeCapability),
+			wwn:     volume.wwn,
 		}
 	}
 
