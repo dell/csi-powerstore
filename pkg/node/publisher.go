@@ -31,7 +31,7 @@ import (
 // VolumePublisher allows to node publish a volume
 type VolumePublisher interface {
 	Publish(ctx context.Context, logFields log.Fields, fs fs.Interface,
-		cap *csi.VolumeCapability, isRO bool, targetPath string, stagingPath string) (*csi.NodePublishVolumeResponse, error)
+		cap *csi.VolumeCapability, isRO bool, targetPath string, stagingPath string, chroot string) (*csi.NodePublishVolumeResponse, error)
 }
 
 // SCSIPublisher implementation of NodeVolumePublisher for SCSI based (FC, iSCSI) volumes
@@ -40,8 +40,8 @@ type SCSIPublisher struct {
 }
 
 // Publish publishes volume as either raw block or mount by mounting it to the target path
-func (sp *SCSIPublisher) Publish(ctx context.Context, logFields log.Fields, fs fs.Interface, cap *csi.VolumeCapability, isRO bool, targetPath string, stagingPath string) (*csi.NodePublishVolumeResponse, error) {
-	published, err := isAlreadyPublished(ctx, targetPath, stagingPath, getRWModeString(isRO), fs, cap)
+func (sp *SCSIPublisher) Publish(ctx context.Context, logFields log.Fields, fs fs.Interface, cap *csi.VolumeCapability, isRO bool, targetPath string, stagingPath string, chroot string) (*csi.NodePublishVolumeResponse, error) {
+	published, err := isAlreadyPublished(ctx, targetPath, stagingPath, getRWModeString(isRO), fs, cap, chroot)
 	if err != nil {
 		return nil, err
 	}
@@ -146,8 +146,8 @@ type NFSPublisher struct {
 
 // Publish publishes nfs volume by mounting it to the target path
 func (np *NFSPublisher) Publish(ctx context.Context, logFields log.Fields, fs fs.Interface,
-	cap *csi.VolumeCapability, isRO bool, targetPath string, stagingPath string) (*csi.NodePublishVolumeResponse, error) {
-	published, err := isAlreadyPublished(ctx, targetPath, stagingPath, getRWModeString(isRO), fs, cap)
+	cap *csi.VolumeCapability, isRO bool, targetPath string, stagingPath string, chroot string) (*csi.NodePublishVolumeResponse, error) {
+	published, err := isAlreadyPublished(ctx, targetPath, stagingPath, getRWModeString(isRO), fs, cap, chroot)
 	if err != nil {
 		return nil, err
 	}

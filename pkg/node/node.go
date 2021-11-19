@@ -383,7 +383,7 @@ func (s *Service) NodePublishVolume(ctx context.Context, req *csi.NodePublishVol
 		}
 	}
 
-	return publisher.Publish(ctx, logFields, s.Fs, volumeCapability, isRO, targetPath, stagingPath)
+	return publisher.Publish(ctx, logFields, s.Fs, volumeCapability, isRO, targetPath, stagingPath, s.opts.NodeChrootPath)
 }
 
 // NodeUnpublishVolume unpublishes volume from the node by unmounting it from the target path

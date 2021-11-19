@@ -213,7 +213,7 @@ func getTargetMount(ctx context.Context, target string, fs fs.Interface) (gofsut
 	return targetMount, found, nil
 }
 
-func getPublishTargetMount(ctx context.Context, targetPath, stagingPath string, fs fs.Interface, volCap *csi.VolumeCapability) (gofsutil.Info, bool, error) {
+func getPublishTargetMount(ctx context.Context, targetPath, stagingPath string, fs fs.Interface, volCap *csi.VolumeCapability, chroot string) (gofsutil.Info, bool, error) {
 	logFields := common.GetLogFields(ctx)
 	var targetMount gofsutil.Info
 	var found bool
@@ -231,7 +231,7 @@ func getPublishTargetMount(ctx context.Context, targetPath, stagingPath string, 
 				targetPath, mount.Path)
 			found = true
 			break
-		} else if mount.Path == stagingPath || mount.Path == opts.NodeChrootPath+stagingPath {
+		} else if mount.Path == stagingPath || mount.Path == chroot+stagingPath {
 			continue
 		} else if accMode.Mode == csi.VolumeCapability_AccessMode_SINGLE_NODE_SINGLE_WRITER {
 			log.Error("-------")
@@ -311,8 +311,8 @@ func isBlock(cap *csi.VolumeCapability) bool {
 	return isBlock
 }
 
-func isAlreadyPublished(ctx context.Context, targetPath, stagingPath, rwMode string, fs fs.Interface, cap *csi.VolumeCapability) (bool, error) {
-	mount, found, err := getPublishTargetMount(ctx, targetPath, stagingPath, fs, cap)
+func isAlreadyPublished(ctx context.Context, targetPath, stagingPath, rwMode string, fs fs.Interface, cap *csi.VolumeCapability, chroot string) (bool, error) {
+	mount, found, err := getPublishTargetMount(ctx, targetPath, stagingPath, fs, cap, chroot)
 	if err != nil {
 		return false, status.Errorf(codes.Internal,
 			"can't check mounts for path %s: %s", targetPath, err.Error())
