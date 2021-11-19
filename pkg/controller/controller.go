@@ -61,6 +61,7 @@ type Service struct {
 
 	replicationContextPrefix string
 	replicationPrefix        string
+	isHealthMonitorEnabled   bool
 }
 
 // Init is a method that initializes internal variables of controller service
@@ -76,6 +77,10 @@ func (s *Service) Init() error {
 
 	if replicationPrefix, ok := csictx.LookupEnv(ctx, common.EnvReplicationPrefix); ok {
 		s.replicationPrefix = replicationPrefix
+	}
+
+	if isHealthMonitorEnabled, ok := csictx.LookupEnv(ctx, common.EnvIsHealthMonitorEnabled); ok {
+		s.isHealthMonitorEnabled, _ = strconv.ParseBool(isHealthMonitorEnabled)
 	}
 
 	return nil
@@ -769,11 +774,18 @@ func (s *Service) ControllerGetCapabilities(ctx context.Context, request *csi.Co
 		csi.ControllerServiceCapability_RPC_LIST_SNAPSHOTS,
 		csi.ControllerServiceCapability_RPC_CLONE_VOLUME,
 		csi.ControllerServiceCapability_RPC_EXPAND_VOLUME,
-		csi.ControllerServiceCapability_RPC_GET_VOLUME,
-		csi.ControllerServiceCapability_RPC_LIST_VOLUMES_PUBLISHED_NODES,
-		csi.ControllerServiceCapability_RPC_VOLUME_CONDITION,
 	} {
 		capabilities = append(capabilities, newCap(capability))
+	}
+
+	if s.isHealthMonitorEnabled {
+		for _, capability := range []csi.ControllerServiceCapability_RPC_Type{
+			csi.ControllerServiceCapability_RPC_GET_VOLUME,
+			csi.ControllerServiceCapability_RPC_LIST_VOLUMES_PUBLISHED_NODES,
+			csi.ControllerServiceCapability_RPC_VOLUME_CONDITION,
+		} {
+			capabilities = append(capabilities, newCap(capability))
+		}
 	}
 
 	return &csi.ControllerGetCapabilitiesResponse{
@@ -1058,14 +1070,17 @@ func (s *Service) ControllerGetVolume(ctx context.Context, req *csi.ControllerGe
 			for _, hostMapping := range hostMappings {
 				host, err := s.Arrays()[arrayID].Client.GetHost(ctx, hostMapping.HostID)
 				if err != nil {
-					return nil, status.Errorf(codes.NotFound, "failed to get host: %s with error: %v", hostMapping.HostID, err.Error())
+					if apiError, ok := err.(gopowerstore.APIError); !ok || !apiError.NotFound() {
+						return nil, status.Errorf(codes.NotFound, "failed to get host: %s with error: %v", hostMapping.HostID, err.Error())
+					}
+				} else {
+					hosts = append(hosts, host.Name)
 				}
-				hosts = append(hosts, host.Name)
 			}
 			// check if volume is in ready state
 			if vol.State != gopowerstore.VolumeStateEnumReady {
 				abnormal = true
-				message = fmt.Sprintf("Volume is in %s state", string(vol.State))
+				message = fmt.Sprintf("Volume %s is in %s state", id, string(vol.State))
 			}
 		}
 	}
