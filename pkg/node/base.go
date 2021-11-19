@@ -233,7 +233,7 @@ func getPublishTargetMount(ctx context.Context, targetPath, stagingPath string, 
 			break
 		} else if mount.Path == stagingPath || mount.Path == chroot+stagingPath {
 			continue
-		} else if accMode.Mode == csi.VolumeCapability_AccessMode_SINGLE_NODE_SINGLE_WRITER {
+		} else if accMode.Mode == csi.VolumeCapability_AccessMode_SINGLE_NODE_SINGLE_WRITER && mount.Path != chroot {
 			log.Error("-------")
 			log.Error(mount.Path)
 			log.Error(mount.Device)
