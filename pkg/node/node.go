@@ -393,7 +393,7 @@ func (s *Service) NodePublishVolume(ctx context.Context, req *csi.NodePublishVol
 		}
 		publisher = &SCSIPublisher{
 			isBlock: isBlock(req.VolumeCapability),
-			wwn:     volume.Wwn,
+			wwn:     strings.TrimPrefix(volume.Wwn, common.WWNPrefix),
 		}
 	}
 
