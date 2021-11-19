@@ -460,6 +460,11 @@ func (s *Service) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolume
 		return nil, status.Error(codes.InvalidArgument, "no volume Path provided")
 	}
 
+	stagingPath := req.GetStagingTargetPath()
+	if len(stagingPath) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "no staging Path provided")
+	}
+
 	// parse volume Id
 	id, arrayID, protocol, err := array.ParseVolumeID(ctx, volumeID, s.DefaultArray(), nil)
 	if err != nil {
@@ -476,7 +481,7 @@ func (s *Service) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolume
 
 	// Validate if volume exists
 	if protocol == "nfs" {
-		_, err = arr.Client.GetFS(ctx, id)
+		fs, err := arr.Client.GetFS(ctx, id)
 		if err != nil {
 			if apiError, ok := err.(gopowerstore.APIError); !ok || !apiError.NotFound() {
 				return nil, status.Errorf(codes.NotFound, "failed to find filesystem %s with error: %v", id, err.Error())
@@ -488,6 +493,40 @@ func (s *Service) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolume
 				},
 			}
 			return resp, nil
+		} else {
+			nfsExport, err := s.Arrays()[arrayID].Client.GetNFSExportByFileSystemID(ctx, fs.ID)
+			if err != nil {
+				if apiError, ok := err.(gopowerstore.APIError); !ok || !apiError.NotFound() {
+					return nil, status.Errorf(codes.NotFound, "failed to find nfs export for filesystem with error: %v", err.Error())
+				}
+				resp := &csi.NodeGetVolumeStatsResponse{
+					VolumeCondition: &csi.VolumeCondition{
+						Abnormal: true,
+						Message:  fmt.Sprintf("NFS export for volume %s is not found", id),
+					},
+				}
+				return resp, nil
+			} else {
+				// get hosts publish to export
+				hosts := append(nfsExport.ROHosts, nfsExport.RORootHosts...)
+				hosts = append(hosts, nfsExport.RWHosts...)
+				hosts = append(hosts, nfsExport.RWRootHosts...)
+				attached := false
+				for _, host := range hosts {
+					if s.nodeID == host {
+						attached = true
+					}
+				}
+				if !attached {
+					resp := &csi.NodeGetVolumeStatsResponse{
+						VolumeCondition: &csi.VolumeCondition{
+							Abnormal: true,
+							Message:  fmt.Sprintf("host %s is not attached to NFS export for filesystem %s", s.nodeID, id),
+						},
+					}
+					return resp, nil
+				}
+			}
 		}
 	} else {
 		_, err := arr.Client.GetVolume(ctx, id)
@@ -502,11 +541,42 @@ func (s *Service) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolume
 				},
 			}
 			return resp, nil
+		} else {
+			// get hosts published to volume
+			hostMappings, err := s.Arrays()[arrayID].Client.GetHostVolumeMappingByVolumeID(ctx, id)
+			if err != nil {
+				return nil, status.Errorf(codes.NotFound, "failed to get host volume mapping for volume: %s with error: %v", id, err.Error())
+			}
+			for _, hostMapping := range hostMappings {
+				host, err := s.Arrays()[arrayID].Client.GetHost(ctx, hostMapping.HostID)
+				if err != nil {
+					if apiError, ok := err.(gopowerstore.APIError); !ok || !apiError.NotFound() {
+						return nil, status.Errorf(codes.NotFound, "failed to get host: %s with error: %v", hostMapping.HostID, err.Error())
+					}
+					resp := &csi.NodeGetVolumeStatsResponse{
+						VolumeCondition: &csi.VolumeCondition{
+							Abnormal: true,
+							Message:  fmt.Sprintf("host %s is not attached to volume %s", s.nodeID, id),
+						},
+					}
+					return resp, nil
+				} else {
+					if host.Name != s.nodeID {
+						resp := &csi.NodeGetVolumeStatsResponse{
+							VolumeCondition: &csi.VolumeCondition{
+								Abnormal: true,
+								Message:  fmt.Sprintf("host %s is not attached to volume %s", s.nodeID, id),
+							},
+						}
+						return resp, nil
+					}
+				}
+			}
 		}
 	}
 
-	// Check if target path is mounted
-	_, found, err := getTargetMount(ctx, volumePath, s.Fs)
+	// Check if staging target path is mounted
+	_, found, err := getTargetMount(ctx, stagingPath, s.Fs)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "can't check mounts for path %s: %s", volumePath, err.Error())
 	}
@@ -514,7 +584,22 @@ func (s *Service) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolume
 		resp := &csi.NodeGetVolumeStatsResponse{
 			VolumeCondition: &csi.VolumeCondition{
 				Abnormal: true,
-				Message:  "volume path not mounted",
+				Message:  fmt.Sprintf("staging target path %s not mounted for volume %s", stagingPath, id),
+			},
+		}
+		return resp, nil
+	}
+
+	// Check if target path is mounted
+	_, found, err = getTargetMount(ctx, volumePath, s.Fs)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "can't check mounts for path %s: %s", volumePath, err.Error())
+	}
+	if !found {
+		resp := &csi.NodeGetVolumeStatsResponse{
+			VolumeCondition: &csi.VolumeCondition{
+				Abnormal: true,
+				Message:  fmt.Sprintf("volume path %s not mounted for volume %s", volumePath, id),
 			},
 		}
 		return resp, nil
@@ -526,7 +611,7 @@ func (s *Service) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolume
 		resp := &csi.NodeGetVolumeStatsResponse{
 			VolumeCondition: &csi.VolumeCondition{
 				Abnormal: true,
-				Message:  "volume path not accessible",
+				Message:  fmt.Sprintf("volume path %s not accessible for volume %s", volumePath, id),
 			},
 		}
 		return resp, nil

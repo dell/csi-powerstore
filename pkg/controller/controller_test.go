@@ -2825,8 +2825,10 @@ var _ = Describe("CSIControllerService", func() {
 	})
 
 	Describe("calling ControllerGetCapabilities()", func() {
-		When("plugin functions correctly", func() {
+		When("plugin functions correctly with health monitor capabilities", func() {
 			It("should return supported capabilities", func() {
+				csictx.Setenv(context.Background(), common.EnvIsHealthMonitorEnabled, "true")
+				ctrlSvc.Init()
 				res, err := ctrlSvc.ControllerGetCapabilities(context.Background(), &csi.ControllerGetCapabilitiesRequest{})
 				Expect(err).To(BeNil())
 				Expect(res).To(Equal(&csi.ControllerGetCapabilitiesResponse{
@@ -2898,6 +2900,67 @@ var _ = Describe("CSIControllerService", func() {
 							Type: &csi.ControllerServiceCapability_Rpc{
 								Rpc: &csi.ControllerServiceCapability_RPC{
 									Type: csi.ControllerServiceCapability_RPC_VOLUME_CONDITION,
+								},
+							},
+						},
+					},
+				}))
+			})
+		})
+		When("plugin functions correctly without health monitor capabilities", func() {
+			It("should return supported capabilities", func() {
+				csictx.Setenv(context.Background(), common.EnvIsHealthMonitorEnabled, "false")
+				ctrlSvc.Init()
+				res, err := ctrlSvc.ControllerGetCapabilities(context.Background(), &csi.ControllerGetCapabilitiesRequest{})
+				Expect(err).To(BeNil())
+				Expect(res).To(Equal(&csi.ControllerGetCapabilitiesResponse{
+					Capabilities: []*csi.ControllerServiceCapability{
+						{
+							Type: &csi.ControllerServiceCapability_Rpc{
+								Rpc: &csi.ControllerServiceCapability_RPC{
+									Type: csi.ControllerServiceCapability_RPC_CREATE_DELETE_VOLUME,
+								},
+							},
+						},
+						{
+							Type: &csi.ControllerServiceCapability_Rpc{
+								Rpc: &csi.ControllerServiceCapability_RPC{
+									Type: csi.ControllerServiceCapability_RPC_PUBLISH_UNPUBLISH_VOLUME,
+								},
+							},
+						},
+						{
+							Type: &csi.ControllerServiceCapability_Rpc{
+								Rpc: &csi.ControllerServiceCapability_RPC{
+									Type: csi.ControllerServiceCapability_RPC_GET_CAPACITY,
+								},
+							},
+						},
+						{
+							Type: &csi.ControllerServiceCapability_Rpc{
+								Rpc: &csi.ControllerServiceCapability_RPC{
+									Type: csi.ControllerServiceCapability_RPC_CREATE_DELETE_SNAPSHOT,
+								},
+							},
+						},
+						{
+							Type: &csi.ControllerServiceCapability_Rpc{
+								Rpc: &csi.ControllerServiceCapability_RPC{
+									Type: csi.ControllerServiceCapability_RPC_LIST_SNAPSHOTS,
+								},
+							},
+						},
+						{
+							Type: &csi.ControllerServiceCapability_Rpc{
+								Rpc: &csi.ControllerServiceCapability_RPC{
+									Type: csi.ControllerServiceCapability_RPC_CLONE_VOLUME,
+								},
+							},
+						},
+						{
+							Type: &csi.ControllerServiceCapability_Rpc{
+								Rpc: &csi.ControllerServiceCapability_RPC{
+									Type: csi.ControllerServiceCapability_RPC_EXPAND_VOLUME,
 								},
 							},
 						},
