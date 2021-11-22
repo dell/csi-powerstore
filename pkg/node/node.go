@@ -547,6 +547,7 @@ func (s *Service) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolume
 		if err != nil {
 			return nil, status.Errorf(codes.NotFound, "failed to get host volume mapping for volume: %s with error: %v", id, err.Error())
 		}
+		hostMapped := false
 		for _, hostMapping := range hostMappings {
 			host, err := s.Arrays()[arrayID].Client.GetHost(ctx, hostMapping.HostID)
 			if err != nil {
@@ -562,20 +563,14 @@ func (s *Service) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolume
 				return resp, nil
 			}
 
-			if host.Name != s.nodeID {
-				resp := &csi.NodeGetVolumeStatsResponse{
-					VolumeCondition: &csi.VolumeCondition{
-						Abnormal: true,
-						Message:  fmt.Sprintf("host %s is not attached to volume %s", s.nodeID, id),
-					},
-				}
-				return resp, nil
+			if host.Name == s.nodeID {
+				hostMapped = true
 			}
 
 			iscsiConnection := false
 			for _, initiator := range host.Initiators {
 				if len(initiator.ActiveSessions) > 0 {
-					iscsiConnection = false
+					iscsiConnection = true
 				}
 			}
 			if !iscsiConnection {
@@ -587,6 +582,15 @@ func (s *Service) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolume
 				}
 				return resp, nil
 			}
+		}
+		if !hostMapped {
+			resp := &csi.NodeGetVolumeStatsResponse{
+				VolumeCondition: &csi.VolumeCondition{
+					Abnormal: true,
+					Message:  fmt.Sprintf("host %s is not attached to volume %s", s.nodeID, id),
+				},
+			}
+			return resp, nil
 		}
 	}
 
