@@ -21,6 +21,7 @@ RUN microdnf update -y \
 	nfs-utils \
 	which \
 	device-mapper-multipath \
+	python39-pyyaml\
 	&& \
 	microdnf clean all
 
