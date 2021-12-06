@@ -103,7 +103,7 @@ func main() {
 
 	gitdesc := chkErr(doExec("git", "describe", "--long", "--dirty"))
 	rx := regexp.MustCompile(
-		`^[^\d]*(\d+)\.(\d+)\.(\d+)\-?(?:(-?[a-zA-Z]+))?(?:-(\d+)-g(.+?)(?:-(dirty))?)?\s*$`)
+		`^[^\d]*(\d+)\.(\d+)\.(\d+)(?:-([a-zA-Z].+?))?(?:-(\d+)-g(.+?)(?:-(dirty))?)?\s*$`)
 	m := rx.FindStringSubmatch(gitdesc)
 	if len(m) == 0 {
 		fmt.Fprintf(os.Stderr, "error: match git describe failed: %s\n", gitdesc)
