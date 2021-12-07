@@ -233,6 +233,8 @@ spec:
               mountPath: /powerstore-config-params
         {{- end }}
         {{- end }}
+        {{- if hasKey .Values.controller "healthMonitor" }}
+        {{- if eq .Values.controller.healthMonitor.enabled true}}
         - name: csi-external-health-monitor-controller
           image: {{ required "Must provide the CSI external health monitor controller image." .Values.images.externalhealthmonitorcontroller}}
           imagePullPolicy: {{ .Values.imagePullPolicy }}
@@ -242,7 +244,7 @@ spec:
             - "--leader-election"
             - "--http-endpoint=:8080"
             - "--enable-node-watcher=true"
-            - "--monitor-interval={{ .Values.volumeHealthMonitorInterval | default "60s" }}"
+            - "--monitor-interval={{ .Values.controller.healthMonitor.volumeHealthMonitorInterval | default "60s" }}"
             - "--timeout=180s"
           env:
             - name: ADDRESS
@@ -250,6 +252,8 @@ spec:
           volumeMounts:
             - name: socket-dir
               mountPath: /var/run/csi
+        {{- end }}
+        {{- end }}
         - name: driver
           image: {{ required "Must provide the PowerStore driver container image." .Values.images.driver }}
           imagePullPolicy: {{ .Values.imagePullPolicy }}
@@ -278,6 +282,12 @@ spec:
               value: {{ .Values.controller.replication.replicationContextPrefix | default "powerstore"}}
             - name: X_CSI_REPLICATION_PREFIX
               value: {{ .Values.controller.replication.replicationPrefix | default "replication.storage.dell.com"}}
+            {{- end }}
+            {{- end }}
+            {{- if hasKey .Values.controller "healthMonitor" }}
+            {{- if eq .Values.controller.healthMonitor.enabled true}}
+            - name: X_CSI_HEALTH_MONITOR_ENABLED
+              value: "{{ .Values.controller.healthMonitor.enabled }}"
             {{- end }}
             {{- end }}
             - name: GOPOWERSTORE_DEBUG

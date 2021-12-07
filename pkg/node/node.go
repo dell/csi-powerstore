@@ -37,6 +37,7 @@ import (
 	"github.com/dell/csi-powerstore/pkg/common/fs"
 	"github.com/dell/csi-powerstore/pkg/controller"
 	"github.com/dell/gobrick"
+	csictx "github.com/dell/gocsi/context"
 	"github.com/dell/gofsutil"
 	"github.com/dell/goiscsi"
 	"github.com/dell/gopowerstore"
@@ -72,9 +73,10 @@ type Service struct {
 	opts   Opts
 	nodeID string
 
-	useFC       bool
-	initialized bool
-	reusedHost  bool
+	useFC                  bool
+	initialized            bool
+	reusedHost             bool
+	isHealthMonitorEnabled bool
 
 	array.Locker
 }
@@ -82,6 +84,7 @@ type Service struct {
 // Init initializes node service by parsing environmental variables, connecting it as a host.
 // Will init ISCSIConnector, FcConnector and ControllerService if they are nil.
 func (s *Service) Init() error {
+	ctx := context.Background()
 	s.opts = getNodeOptions()
 
 	s.initConnectors()
@@ -133,6 +136,10 @@ func (s *Service) Init() error {
 		if err != nil {
 			log.Errorf("can't setup host on %s: %s", arr.Endpoint, err.Error())
 		}
+	}
+
+	if isHealthMonitorEnabled, ok := csictx.LookupEnv(ctx, common.EnvIsHealthMonitorEnabled); ok {
+		s.isHealthMonitorEnabled, _ = strconv.ParseBool(isHealthMonitorEnabled)
 	}
 
 	return nil
@@ -476,7 +483,7 @@ func (s *Service) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolume
 
 	// Validate if volume exists
 	if protocol == "nfs" {
-		_, err = arr.Client.GetFS(ctx, id)
+		fs, err := arr.Client.GetFS(ctx, id)
 		if err != nil {
 			if apiError, ok := err.(gopowerstore.APIError); !ok || !apiError.NotFound() {
 				return nil, status.Errorf(codes.NotFound, "failed to find filesystem %s with error: %v", id, err.Error())
@@ -485,6 +492,38 @@ func (s *Service) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolume
 				VolumeCondition: &csi.VolumeCondition{
 					Abnormal: true,
 					Message:  fmt.Sprintf("Filesystem %s is not found", id),
+				},
+			}
+			return resp, nil
+		}
+		nfsExport, err := s.Arrays()[arrayID].Client.GetNFSExportByFileSystemID(ctx, fs.ID)
+		if err != nil {
+			if apiError, ok := err.(gopowerstore.APIError); !ok || !apiError.NotFound() {
+				return nil, status.Errorf(codes.NotFound, "failed to find nfs export for filesystem with error: %v", err.Error())
+			}
+			resp := &csi.NodeGetVolumeStatsResponse{
+				VolumeCondition: &csi.VolumeCondition{
+					Abnormal: true,
+					Message:  fmt.Sprintf("NFS export for volume %s is not found", id),
+				},
+			}
+			return resp, nil
+		}
+		// get hosts publish to export
+		hosts := append(nfsExport.ROHosts, nfsExport.RORootHosts...)
+		hosts = append(hosts, nfsExport.RWHosts...)
+		hosts = append(hosts, nfsExport.RWRootHosts...)
+		attached := false
+		for _, host := range hosts {
+			if s.nodeID == host {
+				attached = true
+			}
+		}
+		if !attached {
+			resp := &csi.NodeGetVolumeStatsResponse{
+				VolumeCondition: &csi.VolumeCondition{
+					Abnormal: true,
+					Message:  fmt.Sprintf("host %s is not attached to NFS export for filesystem %s", s.nodeID, id),
 				},
 			}
 			return resp, nil
@@ -503,6 +542,74 @@ func (s *Service) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolume
 			}
 			return resp, nil
 		}
+		// get hosts published to volume
+		hostMappings, err := s.Arrays()[arrayID].Client.GetHostVolumeMappingByVolumeID(ctx, id)
+		if err != nil {
+			return nil, status.Errorf(codes.NotFound, "failed to get host volume mapping for volume: %s with error: %v", id, err.Error())
+		}
+		hostMapped := false
+		for _, hostMapping := range hostMappings {
+			host, err := s.Arrays()[arrayID].Client.GetHost(ctx, hostMapping.HostID)
+			if err != nil {
+				if apiError, ok := err.(gopowerstore.APIError); !ok || !apiError.NotFound() {
+					return nil, status.Errorf(codes.NotFound, "failed to get host: %s with error: %v", hostMapping.HostID, err.Error())
+				}
+				resp := &csi.NodeGetVolumeStatsResponse{
+					VolumeCondition: &csi.VolumeCondition{
+						Abnormal: true,
+						Message:  fmt.Sprintf("host %s is not attached to volume %s", s.nodeID, id),
+					},
+				}
+				return resp, nil
+			}
+
+			if host.Name == s.nodeID {
+				hostMapped = true
+			}
+
+			iscsiConnection := false
+			for _, initiator := range host.Initiators {
+				if len(initiator.ActiveSessions) > 0 {
+					iscsiConnection = true
+				}
+			}
+			if !iscsiConnection {
+				resp := &csi.NodeGetVolumeStatsResponse{
+					VolumeCondition: &csi.VolumeCondition{
+						Abnormal: true,
+						Message:  fmt.Sprintf("host %s has no active initiator connection", s.nodeID),
+					},
+				}
+				return resp, nil
+			}
+		}
+		if !hostMapped {
+			resp := &csi.NodeGetVolumeStatsResponse{
+				VolumeCondition: &csi.VolumeCondition{
+					Abnormal: true,
+					Message:  fmt.Sprintf("host %s is not attached to volume %s", s.nodeID, id),
+				},
+			}
+			return resp, nil
+		}
+	}
+
+	stagingPath := req.GetStagingTargetPath()
+	if len(stagingPath) != 0 {
+		// Check if staging target path is mounted
+		_, found, err := getTargetMount(ctx, stagingPath, s.Fs)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "can't check mounts for path %s: %s", volumePath, err.Error())
+		}
+		if !found {
+			resp := &csi.NodeGetVolumeStatsResponse{
+				VolumeCondition: &csi.VolumeCondition{
+					Abnormal: true,
+					Message:  fmt.Sprintf("staging target path %s not mounted for volume %s", stagingPath, id),
+				},
+			}
+			return resp, nil
+		}
 	}
 
 	// Check if target path is mounted
@@ -514,7 +621,7 @@ func (s *Service) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolume
 		resp := &csi.NodeGetVolumeStatsResponse{
 			VolumeCondition: &csi.VolumeCondition{
 				Abnormal: true,
-				Message:  "volume path not mounted",
+				Message:  fmt.Sprintf("volume path %s not mounted for volume %s", volumePath, id),
 			},
 		}
 		return resp, nil
@@ -526,7 +633,7 @@ func (s *Service) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolume
 		resp := &csi.NodeGetVolumeStatsResponse{
 			VolumeCondition: &csi.VolumeCondition{
 				Abnormal: true,
-				Message:  "volume path not accessible",
+				Message:  fmt.Sprintf("volume path %s not accessible for volume %s", volumePath, id),
 			},
 		}
 		return resp, nil
@@ -788,36 +895,35 @@ func (s *Service) nodeExpandRawBlockVolume(ctx context.Context, volumeWWN string
 
 // NodeGetCapabilities returns supported features by the node service
 func (s *Service) NodeGetCapabilities(context context.Context, request *csi.NodeGetCapabilitiesRequest) (*csi.NodeGetCapabilitiesResponse, error) {
-	return &csi.NodeGetCapabilitiesResponse{
-		Capabilities: []*csi.NodeServiceCapability{
-			{Type: &csi.NodeServiceCapability_Rpc{
+	newCap := func(cap csi.NodeServiceCapability_RPC_Type) *csi.NodeServiceCapability {
+		return &csi.NodeServiceCapability{
+			Type: &csi.NodeServiceCapability_Rpc{
 				Rpc: &csi.NodeServiceCapability_RPC{
-					Type: csi.NodeServiceCapability_RPC_STAGE_UNSTAGE_VOLUME,
+					Type: cap,
 				},
 			},
-			},
-			{
-				Type: &csi.NodeServiceCapability_Rpc{
-					Rpc: &csi.NodeServiceCapability_RPC{
-						Type: csi.NodeServiceCapability_RPC_EXPAND_VOLUME,
-					},
-				},
-			},
-			{
-				Type: &csi.NodeServiceCapability_Rpc{
-					Rpc: &csi.NodeServiceCapability_RPC{
-						Type: csi.NodeServiceCapability_RPC_GET_VOLUME_STATS,
-					},
-				},
-			},
-			{
-				Type: &csi.NodeServiceCapability_Rpc{
-					Rpc: &csi.NodeServiceCapability_RPC{
-						Type: csi.NodeServiceCapability_RPC_VOLUME_CONDITION,
-					},
-				},
-			},
-		},
+		}
+	}
+	var capabilities []*csi.NodeServiceCapability
+	for _, capability := range []csi.NodeServiceCapability_RPC_Type{
+		csi.NodeServiceCapability_RPC_STAGE_UNSTAGE_VOLUME,
+		csi.NodeServiceCapability_RPC_EXPAND_VOLUME,
+		csi.NodeServiceCapability_RPC_SINGLE_NODE_MULTI_WRITER,
+	} {
+		capabilities = append(capabilities, newCap(capability))
+	}
+
+	if s.isHealthMonitorEnabled {
+		for _, capability := range []csi.NodeServiceCapability_RPC_Type{
+			csi.NodeServiceCapability_RPC_GET_VOLUME_STATS,
+			csi.NodeServiceCapability_RPC_VOLUME_CONDITION,
+		} {
+			capabilities = append(capabilities, newCap(capability))
+		}
+	}
+
+	return &csi.NodeGetCapabilitiesResponse{
+		Capabilities: capabilities,
 	}, nil
 }
 
