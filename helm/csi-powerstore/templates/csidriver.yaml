@@ -1,13 +1,9 @@
-{{- if or (eq .Capabilities.KubeVersion.Minor "17") (eq .Capabilities.KubeVersion.Minor "17+")}}
-apiVersion: storage.k8s.io/v1beta1
-{{- else }}
 apiVersion: storage.k8s.io/v1
-{{- end }}
 kind: CSIDriver
 metadata:
   name: {{ .Values.driverName }}
 spec:
   podInfoOnMount: true
-  volumeLifecycleModes: # added in Kubernetes 1.16, this field is beta
+  volumeLifecycleModes:
   - Persistent
   - Ephemeral
