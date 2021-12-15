@@ -1123,6 +1123,7 @@ func (s *Service) ProbeController(ctx context.Context, req *commonext.ProbeContr
 	return rep, nil
 }
 
+// CreateVolumeGroupSnapshot creates snapshots of the volume group
 func (s *Service) CreateVolumeGroupSnapshot(ctx context.Context, request *vgsext.CreateVolumeGroupSnapshotRequest) (*vgsext.CreateVolumeGroupSnapshotResponse, error) {
 	panic("implement me")
 }
