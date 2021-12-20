@@ -1,9 +1,8 @@
 module github.com/dell/csi-powerstore
 
-go 1.16
+go 1.17
 
 require (
-	github.com/HdrHistogram/hdrhistogram-go v1.0.1 // indirect
 	github.com/akutz/gosync v0.1.0
 	github.com/container-storage-interface/spec v1.5.0
 	github.com/dell/dell-csi-extensions/common v1.0.0
@@ -31,6 +30,10 @@ require (
 	google.golang.org/grpc v1.42.0
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
 	k8s.io/kubernetes v1.21.5
+)
+
+require (
+	github.com/HdrHistogram/hdrhistogram-go v1.0.1 // indirect
 )
 
 replace (
