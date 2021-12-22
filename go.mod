@@ -5,7 +5,9 @@ go 1.17
 require (
 	github.com/akutz/gosync v0.1.0
 	github.com/container-storage-interface/spec v1.5.0
+	github.com/dell/dell-csi-extensions/common v1.0.0
 	github.com/dell/dell-csi-extensions/replication v1.0.0
+	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.0.0
 	github.com/dell/gobrick v1.2.0
 	github.com/dell/gocsi v1.5.0
 	github.com/dell/gofsutil v1.6.0
@@ -24,7 +26,7 @@ require (
 	github.com/uber/jaeger-client-go v2.25.0+incompatible
 	github.com/uber/jaeger-lib v2.4.0+incompatible
 	golang.org/x/net v0.0.0-20210520170846-37e1c6afe023
-	google.golang.org/grpc v1.38.0
+	google.golang.org/grpc v1.42.0
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
 	k8s.io/kubernetes v1.21.5
 )
@@ -84,6 +86,12 @@ require (
 	k8s.io/klog/v2 v2.9.0 // indirect
 	k8s.io/mount-utils v0.0.0 // indirect
 	k8s.io/utils v0.0.0-20210819203725-bdf08cb9a70a // indirect
+)
+
+replace (
+	github.com/dell/dell-csi-extensions/common v1.0.0 => github.com/dell/dell-csi-extensions/common v0.0.0-20211215102840-e20060eb09e7
+	github.com/dell/dell-csi-extensions/replication v1.0.0 => github.com/dell/dell-csi-extensions/replication v0.0.0-20211215102840-e20060eb09e7
+	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.0.0 => github.com/dell/dell-csi-extensions/volumeGroupSnapshot v0.0.0-20211215102840-e20060eb09e7
 )
 
 replace (

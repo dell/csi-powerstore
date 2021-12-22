@@ -31,7 +31,9 @@ import (
 	"github.com/dell/csi-powerstore/pkg/array"
 	"github.com/dell/csi-powerstore/pkg/common"
 	"github.com/dell/csi-powerstore/pkg/common/fs"
+	commonext "github.com/dell/dell-csi-extensions/common"
 	csiext "github.com/dell/dell-csi-extensions/replication"
+	vgsext "github.com/dell/dell-csi-extensions/volumeGroupSnapshot"
 	csictx "github.com/dell/gocsi/context"
 	"github.com/dell/gopowerstore"
 	"github.com/golang/protobuf/ptypes/wrappers"
@@ -1104,13 +1106,14 @@ func (s *Service) ControllerGetVolume(ctx context.Context, req *csi.ControllerGe
 // RegisterAdditionalServers registers replication extension
 func (s *Service) RegisterAdditionalServers(server *grpc.Server) {
 	csiext.RegisterReplicationServer(server, s)
+	vgsext.RegisterVolumeGroupSnapshotServer(server, s)
 }
 
 // ProbeController probes the controller service
-func (s *Service) ProbeController(ctx context.Context, req *csiext.ProbeControllerRequest) (*csiext.ProbeControllerResponse, error) {
+func (s *Service) ProbeController(ctx context.Context, req *commonext.ProbeControllerRequest) (*commonext.ProbeControllerResponse, error) {
 	ready := new(wrappers.BoolValue)
 	ready.Value = true
-	rep := new(csiext.ProbeControllerResponse)
+	rep := new(commonext.ProbeControllerResponse)
 	rep.Ready = ready
 	rep.Name = common.Name
 	rep.VendorVersion = core.SemVer
@@ -1118,6 +1121,11 @@ func (s *Service) ProbeController(ctx context.Context, req *csiext.ProbeControll
 
 	log.Debug(fmt.Sprintf("ProbeController returning: %v", rep.Ready.GetValue()))
 	return rep, nil
+}
+
+// CreateVolumeGroupSnapshot creates snapshots of the volume group
+func (s *Service) CreateVolumeGroupSnapshot(ctx context.Context, request *vgsext.CreateVolumeGroupSnapshotRequest) (*vgsext.CreateVolumeGroupSnapshotResponse, error) {
+	panic("implement me")
 }
 
 func (s *Service) listPowerStoreVolumes(ctx context.Context, startToken, maxEntries int) ([]gopowerstore.Volume, string, error) {
