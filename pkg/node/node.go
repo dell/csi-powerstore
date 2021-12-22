@@ -186,6 +186,8 @@ func (s *Service) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeR
 	if req.GetVolumeCapability() == nil {
 		return nil, status.Error(codes.InvalidArgument, "volume capability is required")
 	}
+	log.Info("----GET MOUNT DATA")
+	log.Info(req.GetVolumeCapability().GetMount())
 
 	id := req.GetVolumeId()
 	if id == "" {
@@ -909,6 +911,7 @@ func (s *Service) NodeGetCapabilities(context context.Context, request *csi.Node
 		csi.NodeServiceCapability_RPC_STAGE_UNSTAGE_VOLUME,
 		csi.NodeServiceCapability_RPC_EXPAND_VOLUME,
 		csi.NodeServiceCapability_RPC_SINGLE_NODE_MULTI_WRITER,
+		csi.NodeServiceCapability_RPC_VOLUME_MOUNT_GROUP,
 	} {
 		capabilities = append(capabilities, newCap(capability))
 	}

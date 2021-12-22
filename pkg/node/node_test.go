@@ -2868,6 +2868,12 @@ var _ = Describe("CSINodeService", func() {
 								Type: csi.NodeServiceCapability_RPC_VOLUME_CONDITION,
 							},
 						},
+					}, {
+						Type: &csi.NodeServiceCapability_Rpc{
+							Rpc: &csi.NodeServiceCapability_RPC{
+								Type: csi.NodeServiceCapability_RPC_VOLUME_MOUNT_GROUP,
+							},
+						},
 					},
 				},
 			}))
