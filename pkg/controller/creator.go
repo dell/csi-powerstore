@@ -130,9 +130,8 @@ func (*SCSICreator) CheckIfAlreadyExists(ctx context.Context, name string, sizeI
 
 // Create creates new block volume on storage array
 func (sc *SCSICreator) Create(ctx context.Context, req *csi.CreateVolumeRequest, sizeInBytes int64, client gopowerstore.Client) (gopowerstore.CreateResponse, error) {
-	storageType := gopowerstore.StorageTypeEnumBlock
 	name := req.GetName()
-	reqParams := &gopowerstore.VolumeCreate{Name: &name, Size: &sizeInBytes, StorageType: &storageType}
+	reqParams := &gopowerstore.VolumeCreate{Name: &name, Size: &sizeInBytes}
 	if sc.vg != nil {
 		reqParams.VolumeGroupID = sc.vg.ID
 	}
