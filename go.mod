@@ -89,9 +89,9 @@ require (
 )
 
 replace (
-	github.com/dell/dell-csi-extensions/common v1.0.0 => github.com/dell/dell-csi-extensions/common v0.0.0-20211215102840-e20060eb09e7
-	github.com/dell/dell-csi-extensions/replication v1.0.0 => github.com/dell/dell-csi-extensions/replication v0.0.0-20211215102840-e20060eb09e7
-	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.0.0 => github.com/dell/dell-csi-extensions/volumeGroupSnapshot v0.0.0-20211215102840-e20060eb09e7
+	github.com/dell/dell-csi-extensions/common v1.0.0 => github.com/dell/dell-csi-extensions/common v0.0.0-20211217121714-58de430139aa
+	github.com/dell/dell-csi-extensions/replication v1.0.0 => github.com/dell/dell-csi-extensions/replication v0.0.0-20211217121714-58de430139aa
+	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.0.0 => github.com/dell/dell-csi-extensions/volumeGroupSnapshot v0.0.0-20211217121714-58de430139aa
 )
 
 replace (
