@@ -9,6 +9,7 @@ metadata:
   name: {{ .Values.driverName }}
 spec:
   podInfoOnMount: true
+  fsGroupPolicy: {{ .Values.fsGroupPolicy }}
   volumeLifecycleModes:
   - Persistent
   - Ephemeral

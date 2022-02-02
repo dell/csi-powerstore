@@ -77,7 +77,7 @@ controller:
     #   false: disable checking of health condition of CSI volumes
     # Default value: None
     enabled: false
-    
+
     # healthMonitorInterval: Interval of monitoring volume health condition
     # Allowed values: Number followed by unit (s,m,h)
     # Examples: 60s, 5m, 1h
@@ -189,3 +189,6 @@ logLevel: "debug"
 # Allowed values: "TEXT" or "JSON"
 # Default value: "JSON"
 logFormat: "JSON"
+
+# Following modes are supported: None, File and ReadWriteOnceWithFSType
+fsGroupPolicy: ReadWriteOnceWithFSType
