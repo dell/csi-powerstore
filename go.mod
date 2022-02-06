@@ -10,7 +10,7 @@ require (
 	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.0.0
 	github.com/dell/gobrick v1.2.0
 	github.com/dell/gocsi v1.5.0
-	github.com/dell/gofsutil v1.7.0-20220204052137-9928a2dc48d8
+	github.com/dell/gofsutil v1.7.1-0.20220204052137-9928a2dc48d8
 	github.com/dell/goiscsi v1.2.0
 	github.com/dell/gopowerstore v1.6.1-0.20211223095101-c47391fc979f
 	github.com/fsnotify/fsnotify v1.4.9
@@ -27,7 +27,7 @@ require (
 	github.com/uber/jaeger-lib v2.4.0+incompatible
 	golang.org/x/net v0.0.0-20210520170846-37e1c6afe023
 	google.golang.org/grpc v1.42.0
-	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307bS
+	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
 )
 
 require (
