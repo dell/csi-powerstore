@@ -45,7 +45,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
-	k8sutilfs "k8s.io/kubernetes/pkg/volume/util/fs"
 )
 
 // Opts defines service configuration options.
@@ -640,7 +639,7 @@ func (s *Service) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolume
 	}
 
 	// get volume metrics for mounted volume path
-	availableBytes, totalBytes, usedBytes, totalInodes, freeInodes, usedInodes, err := k8sutilfs.Info(volumePath)
+	availableBytes, totalBytes, usedBytes, totalInodes, freeInodes, usedInodes, err := gofsutil.FsInfo(ctx, volumePath)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to get metrics for volume with error: %v", err)
 	}
