@@ -1019,7 +1019,7 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 					resp.AccessibleTopology.Segments[common.Name+"/"+arr.GetIP()+"-iscsi"] = "true"
 
 				} else {
-					log.Infof("Discovering NVMe targets is requested")
+					log.Infof("Discovering NVMe targets")
 					nvmeIP := strings.Split(infoList[0].Portal, ":")
 					_, err := s.nvmeLib.DiscoverNVMeTCPTargets(nvmeIP[0], false)
 
