@@ -2879,7 +2879,8 @@ var _ = Describe("CSINodeService", func() {
 			It("should succeed", func() {
 				iscsiConnectorMock.On("GetInitiatorName", mock.Anything).Return(validISCSIInitiators, nil)
 				fcConnectorMock.On("GetInitiatorPorts", mock.Anything).Return([]string{}, nil)
-				iinit, fcinit, err := nodeSvc.getInitiators()
+				// Added a workaround for the NVMe initiators. Will add the unit tests once all the driver changes go in.
+				iinit, fcinit, _, err := nodeSvc.getInitiators()
 				Ω(iinit).To(Equal([]string{
 					"iqn.1994-05.com.redhat:4db86abbe3c",
 					"iqn.1994-05.com.redhat:2950c9ca441b"}))
@@ -2891,7 +2892,7 @@ var _ = Describe("CSINodeService", func() {
 			It("should succeed", func() {
 				iscsiConnectorMock.On("GetInitiatorName", mock.Anything).Return(validISCSIInitiators, nil)
 				fcConnectorMock.On("GetInitiatorPorts", mock.Anything).Return(validFCTargetsWWPN, nil)
-				iinit, fcinit, err := nodeSvc.getInitiators()
+				iinit, fcinit, _, err := nodeSvc.getInitiators()
 				Ω(iinit).To(Equal([]string{
 					"iqn.1994-05.com.redhat:4db86abbe3c",
 					"iqn.1994-05.com.redhat:2950c9ca441b"}))
@@ -2905,7 +2906,7 @@ var _ = Describe("CSINodeService", func() {
 			It("should succeed [NFS only]", func() {
 				iscsiConnectorMock.On("GetInitiatorName", mock.Anything).Return([]string{}, nil)
 				fcConnectorMock.On("GetInitiatorPorts", mock.Anything).Return([]string{}, nil)
-				iinit, fcinit, err := nodeSvc.getInitiators()
+				iinit, fcinit, _, err := nodeSvc.getInitiators()
 				Ω(len(iinit)).To(Equal(0))
 				Ω(len(fcinit)).To(Equal(0))
 				Ω(err).To(BeNil())
@@ -2915,7 +2916,7 @@ var _ = Describe("CSINodeService", func() {
 			It("should succeed", func() {
 				iscsiConnectorMock.On("GetInitiatorName", mock.Anything).Return([]string{}, nil)
 				fcConnectorMock.On("GetInitiatorPorts", mock.Anything).Return(validFCTargetsWWPN, nil)
-				iinit, fcinit, err := nodeSvc.getInitiators()
+				iinit, fcinit, _, err := nodeSvc.getInitiators()
 				Ω(iinit).To(Equal([]string{}))
 				Ω(fcinit).To(Equal([]string{
 					"58:cc:f0:93:48:a0:03:a3",

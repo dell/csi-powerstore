@@ -1,0 +1,31 @@
+kubeletConfigDir: /var/lib/kubelet
+nodeFCPortsFilterFile: /etc/fc-ports-filter
+externalAccess: 
+imagePullPolicy: Always
+controller:
+   controllerCount: 2
+   volumeNamePrefix: csivol
+   snapshot:
+      enabled: true
+      snapNamePrefix: csisnap
+   resizer:
+      enabled: true
+   healthMonitor:
+      enabled: true
+      volumeHealthMonitorInterval: 60s
+   replication:
+      enabled: false
+      image: amaas-eos-mw1.cec.lab.emc.com:5028/dell-csi-replicator:v0.0.1.025
+      replicationContextPrefix: "powerstore"
+      replicationPrefix: "replication.storage.dell.com"   
+   nodeSelector:
+   tolerations:
+node:
+   nodeNamePrefix: csi-node
+   nodeIDPath: /etc/machine-id
+   healthMonitor:
+      enabled: true
+   nodeSelector:
+   tolerations:
+connection:
+   enableCHAP: false

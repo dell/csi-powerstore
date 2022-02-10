@@ -78,6 +78,8 @@ const (
 	FcTransport TransportType = "FC"
 	// ISCSITransport indicates that ISCSI is chosen as a SCSI transport protocol
 	ISCSITransport TransportType = "ISCSI"
+	// NVMETransport indicates that NVMe is chosen as a transport protocol
+	NVMETransport TransportType = "NVME"
 	// AutoDetectTransport indicates that SCSI transport protocol would be detected automatically
 	AutoDetectTransport TransportType = "AUTO"
 	// NoneTransport indicates that no SCSI transport protocol needed
