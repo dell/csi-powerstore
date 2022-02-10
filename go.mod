@@ -12,6 +12,7 @@ require (
 	github.com/dell/gocsi v1.5.0
 	github.com/dell/gofsutil v1.6.0
 	github.com/dell/goiscsi v1.2.0
+	github.com/dell/gonvme v0.0.0-20220210082521-079dfc248ab3
 	github.com/dell/gopowerstore v1.6.1-0.20220120132720-96c2320b69fe
 	github.com/fsnotify/fsnotify v1.4.9
 	github.com/golang/mock v1.4.4
@@ -39,7 +40,6 @@ require (
 	github.com/coreos/go-semver v0.3.0 // indirect
 	github.com/coreos/go-systemd/v22 v22.3.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/dell/gonvme v0.0.0-20220210082521-079dfc248ab3 // indirect
 	github.com/go-logr/logr v0.4.0 // indirect
 	github.com/go-openapi/errors v0.19.8 // indirect
 	github.com/go-openapi/strfmt v0.20.0 // indirect
