@@ -178,6 +178,8 @@ github.com/dell/gonvme v0.0.0-20220119211702-1dd63f6211d2 h1:DmgJgOZGH5z5cxmLnrx
 github.com/dell/gonvme v0.0.0-20220119211702-1dd63f6211d2/go.mod h1:JXLmgxE/2dsiXqW5E+kH5Zo11lOjCuHyiHu92xqR9O0=
 github.com/dell/gonvme v0.0.0-20220209190005-6e98df0a6243 h1:NwUde8PhN39qERfCe/AFdwporzFUeZKOm5sd3ndxAMw=
 github.com/dell/gonvme v0.0.0-20220209190005-6e98df0a6243/go.mod h1:JXLmgxE/2dsiXqW5E+kH5Zo11lOjCuHyiHu92xqR9O0=
+github.com/dell/gonvme v0.0.0-20220210082521-079dfc248ab3 h1:BWTnpXO7vORcbO0p9p0N2vvGlF7rAw1jbZZUNMHvQTw=
+github.com/dell/gonvme v0.0.0-20220210082521-079dfc248ab3/go.mod h1:JXLmgxE/2dsiXqW5E+kH5Zo11lOjCuHyiHu92xqR9O0=
 github.com/dell/gopowerstore v1.6.1-0.20211223095101-c47391fc979f h1:F+aAuMlcTUV/F6eWYoM94+I6MR94gVE3g8ZY65DGzbE=
 github.com/dell/gopowerstore v1.6.1-0.20211223095101-c47391fc979f/go.mod h1:0ziQJ1iuZYDV+P53ua+VeH+rIylYT9WNjGSI/7aPly0=
 github.com/dell/gopowerstore v1.6.1-0.20220120132720-96c2320b69fe h1:GC4KihepEV4ctfHoZXM+o2wd807fsBGzLrXsl1bHk6Q=
