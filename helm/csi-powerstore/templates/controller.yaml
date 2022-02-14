@@ -272,6 +272,8 @@ spec:
               value: {{ .Values.driverName }}
             - name: X_CSI_POWERSTORE_EXTERNAL_ACCESS
               value: {{ .Values.externalAccess }}
+            - name: X_CSI_NFS_ACLS
+              value: "{{ .Values.nfsAcls }}"
             - name: X_CSI_POWERSTORE_CONFIG_PATH
               value: /powerstore-config/config
             - name: X_CSI_POWERSTORE_CONFIG_PARAMS_PATH

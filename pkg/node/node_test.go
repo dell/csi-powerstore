@@ -80,6 +80,8 @@ const (
 	firstValidIP       = "gid1"
 	secondValidIP      = "gid2"
 	validNasName       = "my-nas-name"
+	validNasID         = "e8f4c5f8-c2fc-4df4-bd99-c292c12b55be"
+	validNfsServerID   = "e8f4c5f8-c2fc-4dd2-bd99-c292c12b55be"
 	validEphemeralName = "ephemeral-39bb1b5f-5624-490d-9ece-18f7b28a904e/gid1/scsi"
 	ephemerallockfile  = "/var/lib/kubelet/plugins/kubernetes.io/csi/pv/ephemeral/39bb1b5f-5624-490d-9ece-18f7b28a904e/gid1/scsi/id"
 )

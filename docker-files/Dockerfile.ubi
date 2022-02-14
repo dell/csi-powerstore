@@ -15,7 +15,7 @@ COPY licenses /licenses
 # dependencies, following by cleaning the cache
 RUN yum update -y \
     && \
-    yum install -y e2fsprogs xfsprogs nfs-utils which device-mapper-multipath \
+    yum install -y e2fsprogs xfsprogs nfs-utils nfs4-acl-tools acl which device-mapper-multipath \
     && \
     yum clean all \
     && \

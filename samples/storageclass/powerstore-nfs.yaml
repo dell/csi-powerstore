@@ -34,6 +34,23 @@ parameters:
   # Default value: false
   allowRoot: "false"
 
+  # nfsAcls: enables setting ACLs for NFS mount directory
+  # This value overrides the nfsAcls attribute of corresponding array config in secret, if present
+  # ACLs can be specified in three formats:
+  #   1) Unix mode
+  #   2) POSIX acl
+  #   3) NFSv4 acl (specific to NFSv4 shares only)
+  # Allowed values:
+  #   1) Unix mode: valid octal mode number
+  #      Examples: "0777", "777", "0755"
+  #   2) POSIX acls: valid POSIX acls, seperated by comma
+  #      Examples: "group::rwx", "user::rwx,group::rwx"
+  #   3) NFSv4 acls: valid NFSv4 acls, seperated by comma
+  #      Examples: "A::OWNER@:RWX,A::GROUP@:RWX", "A::OWNER@:rxtncy"
+  # Optional: true
+  # Default value: "0777"
+  # nfsAcls: "0777"
+
 # reclaimPolicy: PVs that are dynamically created by a StorageClass will have the reclaim policy specified here
 # Allowed values:
 #   Reclaim: retain the PV after PVC deletion
