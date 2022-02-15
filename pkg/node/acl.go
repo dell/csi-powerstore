@@ -47,14 +47,8 @@ func validateAndSetACLs(ctx context.Context, nasName string, client gopowerstore
 		} else {
 			return false, status.Errorf(codes.Internal, "can't assign NFSv4 ACLs to folder %s: NAS server is not NFSv4 enabled", dir)
 		}
-	} else if posixACL(acls) {
-		if err := setPosixAcls(acls, dir); err != nil {
-			log.Error(fmt.Sprintf("can't assign POSIX ACLs to folder %s: %s", dir, err.Error()))
-			return false, err
-		}
-		aclsConfigured = true
 	} else {
-		return false, status.Errorf(codes.Internal, "can't assign ACLs to folder %s: unknown ACL format %s", dir, acls)
+		return false, status.Errorf(codes.Internal, "can't assign ACLs to folder %s: invalid NFSv4 ACL format %s", dir, acls)
 	}
 
 	return aclsConfigured, nil
@@ -67,35 +61,15 @@ func posixMode(acls string) bool {
 	return false
 }
 
-func posixACL(acls string) bool {
-	if matched, _ := regexp.Match(`[\w*:\w*:\w*,*]+`, []byte(acls)); matched {
-		return true
-	}
-	return false
-}
-
-func setPosixAcls(acls string, dir string) error {
-	aclList := strings.Split(acls, ",")
-	for _, acl := range aclList {
-		command := []string{"setfacl", "-m",
-			strings.TrimSpace(acl),
-			strings.TrimSpace(dir)}
-		log.Info("POSIX ACL command: " + strings.Join(command, " ") + "\n")
-		outStr, err := execCommand(command)
-		log.Info("POSIX ACL output: " + string(outStr) + "\n")
-		if err != nil {
-			return err
+func nfsv4ACLs(acls string) bool {
+	aclsList := strings.Split(acls, ",")
+	for _, acl := range aclsList {
+		matched, err := regexp.Match(`([AD]:\w*:\w*@\w*:\w*)`, []byte(acl))
+		if !matched || err != nil {
+			return false
 		}
 	}
-
-	return nil
-}
-
-func nfsv4ACLs(acls string) bool {
-	if strings.HasPrefix(acls, "A:") || strings.HasPrefix(acls, "D:") {
-		return true
-	}
-	return false
+	return true
 }
 
 func setNfsv4Acls(acls string, dir string) error {

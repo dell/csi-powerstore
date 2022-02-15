@@ -27,22 +27,6 @@ func TestPosixMode_Fail(t *testing.T) {
 	}
 }
 
-func TestPosixAcl_Success(t *testing.T) {
-	isPosixACL := posixACL("u::rwx")
-	expected := true
-	if isPosixACL != expected {
-		t.Errorf(fmt.Sprintf("expected: %v, actual: %v", expected, isPosixACL))
-	}
-}
-
-func TestPosixAcl_Fail(t *testing.T) {
-	isPosixACL := posixACL("abcd")
-	expected := false
-	if isPosixACL != expected {
-		t.Errorf(fmt.Sprintf("expected: %v, actual: %v", expected, isPosixACL))
-	}
-}
-
 func TestNfsv4Acl_Success(t *testing.T) {
 	isNfsv4ACLs := nfsv4ACLs("A::OWNER@:RWX")
 	expected := true
@@ -155,29 +139,6 @@ func TestValidateAndSetNfsACLs_Success_nfsv4Acls(t *testing.T) {
 	}
 }
 
-func TestValidateAndSetNfsACLs_Success_posixAcls(t *testing.T) {
-	clientMock = new(gopowerstoremock.Client)
-
-	nfsServers := []gopowerstore.NFSServerInstance{
-		{
-			Id:             validNfsServerID,
-			IsNFSv4Enabled: true,
-		},
-	}
-
-	clientMock.On("GetNASByName", mock.Anything, validNasName).Return(gopowerstore.NAS{ID: validNasID, NfsServers: nfsServers}, nil)
-	clientMock.On("GetNfsServer", mock.Anything, mock.Anything).Return(gopowerstore.NFSServerInstance{Id: validNfsServerID, IsNFSv4Enabled: true}, nil)
-
-	execCommand = executeCommandMock
-	defer execCommandReset()
-
-	aclConfigured, err := validateAndSetACLs(context.Background(), validNasName, clientMock, "u::rwx", "dir1")
-
-	if err != nil || aclConfigured == false {
-		t.Errorf(fmt.Sprintf("expected: true, actual: %v err: %s", aclConfigured, err.Error()))
-	}
-}
-
 func TestValidateAndSetNfsACLs_Fail_InvalidAcls(t *testing.T) {
 	clientMock = new(gopowerstoremock.Client)
 
@@ -196,7 +157,7 @@ func TestValidateAndSetNfsACLs_Fail_InvalidAcls(t *testing.T) {
 
 	aclConfigured, err := validateAndSetACLs(context.Background(), validNasName, clientMock, "abcd", "dir1")
 
-	if err != nil || aclConfigured == true {
+	if err == nil || aclConfigured != false {
 		t.Errorf(fmt.Sprintf("expected: false, actual: %v err: %s", aclConfigured, err.Error()))
 	}
 }
@@ -219,7 +180,7 @@ func TestValidateAndSetNfsACLs_Fail_GetNfsServerFail(t *testing.T) {
 
 	aclConfigured, err := validateAndSetACLs(context.Background(), validNasName, clientMock, "u::rwx", "dir1")
 
-	if err != nil || aclConfigured == true {
+	if err == nil || aclConfigured != false {
 		t.Errorf(fmt.Sprintf("expected: false, actual: %v err: %s", aclConfigured, err.Error()))
 	}
 }
