@@ -310,6 +310,7 @@ func (s *SCSIStager) connectISCSIDevice(ctx context.Context,
 	return s.iscsiConnector.ConnectVolume(connectorCtx, gobrick.ISCSIVolumeInfo{
 		Targets: targets,
 		Lun:     lun,
+		WWN:     data.deviceWWN,
 	})
 }
 
@@ -329,6 +330,7 @@ func (s *SCSIStager) connectFCDevice(ctx context.Context,
 	return s.fcConnector.ConnectVolume(connectorCtx, gobrick.FCVolumeInfo{
 		Targets: targets,
 		Lun:     lun,
+		WWN:     data.deviceWWN,
 	})
 }
 
