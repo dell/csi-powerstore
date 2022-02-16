@@ -223,7 +223,8 @@ func GetISCSITargetsInfoFromStorage(client gopowerstore.Client, volumeApplianceI
 	})
 	var result []gobrick.ISCSITargetInfo
 	for _, t := range addrInfo {
-		if t.ApplianceID == volumeApplianceID {
+		//volumeApplianceID will be empty in case the call is from NodeGetInfo
+		if t.ApplianceID == volumeApplianceID || volumeApplianceID == "" {
 			result = append(result, gobrick.ISCSITargetInfo{Target: t.IPPort.TargetIqn, Portal: fmt.Sprintf("%s:3260", t.Address)})
 		}
 	}
