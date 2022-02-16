@@ -211,7 +211,7 @@ func GetLogFields(ctx context.Context) log.Fields {
 }
 
 // GetISCSITargetsInfoFromStorage returns list of gobrick compatible iscsi tragets by querying PowerStore array
-func GetISCSITargetsInfoFromStorage(client gopowerstore.Client, string volumeApplianceID) ([]gobrick.ISCSITargetInfo, error) {
+func GetISCSITargetsInfoFromStorage(client gopowerstore.Client, volumeApplianceID string) ([]gobrick.ISCSITargetInfo, error) {
 	addrInfo, err := client.GetStorageISCSITargetAddresses(context.Background())
 	if err != nil {
 		log.Error(err.Error())
@@ -221,7 +221,7 @@ func GetISCSITargetsInfoFromStorage(client gopowerstore.Client, string volumeApp
 	sort.Slice(addrInfo, func(i, j int) bool {
 		return addrInfo[i].ID < addrInfo[j].ID
 	})
-	result := make([]gobrick.ISCSITargetInfo)
+	var result []gobrick.ISCSITargetInfo
 	for i, t := range addrInfo {
 		if t.ApplianceID == volumeApplianceID {
 			result = append(result, gobrick.ISCSITargetInfo{Target: t.IPPort.TargetIqn, Portal: fmt.Sprintf("%s:3260", t.Address)})
