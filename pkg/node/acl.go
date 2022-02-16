@@ -64,7 +64,7 @@ func posixMode(acls string) bool {
 func nfsv4ACLs(acls string) bool {
 	aclsList := strings.Split(acls, ",")
 	for _, acl := range aclsList {
-		matched, err := regexp.Match(`([AD]:\w*:\w*@\w*:\w*)`, []byte(acl))
+		matched, err := regexp.Match(`([ADUL]:\w*:\w*[@]\w*:\w*)`, []byte(acl))
 		if !matched || err != nil {
 			return false
 		}
