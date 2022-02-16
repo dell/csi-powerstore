@@ -3,7 +3,7 @@ module github.com/dell/csi-powerstore
 go 1.17
 
 // Remove replace before merging PR
-replace github.com/dell/gonvme => ../gonvme
+replace github.com/dell/gopowerstore => ../gopowerstore
 
 require (
 	github.com/akutz/gosync v0.1.0
