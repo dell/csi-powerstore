@@ -38,6 +38,7 @@ require (
 	github.com/coreos/go-semver v0.3.0 // indirect
 	github.com/coreos/go-systemd/v22 v22.3.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/dell/gonvme v0.0.0-20220119211702-1dd63f6211d2 // indirect
 	github.com/go-openapi/errors v0.19.8 // indirect
 	github.com/go-openapi/strfmt v0.20.0 // indirect
 	github.com/go-stack/stack v1.8.0 // indirect
