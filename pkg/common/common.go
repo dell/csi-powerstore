@@ -231,7 +231,7 @@ func GetISCSITargetsInfoFromStorage(client gopowerstore.Client, volumeApplianceI
 }
 
 // GetFCTargetsInfoFromStorage returns list of gobrick compatible FC tragets by querying PowerStore array
-func GetFCTargetsInfoFromStorage(client gopowerstore.Client, string volumeApplianceID) ([]gobrick.FCTargetInfo, error) {
+func GetFCTargetsInfoFromStorage(client gopowerstore.Client, volumeApplianceID string) ([]gobrick.FCTargetInfo, error) {
 	fcPorts, err := client.GetFCPorts(context.Background())
 	if err != nil {
 		log.Error(err.Error())
