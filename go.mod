@@ -2,6 +2,9 @@ module github.com/dell/csi-powerstore
 
 go 1.17
 
+// Remove replace before merging PR
+replace github.com/dell/gonvme => ../gonvme
+
 require (
 	github.com/akutz/gosync v0.1.0
 	github.com/container-storage-interface/spec v1.5.0

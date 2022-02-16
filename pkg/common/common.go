@@ -211,7 +211,7 @@ func GetLogFields(ctx context.Context) log.Fields {
 }
 
 // GetISCSITargetsInfoFromStorage returns list of gobrick compatible iscsi tragets by querying PowerStore array
-func GetISCSITargetsInfoFromStorage(client gopowerstore.Client) ([]gobrick.ISCSITargetInfo, error) {
+func GetISCSITargetsInfoFromStorage(client gopowerstore.Client, string volumeApplianceID) ([]gobrick.ISCSITargetInfo, error) {
 	addrInfo, err := client.GetStorageISCSITargetAddresses(context.Background())
 	if err != nil {
 		log.Error(err.Error())
@@ -221,15 +221,17 @@ func GetISCSITargetsInfoFromStorage(client gopowerstore.Client) ([]gobrick.ISCSI
 	sort.Slice(addrInfo, func(i, j int) bool {
 		return addrInfo[i].ID < addrInfo[j].ID
 	})
-	result := make([]gobrick.ISCSITargetInfo, len(addrInfo))
+	result := make([]gobrick.ISCSITargetInfo)
 	for i, t := range addrInfo {
-		result[i] = gobrick.ISCSITargetInfo{Target: t.IPPort.TargetIqn, Portal: fmt.Sprintf("%s:3260", t.Address)}
+		if t.ApplianceID == volumeApplianceID {
+			result = append(result, gobrick.ISCSITargetInfo{Target: t.IPPort.TargetIqn, Portal: fmt.Sprintf("%s:3260", t.Address)})
+		}
 	}
 	return result, nil
 }
 
 // GetFCTargetsInfoFromStorage returns list of gobrick compatible FC tragets by querying PowerStore array
-func GetFCTargetsInfoFromStorage(client gopowerstore.Client) ([]gobrick.FCTargetInfo, error) {
+func GetFCTargetsInfoFromStorage(client gopowerstore.Client, string volumeApplianceID) ([]gobrick.FCTargetInfo, error) {
 	fcPorts, err := client.GetFCPorts(context.Background())
 	if err != nil {
 		log.Error(err.Error())
@@ -237,7 +239,7 @@ func GetFCTargetsInfoFromStorage(client gopowerstore.Client) ([]gobrick.FCTarget
 	}
 	var result []gobrick.FCTargetInfo
 	for _, t := range fcPorts {
-		if t.IsLinkUp {
+		if t.IsLinkUp && t.ApplianceID == volumeApplianceID {
 			result = append(result, gobrick.FCTargetInfo{WWPN: strings.Replace(t.Wwn, ":", "", -1)})
 		}
 	}

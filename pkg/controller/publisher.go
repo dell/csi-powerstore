@@ -86,7 +86,7 @@ func (s *SCSIPublisher) Publish(ctx context.Context, req *csi.ControllerPublishV
 			"failed to get mapping for volume with ID '%s': %s", volume.ID, err.Error())
 	}
 
-	err = s.addTargetsInfoToPublishContext(publishContext, client)
+	err = s.addTargetsInfoToPublishContext(publishContext, volume.ApplianceID, client)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "could not get iscsiTargets: %s", err.Error())
 	}
@@ -164,8 +164,8 @@ func (s *SCSIPublisher) addLUNIDToPublishContext(
 }
 
 func (s *SCSIPublisher) addTargetsInfoToPublishContext(
-	publishContext map[string]string, client gopowerstore.Client) error {
-	iscsiTargetsInfo, err := common.GetISCSITargetsInfoFromStorage(client)
+	publishContext map[string]string, volumeApplianceID string, client gopowerstore.Client) error {
+	iscsiTargetsInfo, err := common.GetISCSITargetsInfoFromStorage(client, volumeApplianceID)
 	if err != nil {
 		return err
 	}
@@ -173,7 +173,7 @@ func (s *SCSIPublisher) addTargetsInfoToPublishContext(
 		publishContext[fmt.Sprintf("%s%d", common.PublishContextISCSIPortalsPrefix, i)] = t.Portal
 		publishContext[fmt.Sprintf("%s%d", common.PublishContextISCSITargetsPrefix, i)] = t.Target
 	}
-	fcTargetsInfo, err := common.GetFCTargetsInfoFromStorage(client)
+	fcTargetsInfo, err := common.GetFCTargetsInfoFromStorage(client, volumeApplianceID)
 	if err != nil {
 		return err
 	}
