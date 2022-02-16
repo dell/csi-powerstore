@@ -144,6 +144,7 @@ func (s *Service) Init() error {
 			initiators = fcInitiators
 			log.Infof("FC Protocol is requested")
 		} else if s.useISCSI {
+			initiators = iscsiInitiators
 			log.Infof("iSCSI Protocol is requested")
 		} else {
 			initiators = nvmeInitiators
