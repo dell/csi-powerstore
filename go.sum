@@ -74,8 +74,6 @@ github.com/dell/dell-csi-extensions/replication v0.0.0-20211217121714-58de430139
 github.com/dell/dell-csi-extensions/replication v0.0.0-20211217121714-58de430139aa/go.mod h1:9BF1BUr8XF9IXLrghrznqO6J5J1TX0fcunoFZfQ0Ozc=
 github.com/dell/dell-csi-extensions/volumeGroupSnapshot v0.0.0-20211217121714-58de430139aa h1:L4cowHMVAmgnHxrSLFhhgH5+K1Lli+LzN0xEKoIKZe8=
 github.com/dell/dell-csi-extensions/volumeGroupSnapshot v0.0.0-20211217121714-58de430139aa/go.mod h1:jfpjS6YywYdApbmkRYHSeqYhKVOJZMSH9SGbb4ig2qI=
-github.com/dell/gobrick v1.2.0 h1:dlgWgonXG7qoa+SXlek/NkdFBnfxgqSv+8tsHIBIEDg=
-github.com/dell/gobrick v1.2.0/go.mod h1:pYN9r3XvIjct/QkEg5mEM+k2L3QBLVaHUZeAMzQgwRg=
 github.com/dell/gocsi v1.5.0 h1:qi2T6H6JHDo9sJEw24jo6Z88fJszBXfQc3lxOBaUijo=
 github.com/dell/gocsi v1.5.0/go.mod h1:nIsIXXB5JpAvOQ0//gtPGULC2+NUddpi5qwpBeMhiLs=
 github.com/dell/gofsutil v1.7.1-0.20220204052137-9928a2dc48d8 h1:OR7yhgvIFiGWHNvMOZnK5rhy46xIXpoZHKtqhW3omO4=
@@ -83,8 +81,8 @@ github.com/dell/gofsutil v1.7.1-0.20220204052137-9928a2dc48d8/go.mod h1:0tAefmK/
 github.com/dell/goiscsi v1.1.0/go.mod h1:MfuMjbKWsh/MOb0VDW20C+LFYRIOfWKGiAxWkeM5TKo=
 github.com/dell/goiscsi v1.2.0 h1:ocQs4pz2Fw2vr73RVAQBKwpN468SK4TZHPLhU7/FB9A=
 github.com/dell/goiscsi v1.2.0/go.mod h1:MfuMjbKWsh/MOb0VDW20C+LFYRIOfWKGiAxWkeM5TKo=
-github.com/dell/gopowerstore v1.6.1-0.20211223095101-c47391fc979f h1:F+aAuMlcTUV/F6eWYoM94+I6MR94gVE3g8ZY65DGzbE=
-github.com/dell/gopowerstore v1.6.1-0.20211223095101-c47391fc979f/go.mod h1:0ziQJ1iuZYDV+P53ua+VeH+rIylYT9WNjGSI/7aPly0=
+github.com/dell/gopowerstore v1.6.1-0.20220217053906-266b40ccdb6e h1:Hcpj2I3JEBrQcAv+du8E3Rd6+8IPzyqGHxNXcfRtqRk=
+github.com/dell/gopowerstore v1.6.1-0.20220217053906-266b40ccdb6e/go.mod h1:0ziQJ1iuZYDV+P53ua+VeH+rIylYT9WNjGSI/7aPly0=
 github.com/dgrijalva/jwt-go v3.2.0+incompatible/go.mod h1:E3ru+11k8xSBh+hMPgOLZmtrrCbhqsmaPHjLKYnJCaQ=
 github.com/dgryski/go-sip13 v0.0.0-20181026042036-e10d5fee7954/go.mod h1:vAd38F8PWV+bWy6jNmig1y/TA+kYO4g3RSRF0IAv0no=
 github.com/dustin/go-humanize v1.0.0/go.mod h1:HtrtbFcZ19U5GC7JDqmcUSB87Iq5E25KnS6fMYU6eOk=

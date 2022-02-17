@@ -23,6 +23,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/dell/gonvme"
 	"io/ioutil"
 	"os"
 	"path"
@@ -67,12 +68,15 @@ type Service struct {
 	ctrlSvc        controller.Interface
 	iscsiConnector ISCSIConnector
 	fcConnector    FcConnector
+	nvmeConnector  NVMETCPConnector
 	iscsiLib       goiscsi.ISCSIinterface
+	nvmeLib        gonvme.NVMEinterface
 
 	opts   Opts
 	nodeID string
 
 	useFC                  bool
+	useISCSI               bool
 	initialized            bool
 	reusedHost             bool
 	isHealthMonitorEnabled bool
@@ -93,12 +97,12 @@ func (s *Service) Init() error {
 		return fmt.Errorf("can't update node id: %s", err.Error())
 	}
 
-	iscsiInitiators, fcInitiators, err := s.getInitiators()
+	iscsiInitiators, fcInitiators, nvmeInitiators, err := s.getInitiators()
 	if err != nil {
 		return fmt.Errorf("can't get initiators of the node: %s", err.Error())
 	}
 
-	if len(iscsiInitiators) == 0 && len(fcInitiators) == 0 {
+	if len(iscsiInitiators) == 0 && len(fcInitiators) == 0 && len(nvmeInitiators) == 0 {
 		return nil
 	}
 
@@ -111,24 +115,38 @@ func (s *Service) Init() error {
 		var initiators []string
 
 		switch arr.BlockProtocol {
+		case common.NVMETransport:
+			if len(nvmeInitiators) == 0 {
+				return fmt.Errorf("NVMe transport was requested but NVMe initiator is not available")
+			}
+			s.useISCSI = false
+			s.useFC = false
 		case common.ISCSITransport:
 			if len(iscsiInitiators) == 0 {
 				return fmt.Errorf("iSCSI transport was requested but iSCSI initiator is not available")
 			}
+			s.useISCSI = true
 			s.useFC = false
 		case common.FcTransport:
 			if len(fcInitiators) == 0 {
 				return fmt.Errorf("FC transport was requested but FC initiator is not available")
 			}
 			s.useFC = true
+			s.useISCSI = false
 		default:
+			s.useISCSI = len(iscsiInitiators) > 0
 			s.useFC = len(fcInitiators) > 0
 		}
 
 		if s.useFC {
 			initiators = fcInitiators
-		} else {
+			log.Infof("FC Protocol is requested")
+		} else if s.useISCSI {
 			initiators = iscsiInitiators
+			log.Infof("iSCSI Protocol is requested")
+		} else {
+			initiators = nvmeInitiators
+			log.Infof("NVMe Protocol is requested")
 		}
 
 		err = s.setupHost(initiators, arr.GetClient(), arr.GetIP())
@@ -162,6 +180,11 @@ func (s *Service) initConnectors() {
 			gobrick.FCConnectorParams{Chroot: s.opts.NodeChrootPath})
 	}
 
+	if s.nvmeConnector == nil {
+		s.nvmeConnector = gobrick.NewNVMeTCPConnector(
+			gobrick.NVMeTCPConnectorParams{Chroot: s.opts.NodeChrootPath})
+	}
+
 	if s.ctrlSvc == nil {
 		svc := &controller.Service{Fs: s.Fs}
 		svc.SetArrays(s.Arrays())
@@ -176,6 +199,12 @@ func (s *Service) initConnectors() {
 		s.iscsiLib = goiscsi.NewLinuxISCSI(iSCSIOpts)
 	}
 
+	if s.nvmeLib == nil {
+		NVMeOpts := make(map[string]string)
+		NVMeOpts["chrootDirectory"] = s.opts.NodeChrootPath
+
+		s.nvmeLib = gonvme.NewNVMeTCP(NVMeOpts)
+	}
 }
 
 // NodeStageVolume prepares volume to be consumed by node publish by connecting volume to the node
@@ -981,19 +1010,35 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 					continue
 				}
 			} else {
+
 				infoList, err := common.GetISCSITargetsInfoFromStorage(arr.GetClient())
 				if err != nil {
 					log.Errorf("couldn't get targets from array: %s", err.Error())
 					continue
 				}
 
-				_, err = s.iscsiLib.DiscoverTargets(infoList[0].Portal, false)
-				if err != nil {
-					log.Error("couldn't discover targets")
-					continue
-				}
+				if s.useISCSI {
+					_, err = s.iscsiLib.DiscoverTargets(infoList[0].Portal, false)
+					if err != nil {
+						log.Error("couldn't discover targets")
+						continue
+					}
 
-				resp.AccessibleTopology.Segments[common.Name+"/"+arr.GetIP()+"-iscsi"] = "true"
+					resp.AccessibleTopology.Segments[common.Name+"/"+arr.GetIP()+"-iscsi"] = "true"
+
+				} else {
+
+					log.Infof("Discovering NVMe targets")
+
+					nvmeIP := strings.Split(infoList[0].Portal, ":")
+					_, err := s.nvmeLib.DiscoverNVMeTCPTargets(nvmeIP[0], false)
+					if err != nil {
+						log.Error("couldn't discover NVMe targets")
+						continue
+					}
+
+					resp.AccessibleTopology.Segments[common.Name+"/"+arr.GetIP()+"-nvme"] = "true"
+				}
 			}
 		}
 	}
@@ -1039,11 +1084,12 @@ func (s *Service) updateNodeID() error {
 	return nil
 }
 
-func (s *Service) getInitiators() ([]string, []string, error) {
+func (s *Service) getInitiators() ([]string, []string, []string, error) {
 	ctx := context.Background()
 
 	var iscsiAvailable bool
 	var fcAvailable bool
+	var nvmeAvailable bool
 
 	iscsiInitiators, err := s.iscsiConnector.GetInitiatorName(ctx)
 	if err != nil {
@@ -1065,12 +1111,23 @@ func (s *Service) getInitiators() ([]string, []string, error) {
 		fcAvailable = true
 	}
 
-	if !iscsiAvailable && !fcAvailable {
-		// If we haven't found any initiators we still can use NFS
-		log.Info("FC and iSCSI initiators not found on node")
+	nvmeInitiators, err := s.nvmeConnector.GetInitiatorName(ctx)
+
+	if err != nil {
+		log.Error("nodeStartup could not get Initiator NQNs")
+	} else if len(nvmeInitiators) == 0 {
+		log.Error("NVMe initiators not found on node")
+	} else {
+		log.Debug("NVMe initiators found on node")
+		nvmeAvailable = true
 	}
 
-	return iscsiInitiators, fcInitiators, nil
+	if !iscsiAvailable && !fcAvailable && !nvmeAvailable {
+		// If we haven't found any initiators we still can use NFS
+		log.Info("FC, iSCSI and NVMe initiators not found on node")
+	}
+
+	return iscsiInitiators, fcInitiators, nvmeInitiators, nil
 }
 
 func (s *Service) getNodeFCPorts(ctx context.Context) ([]string, error) {
@@ -1238,8 +1295,10 @@ func (s *Service) buildInitiatorsArray(initiators []string) []gopowerstore.Initi
 	var portType gopowerstore.InitiatorProtocolTypeEnum
 	if s.useFC {
 		portType = gopowerstore.InitiatorProtocolTypeEnumFC
-	} else {
+	} else if s.useISCSI  {
 		portType = gopowerstore.InitiatorProtocolTypeEnumISCSI
+	} else {
+		portType = gopowerstore.InitiatorProtocolTypeEnumNVME
 	}
 	initiatorsReq := make([]gopowerstore.InitiatorCreateModify, len(initiators))
 	for i, iqn := range initiators {

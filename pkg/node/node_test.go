@@ -21,6 +21,7 @@ package node
 import (
 	"context"
 	"errors"
+	"github.com/dell/gonvme"
 	"net"
 	"net/http"
 	"os"
@@ -48,6 +49,7 @@ import (
 
 var (
 	iscsiConnectorMock *mocks.ISCSIConnector
+	nvmeConnectorMock  *mocks.NVMETCPConnector
 	fcConnectorMock    *mocks.FcConnector
 	utilMock           *mocks.UtilInterface
 	fsMock             *mocks.FsInterface
@@ -55,6 +57,7 @@ var (
 	clientMock         *gopowerstoremock.Client
 	ctrlMock           *mocks.ControllerInterface
 	iscsiLibMock       *goiscsi.MockISCSI
+	nvmeLibMock        *gonvme.MockNVMeTCP
 )
 
 const (
@@ -93,6 +96,11 @@ var (
 	validISCSIPortals    = []string{"192.168.1.1:3260", "192.168.1.2:3260"}
 	validISCSITargets    = []string{"iqn.2015-10.com.dell:dellemc-powerstore-fnm00180700173-a-39f17e0e",
 		"iqn.2015-10.com.dell:dellemc-powerstore-fnm00180700173-b-10de15a5"}
+	validNVMEInitiators = []string{"nqn.2014-08.org.nvmexpress:uuid:02a08600-57d6-4089-8736-bf1f7326990e",
+		"nqn.2014-08.org.nvmexpress:uuid:fa363a22-1c74-44f3-9932-1c35d5cf5c4d"}
+	validNVMEPortals    = []string{"192.168.1.1:4420", "192.168.1.2:4420"}
+	validNVMETargets    = []string{"nqn.1988-11.com.dell:powerstore:00:e6e2d5b871f1403E169D",
+		"nqn.1988-11.com.dell:powerstore:00:e6e2d5b871f1403E169D"}
 	validISCSITargetInfo = []gobrick.ISCSITargetInfo{
 		{Portal: validISCSIPortals[0], Target: validISCSITargets[0]},
 		{Portal: validISCSIPortals[1], Target: validISCSITargets[1]}}
@@ -102,6 +110,15 @@ var (
 				Target: validISCSITargetInfo[0].Target},
 			{Portal: validISCSITargetInfo[1].Portal, Target: validISCSITargetInfo[1].Target}},
 		Lun: validLUNIDINT}
+	validNVMETCPTargetInfo = []gobrick.NVMeTCPTargetInfo{
+		{Portal: validNVMEPortals[0], Target: validNVMETargets[0]},
+		{Portal: validNVMEPortals[1], Target: validNVMETargets[1]}}
+	validGobrickNVMEVolumeINFO = gobrick.NVMeTCPVolumeInfo{
+		Targets: []gobrick.NVMeTCPTargetInfo{
+			{Portal: validNVMETCPTargetInfo[0].Portal,
+				Target: validNVMETCPTargetInfo[0].Target},
+			{Portal: validNVMETCPTargetInfo[1].Portal, Target: validNVMETCPTargetInfo[1].Target}},
+		WWN: validDeviceWWN}
 	validGobrickFCVolumeINFO = gobrick.FCVolumeInfo{
 		Targets: []gobrick.FCTargetInfo{
 			{WWPN: validFCTargetsWWPN[0]},
@@ -146,12 +163,14 @@ func getTestArrays() map[string]*array.PowerStoreArray {
 
 func setVariables() {
 	iscsiConnectorMock = new(mocks.ISCSIConnector)
+	nvmeConnectorMock = new(mocks.NVMETCPConnector)
 	fcConnectorMock = new(mocks.FcConnector)
 	utilMock = new(mocks.UtilInterface)
 	fsMock = new(mocks.FsInterface)
 	ctrlMock = new(mocks.ControllerInterface)
 	clientMock = new(gopowerstoremock.Client)
 	iscsiLibMock = goiscsi.NewMockISCSI(nil)
+	nvmeLibMock = gonvme.NewMockNVMeTCP(nil)
 
 	arrays := getTestArrays()
 
@@ -159,8 +178,10 @@ func setVariables() {
 		Fs:             fsMock,
 		ctrlSvc:        ctrlMock,
 		iscsiConnector: iscsiConnectorMock,
+		nvmeConnector:  nvmeConnectorMock,
 		fcConnector:    fcConnectorMock,
 		iscsiLib:       iscsiLibMock,
+		nvmeLib:        nvmeLibMock,
 		nodeID:         validNodeID,
 		useFC:          false,
 		initialized:    true,
@@ -188,6 +209,8 @@ var _ = Describe("CSINodeService", func() {
 				)
 				iscsiConnectorMock.On("GetInitiatorName", mock.Anything).
 					Return(validISCSIInitiators, nil)
+				nvmeConnectorMock.On("GetInitiatorName", mock.Anything).
+					Return(validNVMEInitiators, nil)
 				fcConnectorMock.On("GetInitiatorPorts", mock.Anything).
 					Return(validFCTargetsWWPN, nil)
 
@@ -235,6 +258,8 @@ var _ = Describe("CSINodeService", func() {
 				)
 				iscsiConnectorMock.On("GetInitiatorName", mock.Anything).
 					Return(validISCSIInitiators, nil)
+				nvmeConnectorMock.On("GetInitiatorName", mock.Anything).
+					Return(validNVMEInitiators, nil)
 				fcConnectorMock.On("GetInitiatorPorts", mock.Anything).
 					Return(validFCTargetsWWPN, nil)
 
@@ -272,6 +297,8 @@ var _ = Describe("CSINodeService", func() {
 				)
 				iscsiConnectorMock.On("GetInitiatorName", mock.Anything).
 					Return(validISCSIInitiators, nil)
+				nvmeConnectorMock.On("GetInitiatorName", mock.Anything).
+					Return(validNVMEInitiators, nil)
 				fcConnectorMock.On("GetInitiatorPorts", mock.Anything).
 					Return(validFCTargetsWWPN, nil)
 
@@ -303,6 +330,8 @@ var _ = Describe("CSINodeService", func() {
 				It("should reuse host [no initiator updates]", func() {
 					iscsiConnectorMock.On("GetInitiatorName", mock.Anything).
 						Return(validISCSIInitiators, nil)
+					nvmeConnectorMock.On("GetInitiatorName", mock.Anything).
+						Return(validNVMEInitiators, nil)
 					fcConnectorMock.On("GetInitiatorPorts", mock.Anything).
 						Return(validFCTargetsWWPN, nil)
 
@@ -326,6 +355,8 @@ var _ = Describe("CSINodeService", func() {
 				It("should modify host [update initiators]", func() {
 					iscsiConnectorMock.On("GetInitiatorName", mock.Anything).
 						Return(validISCSIInitiators, nil)
+					nvmeConnectorMock.On("GetInitiatorName", mock.Anything).
+						Return(validNVMEInitiators, nil)
 					fcConnectorMock.On("GetInitiatorPorts", mock.Anything).
 						Return(validFCTargetsWWPN, nil)
 
@@ -358,6 +389,8 @@ var _ = Describe("CSINodeService", func() {
 					)
 					iscsiConnectorMock.On("GetInitiatorName", mock.Anything).
 						Return(validISCSIInitiators, nil)
+					nvmeConnectorMock.On("GetInitiatorName", mock.Anything).
+						Return(validNVMEInitiators, nil)
 					fcConnectorMock.On("GetInitiatorPorts", mock.Anything).
 						Return(validFCTargetsWWPN, nil)
 
@@ -393,6 +426,8 @@ var _ = Describe("CSINodeService", func() {
 
 					iscsiConnectorMock.On("GetInitiatorName", mock.Anything).
 						Return(validISCSIInitiators, nil)
+					nvmeConnectorMock.On("GetInitiatorName", mock.Anything).
+						Return(validNVMEInitiators, nil)
 					fcConnectorMock.On("GetInitiatorPorts", mock.Anything).
 						Return(validFCTargetsWWPN, nil)
 
@@ -437,6 +472,8 @@ var _ = Describe("CSINodeService", func() {
 
 				iscsiConnectorMock.On("GetInitiatorName", mock.Anything).
 					Return(validISCSIInitiators, nil)
+				nvmeConnectorMock.On("GetInitiatorName", mock.Anything).
+					Return(validNVMEInitiators, nil)
 				fcConnectorMock.On("GetInitiatorPorts", mock.Anything).
 					Return(validFCTargetsWWPN, nil)
 
@@ -2491,7 +2528,7 @@ var _ = Describe("CSINodeService", func() {
 					AccessibleTopology: &csi.Topology{
 						Segments: map[string]string{
 							common.Name + "/" + firstValidIP + "-nfs":   "true",
-							common.Name + "/" + firstValidIP + "-iscsi": "true",
+							common.Name + "/" + firstValidIP + "-nvme": "true",
 							common.Name + "/" + secondValidIP + "-nfs":  "true",
 						},
 					},
@@ -2527,6 +2564,7 @@ var _ = Describe("CSINodeService", func() {
 		When("target can not be discovered", func() {
 			It("should not return iscsi topology key", func() {
 				goiscsi.GOISCSIMock.InduceDiscoveryError = true
+				gonvme.GONVMEMock.InduceDiscoveryError = true
 
 				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
 					Return([]gopowerstore.IPPoolAddress{
@@ -2808,6 +2846,8 @@ var _ = Describe("CSINodeService", func() {
 			)
 			iscsiConnectorMock.On("GetInitiatorName", mock.Anything).
 				Return(validISCSIInitiators, nil)
+			nvmeConnectorMock.On("GetInitiatorName", mock.Anything).
+				Return(validNVMEInitiators, nil)
 			fcConnectorMock.On("GetInitiatorPorts", mock.Anything).
 				Return(validFCTargetsWWPN, nil)
 
@@ -2878,11 +2918,13 @@ var _ = Describe("CSINodeService", func() {
 		When("Only iSCSI inititators are on node", func() {
 			It("should succeed", func() {
 				iscsiConnectorMock.On("GetInitiatorName", mock.Anything).Return(validISCSIInitiators, nil)
+				nvmeConnectorMock.On("GetInitiatorName", mock.Anything).Return([]string{}, nil)
 				fcConnectorMock.On("GetInitiatorPorts", mock.Anything).Return([]string{}, nil)
-				iinit, fcinit, err := nodeSvc.getInitiators()
+				iinit, fcinit, nvmeinit, err := nodeSvc.getInitiators()
 				Ω(iinit).To(Equal([]string{
 					"iqn.1994-05.com.redhat:4db86abbe3c",
 					"iqn.1994-05.com.redhat:2950c9ca441b"}))
+				Ω(nvmeinit).To(Equal([]string{}))
 				Ω(fcinit).To(BeNil())
 				Ω(err).To(BeNil())
 			})
@@ -2890,11 +2932,13 @@ var _ = Describe("CSINodeService", func() {
 		When("Both FC ans iSCSI initiators are on node", func() {
 			It("should succeed", func() {
 				iscsiConnectorMock.On("GetInitiatorName", mock.Anything).Return(validISCSIInitiators, nil)
+				nvmeConnectorMock.On("GetInitiatorName", mock.Anything).Return([]string{}, nil)
 				fcConnectorMock.On("GetInitiatorPorts", mock.Anything).Return(validFCTargetsWWPN, nil)
-				iinit, fcinit, err := nodeSvc.getInitiators()
+				iinit, fcinit, nvmeinit, err := nodeSvc.getInitiators()
 				Ω(iinit).To(Equal([]string{
 					"iqn.1994-05.com.redhat:4db86abbe3c",
 					"iqn.1994-05.com.redhat:2950c9ca441b"}))
+				Ω(nvmeinit).To(Equal([]string{}))
 				Ω(fcinit).To(Equal([]string{
 					"58:cc:f0:93:48:a0:03:a3",
 					"58:cc:f0:93:48:a0:02:a3"}))
@@ -2904,9 +2948,11 @@ var _ = Describe("CSINodeService", func() {
 		When("Neither FC nor iSCSI initiators are found on node", func() {
 			It("should succeed [NFS only]", func() {
 				iscsiConnectorMock.On("GetInitiatorName", mock.Anything).Return([]string{}, nil)
+				nvmeConnectorMock.On("GetInitiatorName", mock.Anything).Return([]string{}, nil)
 				fcConnectorMock.On("GetInitiatorPorts", mock.Anything).Return([]string{}, nil)
-				iinit, fcinit, err := nodeSvc.getInitiators()
+				iinit, fcinit, nvmeinit, err := nodeSvc.getInitiators()
 				Ω(len(iinit)).To(Equal(0))
+				Ω(len(nvmeinit)).To(Equal(0))
 				Ω(len(fcinit)).To(Equal(0))
 				Ω(err).To(BeNil())
 			})
@@ -2915,8 +2961,10 @@ var _ = Describe("CSINodeService", func() {
 			It("should succeed", func() {
 				iscsiConnectorMock.On("GetInitiatorName", mock.Anything).Return([]string{}, nil)
 				fcConnectorMock.On("GetInitiatorPorts", mock.Anything).Return(validFCTargetsWWPN, nil)
-				iinit, fcinit, err := nodeSvc.getInitiators()
+				nvmeConnectorMock.On("GetInitiatorName", mock.Anything).Return([]string{}, nil)
+				iinit, fcinit, nvmeinit, err := nodeSvc.getInitiators()
 				Ω(iinit).To(Equal([]string{}))
+				Ω(nvmeinit).To(Equal([]string{}))
 				Ω(fcinit).To(Equal([]string{
 					"58:cc:f0:93:48:a0:03:a3",
 					"58:cc:f0:93:48:a0:02:a3"}))

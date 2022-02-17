@@ -95,6 +95,35 @@ function header() {
   echo "|- Kubernetes Version: ${kMajorVersion}.${kMinorVersion}"
 }
 
+# Check if the NVMe client is installed
+function verify_nvme_installation() {
+  if [ ${NODE_VERIFY} -eq 0 ]; then
+    return
+  fi
+
+  log smart_step "Verifying NVMe installation" "$1"
+
+  error=0
+  for node in $MINION_NODES; do
+    # check if the NVMe client is installed
+    run_command ssh ${NODEUSER}@"${node}" "cat /etc/nvme/hostnqn" >/dev/null 2>&1
+    rv=$?
+    if [ $rv -ne 0 ]; then
+      error=1
+      found_warning "Either NVMe client was not found on node: $node or not able to verify"
+    fi
+    run_command ssh ${NODEUSER}@"${node}" lsmod | grep nvme_tcp &>/dev/null
+    rv=$?
+    if [ $rv -ne 0 ]; then
+      error=1
+      found_warning "Either NVMe module is not loaded on node: $node or not able to verify"
+    fi
+  done
+
+  check_error error
+}
+
+
 # Check if the iSCSI client is installed
 function verify_iscsi_installation() {
   if [ ${NODE_VERIFY} -eq 0 ]; then
