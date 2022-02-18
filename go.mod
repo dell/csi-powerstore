@@ -8,11 +8,11 @@ require (
 	github.com/dell/dell-csi-extensions/common v1.0.0
 	github.com/dell/dell-csi-extensions/replication v1.0.0
 	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.0.0
-	github.com/dell/gobrick v1.2.0
+	github.com/dell/gobrick v1.2.1-0.20220218100111-f61fda6500d3
 	github.com/dell/gocsi v1.5.0
 	github.com/dell/gofsutil v1.7.1-0.20220204052137-9928a2dc48d8
 	github.com/dell/goiscsi v1.2.0
-	github.com/dell/gonvme v0.0.0-20220214203653-9781a8511a08
+	github.com/dell/gonvme v0.0.0-20220217061253-306d51e093bd
 	github.com/dell/gopowerstore v1.6.1-0.20220217053906-266b40ccdb6e
 	github.com/fsnotify/fsnotify v1.4.9
 	github.com/golang/mock v1.4.4
@@ -83,8 +83,6 @@ replace (
 	github.com/dell/dell-csi-extensions/common v1.0.0 => github.com/dell/dell-csi-extensions/common v0.0.0-20211217121714-58de430139aa
 	github.com/dell/dell-csi-extensions/replication v1.0.0 => github.com/dell/dell-csi-extensions/replication v0.0.0-20211217121714-58de430139aa
 	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.0.0 => github.com/dell/dell-csi-extensions/volumeGroupSnapshot v0.0.0-20211217121714-58de430139aa
-	github.com/dell/gobrick => ../gobrick
-	github.com/dell/gonvme => ../gonvme
 )
 
 replace (
