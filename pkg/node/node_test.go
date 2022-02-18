@@ -98,8 +98,8 @@ var (
 		"iqn.2015-10.com.dell:dellemc-powerstore-fnm00180700173-b-10de15a5"}
 	validNVMEInitiators = []string{"nqn.2014-08.org.nvmexpress:uuid:02a08600-57d6-4089-8736-bf1f7326990e",
 		"nqn.2014-08.org.nvmexpress:uuid:fa363a22-1c74-44f3-9932-1c35d5cf5c4d"}
-	validNVMEPortals    = []string{"192.168.1.1:4420", "192.168.1.2:4420"}
-	validNVMETargets    = []string{"nqn.1988-11.com.dell:powerstore:00:e6e2d5b871f1403E169D",
+	validNVMEPortals = []string{"192.168.1.1:4420", "192.168.1.2:4420"}
+	validNVMETargets = []string{"nqn.1988-11.com.dell:powerstore:00:e6e2d5b871f1403E169D",
 		"nqn.1988-11.com.dell:powerstore:00:e6e2d5b871f1403E169D"}
 	validISCSITargetInfo = []gobrick.ISCSITargetInfo{
 		{Portal: validISCSIPortals[0], Target: validISCSITargets[0]},
@@ -2527,9 +2527,9 @@ var _ = Describe("CSINodeService", func() {
 					NodeId: nodeSvc.nodeID,
 					AccessibleTopology: &csi.Topology{
 						Segments: map[string]string{
-							common.Name + "/" + firstValidIP + "-nfs":   "true",
+							common.Name + "/" + firstValidIP + "-nfs":  "true",
 							common.Name + "/" + firstValidIP + "-nvme": "true",
-							common.Name + "/" + secondValidIP + "-nfs":  "true",
+							common.Name + "/" + secondValidIP + "-nfs": "true",
 						},
 					},
 				}))

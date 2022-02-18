@@ -1036,7 +1036,6 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 						log.Error("couldn't discover NVMe targets")
 						continue
 					}
-
 					resp.AccessibleTopology.Segments[common.Name+"/"+arr.GetIP()+"-nvme"] = "true"
 				}
 			}
@@ -1295,7 +1294,7 @@ func (s *Service) buildInitiatorsArray(initiators []string) []gopowerstore.Initi
 	var portType gopowerstore.InitiatorProtocolTypeEnum
 	if s.useFC {
 		portType = gopowerstore.InitiatorProtocolTypeEnumFC
-	} else if s.useISCSI  {
+	} else if s.useISCSI {
 		portType = gopowerstore.InitiatorProtocolTypeEnumISCSI
 	} else {
 		portType = gopowerstore.InitiatorProtocolTypeEnumNVME
