@@ -23,7 +23,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"sort"
 	"strconv"
 
@@ -87,14 +86,11 @@ func (s *Service) Init() error {
 		s.isHealthMonitorEnabled, _ = strconv.ParseBool(isHealthMonitorEnabled)
 	}
 
+	s.nfsAcls = ""
 	if nfsAcls, ok := csictx.LookupEnv(ctx, common.EnvNfsAcls); ok {
-		if nfsAcls == "" {
-			nfsAcls = fmt.Sprintf("%s", os.ModePerm) // Default to 0777
-		} else {
+		if nfsAcls != "" {
 			s.nfsAcls = nfsAcls
 		}
-	} else {
-		nfsAcls = fmt.Sprintf("%s", os.ModePerm) // Default to 0777
 	}
 
 	return nil

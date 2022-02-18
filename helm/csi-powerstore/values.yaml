@@ -35,7 +35,7 @@ externalAccess:
 imagePullPolicy: IfNotPresent
 
 # nfsAcls: enables setting permissions on NFS mount directory
-# This value acts as default value for nfsAcls, if not specified for an array config in secret
+# This value acts as default value for NFS ACL (nfsAcls), if not specified for an array config in secret
 # Permissions can be specified in two formats:
 #   1) Unix mode (NFSv3)
 #   2) NFSv4 acl (NFSv4)

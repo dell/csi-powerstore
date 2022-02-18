@@ -485,8 +485,8 @@ var _ = Describe("CSIControllerService", func() {
 			})
 		})
 
-		When("creating nfs volume with NFS acls in not in secrets", func() {
-			It("should successfully create nfs volume with default NFS acls in volume response", func() {
+		When("creating nfs volume with NFS acls in not in secrets & default", func() {
+			It("should successfully create nfs volume with empty NFS acls in volume response", func() {
 				clientMock.On("GetNASByName", mock.Anything, validNasName).Return(gopowerstore.NAS{ID: validNasID}, nil)
 				clientMock.On("CreateFS", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
 				clientMock.On("GetNfsServer", mock.Anything, mock.Anything).Return(gopowerstore.NFSServerInstance{Id: validNfsServerID, IsNFSv4Enabled: true}, nil)
@@ -494,7 +494,9 @@ var _ = Describe("CSIControllerService", func() {
 				req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
 				req.Parameters[common.KeyArrayID] = secondValidID
 
+				ctrlSvc.Arrays()[secondValidID].NfsAcls = ""
 				csictx.Setenv(context.Background(), common.EnvNfsAcls, "")
+
 				_ = ctrlSvc.Init()
 
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
@@ -507,7 +509,7 @@ var _ = Describe("CSIControllerService", func() {
 							common.KeyArrayVolumeName: "my-vol",
 							common.KeyProtocol:        "nfs",
 							common.KeyArrayID:         secondValidID,
-							common.KeyNfsACL:          "A::OWNER@:RWX",
+							common.KeyNfsACL:          "",
 							common.KeyNasName:         validNasName,
 						},
 					},

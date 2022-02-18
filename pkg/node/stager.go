@@ -178,8 +178,12 @@ func (n *NFSStager) Stage(ctx context.Context, req *csi.NodeStageVolumeRequest,
 	aclsConfigured := false
 	if acls != "" {
 		if posixMode(acls) {
-			perm, _ := strconv.ParseUint(acls, 8, 64)
-			mode = os.FileMode(perm)
+			perm, err := strconv.ParseUint(acls, 8, 64)
+			if err == nil {
+				mode = os.FileMode(perm)
+			} else {
+				log.WithFields(logFields).Warn("can't parse file mode, invalid mode specified. Default mode permissions will be set.")
+			}
 		} else {
 			aclsConfigured, err = validateAndSetACLs(ctx, nasName, n.array.GetClient(), acls, filepath.Join(stagingPath, commonNfsVolumeFolder))
 			if err != nil || !aclsConfigured {
