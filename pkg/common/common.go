@@ -90,6 +90,10 @@ const (
 	PublishContextISCSIPortalsPrefix = "PORTAL"
 	// PublishContextISCSITargetsPrefix indicates publish context iSCSI targets prefix
 	PublishContextISCSITargetsPrefix = "TARGET"
+	// PublishContextNVMEPortalsPrefix indicates publish context NVMe portals prefix
+	PublishContextNVMEPortalsPrefix = "NVMEPORTAL"
+	// PublishContextNVMETargetsPrefix indicates publish context NVMe targets prefix
+	PublishContextNVMETargetsPrefix = "NVMETARGET"
 	// NVMETransport indicates that NVMe is chosen as a transport protocol
 	NVMETransport TransportType = "NVME"
 	// PublishContextFCWWPNPrefix indicates publish context FC WWPN prefix
