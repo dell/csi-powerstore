@@ -178,7 +178,7 @@ func setVariables() {
 		Fs:             fsMock,
 		ctrlSvc:        ctrlMock,
 		iscsiConnector: iscsiConnectorMock,
-		nvmeConnector:  nvmeConnectorMock,
+		nvmetcpConnector:  nvmeConnectorMock,
 		fcConnector:    fcConnectorMock,
 		iscsiLib:       iscsiLibMock,
 		nvmeLib:        nvmeLibMock,
