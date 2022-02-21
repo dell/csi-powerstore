@@ -31,10 +31,13 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+// NFSv4ACLsInterface contains method definition to set NFSv4 ACLs
 type NFSv4ACLsInterface interface {
+	// SetNfsv4Acls sets NFSv4 ACLs
 	SetNfsv4Acls(acls string, dir string) error
 }
 
+// NFSv4ACLs implements setting NFSv4 ACLs
 type NFSv4ACLs struct{}
 
 func validateAndSetACLs(ctx context.Context, s NFSv4ACLsInterface, nasName string, client gopowerstore.Client, acls string, dir string) (bool, error) {

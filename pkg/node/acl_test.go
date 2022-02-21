@@ -6,10 +6,13 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/dell/csi-powerstore/mocks"
 	"github.com/dell/gopowerstore"
 	gopowerstoremock "github.com/dell/gopowerstore/mocks"
 	"github.com/stretchr/testify/mock"
 )
+
+var nfsv4ACLsMock *mocks.NFSv4ACLsInterface
 
 func TestPosixMode_Success(t *testing.T) {
 	isPosixMode := posixMode("0755")
@@ -56,7 +59,7 @@ func TestNfsv4NasServer_Success(t *testing.T) {
 	clientMock.On("GetNASByName", mock.Anything, validNasName).Return(gopowerstore.NAS{ID: validNasID, NfsServers: nfsServers}, nil)
 	clientMock.On("GetNfsServer", mock.Anything, mock.Anything).Return(gopowerstore.NFSServerInstance{Id: validNfsServerID, IsNFSv4Enabled: true}, nil)
 
-	isNFSv4Enabled := nfsv4NasServer(context.Background(), clientMock, validNasName)
+	isNFSv4Enabled := isNfsv4Enabled(context.Background(), clientMock, validNasName)
 	expected := true
 	if isNFSv4Enabled != expected {
 		t.Errorf(fmt.Sprintf("expected: %v, actual: %v", expected, isNFSv4Enabled))
@@ -69,7 +72,7 @@ func TestNfsv4NasServer_Err_GetNASByName(t *testing.T) {
 	clientMock.On("GetNASByName", mock.Anything, validNasName).Return(gopowerstore.NAS{ID: validNasID}, errors.New("GetNASByName_fail"))
 	clientMock.On("GetNfsServer", mock.Anything, mock.Anything).Return(gopowerstore.NFSServerInstance{Id: validNfsServerID, IsNFSv4Enabled: true}, nil)
 
-	isNFSv4Enabled := nfsv4NasServer(context.Background(), clientMock, validNasName)
+	isNFSv4Enabled := isNfsv4Enabled(context.Background(), clientMock, validNasName)
 	expected := false
 	if isNFSv4Enabled != expected {
 		t.Errorf(fmt.Sprintf("expected: %v, actual: %v", expected, isNFSv4Enabled))
@@ -89,7 +92,7 @@ func TestNfsv4NasServer_Err_GetNfsServer(t *testing.T) {
 	clientMock.On("GetNASByName", mock.Anything, validNasName).Return(gopowerstore.NAS{ID: validNasID, NfsServers: nfsServers}, nil)
 	clientMock.On("GetNfsServer", mock.Anything, mock.Anything).Return(gopowerstore.NFSServerInstance{Id: validNfsServerID, IsNFSv4Enabled: true}, errors.New("GetNfsServer_fail"))
 
-	isNFSv4Enabled := nfsv4NasServer(context.Background(), clientMock, validNasName)
+	isNFSv4Enabled := isNfsv4Enabled(context.Background(), clientMock, validNasName)
 	expected := false
 	if isNFSv4Enabled != expected {
 		t.Errorf(fmt.Sprintf("expected: %v, actual: %v", expected, isNFSv4Enabled))
@@ -109,7 +112,7 @@ func TestNfsv4NasServer_Fail(t *testing.T) {
 	clientMock.On("GetNASByName", mock.Anything, validNasName).Return(gopowerstore.NAS{ID: validNasID, NfsServers: nfsServers}, nil)
 	clientMock.On("GetNfsServer", mock.Anything, mock.Anything).Return(gopowerstore.NFSServerInstance{Id: validNfsServerID, IsNFSv4Enabled: false}, nil)
 
-	isNFSv4Enabled := nfsv4NasServer(context.Background(), clientMock, validNasName)
+	isNFSv4Enabled := isNfsv4Enabled(context.Background(), clientMock, validNasName)
 	expected := false
 	if isNFSv4Enabled != expected {
 		t.Errorf(fmt.Sprintf("expected: %v, actual: %v", expected, isNFSv4Enabled))
@@ -118,6 +121,7 @@ func TestNfsv4NasServer_Fail(t *testing.T) {
 
 func TestValidateAndSetNfsACLs_Success_nfsv4Acls(t *testing.T) {
 	clientMock = new(gopowerstoremock.Client)
+	nfsv4ACLsMock = new(mocks.NFSv4ACLsInterface)
 
 	nfsServers := []gopowerstore.NFSServerInstance{
 		{
@@ -126,13 +130,11 @@ func TestValidateAndSetNfsACLs_Success_nfsv4Acls(t *testing.T) {
 		},
 	}
 
+	nfsv4ACLsMock.On("SetNfsv4Acls", mock.Anything, mock.Anything).Return(nil)
 	clientMock.On("GetNASByName", mock.Anything, validNasName).Return(gopowerstore.NAS{ID: validNasID, NfsServers: nfsServers}, nil)
 	clientMock.On("GetNfsServer", mock.Anything, mock.Anything).Return(gopowerstore.NFSServerInstance{Id: validNfsServerID, IsNFSv4Enabled: true}, nil)
 
-	execCommand = executeCommandMock
-	defer execCommandReset()
-
-	aclConfigured, err := validateAndSetACLs(context.Background(), validNasName, clientMock, "A::OWNER@:RWX", "dir1")
+	aclConfigured, err := validateAndSetACLs(context.Background(), nfsv4ACLsMock, validNasName, clientMock, "A::OWNER@:RWX", "dir2")
 
 	if err != nil || aclConfigured == false {
 		t.Errorf(fmt.Sprintf("expected: true, actual: %v err: %s", aclConfigured, err.Error()))
@@ -141,6 +143,7 @@ func TestValidateAndSetNfsACLs_Success_nfsv4Acls(t *testing.T) {
 
 func TestValidateAndSetNfsACLs_Fail_InvalidAcls(t *testing.T) {
 	clientMock = new(gopowerstoremock.Client)
+	nfsv4ACLsMock = new(mocks.NFSv4ACLsInterface)
 
 	nfsServers := []gopowerstore.NFSServerInstance{
 		{
@@ -151,11 +154,9 @@ func TestValidateAndSetNfsACLs_Fail_InvalidAcls(t *testing.T) {
 
 	clientMock.On("GetNASByName", mock.Anything, validNasName).Return(gopowerstore.NAS{ID: validNasID, NfsServers: nfsServers}, nil)
 	clientMock.On("GetNfsServer", mock.Anything, mock.Anything).Return(gopowerstore.NFSServerInstance{Id: validNfsServerID, IsNFSv4Enabled: true}, nil)
+	nfsv4ACLsMock.On("setNfsv4Acls", mock.Anything, mock.Anything).Return(nil)
 
-	execCommand = executeCommandMock
-	defer execCommandReset()
-
-	aclConfigured, err := validateAndSetACLs(context.Background(), validNasName, clientMock, "abcd", "dir1")
+	aclConfigured, err := validateAndSetACLs(context.Background(), nfsv4ACLsMock, validNasName, clientMock, "abcd", "dir1")
 
 	if err == nil || aclConfigured != false {
 		t.Errorf(fmt.Sprintf("expected: false, actual: %v err: %s", aclConfigured, err.Error()))
@@ -164,6 +165,7 @@ func TestValidateAndSetNfsACLs_Fail_InvalidAcls(t *testing.T) {
 
 func TestValidateAndSetNfsACLs_Fail_GetNfsServerFail(t *testing.T) {
 	clientMock = new(gopowerstoremock.Client)
+	nfsv4ACLsMock = new(mocks.NFSv4ACLsInterface)
 
 	nfsServers := []gopowerstore.NFSServerInstance{
 		{
@@ -174,21 +176,11 @@ func TestValidateAndSetNfsACLs_Fail_GetNfsServerFail(t *testing.T) {
 
 	clientMock.On("GetNASByName", mock.Anything, validNasName).Return(gopowerstore.NAS{ID: validNasID, NfsServers: nfsServers}, nil)
 	clientMock.On("GetNfsServer", mock.Anything, mock.Anything).Return(gopowerstore.NFSServerInstance{Id: validNfsServerID, IsNFSv4Enabled: true}, errors.New("GetNfsServer_fail"))
+	nfsv4ACLsMock.On("setNfsv4Acls", mock.Anything, mock.Anything).Return(nil)
 
-	execCommand = executeCommandMock
-	defer execCommandReset()
-
-	aclConfigured, err := validateAndSetACLs(context.Background(), validNasName, clientMock, "u::rwx", "dir1")
+	aclConfigured, err := validateAndSetACLs(context.Background(), nfsv4ACLsMock, validNasName, clientMock, "A::OWNER@:RWX", "dir1")
 
 	if err == nil || aclConfigured != false {
 		t.Errorf(fmt.Sprintf("expected: false, actual: %v err: %s", aclConfigured, err.Error()))
 	}
-}
-
-func executeCommandMock(command []string) ([]byte, error) {
-	return []byte("executed command successfully"), nil
-}
-
-func execCommandReset() {
-	execCommand = executeCommand
 }
