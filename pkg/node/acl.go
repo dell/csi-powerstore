@@ -77,6 +77,7 @@ func nfsv4ACLs(acls string) bool {
 	return true
 }
 
+// SetNfsv4Acls sets NFSv4 ACLS
 func (n *NFSv4ACLs) SetNfsv4Acls(acls string, dir string) error {
 	command := []string{"nfs4_setfacl", "-s", acls, dir}
 	log.Infof("NFSv4 ACL command: %s \n", strings.Join(command, " "))
