@@ -48,16 +48,16 @@ import (
 )
 
 var (
-	iscsiConnectorMock *mocks.ISCSIConnector
-	nvmeConnectorMock  *mocks.NVMETCPConnector
-	fcConnectorMock    *mocks.FcConnector
-	utilMock           *mocks.UtilInterface
-	fsMock             *mocks.FsInterface
-	nodeSvc            *Service
-	clientMock         *gopowerstoremock.Client
-	ctrlMock           *mocks.ControllerInterface
-	iscsiLibMock       *goiscsi.MockISCSI
-	nvmeLibMock        *gonvme.MockNVMeTCP
+	iscsiConnectorMock   *mocks.ISCSIConnector
+	nvmetcpConnectorMock *mocks.NVMETCPConnector
+	fcConnectorMock      *mocks.FcConnector
+	utilMock             *mocks.UtilInterface
+	fsMock               *mocks.FsInterface
+	nodeSvc              *Service
+	clientMock           *gopowerstoremock.Client
+	ctrlMock             *mocks.ControllerInterface
+	iscsiLibMock         *goiscsi.MockISCSI
+	nvmeLibMock          *gonvme.MockNVMeTCP
 )
 
 const (
@@ -163,7 +163,7 @@ func getTestArrays() map[string]*array.PowerStoreArray {
 
 func setVariables() {
 	iscsiConnectorMock = new(mocks.ISCSIConnector)
-	nvmeConnectorMock = new(mocks.NVMETCPConnector)
+	nvmetcpConnectorMock = new(mocks.NVMETCPConnector)
 	fcConnectorMock = new(mocks.FcConnector)
 	utilMock = new(mocks.UtilInterface)
 	fsMock = new(mocks.FsInterface)
@@ -175,16 +175,16 @@ func setVariables() {
 	arrays := getTestArrays()
 
 	nodeSvc = &Service{
-		Fs:             fsMock,
-		ctrlSvc:        ctrlMock,
-		iscsiConnector: iscsiConnectorMock,
-		nvmetcpConnector:  nvmeConnectorMock,
-		fcConnector:    fcConnectorMock,
-		iscsiLib:       iscsiLibMock,
-		nvmeLib:        nvmeLibMock,
-		nodeID:         validNodeID,
-		useFC:          false,
-		initialized:    true,
+		Fs:               fsMock,
+		ctrlSvc:          ctrlMock,
+		iscsiConnector:   iscsiConnectorMock,
+		nvmetcpConnector: nvmetcpConnectorMock,
+		fcConnector:      fcConnectorMock,
+		iscsiLib:         iscsiLibMock,
+		nvmeLib:          nvmeLibMock,
+		nodeID:           validNodeID,
+		useFC:            false,
+		initialized:      true,
 	}
 
 	nodeSvc.SetArrays(arrays)
@@ -209,7 +209,7 @@ var _ = Describe("CSINodeService", func() {
 				)
 				iscsiConnectorMock.On("GetInitiatorName", mock.Anything).
 					Return(validISCSIInitiators, nil)
-				nvmeConnectorMock.On("GetInitiatorName", mock.Anything).
+				nvmetcpConnectorMock.On("GetInitiatorName", mock.Anything).
 					Return(validNVMEInitiators, nil)
 				fcConnectorMock.On("GetInitiatorPorts", mock.Anything).
 					Return(validFCTargetsWWPN, nil)
@@ -258,7 +258,7 @@ var _ = Describe("CSINodeService", func() {
 				)
 				iscsiConnectorMock.On("GetInitiatorName", mock.Anything).
 					Return(validISCSIInitiators, nil)
-				nvmeConnectorMock.On("GetInitiatorName", mock.Anything).
+				nvmetcpConnectorMock.On("GetInitiatorName", mock.Anything).
 					Return(validNVMEInitiators, nil)
 				fcConnectorMock.On("GetInitiatorPorts", mock.Anything).
 					Return(validFCTargetsWWPN, nil)
@@ -297,7 +297,7 @@ var _ = Describe("CSINodeService", func() {
 				)
 				iscsiConnectorMock.On("GetInitiatorName", mock.Anything).
 					Return(validISCSIInitiators, nil)
-				nvmeConnectorMock.On("GetInitiatorName", mock.Anything).
+				nvmetcpConnectorMock.On("GetInitiatorName", mock.Anything).
 					Return(validNVMEInitiators, nil)
 				fcConnectorMock.On("GetInitiatorPorts", mock.Anything).
 					Return(validFCTargetsWWPN, nil)
@@ -330,7 +330,7 @@ var _ = Describe("CSINodeService", func() {
 				It("should reuse host [no initiator updates]", func() {
 					iscsiConnectorMock.On("GetInitiatorName", mock.Anything).
 						Return(validISCSIInitiators, nil)
-					nvmeConnectorMock.On("GetInitiatorName", mock.Anything).
+					nvmetcpConnectorMock.On("GetInitiatorName", mock.Anything).
 						Return(validNVMEInitiators, nil)
 					fcConnectorMock.On("GetInitiatorPorts", mock.Anything).
 						Return(validFCTargetsWWPN, nil)
@@ -355,7 +355,7 @@ var _ = Describe("CSINodeService", func() {
 				It("should modify host [update initiators]", func() {
 					iscsiConnectorMock.On("GetInitiatorName", mock.Anything).
 						Return(validISCSIInitiators, nil)
-					nvmeConnectorMock.On("GetInitiatorName", mock.Anything).
+					nvmetcpConnectorMock.On("GetInitiatorName", mock.Anything).
 						Return(validNVMEInitiators, nil)
 					fcConnectorMock.On("GetInitiatorPorts", mock.Anything).
 						Return(validFCTargetsWWPN, nil)
@@ -389,7 +389,7 @@ var _ = Describe("CSINodeService", func() {
 					)
 					iscsiConnectorMock.On("GetInitiatorName", mock.Anything).
 						Return(validISCSIInitiators, nil)
-					nvmeConnectorMock.On("GetInitiatorName", mock.Anything).
+					nvmetcpConnectorMock.On("GetInitiatorName", mock.Anything).
 						Return(validNVMEInitiators, nil)
 					fcConnectorMock.On("GetInitiatorPorts", mock.Anything).
 						Return(validFCTargetsWWPN, nil)
@@ -426,7 +426,7 @@ var _ = Describe("CSINodeService", func() {
 
 					iscsiConnectorMock.On("GetInitiatorName", mock.Anything).
 						Return(validISCSIInitiators, nil)
-					nvmeConnectorMock.On("GetInitiatorName", mock.Anything).
+					nvmetcpConnectorMock.On("GetInitiatorName", mock.Anything).
 						Return(validNVMEInitiators, nil)
 					fcConnectorMock.On("GetInitiatorPorts", mock.Anything).
 						Return(validFCTargetsWWPN, nil)
@@ -472,7 +472,7 @@ var _ = Describe("CSINodeService", func() {
 
 				iscsiConnectorMock.On("GetInitiatorName", mock.Anything).
 					Return(validISCSIInitiators, nil)
-				nvmeConnectorMock.On("GetInitiatorName", mock.Anything).
+				nvmetcpConnectorMock.On("GetInitiatorName", mock.Anything).
 					Return(validNVMEInitiators, nil)
 				fcConnectorMock.On("GetInitiatorPorts", mock.Anything).
 					Return(validFCTargetsWWPN, nil)
@@ -506,6 +506,7 @@ var _ = Describe("CSINodeService", func() {
 
 		When("using iSCSI", func() {
 			It("should successfully stage iSCSI volume", func() {
+				nodeSvc.useISCSI = true
 				iscsiConnectorMock.On("ConnectVolume", mock.Anything, gobrick.ISCSIVolumeInfo{
 					Targets: validISCSITargetInfo,
 					Lun:     validLUNIDINT,
@@ -677,6 +678,7 @@ var _ = Describe("CSINodeService", func() {
 					},
 				}
 
+				nodeSvc.useISCSI = true
 				iscsiConnectorMock.On("ConnectVolume", mock.Anything, gobrick.ISCSIVolumeInfo{
 					Targets: validISCSITargetInfo,
 					Lun:     validLUNIDINT,
@@ -761,6 +763,7 @@ var _ = Describe("CSINodeService", func() {
 			})
 
 			It("should fail [iscsiTargets]", func() {
+				nodeSvc.useISCSI = true
 				res, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
 					VolumeId: validBlockVolumeID,
 					PublishContext: map[string]string{
@@ -797,6 +800,7 @@ var _ = Describe("CSINodeService", func() {
 		When("can not connect device", func() {
 			It("should fail", func() {
 				e := errors.New("connection-error")
+				nodeSvc.useISCSI = true
 				iscsiConnectorMock.On("ConnectVolume", mock.Anything, gobrick.ISCSIVolumeInfo{
 					Targets: validISCSITargetInfo,
 					Lun:     validLUNIDINT,
@@ -819,6 +823,7 @@ var _ = Describe("CSINodeService", func() {
 		When("mount fails", func() {
 			It("should fail", func() {
 				e := errors.New("mount-error")
+				nodeSvc.useISCSI = true
 				iscsiConnectorMock.On("ConnectVolume", mock.Anything, gobrick.ISCSIVolumeInfo{
 					Targets: validISCSITargetInfo,
 					Lun:     validLUNIDINT,
@@ -865,6 +870,7 @@ var _ = Describe("CSINodeService", func() {
 				fsMock.On("Remove", stagingPath).Return(nil)
 				fsMock.On("WriteFile", path.Join(nodeSvc.opts.TmpDir, validBaseVolumeID), []byte(validDevName), os.FileMode(0640)).Return(nil)
 
+				nodeSvc.useISCSI = true
 				iscsiConnectorMock.On("DisconnectVolumeByDeviceName", mock.Anything, validDevName).Return(nil)
 
 				fsMock.On("Remove", path.Join(nodeSvc.opts.TmpDir, validBaseVolumeID)).Return(nil)
@@ -2008,6 +2014,7 @@ var _ = Describe("CSINodeService", func() {
 						"FCWWPN1":     "58ccf09348a002a3",
 					},
 				}, nil)
+				nodeSvc.useISCSI = true
 				iscsiConnectorMock.On("ConnectVolume", mock.Anything, gobrick.ISCSIVolumeInfo{
 					Targets: validISCSITargetInfo,
 					Lun:     validLUNIDINT,
@@ -2137,6 +2144,7 @@ var _ = Describe("CSINodeService", func() {
 					},
 				}, nil)
 
+				nodeSvc.useISCSI = true
 				iscsiConnectorMock.On("ConnectVolume", mock.Anything, gobrick.ISCSIVolumeInfo{
 					Targets: validISCSITargetInfo,
 					Lun:     validLUNIDINT,
@@ -2332,6 +2340,7 @@ var _ = Describe("CSINodeService", func() {
 					"FCWWPN1":     "58ccf09348a002a3",
 				},
 			}, nil)
+			nodeSvc.useISCSI = true
 			iscsiConnectorMock.On("ConnectVolume", mock.Anything, gobrick.ISCSIVolumeInfo{
 				Targets: validISCSITargetInfo,
 				Lun:     validLUNIDINT,
@@ -2383,6 +2392,7 @@ var _ = Describe("CSINodeService", func() {
 				fsMock.On("Remove", mock.Anything).Return(nil)
 				fsMock.On("WriteFile", mock.Anything, mock.Anything, os.FileMode(0640)).Return(nil)
 
+				nodeSvc.useISCSI = true
 				iscsiConnectorMock.On("DisconnectVolumeByDeviceName", mock.Anything, mock.Anything).Return(nil)
 
 				fsMock.On("Remove", mock.Anything).Return(nil)
@@ -2446,6 +2456,7 @@ var _ = Describe("CSINodeService", func() {
 				fsMock.On("Remove", mock.Anything).Return(nil)
 				fsMock.On("WriteFile", mock.Anything, mock.Anything, os.FileMode(0640)).Return(nil)
 
+				nodeSvc.useISCSI = true
 				iscsiConnectorMock.On("DisconnectVolumeByDeviceName", mock.Anything, mock.Anything).Return(nil)
 
 				fsMock.On("Remove", mock.Anything).Return(nil)
@@ -2485,6 +2496,7 @@ var _ = Describe("CSINodeService", func() {
 				fsMock.On("Remove", mock.Anything).Return(nil)
 				fsMock.On("WriteFile", mock.Anything, mock.Anything, os.FileMode(0640)).Return(nil)
 
+				nodeSvc.useISCSI = true
 				iscsiConnectorMock.On("DisconnectVolumeByDeviceName", mock.Anything, mock.Anything).Return(nil)
 
 				fsMock.On("Remove", mock.Anything).Return(nil)
@@ -2846,7 +2858,7 @@ var _ = Describe("CSINodeService", func() {
 			)
 			iscsiConnectorMock.On("GetInitiatorName", mock.Anything).
 				Return(validISCSIInitiators, nil)
-			nvmeConnectorMock.On("GetInitiatorName", mock.Anything).
+			nvmetcpConnectorMock.On("GetInitiatorName", mock.Anything).
 				Return(validNVMEInitiators, nil)
 			fcConnectorMock.On("GetInitiatorPorts", mock.Anything).
 				Return(validFCTargetsWWPN, nil)
@@ -2918,7 +2930,7 @@ var _ = Describe("CSINodeService", func() {
 		When("Only iSCSI inititators are on node", func() {
 			It("should succeed", func() {
 				iscsiConnectorMock.On("GetInitiatorName", mock.Anything).Return(validISCSIInitiators, nil)
-				nvmeConnectorMock.On("GetInitiatorName", mock.Anything).Return([]string{}, nil)
+				nvmetcpConnectorMock.On("GetInitiatorName", mock.Anything).Return([]string{}, nil)
 				fcConnectorMock.On("GetInitiatorPorts", mock.Anything).Return([]string{}, nil)
 				iinit, fcinit, nvmeinit, err := nodeSvc.getInitiators()
 				Ω(iinit).To(Equal([]string{
@@ -2932,7 +2944,7 @@ var _ = Describe("CSINodeService", func() {
 		When("Both FC ans iSCSI initiators are on node", func() {
 			It("should succeed", func() {
 				iscsiConnectorMock.On("GetInitiatorName", mock.Anything).Return(validISCSIInitiators, nil)
-				nvmeConnectorMock.On("GetInitiatorName", mock.Anything).Return([]string{}, nil)
+				nvmetcpConnectorMock.On("GetInitiatorName", mock.Anything).Return([]string{}, nil)
 				fcConnectorMock.On("GetInitiatorPorts", mock.Anything).Return(validFCTargetsWWPN, nil)
 				iinit, fcinit, nvmeinit, err := nodeSvc.getInitiators()
 				Ω(iinit).To(Equal([]string{
@@ -2948,7 +2960,7 @@ var _ = Describe("CSINodeService", func() {
 		When("Neither FC nor iSCSI initiators are found on node", func() {
 			It("should succeed [NFS only]", func() {
 				iscsiConnectorMock.On("GetInitiatorName", mock.Anything).Return([]string{}, nil)
-				nvmeConnectorMock.On("GetInitiatorName", mock.Anything).Return([]string{}, nil)
+				nvmetcpConnectorMock.On("GetInitiatorName", mock.Anything).Return([]string{}, nil)
 				fcConnectorMock.On("GetInitiatorPorts", mock.Anything).Return([]string{}, nil)
 				iinit, fcinit, nvmeinit, err := nodeSvc.getInitiators()
 				Ω(len(iinit)).To(Equal(0))
@@ -2961,7 +2973,7 @@ var _ = Describe("CSINodeService", func() {
 			It("should succeed", func() {
 				iscsiConnectorMock.On("GetInitiatorName", mock.Anything).Return([]string{}, nil)
 				fcConnectorMock.On("GetInitiatorPorts", mock.Anything).Return(validFCTargetsWWPN, nil)
-				nvmeConnectorMock.On("GetInitiatorName", mock.Anything).Return([]string{}, nil)
+				nvmetcpConnectorMock.On("GetInitiatorName", mock.Anything).Return([]string{}, nil)
 				iinit, fcinit, nvmeinit, err := nodeSvc.getInitiators()
 				Ω(iinit).To(Equal([]string{}))
 				Ω(nvmeinit).To(Equal([]string{}))

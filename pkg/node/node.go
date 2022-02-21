@@ -65,12 +65,12 @@ type Opts struct {
 type Service struct {
 	Fs fs.Interface
 
-	ctrlSvc        controller.Interface
-	iscsiConnector ISCSIConnector
-	fcConnector    FcConnector
-	nvmetcpConnector  NVMETCPConnector
-	iscsiLib       goiscsi.ISCSIinterface
-	nvmeLib        gonvme.NVMEinterface
+	ctrlSvc          controller.Interface
+	iscsiConnector   ISCSIConnector
+	fcConnector      FcConnector
+	nvmetcpConnector NVMETCPConnector
+	iscsiLib         goiscsi.ISCSIinterface
+	nvmeLib          gonvme.NVMEinterface
 
 	opts   Opts
 	nodeID string
@@ -211,13 +211,6 @@ func (s *Service) initConnectors() {
 func (s *Service) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
 	logFields := common.GetLogFields(ctx)
 
-	nvmeIP := strings.Split(req.PublishContext["PORTAL0"],":")
-	nvmeTargets ,_ := s.nvmeLib.DiscoverNVMeTCPTargets(nvmeIP[0],false)
-	for i, t := range nvmeTargets {
-		req.PublishContext[fmt.Sprintf("%s%d",common.PublishContextNVMETargetsPrefix,i)] = t.TargetNqn
-		req.PublishContext[fmt.Sprintf("%s%d",common.PublishContextNVMEPortalsPrefix,i)] = t.Portal + ":4420"
-	}
-
 	if req.GetVolumeCapability() == nil {
 		return nil, status.Error(codes.InvalidArgument, "volume capability is required")
 	}
@@ -229,6 +222,13 @@ func (s *Service) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeR
 
 	if req.GetStagingTargetPath() == "" {
 		return nil, status.Error(codes.InvalidArgument, "staging target path is required")
+	}
+
+	nvmeIP := strings.Split(req.PublishContext["PORTAL0"], ":")
+	nvmeTargets, _ := s.nvmeLib.DiscoverNVMeTCPTargets(nvmeIP[0], false)
+	for i, t := range nvmeTargets {
+		req.PublishContext[fmt.Sprintf("%s%d", common.PublishContextNVMETargetsPrefix, i)] = t.TargetNqn
+		req.PublishContext[fmt.Sprintf("%s%d", common.PublishContextNVMEPortalsPrefix, i)] = t.Portal + ":4420"
 	}
 
 	id, arrayID, protocol, _ := array.ParseVolumeID(ctx, id, s.DefaultArray(), req.VolumeCapability)
@@ -250,7 +250,7 @@ func (s *Service) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeR
 			useISCSI:         s.useISCSI,
 			iscsiConnector:   s.iscsiConnector,
 			nvmetcpConnector: s.nvmetcpConnector,
-			fcConnector:     s.fcConnector,
+			fcConnector:      s.fcConnector,
 		}
 	}
 

@@ -51,11 +51,11 @@ type VolumeStager interface {
 
 // SCSIStager implementation of NodeVolumeStager for SCSI based (FC, iSCSI) volumes
 type SCSIStager struct {
-	useFC          		bool
-	useISCSI       		bool
-	iscsiConnector 		ISCSIConnector
-	nvmetcpConnector  	NVMETCPConnector
-	fcConnector    		FcConnector
+	useFC            bool
+	useISCSI         bool
+	iscsiConnector   ISCSIConnector
+	nvmetcpConnector NVMETCPConnector
+	fcConnector      FcConnector
 }
 
 // Stage stages volume by connecting it through either FC or iSCSI and creating bind mount to staging path
@@ -315,7 +315,7 @@ func (s *SCSIStager) connectDevice(ctx context.Context, data scsiPublishContextD
 	var device gobrick.Device
 	if s.useFC {
 		device, err = s.connectFCDevice(ctx, lun, data)
-	} else if s.useISCSI{
+	} else if s.useISCSI {
 		device, err = s.connectISCSIDevice(ctx, lun, data)
 	} else {
 		device, err = s.connectNVMEDevice(ctx, wwn, data)
@@ -365,7 +365,6 @@ func (s *SCSIStager) connectNVMEDevice(ctx context.Context,
 		WWN:     wwn,
 	})
 }
-
 
 func (s *SCSIStager) connectFCDevice(ctx context.Context,
 	lun int, data scsiPublishContextData) (gobrick.Device, error) {
