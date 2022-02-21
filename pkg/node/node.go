@@ -1042,10 +1042,14 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 					log.Infof("Discovering NVMe targets")
 
 					nvmeIP := strings.Split(infoList[0].Portal, ":")
-					_, err := s.nvmeLib.DiscoverNVMeTCPTargets(nvmeIP[0], false)
+					nvmeTargets, err := s.nvmeLib.DiscoverNVMeTCPTargets(nvmeIP[0], false)
 					if err != nil {
 						log.Error("couldn't discover NVMe targets")
 						continue
+					} else {
+						for _, targets := range nvmeTargets {
+							s.nvmeLib.NVMeConnect(targets)
+						}
 					}
 					resp.AccessibleTopology.Segments[common.Name+"/"+arr.GetIP()+"-nvme"] = "true"
 				}
