@@ -38,7 +38,8 @@ parameters:
   # This value overrides the NFS ACL (nfsAcls) attribute of corresponding array config in secret, if present
   # Permissions can be specified in two formats:
   #   1) Unix mode (NFSv3)
-  #   2) NFSv4 acl (NFSv4)
+  #   2) NFSv4 ACLs (NFSv4)
+  #      NFSv4 ACLs are supported on NFSv4 share only.
   # Allowed values:
   #   1) Unix mode: valid octal mode number
   #      Examples: "0777", "777", "0755"

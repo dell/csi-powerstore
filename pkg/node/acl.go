@@ -31,15 +31,17 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-var (
-	execCommand = executeCommand
-)
+type NFSv4ACLsInterface interface {
+	SetNfsv4Acls(acls string, dir string) error
+}
 
-func validateAndSetACLs(ctx context.Context, nasName string, client gopowerstore.Client, acls string, dir string) (bool, error) {
+type NFSv4ACLs struct{}
+
+func validateAndSetACLs(ctx context.Context, s NFSv4ACLsInterface, nasName string, client gopowerstore.Client, acls string, dir string) (bool, error) {
 	aclsConfigured := false
 	if nfsv4ACLs(acls) {
-		if nfsv4NasServer(ctx, client, nasName) {
-			if err := setNfsv4Acls(acls, dir); err != nil {
+		if isNfsv4Enabled(ctx, client, nasName) {
+			if err := s.SetNfsv4Acls(acls, dir); err != nil {
 				log.Error(fmt.Sprintf("can't assign NFSv4 ACLs to folder %s: %s", dir, err.Error()))
 				return false, err
 			}
@@ -72,20 +74,17 @@ func nfsv4ACLs(acls string) bool {
 	return true
 }
 
-func setNfsv4Acls(acls string, dir string) error {
+func (n *NFSv4ACLs) SetNfsv4Acls(acls string, dir string) error {
 	command := []string{"nfs4_setfacl", "-s", acls, dir}
 	log.Infof("NFSv4 ACL command: %s \n", strings.Join(command, " "))
-	outStr, err := execCommand(command)
+	// arguments for exec.Command() are validated in caller
+	cmd := exec.Command(command[0], command[1:]...) // #nosec G204
+	outStr, err := cmd.Output()
 	log.Infof("NFSv4 ACL output: %s \n", string(outStr))
 	return err
 }
 
-func executeCommand(command []string) ([]byte, error) {
-	cmd := exec.Command(command[0], command[1:]...) // #nosec G204
-	return cmd.Output()
-}
-
-func nfsv4NasServer(ctx context.Context, client gopowerstore.Client, nasName string) bool {
+func isNfsv4Enabled(ctx context.Context, client gopowerstore.Client, nasName string) bool {
 	nfsv4Enabled := false
 	nas, err := gopowerstore.Client.GetNASByName(client, ctx, nasName)
 	if err == nil {
