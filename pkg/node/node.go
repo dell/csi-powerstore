@@ -1125,7 +1125,6 @@ func (s *Service) getInitiators() ([]string, []string, []string, error) {
 		fcAvailable = true
 	}
 
-
 	nvmeInitiators, err := s.nvmetcpConnector.GetInitiatorName(ctx)
 	if err != nil {
 		log.Error("nodeStartup could not get Initiator NQNs")
