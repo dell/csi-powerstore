@@ -82,4 +82,7 @@ const (
 
 	// EnvIsHealthMonitorEnabled specifies if health monitor is enabled.
 	EnvIsHealthMonitorEnabled = "X_CSI_HEALTH_MONITOR_ENABLED"
+
+	// EnvNfsAcls specifies acls to be set on NFS mount directory
+	EnvNfsAcls = "X_CSI_NFS_ACLS"
 )

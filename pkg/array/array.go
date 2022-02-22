@@ -116,6 +116,7 @@ type PowerStoreArray struct {
 	BlockProtocol common.TransportType `yaml:"blockProtocol"`
 	Insecure      bool                 `yaml:"skipCertificateValidation"`
 	IsDefault     bool                 `yaml:"isDefault"`
+	NfsAcls       string               `yaml:"nfsAcls"`
 
 	Client gopowerstore.Client
 	IP     string

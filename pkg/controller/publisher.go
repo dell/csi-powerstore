@@ -267,6 +267,7 @@ func (n *NfsPublisher) Publish(ctx context.Context, req *csi.ControllerPublishVo
 	}
 	publishContext[common.KeyExportID] = export.ID
 	publishContext[common.KeyAllowRoot] = req.VolumeContext[common.KeyAllowRoot]
+	publishContext[common.KeyNfsACL] = req.VolumeContext[common.KeyNfsACL]
 	return &csi.ControllerPublishVolumeResponse{PublishContext: publishContext}, nil
 }
 

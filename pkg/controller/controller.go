@@ -58,6 +58,7 @@ type Service struct {
 	Fs fs.Interface
 
 	externalAccess string
+	nfsAcls        string
 
 	array.Locker
 
@@ -83,6 +84,13 @@ func (s *Service) Init() error {
 
 	if isHealthMonitorEnabled, ok := csictx.LookupEnv(ctx, common.EnvIsHealthMonitorEnabled); ok {
 		s.isHealthMonitorEnabled, _ = strconv.ParseBool(isHealthMonitorEnabled)
+	}
+
+	s.nfsAcls = ""
+	if nfsAcls, ok := csictx.LookupEnv(ctx, common.EnvNfsAcls); ok {
+		if nfsAcls != "" {
+			s.nfsAcls = nfsAcls
+		}
 	}
 
 	return nil
@@ -132,6 +140,7 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 	var creator VolumeCreator
 	var protocol string
 
+	nfsAcls := s.nfsAcls
 	if useNFS {
 		protocol = "nfs"
 		nasParamsName, ok := params[KeyNasName]
@@ -143,6 +152,12 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 			creator = &NfsCreator{
 				nasName: arr.GetNasName(),
 			}
+		}
+
+		if params[common.KeyNfsACL] != "" {
+			nfsAcls = params[common.KeyNfsACL] // Storage class takes precedence
+		} else if arr.NfsAcls != "" {
+			nfsAcls = arr.NfsAcls // Secrets next
 		}
 	} else {
 		protocol = "scsi"
@@ -308,6 +323,12 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 	volumeResponse.VolumeContext[common.KeyArrayID] = arr.GetGlobalID()
 	volumeResponse.VolumeContext[common.KeyArrayVolumeName] = req.Name
 	volumeResponse.VolumeContext[common.KeyProtocol] = protocol
+
+	if useNFS {
+		volumeResponse.VolumeContext[common.KeyNfsACL] = nfsAcls
+		volumeResponse.VolumeContext[common.KeyNasName] = arr.GetNasName()
+	}
+
 	volumeResponse.VolumeId = volumeResponse.VolumeId + "/" + arr.GetGlobalID() + "/" + protocol
 	volumeResponse.AccessibleTopology = topology
 	return &csi.CreateVolumeResponse{

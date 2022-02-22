@@ -134,6 +134,7 @@ func (n *NFSStager) Stage(ctx context.Context, req *csi.NodeStageVolumeRequest,
 	exportID := req.PublishContext[common.KeyExportID]
 	nfsExport := req.PublishContext[common.KeyNfsExportPath]
 	allowRoot := req.PublishContext[common.KeyAllowRoot]
+	nasName := req.PublishContext[common.KeyNasName]
 
 	natIP := ""
 	if ip, ok := req.PublishContext[common.KeyNatIP]; ok {
@@ -147,6 +148,8 @@ func (n *NFSStager) Stage(ctx context.Context, req *csi.NodeStageVolumeRequest,
 	logFields["ExportID"] = exportID
 	logFields["HostIP"] = hostIP
 	logFields["NatIP"] = natIP
+	logFields["NFSv4ACLs"] = req.PublishContext[common.KeyNfsACL]
+	logFields["NasName"] = nasName
 	ctx = common.SetLogFields(ctx, logFields)
 
 	found, err := isReadyToPublishNFS(ctx, stagingPath, fs)
@@ -171,15 +174,35 @@ func (n *NFSStager) Stage(ctx context.Context, req *csi.NodeStageVolumeRequest,
 	}
 
 	// Create folder with 1777 in nfs share so every user can use it
-	log.WithFields(logFields).Info("creating common folder")
 	if err := fs.MkdirAll(filepath.Join(stagingPath, commonNfsVolumeFolder), 0750); err != nil {
 		return nil, status.Errorf(codes.Internal,
 			"can't create common folder %s: %s", filepath.Join(stagingPath, "volume"), err.Error())
 	}
 
-	if err := fs.Chmod(filepath.Join(stagingPath, commonNfsVolumeFolder), os.ModeSticky|os.ModePerm); err != nil {
-		return nil, status.Errorf(codes.Internal,
-			"can't change permissions of folder %s: %s", filepath.Join(stagingPath, "volume"), err.Error())
+	mode := os.ModePerm
+	acls := req.PublishContext[common.KeyNfsACL]
+	aclsConfigured := false
+	if acls != "" {
+		if posixMode(acls) {
+			perm, err := strconv.ParseUint(acls, 8, 64)
+			if err == nil {
+				mode = os.FileMode(perm)
+			} else {
+				log.WithFields(logFields).Warn("can't parse file mode, invalid mode specified. Default mode permissions will be set.")
+			}
+		} else {
+			aclsConfigured, err = validateAndSetACLs(ctx, &NFSv4ACLs{}, nasName, n.array.GetClient(), acls, filepath.Join(stagingPath, commonNfsVolumeFolder))
+			if err != nil || !aclsConfigured {
+				return nil, err
+			}
+		}
+	}
+
+	if !aclsConfigured {
+		if err := fs.Chmod(filepath.Join(stagingPath, commonNfsVolumeFolder), os.ModeSticky|mode); err != nil {
+			return nil, status.Errorf(codes.Internal,
+				"can't change permissions of folder %s: %s", filepath.Join(stagingPath, "volume"), err.Error())
+		}
 	}
 
 	if allowRoot == "false" {
