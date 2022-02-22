@@ -62,6 +62,14 @@ type ISCSIConnector interface {
 	GetInitiatorName(ctx context.Context) ([]string, error)
 }
 
+// NVMETCPConnector is wrapper of gobrick.NVMETCPConnector interface.
+// It allows to connect NVMe volumes to the node.
+type NVMETCPConnector interface {
+	ConnectVolume(ctx context.Context, info gobrick.NVMeTCPVolumeInfo) (gobrick.Device, error)
+	DisconnectVolumeByDeviceName(ctx context.Context, name string) error
+	GetInitiatorName(ctx context.Context) ([]string, error)
+}
+
 // FcConnector is wrapper of gobrcik.FcConnector interface.
 // It allows to connect FC volumes to the node.
 type FcConnector interface {
