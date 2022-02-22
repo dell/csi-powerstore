@@ -72,6 +72,10 @@ const (
 	KeyArrayVolumeName = "Name"
 	// KeyProtocol key value to check in request parameters for volume name
 	KeyProtocol = "Protocol"
+	// KeyNfsACL key value to specify NFS ACLs for NFS volume
+	KeyNfsACL = "nfsAcls"
+	// KeyNasName key value to specify NAS server name
+	KeyNasName = "nasName"
 	// VerboseName longer description of the driver
 	VerboseName = "CSI Driver for Dell EMC PowerStore"
 	// FcTransport indicates that FC is chosen as a SCSI transport protocol
