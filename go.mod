@@ -8,14 +8,14 @@ require (
 	github.com/dell/dell-csi-extensions/common v1.0.0
 	github.com/dell/dell-csi-extensions/replication v1.0.0
 	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.0.0
-	github.com/dell/gobrick v1.2.1-0.20220218100111-f61fda6500d3
-	github.com/dell/gocsi v1.5.0
-	github.com/dell/gofsutil v1.7.1-0.20220204052137-9928a2dc48d8
-	github.com/dell/goiscsi v1.2.0
+	github.com/dell/gobrick v1.2.1-0.20220222134223-209fb196cbc3
+	github.com/dell/gocsi v1.5.1-0.20220218201557-b18545e234c3
+	github.com/dell/gofsutil v1.7.1-0.20220222054218-54aba58afa13
+	github.com/dell/goiscsi v1.2.1-0.20220222054507-9cc2d02a05dd
 	github.com/dell/gonvme v0.0.0-20220217061253-306d51e093bd
 	github.com/dell/gopowerstore v1.6.1-0.20220217053906-266b40ccdb6e
 	github.com/fsnotify/fsnotify v1.4.9
-	github.com/golang/mock v1.4.4
+	github.com/golang/mock v1.6.0
 	github.com/golang/protobuf v1.5.2
 	github.com/grpc-ecosystem/go-grpc-middleware v1.0.1-0.20190118093823-f849b5445de4
 	github.com/onsi/ginkgo v1.16.5
@@ -27,7 +27,7 @@ require (
 	github.com/uber/jaeger-client-go v2.25.0+incompatible
 	github.com/uber/jaeger-lib v2.4.0+incompatible
 	golang.org/x/net v0.0.0-20211015210444-4f30a5c0130f
-	google.golang.org/grpc v1.42.0
+	google.golang.org/grpc v1.43.0
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
 )
 
