@@ -1047,8 +1047,10 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 						log.Error("couldn't discover NVMe targets")
 						continue
 					} else {
-						for _, targets := range nvmeTargets {
-							s.nvmeLib.NVMeConnect(targets)
+						for _, target := range nvmeTargets {
+							if target.TargetNqn != "" {
+								s.nvmeLib.NVMeConnect(target)
+							}
 						}
 					}
 					resp.AccessibleTopology.Segments[common.Name+"/"+arr.GetIP()+"-nvme"] = "true"
