@@ -95,11 +95,14 @@ func TestSCSIStager_Stage(t *testing.T) {
 	t.Run("iscsi -- success test", func(t *testing.T) {
 		iscsiConnectorMock := new(mocks.ISCSIConnector)
 		fcConnectorMock := new(mocks.FcConnector)
+		nvmetcpConnectorMock := new(mocks.NVMETCPConnector)
 
 		stager := &SCSIStager{
-			useFC:          false,
-			iscsiConnector: iscsiConnectorMock,
-			fcConnector:    fcConnectorMock,
+			useFC:            false,
+			useISCSI:         true,
+			iscsiConnector:   iscsiConnectorMock,
+			nvmetcpConnector: nvmetcpConnectorMock,
+			fcConnector:      fcConnectorMock,
 		}
 
 		iscsiConnectorMock.On("ConnectVolume", mock.Anything, gobrick.ISCSIVolumeInfo{
