@@ -246,7 +246,8 @@ func (n *NfsPublisher) Publish(ctx context.Context, req *csi.ControllerPublishVo
 		AddRWRootHosts: ipWithNat,
 	}, export.ID)
 	if err != nil {
-		if apiError, ok := err.(gopowerstore.APIError); !(ok && apiError.NotFound()) {
+		// added 400 bad request error with OR condition check here for customer issue fix
+		if apiError, ok := err.(gopowerstore.APIError); !(ok && (apiError.NotFound() || apiError.HostIsNotAttachedToVolume())) {
 			return nil, status.Errorf(codes.Internal, "failure when adding new host to nfs export: %s", err.Error())
 		}
 	}
