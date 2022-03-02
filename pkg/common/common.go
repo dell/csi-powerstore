@@ -231,7 +231,6 @@ func GetISCSITargetsInfoFromStorage(client gopowerstore.Client, volumeApplianceI
 	sort.Slice(addrInfo, func(i, j int) bool {
 		return addrInfo[i].ID < addrInfo[j].ID
 	})
-	result := make([]gobrick.ISCSITargetInfo, len(addrInfo))
 	var result []gobrick.ISCSITargetInfo
 	for _, t := range addrInfo {
 		//volumeApplianceID will be empty in case the call is from NodeGetInfo
