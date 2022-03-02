@@ -247,7 +247,11 @@ func (n *NfsPublisher) Publish(ctx context.Context, req *csi.ControllerPublishVo
 	}, export.ID)
 	if err != nil {
 		// added 400 bad request error with OR condition check here for customer issue fix
-		if apiError, ok := err.(gopowerstore.APIError); !(ok && (apiError.NotFound() || apiError.HostIsNotAttachedToVolume())) {
+		log.Info("---ADDED 400 CHECK---")
+		eType, okVal := err.(gopowerstore.APIError)
+		log.Info(eType)
+		log.Info(okVal)
+		if apiError, ok := err.(gopowerstore.APIError); !(ok && (apiError.NotFound() || apiError.HostAlreadyPresentInNFSExport())) {
 			return nil, status.Errorf(codes.Internal, "failure when adding new host to nfs export: %s", err.Error())
 		}
 	}
