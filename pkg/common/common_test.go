@@ -22,6 +22,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"testing"
+
 	"github.com/dell/csi-powerstore/mocks"
 	"github.com/dell/csi-powerstore/pkg/common"
 	csictx "github.com/dell/gocsi/context"
@@ -30,8 +33,6 @@ import (
 	gopowerstoremock "github.com/dell/gopowerstore/mocks"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
-	"os"
-	"testing"
 )
 
 func TestCustomLogger(t *testing.T) {
@@ -111,7 +112,7 @@ func TestGetFCTargetsInfoFromStorage(t *testing.T) {
 		e := errors.New("some error")
 		clientMock := new(gopowerstoremock.Client)
 		clientMock.On("GetFCPorts", context.Background()).Return([]gopowerstore.FcPort{}, e)
-		_, err := common.GetFCTargetsInfoFromStorage(clientMock)
+		_, err := common.GetFCTargetsInfoFromStorage(clientMock, "A1")
 		assert.EqualError(t, err, e.Error())
 	})
 }
