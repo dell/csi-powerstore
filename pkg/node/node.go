@@ -1022,7 +1022,7 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 				}
 			} else {
 
-				infoList, err := common.GetISCSITargetsInfoFromStorage(arr.GetClient())
+				infoList, err := common.GetISCSITargetsInfoFromStorage(arr.GetClient(), "")
 				if err != nil {
 					log.Errorf("couldn't get targets from array: %s", err.Error())
 					continue
