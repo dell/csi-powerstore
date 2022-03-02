@@ -1948,6 +1948,7 @@ var _ = Describe("CSINodeService", func() {
 					MPathName:   "/dev/mpatha",
 					MountPoint:  stagingPath,
 				}, nil).Times(1)
+				nodeSvc.useISCSI = true
 				utilMock.On("DeviceRescan", mock.Anything, mock.Anything).Return(errors.New("Failed to rescan device"))
 				_, err := nodeSvc.NodeExpandVolume(context.Background(), getNodeVolumeExpandValidRequest(validBlockVolumeID, false))
 				Ω(err.Error()).To(ContainSubstring("Failed to rescan device"))
