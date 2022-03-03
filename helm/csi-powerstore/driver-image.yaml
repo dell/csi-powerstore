@@ -1,4 +1,4 @@
 # IT IS RECOMMENDED YOU DO NOT CHANGE THE IMAGES TO BE DOWNLOADED.
 images:
   # "images.driver" defines the container images used for the driver container.
-  driver: dellemc/csi-powerstore:v2.2.0
+  driver: amaas-eos-mw1.cec.lab.emc.com:5028/csi-powerstore:nvme-test-final
