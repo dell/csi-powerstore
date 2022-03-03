@@ -99,7 +99,7 @@ const (
 	// PublishContextNVMETargetsPrefix indicates publish context NVMe targets prefix
 	PublishContextNVMETargetsPrefix = "NVMETARGET"
 	// NVMETransport indicates that NVMe is chosen as a transport protocol
-	NVMETransport TransportType = "NVME"
+	NVMETransport TransportType = "NVMETCP"
 	// PublishContextFCWWPNPrefix indicates publish context FC WWPN prefix
 	PublishContextFCWWPNPrefix = "FCWWPN"
 	// WWNPrefix indicates WWN prefix

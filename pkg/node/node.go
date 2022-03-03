@@ -1052,7 +1052,7 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 						for _, target := range nvmeTargets {
 							err = s.nvmeLib.NVMeConnect(target)
 							if err == nil {
-								log.Error("NVMe connection successful")
+								log.Infof("NVMe connection successful")
 							}
 						}
 					}
