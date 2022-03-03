@@ -375,7 +375,7 @@ func (s *SCSIStager) connectNVMEDevice(ctx context.Context,
 	wwn string, data scsiPublishContextData) (gobrick.Device, error) {
 	logFields := common.GetLogFields(ctx)
 	var targets []gobrick.NVMeTCPTargetInfo
-	for _, t := range data.iscsiTargets {
+	for _, t := range data.nvmeTargets {
 		targets = append(targets, gobrick.NVMeTCPTargetInfo{Target: t.Target, Portal: t.Portal})
 	}
 	// separate context to prevent 15 seconds cancel from kubernetes
