@@ -78,8 +78,6 @@ github.com/dell/gobrick v1.2.1-0.20220224111903-717383a5e97e h1:i0nVa6y/bQ+Z7nWw
 github.com/dell/gobrick v1.2.1-0.20220224111903-717383a5e97e/go.mod h1:2dGTtzQNQx/EhDaO9vFuApWy55IXiQue0I1duXdvm14=
 github.com/dell/gocsi v1.5.1-0.20220218201557-b18545e234c3 h1:kxuw6ZTvkhTGPuz8ANx4IIFIzdzO/XiYG18uJGgr05s=
 github.com/dell/gocsi v1.5.1-0.20220218201557-b18545e234c3/go.mod h1:GoNFNluCYj7i9AcPQy4CLFF1FQoLsD5rlnDttVesnzk=
-github.com/dell/gofsutil v1.7.1-0.20220222054218-54aba58afa13 h1:6chFUTevM2q+CwN/X8jO9nE7A/IvpgDjkHTlh66qYz4=
-github.com/dell/gofsutil v1.7.1-0.20220222054218-54aba58afa13/go.mod h1:oWLiV7FmBurEie3An11SNqQ1ReyOiqjSZaXDRhm7tMc=
 github.com/dell/gofsutil v1.7.1-0.20220302093137-8dccd83747e2 h1:avM1qrtUQnSbyk7kuwXGK80xavX/hL2IlAzJafh4Wbg=
 github.com/dell/gofsutil v1.7.1-0.20220302093137-8dccd83747e2/go.mod h1:oWLiV7FmBurEie3An11SNqQ1ReyOiqjSZaXDRhm7tMc=
 github.com/dell/goiscsi v1.1.0/go.mod h1:MfuMjbKWsh/MOb0VDW20C+LFYRIOfWKGiAxWkeM5TKo=
