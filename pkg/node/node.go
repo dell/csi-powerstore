@@ -809,13 +809,15 @@ func (s *Service) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolum
 	}
 	log.WithFields(f).Info("Calling resize the file system")
 
-	// Rescan the device for the volume expanded on the array
-	for _, device := range devMnt.DeviceNames {
-		devicePath := sysBlock + device
-		err = s.Fs.GetUtil().DeviceRescan(context.Background(), devicePath)
-		if err != nil {
-			log.Errorf("Failed to rescan device (%s) with error (%s)", devicePath, err.Error())
-			return nil, status.Error(codes.Internal, err.Error())
+	if s.useFC || s.useISCSI {
+		// Rescan the device for the volume expanded on the array
+		for _, device := range devMnt.DeviceNames {
+			devicePath := sysBlock + device
+			err = s.Fs.GetUtil().DeviceRescan(context.Background(), devicePath)
+			if err != nil {
+				log.Errorf("Failed to rescan device (%s) with error (%s)", devicePath, err.Error())
+				return nil, status.Error(codes.Internal, err.Error())
+			}
 		}
 	}
 	// Expand the filesystem with the actual expanded volume size.
@@ -1022,7 +1024,7 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 				}
 			} else {
 
-				infoList, err := common.GetISCSITargetsInfoFromStorage(arr.GetClient())
+				infoList, err := common.GetISCSITargetsInfoFromStorage(arr.GetClient(), "")
 				if err != nil {
 					log.Errorf("couldn't get targets from array: %s", err.Error())
 					continue
@@ -1050,7 +1052,7 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 						for _, target := range nvmeTargets {
 							err = s.nvmeLib.NVMeConnect(target)
 							if err == nil {
-								log.Error("NVMe connection successful")
+								log.Infof("NVMe connection successful")
 							}
 						}
 					}
