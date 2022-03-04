@@ -246,8 +246,6 @@ func (n *NfsPublisher) Publish(ctx context.Context, req *csi.ControllerPublishVo
 		AddRWRootHosts: ipWithNat,
 	}, export.ID)
 	if err != nil {
-		// added 400 bad request error with OR condition check here for customer issue fix
-		log.Info("---ADDED 400 CHECK---")
 		eType, okVal := err.(gopowerstore.APIError)
 		log.Info(eType)
 		log.Info(okVal)
