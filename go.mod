@@ -12,7 +12,7 @@ require (
 	github.com/dell/gocsi v1.5.1-0.20220218201557-b18545e234c3
 	github.com/dell/gofsutil v1.7.1-0.20220302093137-8dccd83747e2
 	github.com/dell/goiscsi v1.2.1-0.20220222054507-9cc2d02a05dd
-	github.com/dell/gonvme v0.0.0-20220307130634-c4bb56794dc9
+	github.com/dell/gonvme v0.0.0-20220307150010-92060650bc60
 	github.com/dell/gopowerstore v1.6.1-0.20220304101916-7cdf3f4af3b5
 	github.com/fsnotify/fsnotify v1.4.9
 	github.com/golang/mock v1.6.0
