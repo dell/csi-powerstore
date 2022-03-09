@@ -1,14 +1,14 @@
-# CSI Driver for Dell EMC PowerStore
+# CSI Driver for Dell PowerStore
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/dell/csi-powerstore?style=flat-square)](https://goreportcard.com/report/github.com/dell/csi-powerstore)
 [![License](https://img.shields.io/github/license/dell/csi-powerstore?style=flat-square&color=blue&label=License)](https://github.com/dell/csi-powerstore/blob/master/LICENSE)
 [![Docker](https://img.shields.io/docker/pulls/dellemc/csi-powerstore.svg?logo=docker&style=flat-square&label=Pulls)](https://hub.docker.com/r/dellemc/csi-powerstore)
 [![Last Release](https://img.shields.io/github/v/release/dell/csi-powerstore?label=Latest&style=flat-square&logo=go)](https://github.com/dell/csi-powerstore/releases)
 
-**Repository for CSI Driver for Dell EMC PowerStore**
+**Repository for CSI Driver for Dell PowerStore**
 
 ## Description
-CSI Driver for PowerStore is part of the [CSM (Container Storage Modules)](https://github.com/dell/csm) open-source suite of Kubernetes storage enablers for Dell EMC products. CSI Driver for PowerStore is a Container Storage Interface (CSI) driver that provides support for provisioning persistent storage using Dell EMC PowerStore storage array. 
+CSI Driver for PowerStore is part of the [CSM (Container Storage Modules)](https://github.com/dell/csm) open-source suite of Kubernetes storage enablers for Dell products. CSI Driver for PowerStore is a Container Storage Interface (CSI) driver that provides support for provisioning persistent storage using Dell PowerStore storage array. 
 
 It supports CSI specification version 1.3.
 
@@ -29,7 +29,7 @@ To build an image, execute `make docker`.
 
 ## Runtime Dependencies
 
-Both the Controller and the Node portions of the driver can only be run on nodes with network connectivity to a Dell EMC PowerStore server (which is used by the driver). 
+Both the Controller and the Node portions of the driver can only be run on nodes with network connectivity to a Dell PowerStore server (which is used by the driver). 
 
 If you want to use iSCSI as a transport protocol be sure that `iscsi-initiator-utils` package is installed on your node. 
 
