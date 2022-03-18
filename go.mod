@@ -9,7 +9,7 @@ require (
 	github.com/dell/dell-csi-extensions/replication v1.1.0
 	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.1.0
 	github.com/dell/gobrick v1.3.0
-	github.com/dell/gocsi v1.5.1-0.20220218201557-b18545e234c3
+	github.com/dell/gocsi v1.5.1
 	github.com/dell/gofsutil v1.8.0
 	github.com/dell/goiscsi v1.3.0
 	github.com/dell/gonvme v1.0.0
