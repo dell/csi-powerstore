@@ -10,7 +10,7 @@ parameters:
   # Default value: None
   arrayID: "Unique"
 
-  # FsType: file system type for mounted volumes
+  # csi.storage.k8s.io/fstype: file system type for mounted volumes
   # Allowed values:
   #   ext3: ext3 filesystem type
   #   ext4: ext4 filesystem type
@@ -18,7 +18,7 @@ parameters:
   #   nfs: NFS filesystem
   # Optional: true
   # Default value: ext4
-  FsType: "xfs"
+  csi.storage.k8s.io/fstype: "xfs"
 
 # reclaimPolicy: PVs that are dynamically created by a StorageClass will have the reclaim policy specified here
 # Allowed values:

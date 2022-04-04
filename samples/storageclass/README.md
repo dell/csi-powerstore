@@ -7,7 +7,7 @@ You can change following parameters:
 
 - *arrayIP*: specifies what array driver should use to provision volumes, 
 if not specified driver will use array specified as `default` in `helm/config.yaml`
-- *FsType*: specifies what filesystem type driver should use, possible variants `ext4`, `xfs`, `nfs`,
+- *csi.storage.k8s.io/fstype*: specifies what filesystem type driver should use, possible variants `ext4`, `xfs`, `nfs`,
 if not specified driver will use `ext4` by default
 
 If you want you can also add topology constraints by adding `allowedTopologies` parameter
