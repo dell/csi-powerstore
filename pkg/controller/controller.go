@@ -962,8 +962,7 @@ func (s *Service) ListSnapshots(ctx context.Context, req *csi.ListSnapshotsReque
 		snapshotID  string
 		sourceVolID string
 	)
-	log.Info("----ListSnapRequest obj:")
-	log.Info(req)
+
 	if req.SnapshotId != "" {
 		snapshotID = req.SnapshotId
 	}
@@ -980,8 +979,6 @@ func (s *Service) ListSnapshots(ctx context.Context, req *csi.ListSnapshotsReque
 		startToken = int(i)
 	}
 	// Call the common listVolumes code
-	log.Info("----snapshot ID:")
-	log.Info(snapshotID)
 	source, nextToken, err := s.listPowerStoreSnapshots(ctx, startToken, maxEntries, snapshotID, sourceVolID)
 	if err != nil {
 		return nil, err
@@ -1189,9 +1186,7 @@ func (s *Service) listPowerStoreVolumes(ctx context.Context, startToken, maxEntr
 
 func (s *Service) listPowerStoreSnapshots(ctx context.Context, startToken, maxEntries int, snapID, srcID string) ([]GeneralSnapshot, string, error) {
 	var generalSnapshots []GeneralSnapshot
-	log.Info("SnapID in listPowerstore method;")
-	log.Info(snapID)
-	log.Info(srcID)
+
 	if snapID == "" && srcID == "" {
 		log.Info("Requested all snapshots, iterating through arrays")
 		for _, arr := range s.Arrays() {
