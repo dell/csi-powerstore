@@ -962,7 +962,8 @@ func (s *Service) ListSnapshots(ctx context.Context, req *csi.ListSnapshotsReque
 		snapshotID  string
 		sourceVolID string
 	)
-
+	log.Info("----ListSnapRequest obj:")
+	log.Info(req)
 	if req.SnapshotId != "" {
 		snapshotID = req.SnapshotId
 	}
@@ -979,6 +980,8 @@ func (s *Service) ListSnapshots(ctx context.Context, req *csi.ListSnapshotsReque
 		startToken = int(i)
 	}
 	// Call the common listVolumes code
+	log.Info("----snapshot ID:")
+	log.Info(snapshotID)
 	source, nextToken, err := s.listPowerStoreSnapshots(ctx, startToken, maxEntries, snapshotID, sourceVolID)
 	if err != nil {
 		return nil, err
@@ -1140,13 +1143,8 @@ func (s *Service) ProbeController(ctx context.Context, req *commonext.ProbeContr
 	rep.VendorVersion = core.SemVer
 	rep.Manifest = common.Manifest
 
-	log.Debug(fmt.Sprintf("ProbeController returning: %v", rep.Ready.GetValue()))
+	// log.Debug(fmt.Sprintf("ProbeController returning: %v", rep.Ready.GetValue()))
 	return rep, nil
-}
-
-// CreateVolumeGroupSnapshot creates snapshots of the volume group
-func (s *Service) CreateVolumeGroupSnapshot(ctx context.Context, request *vgsext.CreateVolumeGroupSnapshotRequest) (*vgsext.CreateVolumeGroupSnapshotResponse, error) {
-	panic("implement me")
 }
 
 func (s *Service) listPowerStoreVolumes(ctx context.Context, startToken, maxEntries int) ([]gopowerstore.Volume, string, error) {
@@ -1191,7 +1189,9 @@ func (s *Service) listPowerStoreVolumes(ctx context.Context, startToken, maxEntr
 
 func (s *Service) listPowerStoreSnapshots(ctx context.Context, startToken, maxEntries int, snapID, srcID string) ([]GeneralSnapshot, string, error) {
 	var generalSnapshots []GeneralSnapshot
-
+	log.Info("SnapID in listPowerstore method;")
+	log.Info(snapID)
+	log.Info(srcID)
 	if snapID == "" && srcID == "" {
 		log.Info("Requested all snapshots, iterating through arrays")
 		for _, arr := range s.Arrays() {
@@ -1256,6 +1256,7 @@ func (s *Service) listPowerStoreSnapshots(ctx context.Context, startToken, maxEn
 		}
 	} else {
 		log.Infof("Requested snapshot via source id %s", srcID)
+		// This works VGS on single default array, But for multiple array scenario this default array should be changed to dynamic array
 		id, arrayID, protocol, err := array.ParseVolumeID(ctx, srcID, s.DefaultArray(), nil)
 		if err != nil {
 			log.Error(err)

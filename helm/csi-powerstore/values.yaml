@@ -32,7 +32,7 @@ externalAccess:
 #  IfNotPresent: Only pull the image if it does not already exist on the node.
 #  Never: Never pull the image.
 # Default value: None
-imagePullPolicy: IfNotPresent
+imagePullPolicy: Always
 
 # nfsAcls: enables setting permissions on NFS mount directory
 # This value acts as default value for NFS ACL (nfsAcls), if not specified for an array config in secret
@@ -51,6 +51,11 @@ nfsAcls: "0777"
 
 # controller: configure controller specific parameters
 controller:
+  #  To enable/disable Volume group snapshot feature
+  vgsnapshot:
+    enabled: true
+    image: dellemc/csi-volumegroup-snapshotter:v1.0.0
+
   # controllerCount: defines the number of csi-powerscale controller pods to deploy to
   # the Kubernetes release.
   # Allowed values: n, where n > 0
