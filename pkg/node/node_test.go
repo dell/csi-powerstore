@@ -57,7 +57,7 @@ var (
 	clientMock           *gopowerstoremock.Client
 	ctrlMock             *mocks.ControllerInterface
 	iscsiLibMock         *goiscsi.MockISCSI
-	nvmeLibMock          *gonvme.MockNVMeTCP
+	nvmeLibMock          *gonvme.MockNVMe
 )
 
 const (
@@ -172,7 +172,7 @@ func setVariables() {
 	ctrlMock = new(mocks.ControllerInterface)
 	clientMock = new(gopowerstoremock.Client)
 	iscsiLibMock = goiscsi.NewMockISCSI(nil)
-	nvmeLibMock = gonvme.NewMockNVMeTCP(nil)
+	nvmeLibMock = gonvme.NewMockNVMe(nil)
 
 	arrays := getTestArrays()
 

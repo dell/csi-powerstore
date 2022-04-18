@@ -12,8 +12,8 @@ require (
 	github.com/dell/gocsi v1.5.1
 	github.com/dell/gofsutil v1.8.0
 	github.com/dell/goiscsi v1.3.0
-	github.com/dell/gonvme v1.0.0
-	github.com/dell/gopowerstore v1.7.1-0.20220401105348-104d2bf041c3
+	github.com/dell/gonvme v1.0.1-0.20220414093502-f99e58160e4c
+	github.com/dell/gopowerstore v1.7.1-0.20220414081234-71b1762ab263
 	github.com/fsnotify/fsnotify v1.4.9
 	github.com/golang/mock v1.6.0
 	github.com/golang/protobuf v1.5.2
@@ -30,6 +30,8 @@ require (
 	google.golang.org/grpc v1.43.0
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
 )
+
+replace github.com/dell/gobrick => ../gobrick
 
 require (
 	github.com/HdrHistogram/hdrhistogram-go v1.0.1 // indirect
