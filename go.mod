@@ -2,8 +2,6 @@ module github.com/dell/csi-powerstore
 
 go 1.17
 
-replace github.com/dell/gopowerstore v1.7.1-0.20220401105348-104d2bf041c3 => ../gopowerstore
-
 require (
 	github.com/akutz/gosync v0.1.0
 	github.com/container-storage-interface/spec v1.5.0
@@ -15,7 +13,7 @@ require (
 	github.com/dell/gofsutil v1.8.0
 	github.com/dell/goiscsi v1.3.0
 	github.com/dell/gonvme v1.0.0
-	github.com/dell/gopowerstore v1.7.1-0.20220401105348-104d2bf041c3
+	github.com/dell/gopowerstore v1.7.1-0.20220419075538-545f0748195a
 	github.com/fsnotify/fsnotify v1.4.9
 	github.com/golang/mock v1.6.0
 	github.com/golang/protobuf v1.5.2
