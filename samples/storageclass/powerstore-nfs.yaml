@@ -17,8 +17,10 @@ parameters:
   #   xfs: XFS filesystem type
   #   nfs: NFS filesystem
   # Optional: true
-  # Default value: ext4
-  FsType: "nfs"
+  # Default value: None if defaultFsType is not mentioned in values.yaml
+  # Else defaultFsType value mentioned in values.yaml
+  # will be used as default value
+  csi.storage.k8s.io/fstype: "nfs"
 
   # nasName: NAS server's name. If not specified, value from secret.yaml will be used
   # Allowed values: string
