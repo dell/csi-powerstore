@@ -14,20 +14,24 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// ClusterInfoStruct contains k8s server address
 type ClusterInfoStruct struct {
 	Server string `yaml:"server"`
 }
 
+// Cluster contains k8s cluster information
 type Cluster struct {
 	ClusterInfo ClusterInfoStruct `yaml:"cluster"`
 	Name        string            `yaml:"name"`
 }
 
+// KubeConfig contains information read from kubeconfig file
 type KubeConfig struct {
-	ApiVersion string    `yaml:"apiVersion"`
+	APIVersion string    `yaml:"apiVersion"`
 	Clusters   []Cluster `yaml:"clusters,flow"`
 }
 
+// K8sClusterInfo contains information of k8s cluster
 type K8sClusterInfo struct {
 	Name      string
 	IPAddress string

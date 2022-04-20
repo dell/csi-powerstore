@@ -295,6 +295,7 @@ func ParseVolumeID(ctx context.Context, volumeID string, defaultArray *PowerStor
 	return id, arrayID, protocol, nil
 }
 
+// RegisterK8sCluster registers the k8s cluster with PowerStore arrays
 func (s *Locker) RegisterK8sCluster(fs fs.Interface) error {
 	k8sClusters, err := getK8sClusterInfo(fs)
 	if err != nil {
