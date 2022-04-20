@@ -103,6 +103,13 @@ func main() {
 		if err != nil {
 			log.Fatalf("couldn't create controller service: %s", err.Error())
 		}
+
+		if cs.K8sVisibilityAutoRegistration {
+			err = cs.RegisterK8sCluster(f)
+			if err != nil {
+				log.Fatalf("couldn't register to arrays in controller service: %s", err.Error())
+			}
+		}
 		controllerService = cs
 	} else if strings.EqualFold(mode, "node") {
 		ns := &node.Service{
@@ -131,6 +138,12 @@ func main() {
 			err := controllerService.UpdateArrays(configPath, f)
 			if err != nil {
 				log.Fatalf("couldn't initialize arrays in controller service: %s", err.Error())
+			}
+			if controllerService.K8sVisibilityAutoRegistration {
+				err = controllerService.RegisterK8sCluster(f)
+				if err != nil {
+					log.Fatalf("couldn't register to arrays in controller service: %s", err.Error())
+				}
 			}
 		} else if strings.EqualFold(mode, "node") {
 			err := nodeService.UpdateArrays(configPath, f)

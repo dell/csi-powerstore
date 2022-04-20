@@ -53,6 +53,7 @@ type Consumer interface {
 	DefaultArray() *PowerStoreArray
 	SetDefaultArray(*PowerStoreArray)
 	UpdateArrays(string, fs.Interface) error
+	RegisterK8sCluster(fs.Interface) error
 }
 
 // Locker provides implementation for safe management of arrays
@@ -292,4 +293,40 @@ func ParseVolumeID(ctx context.Context, volumeID string, defaultArray *PowerStor
 	}
 	log.Infof("id %s arrayID %s proto %s", id, arrayID, protocol)
 	return id, arrayID, protocol, nil
+}
+
+func (s *Locker) RegisterK8sCluster(fs fs.Interface) error {
+	log.Info("K8s VISIBILITY: Inside RegisterK8sCluster")
+	k8sClusters, err := getK8sClusterInfo(fs)
+	if err != nil {
+		return err
+	}
+
+	for _, array := range s.arrays {
+		for _, cluster := range k8sClusters {
+			resp, err := array.Client.RegisterK8sCluster(context.Background(), &gopowerstore.K8sCluster{
+				Name:      cluster.Name,
+				IPAddress: cluster.IPAddress,
+				Port:      cluster.Port,
+				Token:     cluster.Token,
+			})
+
+			if err != nil {
+				log.Errorf("cannot register k8s cluster: %s with %s:%d to array: %s err: %s \n",
+					cluster.Name, cluster.IPAddress, cluster.Port, array.Endpoint, err.Error())
+				continue
+			}
+
+			if resp.ID == "" {
+				log.Errorf("cannot register k8s cluster: %s with %s:%d to array: %s response Id is empty string \n",
+					cluster.Name, cluster.IPAddress, cluster.Port, array.Endpoint)
+				continue
+			}
+
+			log.Infof("Registered k8s cluster: %s with %s:%d to array: %s id: %s\n",
+				cluster.Name, cluster.IPAddress, cluster.Port, array.Endpoint, resp.ID)
+		}
+	}
+
+	return nil
 }

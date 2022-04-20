@@ -30,6 +30,7 @@ import (
 	"github.com/dell/csi-powerstore/pkg/common"
 	"github.com/dell/csi-powerstore/pkg/common/fs"
 	"github.com/dell/gofsutil"
+	"github.com/dell/gopowerstore"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -189,4 +190,63 @@ func TestLocker_UpdateArrays(t *testing.T) {
 	err := lck.UpdateArrays("./testdata/one-arr.yaml", &fs.Fs{Util: &gofsutil.FS{}})
 	assert.NoError(t, err)
 	assert.Equal(t, lck.DefaultArray().Endpoint, "https://127.0.0.1/api/rest")
+}
+
+func TestLocker_RegisterK8sCluster_Success(t *testing.T) {
+	lck := array.Locker{}
+	err := lck.UpdateArrays("./testdata/one-arr.yaml", &fs.Fs{Util: &gofsutil.FS{}})
+
+	if err != nil {
+		path := "some-path"
+		fsMock := new(mocks.FsInterface)
+		fsMock.On("ReadFile", path).Return([]byte(`
+			apiVersion: v1
+			clusters:
+			- cluster:
+				certificate-authority-data: certficate-authority-data
+				server: https://127.0.0.1:6443
+			name: kubernetes-cluster1
+			contexts:
+			- context:
+				cluster: kubernetes-cluster1
+				user: kubernetes-user
+			name: kubernetes-user@kubernetes
+			current-context: kubernetes-user@kubernetes
+			kind: Config
+			preferences: {}
+			users:
+			- name: kubernetes-user
+			user:`), nil)
+
+		clientMock := new(mocks.Consumer)
+		clientMock.On("RegisterK8sCluster", context.Background(), &gopowerstore.K8sCluster{
+			Name:      "kubernetes-cluster1",
+			IPAddress: "127.0.0.1",
+			Port:      8080,
+			Token:     "service-account-token",
+		}).Return(nil)
+
+		assert.Equal(t, lck.RegisterK8sCluster(fsMock), nil)
+	}
+}
+
+func TestLocker_RegisterK8sCluster_Failure(t *testing.T) {
+	lck := array.Locker{}
+	err := lck.UpdateArrays("./testdata/one-arr.yaml", &fs.Fs{Util: &gofsutil.FS{}})
+
+	if err != nil {
+		path := "some-path"
+		fsMock := new(mocks.FsInterface)
+		fsMock.On("ReadFile", path).Return([]byte("invalid-yaml-content"), nil)
+
+		clientMock := new(mocks.Consumer)
+		clientMock.On("RegisterK8sCluster", context.Background(), &gopowerstore.K8sCluster{
+			Name:      "kubernetes-cluster1",
+			IPAddress: "127.0.0.1",
+			Port:      8080,
+			Token:     "service-account-token",
+		}).Return(nil)
+
+		assert.NotEqual(t, lck.RegisterK8sCluster(fsMock), nil)
+	}
 }
