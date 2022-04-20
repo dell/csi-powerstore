@@ -333,8 +333,14 @@ spec:
               value: controller
             - name: X_CSI_DRIVER_NAME
               value: {{ .Values.driverName }}
+            {{- if hasKey .Values.controller "k8sVisibilityAutoRegistration" }}
+            {{- if eq .Values.controller.k8sVisibilityAutoRegistration.enabled true}}
             - name: X_CSI_POWERSTORE_CTRL_ROOT_PATH
               value: /ctrlroot
+            - name: X_CSI_K8S_VISIBILITY_AUTO_REGISTRATION
+              value: "{{ .Values.controller.k8sVisibilityAutoRegistration.enabled }}"
+            {{- end }}
+            {{- end }}
             - name: X_CSI_POWERSTORE_EXTERNAL_ACCESS
               value: {{ .Values.externalAccess }}
             - name: X_CSI_NFS_ACLS
@@ -370,8 +376,8 @@ spec:
             {{- if eq .Values.controller.k8sVisibilityAutoRegistration.enabled true}}
             - name: powerstore-visibility-secret
               mountPath: /powerstore-visibility
-            - name: noderoot
-              mountPath: /noderoot
+            - name: ctrlroot
+              mountPath: /ctrlroot
             {{- end}}
             {{- end}}
       volumes:
@@ -391,7 +397,7 @@ spec:
             items:
               - key: token
                 path: token
-        - name: noderoot
+        - name: ctrlroot
           hostPath:
             path: /
             type: Directory

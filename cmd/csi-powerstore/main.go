@@ -107,7 +107,7 @@ func main() {
 		if cs.K8sVisibilityAutoRegistration {
 			err = cs.RegisterK8sCluster(f)
 			if err != nil {
-				log.Fatalf("couldn't register to arrays in controller service: %s", err.Error())
+				log.Errorf("couldn't register to arrays in controller service: %s", err.Error())
 			}
 		}
 		controllerService = cs
@@ -142,7 +142,7 @@ func main() {
 			if controllerService.K8sVisibilityAutoRegistration {
 				err = controllerService.RegisterK8sCluster(f)
 				if err != nil {
-					log.Fatalf("couldn't register to arrays in controller service: %s", err.Error())
+					log.Errorf("couldn't register to arrays in controller service: %s", err.Error())
 				}
 			}
 		} else if strings.EqualFold(mode, "node") {

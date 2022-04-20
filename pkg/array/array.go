@@ -296,13 +296,16 @@ func ParseVolumeID(ctx context.Context, volumeID string, defaultArray *PowerStor
 }
 
 func (s *Locker) RegisterK8sCluster(fs fs.Interface) error {
-	log.Info("K8s VISIBILITY: Inside RegisterK8sCluster")
 	k8sClusters, err := getK8sClusterInfo(fs)
 	if err != nil {
 		return err
 	}
 
 	for _, array := range s.arrays {
+		if !isK8sVisibilitySupported(array.Client) {
+			continue
+		}
+
 		for _, cluster := range k8sClusters {
 			resp, err := array.Client.RegisterK8sCluster(context.Background(), &gopowerstore.K8sCluster{
 				Name:      cluster.Name,

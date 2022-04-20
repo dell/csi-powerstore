@@ -9,6 +9,7 @@ import (
 	"github.com/dell/csi-powerstore/pkg/common"
 	"github.com/dell/csi-powerstore/pkg/common/fs"
 	csictx "github.com/dell/gocsi/context"
+	"github.com/dell/gopowerstore"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 )
@@ -48,7 +49,7 @@ func getKubeConfigInfo(fs fs.Interface) (KubeConfig, error) {
 
 	kubeconfigPath := filepath.Join(kubeconfigDir, "kubelet.conf")
 
-	log.Info("K8s visibility: Reading file: \n", kubeconfigPath)
+	log.Debug("K8s visibility: Reading file: \n", kubeconfigPath)
 	kubeconfigInfo, err := fs.ReadFile(kubeconfigPath)
 	if err != nil {
 		log.Warnf("K8s visibility: Error reading file: %s err: %s\n", kubeconfigPath, err.Error())
@@ -80,7 +81,6 @@ func getK8sVisibilityServiceToken(fs fs.Interface) (string, error) {
 }
 
 func getK8sClusterInfo(fs fs.Interface) ([]K8sClusterInfo, error) {
-
 	k8sClusters := []K8sClusterInfo{}
 
 	kubeconfig, err := getKubeConfigInfo(fs)
@@ -120,4 +120,43 @@ func getK8sClusterInfo(fs fs.Interface) ([]K8sClusterInfo, error) {
 	}
 
 	return k8sClusters, nil
+}
+
+func isK8sVisibilitySupported(client gopowerstore.Client) bool {
+	k8sVisibilitySupported := false
+	resp, err := client.GetSoftwareInstalled(context.Background())
+	if err != nil {
+		log.Errorf("couldn't get the software version installed on the PowerStore array: %v", err)
+		return k8sVisibilitySupported
+	}
+
+	for _, softwareInstalled := range resp {
+		if softwareInstalled.IsCluster {
+			versionString := softwareInstalled.BuildVersion
+			versions := strings.Split(versionString, ".")
+			if len(versions) > 2 {
+				var majorMinorVersion float32
+				var majorVersion, minorVersion int
+
+				if majorVersion, err = strconv.Atoi(versions[0]); err != nil {
+					log.Errorf("couldn't get the software major version installed on the PowerStore array: %v", err)
+					break
+				}
+				if minorVersion, err = strconv.Atoi(versions[1]); err != nil {
+					log.Errorf("couldn't get the software minor version installed on the PowerStore array: %v", err)
+					break
+				}
+
+				majorMinorVersion = float32(majorVersion) + float32(minorVersion)*0.1
+				if majorMinorVersion >= 3.1 {
+					k8sVisibilitySupported = true
+				} else {
+					log.Debugf("Software version installed on the PowerStore array: %v\n", majorMinorVersion)
+				}
+			}
+			break
+		}
+	}
+
+	return k8sVisibilitySupported
 }
