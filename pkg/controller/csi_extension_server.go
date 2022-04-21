@@ -12,8 +12,10 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+// StateReady resembles ready state
 const StateReady = "Ready"
 
+// CreateVolumeGroupSnapshot creates volume group snapshot
 func (s *Service) CreateVolumeGroupSnapshot(ctx context.Context, request *vgsext.CreateVolumeGroupSnapshotRequest) (*vgsext.CreateVolumeGroupSnapshotResponse, error) {
 	log.Infof("CreateVolumeGroupSnapshot called with req: %v", request)
 
@@ -72,14 +74,14 @@ func (s *Service) CreateVolumeGroupSnapshot(ctx context.Context, request *vgsext
 			if v.State == StateReady {
 				snapState = true
 			}
-			volId := strings.Split(request.SourceVolumeIDs[0], "/")
-			if len(volId) >= 2 {
+			volID := strings.Split(request.SourceVolumeIDs[0], "/")
+			if len(volID) >= 2 {
 				snapsList = append(snapsList, &vgsext.Snapshot{
 					Name:          v.Name,
-					SnapId:        v.ID + "/" + arr + "/" + volId[2],
+					SnapId:        v.ID + "/" + arr + "/" + volID[2],
 					ReadyToUse:    snapState,
 					CapacityBytes: v.Size,
-					SourceId:      v.ProtectionData.SourceID + "/" + arr + "/" + volId[2],
+					SourceId:      v.ProtectionData.SourceID + "/" + arr + "/" + volID[2],
 					CreationTime:  int64CreationTime,
 				})
 			}
