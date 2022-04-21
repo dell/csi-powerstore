@@ -60,7 +60,6 @@ func (s *Service) CreateVolumeGroupSnapshot(ctx context.Context, request *vgsext
 		}
 
 		volGroup, err = s.Arrays()[arr].GetClient().GetVolumeGroup(ctx, resp.ID)
-		log.Infof("%v", volGroup)
 		if err != nil {
 			if apiError, ok := err.(gopowerstore.APIError); !(ok && apiError.VolumeNameIsAlreadyUse()) {
 				return nil, status.Errorf(codes.Internal, "Error getting volume group snapshot: %s", err.Error())
