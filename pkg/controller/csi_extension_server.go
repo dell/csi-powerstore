@@ -2,7 +2,6 @@ package controller
 
 import (
 	"context"
-	"errors"
 	"strings"
 	"time"
 
@@ -26,11 +25,16 @@ func (s *Service) CreateVolumeGroupSnapshot(ctx context.Context, request *vgsext
 	var reqParams gopowerstore.VolumeGroupSnapshotCreate
 	reqParams.Name = request.GetName()
 	reqParams.Description = request.GetDescription()
-	arr := strings.Split(request.SourceVolumeIDs[0], "/")[1]
+	parsedVolHandle := strings.Split(request.SourceVolumeIDs[0], "/")
+	var arr string
+	if len(arr) > 1 {
+		arr = parsedVolHandle[1]
+	}
 
 	var sourceVols []string
 	var volGroup gopowerstore.VolumeGroup
 	var snapsList []*vgsext.Snapshot
+	var int64CreationTime int64
 
 	for _, v := range request.GetSourceVolumeIDs() {
 		sourceVols = append(sourceVols, strings.Split(v, "/")[0])
@@ -62,36 +66,33 @@ func (s *Service) CreateVolumeGroupSnapshot(ctx context.Context, request *vgsext
 				return nil, status.Errorf(codes.Internal, "Error getting volume group snapshot: %s", err.Error())
 			}
 		}
-
+		etime, _ := time.Parse(time.RFC3339, volGroup.CreationTimeStamp)
+		int64CreationTime = etime.Unix()
 		for _, v := range volGroup.Volumes {
 			var snapState bool
 			if v.State == StateReady {
 				snapState = true
 			}
-			etime, _ := time.Parse(time.RFC3339, v.CreationTimeStamp)
-			int64Time := etime.Unix()
+
 			snapsList = append(snapsList, &vgsext.Snapshot{
 				Name:          v.Name,
 				SnapId:        v.ID + "/" + arr + "/" + strings.Split(request.SourceVolumeIDs[0], "/")[2],
 				ReadyToUse:    snapState,
 				CapacityBytes: v.Size,
 				SourceId:      v.ProtectionData.SourceID + "/" + arr + "/" + strings.Split(request.SourceVolumeIDs[0], "/")[2],
-				CreationTime:  int64Time,
+				CreationTime:  int64CreationTime,
 			})
 		}
 	}
 
-	etime, _ := time.Parse(time.RFC3339, volGroup.CreationTimeStamp)
-	int64Time := etime.Unix()
-
 	return &vgsext.CreateVolumeGroupSnapshotResponse{
 		SnapshotGroupID: volGroup.ID,
 		Snapshots:       snapsList,
-		CreationTime:    int64Time,
+		CreationTime:    int64CreationTime,
 	}, nil
 }
 
-//validate if request has VGS name, and VGS name length < 27 chars
+//validate if request has VGS name, and VGS name must be less than 28 chars
 func validateCreateVGSreq(request *vgsext.CreateVolumeGroupSnapshotRequest) error {
 	if request.Name == "" {
 		err := status.Error(codes.InvalidArgument, "CreateVolumeGroupSnapshotRequest needs Name to be set")
@@ -113,16 +114,4 @@ func validateCreateVGSreq(request *vgsext.CreateVolumeGroupSnapshotRequest) erro
 	}
 
 	return nil
-}
-
-func (s *Service) ParseVolumeHandle(ctx context.Context, request *vgsext.VolumeHandleRequest) (*vgsext.VolumeHandleResponse, error) {
-	if request.VolumeHandle == "" {
-		return nil, errors.New("volume handle should not be empty")
-	}
-	volHandle := strings.Split(request.VolumeHandle, "/")
-	return &vgsext.VolumeHandleResponse{
-		VolumeID: volHandle[0],
-		ArrayID:  volHandle[1],
-		Protocol: volHandle[2],
-	}, nil
 }

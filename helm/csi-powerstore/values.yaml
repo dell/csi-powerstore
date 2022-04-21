@@ -32,7 +32,7 @@ externalAccess:
 #  IfNotPresent: Only pull the image if it does not already exist on the node.
 #  Never: Never pull the image.
 # Default value: None
-imagePullPolicy: Always
+imagePullPolicy: IfNotPresent
 
 # nfsAcls: enables setting permissions on NFS mount directory
 # This value acts as default value for NFS ACL (nfsAcls), if not specified for an array config in secret

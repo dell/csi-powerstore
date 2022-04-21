@@ -1140,7 +1140,7 @@ func (s *Service) ProbeController(ctx context.Context, req *commonext.ProbeContr
 	rep.VendorVersion = core.SemVer
 	rep.Manifest = common.Manifest
 
-	// log.Debug(fmt.Sprintf("ProbeController returning: %v", rep.Ready.GetValue()))
+	log.Debug(fmt.Sprintf("ProbeController returning: %v", rep.Ready.GetValue()))
 	return rep, nil
 }
 
