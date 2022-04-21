@@ -1144,11 +1144,6 @@ func (s *Service) ProbeController(ctx context.Context, req *commonext.ProbeContr
 	return rep, nil
 }
 
-// CreateVolumeGroupSnapshot creates snapshots of the volume group
-func (s *Service) CreateVolumeGroupSnapshot(ctx context.Context, request *vgsext.CreateVolumeGroupSnapshotRequest) (*vgsext.CreateVolumeGroupSnapshotResponse, error) {
-	panic("implement me")
-}
-
 func (s *Service) listPowerStoreVolumes(ctx context.Context, startToken, maxEntries int) ([]gopowerstore.Volume, string, error) {
 	var volumes []gopowerstore.Volume
 
@@ -1256,6 +1251,7 @@ func (s *Service) listPowerStoreSnapshots(ctx context.Context, startToken, maxEn
 		}
 	} else {
 		log.Infof("Requested snapshot via source id %s", srcID)
+		// This works VGS on single default array, But for multiple array scenario this default array should be changed to dynamic array
 		id, arrayID, protocol, err := array.ParseVolumeID(ctx, srcID, s.DefaultArray(), nil)
 		if err != nil {
 			log.Error(err)
