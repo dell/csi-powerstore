@@ -29,7 +29,7 @@ func (s *Service) CreateVolumeGroupSnapshot(ctx context.Context, request *vgsext
 	reqParams.Description = request.GetDescription()
 	parsedVolHandle := strings.Split(request.SourceVolumeIDs[0], "/")
 	var arr string
-	if len(parsedVolHandle) >= 1 {
+	if len(parsedVolHandle) >= 2 {
 		arr = parsedVolHandle[1]
 	}
 
@@ -75,7 +75,7 @@ func (s *Service) CreateVolumeGroupSnapshot(ctx context.Context, request *vgsext
 				snapState = true
 			}
 			volID := strings.Split(request.SourceVolumeIDs[0], "/")
-			if len(volID) >= 2 {
+			if len(volID) >= 3 {
 				snapsList = append(snapsList, &vgsext.Snapshot{
 					Name:          v.Name,
 					SnapId:        v.ID + "/" + arr + "/" + volID[2],
