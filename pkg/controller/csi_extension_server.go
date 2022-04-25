@@ -37,6 +37,7 @@ func (s *Service) CreateVolumeGroupSnapshot(ctx context.Context, request *vgsext
 	var volGroup gopowerstore.VolumeGroup
 	var snapsList []*vgsext.Snapshot
 	var int64CreationTime int64
+	var existingVgID string
 
 	for _, v := range request.GetSourceVolumeIDs() {
 		sourceVols = append(sourceVols, strings.Split(v, "/")[0])
@@ -47,14 +48,31 @@ func (s *Service) CreateVolumeGroupSnapshot(ctx context.Context, request *vgsext
 		Description: request.GetDescription(),
 		VolumeIds:   sourceVols,
 	}
-	resp, err := s.Arrays()[arr].GetClient().CreateVolumeGroup(ctx, &vgParams)
+	volGroups, err := s.Arrays()[arr].GetClient().GetVolumeGroupsByVolumeID(ctx, sourceVols[0])
 	if err != nil {
 		if apiError, ok := err.(gopowerstore.APIError); !(ok && apiError.VolumeNameIsAlreadyUse()) {
-			return nil, status.Errorf(codes.Internal, "Error creating volume group: %s", err.Error())
+			return nil, status.Errorf(codes.Internal, "Error getting volume group by volume ID: %s", err.Error())
 		}
 	}
-	if resp.ID != "" {
-		resp, err = s.Arrays()[arr].GetClient().CreateVolumeGroupSnapshot(ctx, resp.ID, &reqParams)
+
+	// Check whether volume group already exists, if yes proceed to create a snapshot else create a new volume group
+	if len(volGroups.VolumeGroup) >= 1 {
+		// one volume can be present only in one group and hence we will take only the first entry
+		existingVgID = volGroups.VolumeGroup[0].ID
+	} else {
+		resp, err := s.Arrays()[arr].GetClient().CreateVolumeGroup(ctx, &vgParams)
+		if err != nil {
+			if apiError, ok := err.(gopowerstore.APIError); !(ok && apiError.VolumeNameIsAlreadyUse()) {
+				return nil, status.Errorf(codes.Internal, "Error creating volume group: %s", err.Error())
+			}
+		}
+		if resp.ID != "" {
+			existingVgID = resp.ID
+		}
+	}
+
+	if existingVgID != "" {
+		resp, err := s.Arrays()[arr].GetClient().CreateVolumeGroupSnapshot(ctx, existingVgID, &reqParams)
 		if err != nil {
 			if apiError, ok := err.(gopowerstore.APIError); !(ok && apiError.VolumeNameIsAlreadyUse()) {
 				return nil, status.Errorf(codes.Internal, "Error creating volume group snapshot: %s", err.Error())
@@ -69,6 +87,7 @@ func (s *Service) CreateVolumeGroupSnapshot(ctx context.Context, request *vgsext
 		}
 		etime, _ := time.Parse(time.RFC3339, volGroup.CreationTimeStamp)
 		int64CreationTime = etime.Unix()
+
 		for _, v := range volGroup.Volumes {
 			var snapState bool
 			if v.State == StateReady {
