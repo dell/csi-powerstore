@@ -148,6 +148,9 @@ controller:
   #    operator: "Exists"
   #    effect: "NoSchedule"
 
+  k8sVisibilityAutoRegistration:
+    enabled: true
+
 # node: configure node pod specific parameters
 node:
   # nodeNamePrefix: defines a string prepended to each node registered by the CSI driver.

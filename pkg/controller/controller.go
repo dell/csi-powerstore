@@ -65,6 +65,8 @@ type Service struct {
 	replicationContextPrefix string
 	replicationPrefix        string
 	isHealthMonitorEnabled   bool
+
+	K8sVisibilityAutoRegistration bool
 }
 
 // Init is a method that initializes internal variables of controller service
@@ -91,6 +93,10 @@ func (s *Service) Init() error {
 		if nfsAcls != "" {
 			s.nfsAcls = nfsAcls
 		}
+	}
+
+	if isk8sVisibilityAutoRegistrationEnabled, ok := csictx.LookupEnv(ctx, common.EnvK8sVisibilityAutoRegistration); ok {
+		s.K8sVisibilityAutoRegistration, _ = strconv.ParseBool(isk8sVisibilityAutoRegistrationEnabled)
 	}
 
 	return nil
