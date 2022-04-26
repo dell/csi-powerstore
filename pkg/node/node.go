@@ -68,16 +68,14 @@ type Service struct {
 	ctrlSvc          controller.Interface
 	iscsiConnector   ISCSIConnector
 	fcConnector      FcConnector
-	nvmetcpConnector NVMETCPConnector
+	nvmeConnector 	 NVMEConnector
 	iscsiLib         goiscsi.ISCSIinterface
 	nvmeLib          gonvme.NVMEinterface
-	nvmeFCLib        gonvme.NVMEinterface
 
 	opts   Opts
 	nodeID string
 
 	useFC                  bool
-	useISCSI               bool
 	useNVME                bool
 	initialized            bool
 	reusedHost             bool
@@ -128,7 +126,7 @@ func (s *Service) Init() error {
 				return fmt.Errorf("NVMe/FC transport was requested but NVMe initiator is not available")
 			}
 			s.useNVME = true
-			s.useFC = false
+			s.useFC = true
 		case common.ISCSITransport:
 			if len(iscsiInitiators) == 0 {
 				return fmt.Errorf("iSCSI transport was requested but iSCSI initiator is not available")
@@ -148,9 +146,9 @@ func (s *Service) Init() error {
 		if s.useNVME {
 			initiators = nvmeInitiators
 			if s.useFC {
-				log.Infof("NVMe/FC Protocol is requested")
+				log.Infof("NVMeFC Protocol is requested")
 			} else {
-				log.Infof("NVMe/TCP Protocol is requested")
+				log.Infof("NVMeTCP Protocol is requested")
 			}
 		} else if s.useFC {
 			initiators = fcInitiators
@@ -191,9 +189,9 @@ func (s *Service) initConnectors() {
 			gobrick.FCConnectorParams{Chroot: s.opts.NodeChrootPath})
 	}
 
-	if s.nvmetcpConnector == nil {
-		s.nvmetcpConnector = gobrick.NewNVMeTCPConnector(
-			gobrick.NVMeTCPConnectorParams{Chroot: s.opts.NodeChrootPath})
+	if s.nvmeConnector == nil {
+		s.nvmeConnector = gobrick.NewNVMeConnector(
+			gobrick.NVMeConnectorParams{Chroot: s.opts.NodeChrootPath})
 	}
 
 	if s.ctrlSvc == nil {
@@ -214,14 +212,7 @@ func (s *Service) initConnectors() {
 		NVMeOpts := make(map[string]string)
 		NVMeOpts["chrootDirectory"] = s.opts.NodeChrootPath
 
-		s.nvmeLib = gonvme.NewNVMeTCP(NVMeOpts)
-	}
-
-	if s.nvmeFCLib == nil {
-		NVMeOpts := make(map[string]string)
-		NVMeOpts["chrootDirectory"] = s.opts.NodeChrootPath
-
-		s.nvmeFCLib = gonvme.NewNVMeFC(NVMeOpts)
+		s.nvmeLib = gonvme.NewNVMe(NVMeOpts)
 	}
 }
 
@@ -243,11 +234,12 @@ func (s *Service) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeR
 	}
 
 	nvmeIP := strings.Split(req.PublishContext["PORTAL0"], ":")
-	nvmeTargets, _ := s.nvmeLib.DiscoverNVMeTargets(nvmeIP[0], false)
+	nvmeTargets, _ := s.nvmeLib.DiscoverNVMeTCPTargets(nvmeIP[0], false)
 	for i, t := range nvmeTargets {
-		req.PublishContext[fmt.Sprintf("%s%d", common.PublishContextNVMETargetsPrefix, i)] = t.TargetNqn
-		req.PublishContext[fmt.Sprintf("%s%d", common.PublishContextNVMEPortalsPrefix, i)] = t.Portal + ":4420"
+		req.PublishContext[fmt.Sprintf("%s%d", common.PublishContextNVMETCPTargetsPrefix, i)] = t.TargetNqn
+		req.PublishContext[fmt.Sprintf("%s%d", common.PublishContextNVMETCPPortalsPrefix, i)] = t.Portal + ":4420"
 	}
+
 
 	id, arrayID, protocol, _ := array.ParseVolumeID(ctx, id, s.DefaultArray(), req.VolumeCapability)
 
@@ -265,9 +257,9 @@ func (s *Service) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeR
 	} else {
 		stager = &SCSIStager{
 			useFC:            s.useFC,
-			useISCSI:         s.useISCSI,
+			useNVME:          s.useNVME,
 			iscsiConnector:   s.iscsiConnector,
-			nvmetcpConnector: s.nvmetcpConnector,
+			nvmeConnector: 	  s.nvmeConnector,
 			fcConnector:      s.fcConnector,
 		}
 	}
@@ -328,12 +320,12 @@ func (s *Service) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVol
 
 	connectorCtx := common.SetLogFields(context.Background(), logFields)
 
-	if s.useFC {
+	if s.useNVME {
+		err = s.nvmeConnector.DisconnectVolumeByDeviceName(connectorCtx, device)
+	} else if s.useFC {
 		err = s.fcConnector.DisconnectVolumeByDeviceName(connectorCtx, device)
-	} else if s.useISCSI {
-		err = s.iscsiConnector.DisconnectVolumeByDeviceName(connectorCtx, device)
 	} else {
-		err = s.nvmetcpConnector.DisconnectVolumeByDeviceName(connectorCtx, device)
+		err = s.iscsiConnector.DisconnectVolumeByDeviceName(connectorCtx, device)
 	}
 	if err != nil {
 		log.WithFields(logFields).Error(err)
@@ -827,7 +819,7 @@ func (s *Service) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolum
 	}
 	log.WithFields(f).Info("Calling resize the file system")
 
-	if s.useFC || s.useISCSI {
+	if s.useFC || s.useNVME {
 		// Rescan the device for the volume expanded on the array
 		for _, device := range devMnt.DeviceNames {
 			devicePath := sysBlock + device
@@ -1006,30 +998,21 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 		if arr.BlockProtocol != common.NoneTransport {
 			if s.useNVME {
 				if s.useFC {
-					fcPorts, err := arr.Client.GetFCPorts(ctx)
+					nvmefcInfo, err := common.GetNVMEFCTargetInfoFromStorage(arr.GetClient(), "")
 					if err != nil {
-						log.Error("couldn't find FC Ports", err.Error())
+						log.Error("couldn't get targets from the array: %s", err.Error())
 					}
-					NVMeFCConnectCount := 0
-					for _, fcPort := range fcPorts {
-						log.Info("FC Port: ", fcPort)
-						wwnNode := strings.Replace(fcPort.WwnNode, ":", "", -1)
-						wwnNVMe := strings.Replace(fcPort.WwnNVMe, ":", "", -1)
-						targetAddress := strings.Replace(fmt.Sprintf("nn-0x%s:pn-0x%s", wwnNode, wwnNVMe), "\n", "", -1)
-						NVMeFCTargets, err := s.nvmeFCLib.DiscoverNVMeTargets(targetAddress, false)
+
+					log.Infof("Discovering NVMeFC targets")
+					for _, info := range nvmefcInfo {
+						NVMeFCTargets, err := s.nvmeLib.DiscoverNVMeFCTargets(info.Portal, false)
 						if err != nil {
-							continue
-						}
-						for _, target := range NVMeFCTargets {
-							connectErr := s.nvmeFCLib.NVMeConnect(target)
-							if connectErr == nil {
-								NVMeFCConnectCount = NVMeFCConnectCount + 1
+							log.Errorf("couldn't discover NVMeFC targets")
+						} else {
+							for _, target := range NVMeFCTargets {
+								err = s.nvmeLib.NVMeFCConnect(target)
 							}
 						}
-					}
-					log.Info("NVMe FC connect count: ", NVMeFCConnectCount)
-					if NVMeFCConnectCount == 0 {
-						log.Infof("couldn't connect to NVMe/FC targets")
 					}
 				} else {
 					infoList, err := common.GetISCSITargetsInfoFromStorage(arr.GetClient(), "")
@@ -1038,16 +1021,15 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 						continue
 					}
 
-					log.Infof("Discovering NVMe targets")
-
+					log.Infof("Discovering NVMeTCP targets")
 					nvmeIP := strings.Split(infoList[0].Portal, ":")
-					nvmeTargets, err := s.nvmeLib.DiscoverNVMeTargets(nvmeIP[0], false)
+					nvmeTargets, err := s.nvmeLib.DiscoverNVMeTCPTargets(nvmeIP[0], false)
 					if err != nil {
 						log.Error("couldn't discover NVMe targets")
 						continue
 					} else {
 						for _, target := range nvmeTargets {
-							err = s.nvmeLib.NVMeConnect(target)
+							err = s.nvmeLib.NVMeTCPConnect(target)
 							if err == nil {
 								log.Infof("NVMe connection successful")
 							}
@@ -1177,7 +1159,7 @@ func (s *Service) getInitiators() ([]string, []string, []string, error) {
 		fcAvailable = true
 	}
 
-	nvmeInitiators, err := s.nvmetcpConnector.GetInitiatorName(ctx)
+	nvmeInitiators, err := s.nvmeConnector.GetInitiatorName(ctx)
 	if err != nil {
 		log.Error("nodeStartup could not get Initiator NQNs")
 	} else if len(nvmeInitiators) == 0 {

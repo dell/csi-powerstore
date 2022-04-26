@@ -94,10 +94,14 @@ const (
 	PublishContextISCSIPortalsPrefix = "PORTAL"
 	// PublishContextISCSITargetsPrefix indicates publish context iSCSI targets prefix
 	PublishContextISCSITargetsPrefix = "TARGET"
-	// PublishContextNVMEPortalsPrefix indicates publish context NVMe portals prefix
-	PublishContextNVMEPortalsPrefix = "NVMEPORTAL"
-	// PublishContextNVMETargetsPrefix indicates publish context NVMe targets prefix
-	PublishContextNVMETargetsPrefix = "NVMETARGET"
+	// PublishContextNVMETCPPortalsPrefix indicates publish context NVMeTCP portals prefix
+	PublishContextNVMETCPPortalsPrefix = "NVMETCPPORTAL"
+	// PublishContextNVMETCPTargetsPrefix indicates publish context NVMe targets prefix
+	PublishContextNVMETCPTargetsPrefix = "NVMEFCTARGET"
+	// PublishContextNVMEFCTargetsPrefix indicates publish context NVMe targets prefix
+	PublishContextNVMEFCTargetsPrefix = "NVMEFCTARGET"
+	// PublishContextNVMEFCPortalsPrefix indicates publish context NVMe targets prefix
+	PublishContextNVMEFCPortalsPrefix = "NVMEFCPORTAL"
 	// NVMETCPTransport indicates that NVMe/TCP is chosen as the transport protocol
 	NVMETCPTransport TransportType = "NVMETCP"
 	// NVMEFCTransport indicates that NVMe/FC is chosen as the transport protocol
@@ -254,6 +258,26 @@ func GetFCTargetsInfoFromStorage(client gopowerstore.Client, volumeApplianceID s
 	for _, t := range fcPorts {
 		if t.IsLinkUp && t.ApplianceID == volumeApplianceID {
 			result = append(result, gobrick.FCTargetInfo{WWPN: strings.Replace(t.Wwn, ":", "", -1)})
+		}
+	}
+	return result, nil
+}
+
+// GetNVMEFCTargetInfoFromStorage returns a list of gobrick compatible NVMeFC targets by quering Powerstore Array
+func GetNVMEFCTargetInfoFromStorage (client gopowerstore.Client, volumeApplianceID string ) ([]gobrick.NVMeTargetInfo, error) {
+	clusterInfo, err := client.GetCluster(context.Background())
+	nvmeNQN := clusterInfo.NVMeNQN
+
+	fcPorts, err := client.GetFCPorts(context.Background())
+	if err != nil {
+		log.Error(err.Error())
+		return nil, err
+	}
+	var result []gobrick.NVMeTargetInfo
+	for _, t := range fcPorts {
+		if t.IsLinkUp && (t.ApplianceID == volumeApplianceID || volumeApplianceID == "") {
+			targetAddress := strings.Replace(fmt.Sprintf("nn-0x%s:pn-0x%s", strings.Replace(t.WwnNode, ":", "", -1), strings.Replace(t.WwnNVMe, ":", "", -1)), "\n", "", -1)
+			result = append(result, gobrick.NVMeTargetInfo{Target: nvmeNQN, Portal: targetAddress})
 		}
 	}
 	return result, nil

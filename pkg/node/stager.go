@@ -52,9 +52,9 @@ type VolumeStager interface {
 // SCSIStager implementation of NodeVolumeStager for SCSI based (FC, iSCSI) volumes
 type SCSIStager struct {
 	useFC            bool
-	useISCSI         bool
+	useNVME          bool
 	iscsiConnector   ISCSIConnector
-	nvmetcpConnector NVMETCPConnector
+	nvmeConnector    NVMEConnector
 	fcConnector      FcConnector
 }
 
@@ -64,16 +64,20 @@ func (s *SCSIStager) Stage(ctx context.Context, req *csi.NodeStageVolumeRequest,
 	// append additional path to be able to do bind mounts
 	stagingPath := getStagingPath(ctx, req.GetStagingTargetPath(), id)
 
-	publishContext, err := readSCSIInfoFromPublishContext(req.PublishContext, s.useFC, s.useISCSI)
+	publishContext, err := readSCSIInfoFromPublishContext(req.PublishContext, s.useFC, s.useNVME)
 	if err != nil {
 		return nil, err
 	}
 
 	logFields["ID"] = id
-	if s.useISCSI {
-		logFields["Targets"] = publishContext.iscsiTargets
+	if s.useNVME {
+		if s.useFC {
+			logFields["Targets"] = publishContext.nvmefcTargets
+		} else {
+			logFields["Targets"] = publishContext.nvmetcpTargets
+		}
 	} else {
-		logFields["Targets"] = publishContext.nvmeTargets
+		logFields["Targets"] = publishContext.iscsiTargets
 	}
 	logFields["WWN"] = publishContext.deviceWWN
 	logFields["Lun"] = publishContext.volumeLUNAddress
@@ -238,11 +242,12 @@ type scsiPublishContextData struct {
 	deviceWWN        string
 	volumeLUNAddress string
 	iscsiTargets     []gobrick.ISCSITargetInfo
-	nvmeTargets      []gobrick.NVMeTCPTargetInfo
+	nvmetcpTargets   []gobrick.NVMeTargetInfo
+	nvmefcTargets    []gobrick.NVMeTargetInfo
 	fcTargets        []gobrick.FCTargetInfo
 }
 
-func readSCSIInfoFromPublishContext(publishContext map[string]string, useFC bool, useISCSI bool) (scsiPublishContextData, error) {
+func readSCSIInfoFromPublishContext(publishContext map[string]string, useFC bool, useNVMe bool) (scsiPublishContextData, error) {
 	// Get publishContext
 	var data scsiPublishContextData
 	deviceWWN, ok := publishContext[common.PublishContextDeviceWWN]
@@ -255,19 +260,23 @@ func readSCSIInfoFromPublishContext(publishContext map[string]string, useFC bool
 	}
 
 	iscsiTargets := readISCSITargetsFromPublishContext(publishContext)
-	if len(iscsiTargets) == 0 && !useFC && useISCSI {
+	if len(iscsiTargets) == 0 && !useFC && !useNVMe {
 		return data, status.Error(codes.InvalidArgument, "iscsiTargets data must be in publish context")
 	}
-	nvmeTargets := readNVMETargetsFromPublishContext(publishContext)
-	if len(nvmeTargets) == 0 && !useFC && !useISCSI {
-		return data, status.Error(codes.InvalidArgument, "NVMe Targets data must be in publish context")
+	nvmeTCPTargets := readNVMETCPTargetsFromPublishContext(publishContext)
+	if len(nvmeTCPTargets) == 0 && useNVMe && !useFC {
+		return data, status.Error(codes.InvalidArgument, "NVMeTCP Targets data must be in publish context")
+	}
+	nvmeFCTargets := readNVMEFCTargetsFromPublishContext(publishContext)
+	if len(nvmeFCTargets) == 0 && useNVMe && useFC {
+		return data, status.Error(codes.InvalidArgument, "NVMeFC Targets data must be in publish context")
 	}
 	fcTargets := readFCTargetsFromPublishContext(publishContext)
-	if len(fcTargets) == 0 && useFC {
+	if len(fcTargets) == 0 && useFC && !useNVMe{
 		return data, status.Error(codes.InvalidArgument, "fcTargets data must be in publish context")
 	}
 	return scsiPublishContextData{deviceWWN: deviceWWN, volumeLUNAddress: volumeLUNAddress,
-		iscsiTargets: iscsiTargets, nvmeTargets: nvmeTargets, fcTargets: fcTargets}, nil
+		iscsiTargets: iscsiTargets, nvmetcpTargets: nvmeTCPTargets, nvmefcTargets: nvmeFCTargets, fcTargets: fcTargets}, nil
 }
 
 func readISCSITargetsFromPublishContext(pc map[string]string) []gobrick.ISCSITargetInfo {
@@ -291,15 +300,15 @@ func readISCSITargetsFromPublishContext(pc map[string]string) []gobrick.ISCSITar
 	return targets
 }
 
-func readNVMETargetsFromPublishContext(pc map[string]string) []gobrick.NVMeTCPTargetInfo {
-	var targets []gobrick.NVMeTCPTargetInfo
+func readNVMETCPTargetsFromPublishContext(pc map[string]string) []gobrick.NVMeTargetInfo {
+	var targets []gobrick.NVMeTargetInfo
 	for i := 0; ; i++ {
-		target := gobrick.NVMeTCPTargetInfo{}
-		t, tfound := pc[fmt.Sprintf("%s%d", common.PublishContextNVMETargetsPrefix, i)]
+		target := gobrick.NVMeTargetInfo{}
+		t, tfound := pc[fmt.Sprintf("%s%d", common.PublishContextNVMETCPTargetsPrefix, i)]
 		if tfound {
 			target.Target = t
 		}
-		p, pfound := pc[fmt.Sprintf("%s%d", common.PublishContextNVMEPortalsPrefix, i)]
+		p, pfound := pc[fmt.Sprintf("%s%d", common.PublishContextNVMETCPPortalsPrefix, i)]
 		if pfound {
 			target.Portal = p
 		}
@@ -308,7 +317,28 @@ func readNVMETargetsFromPublishContext(pc map[string]string) []gobrick.NVMeTCPTa
 		}
 		targets = append(targets, target)
 	}
-	log.Infof("NVMe Targets from context: %v", targets)
+	log.Infof("NVMeTCP Targets from context: %v", targets)
+	return targets
+}
+
+func readNVMEFCTargetsFromPublishContext(pc map[string]string) []gobrick.NVMeTargetInfo {
+	var targets []gobrick.NVMeTargetInfo
+	for i := 0; ; i++ {
+		target := gobrick.NVMeTargetInfo{}
+		t, tfound := pc[fmt.Sprintf("%s%d", common.PublishContextNVMEFCTargetsPrefix, i)]
+		if tfound {
+			target.Target = t
+		}
+		p, pfound := pc[fmt.Sprintf("%s%d", common.PublishContextNVMEFCPortalsPrefix, i)]
+		if pfound {
+			target.Portal = p
+		}
+		if !tfound || !pfound {
+			break
+		}
+		targets = append(targets, target)
+	}
+	log.Infof("NVMeFC Targets from context: %v", targets)
 	return targets
 }
 
@@ -336,12 +366,12 @@ func (s *SCSIStager) connectDevice(ctx context.Context, data scsiPublishContextD
 	}
 	wwn := data.deviceWWN
 	var device gobrick.Device
-	if s.useFC {
+	if s.useNVME {
+		device, err = s.connectNVMEDevice(ctx, wwn, data, s.useFC)
+	} else if s.useFC {
 		device, err = s.connectFCDevice(ctx, lun, data)
-	} else if s.useISCSI {
-		device, err = s.connectISCSIDevice(ctx, lun, data)
 	} else {
-		device, err = s.connectNVMEDevice(ctx, wwn, data)
+		device, err = s.connectISCSIDevice(ctx, lun, data)
 	}
 
 	if err != nil {
@@ -372,18 +402,25 @@ func (s *SCSIStager) connectISCSIDevice(ctx context.Context,
 }
 
 func (s *SCSIStager) connectNVMEDevice(ctx context.Context,
-	wwn string, data scsiPublishContextData) (gobrick.Device, error) {
+	wwn string, data scsiPublishContextData, useFC bool) (gobrick.Device, error) {
 	logFields := common.GetLogFields(ctx)
-	var targets []gobrick.NVMeTCPTargetInfo
-	for _, t := range data.nvmeTargets {
-		targets = append(targets, gobrick.NVMeTCPTargetInfo{Target: t.Target, Portal: t.Portal})
+	var targets []gobrick.NVMeTargetInfo
+
+	if useFC {
+		for _, t := range data.nvmefcTargets {
+			targets = append(targets, gobrick.NVMeTargetInfo{Target: t.Target, Portal: t.Portal})
+		}
+	} else {
+		for _, t := range data.nvmetcpTargets {
+			targets = append(targets, gobrick.NVMeTargetInfo{Target: t.Target, Portal: t.Portal})
+		}
 	}
 	// separate context to prevent 15 seconds cancel from kubernetes
 	connectorCtx, cFunc := context.WithTimeout(context.Background(), time.Second*120)
 	defer cFunc()
 
 	connectorCtx = common.SetLogFields(connectorCtx, logFields)
-	return s.nvmetcpConnector.ConnectVolume(connectorCtx, gobrick.NVMeTCPVolumeInfo{
+	return s.nvmeConnector.ConnectVolume(connectorCtx, gobrick.NVMeVolumeInfo{
 		Targets: targets,
 		WWN:     wwn,
 	})
