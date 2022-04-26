@@ -35,6 +35,13 @@ rules:
   - apiGroups: [""]
     resources: ["secrets"]
     verbs: ["get", "list"]
+  {{- if hasKey .Values.controller "vgsnapshot" }}
+  {{- if eq .Values.controller.vgsnapshot.enabled true }}
+  - apiGroups: ["volumegroup.storage.dell.com"]
+    resources: ["dellcsivolumegroupsnapshots","dellcsivolumegroupsnapshots/status"]
+    verbs: ["create", "list", "watch", "delete", "update"]
+  {{- end }}
+  {{- end }} 
   - apiGroups: ["snapshot.storage.k8s.io"]
     resources: ["volumesnapshotclasses"]
     verbs: ["get", "list", "watch"]
@@ -46,7 +53,13 @@ rules:
     verbs: ["update", "patch"]
   - apiGroups: ["snapshot.storage.k8s.io"]
     resources: ["volumesnapshots", "volumesnapshots/status"]
+  {{- if hasKey .Values.controller "vgsnapshot" }}
+  {{- if eq .Values.controller.vgsnapshot.enabled true }}
+    verbs: ["get", "list", "watch", "update", "create", "delete"]
+  {{- else }}
     verbs: ["get", "list", "watch", "update"]
+  {{- end }}
+  {{- end }}    
   - apiGroups: ["storage.k8s.io"]
     resources: ["volumeattachments/status"]
     verbs: ["patch"]
@@ -268,6 +281,19 @@ spec:
               mountPath: /var/run/csi
         {{end}}
         {{end}}
+        {{- if hasKey .Values.controller "vgsnapshot" }}
+        {{- if eq .Values.controller.vgsnapshot.enabled true }}
+        - name: vg-snapshotter
+          image: {{ required "Must provide the vgsnapshotter container image." .Values.controller.vgsnapshot.image }}
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
+          env:
+            - name: ADDRESS
+              value: /var/run/csi/csi.sock
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /var/run/csi
+        {{- end }}
+        {{- end }}
         {{- if hasKey .Values.controller "replication" }}
         {{- if eq .Values.controller.replication.enabled true}}
         - name: dell-csi-replicator

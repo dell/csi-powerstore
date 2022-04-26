@@ -51,6 +51,11 @@ nfsAcls: "0777"
 
 # controller: configure controller specific parameters
 controller:
+  #  To enable/disable Volume group snapshot feature
+  vgsnapshot:
+    enabled: true
+    image: dellemc/csi-volumegroup-snapshotter:v1.0.0
+
   # controllerCount: defines the number of csi-powerscale controller pods to deploy to
   # the Kubernetes release.
   # Allowed values: n, where n > 0
