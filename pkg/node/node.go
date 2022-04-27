@@ -819,7 +819,7 @@ func (s *Service) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolum
 	}
 	log.WithFields(f).Info("Calling resize the file system")
 
-	if s.useFC || s.useNVME {
+	if !s.useNVME {
 		// Rescan the device for the volume expanded on the array
 		for _, device := range devMnt.DeviceNames {
 			devicePath := sysBlock + device
