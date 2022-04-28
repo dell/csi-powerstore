@@ -310,6 +310,8 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 		}
 	}
 
+	params["Description"] = getDescription(req.GetParameters())
+
 	var volumeResponse *csi.Volume
 	resp, err := creator.Create(ctx, req, sizeInBytes, arr.GetClient())
 	if err != nil {

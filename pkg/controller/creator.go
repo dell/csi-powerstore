@@ -83,6 +83,27 @@ func setMetaData(reqParams map[string]string, createParams interface{}) {
 	}
 }
 
+func setVolumeAttributes(reqParams map[string]string, createParams *gopowerstore.VolumeCreate) {
+	if applianceId, ok := reqParams["ApplianceID"]; ok {
+		createParams.ApplianceID = applianceId
+	}
+	if description, ok := reqParams["Description"]; ok {
+		createParams.Description = description
+	}
+	if protectionPolicyId, ok := reqParams["ProtectionPolicyID"]; ok {
+		createParams.ProtectionPolicyID = protectionPolicyId
+	}
+	if performancePolicyId, ok := reqParams["PerformancePolicyID"]; ok {
+		createParams.PerformancePolicyID = performancePolicyId
+	}
+	if appType, ok := reqParams["AppType"]; ok {
+		createParams.AppType = appType
+		if appTypeOther, ok := reqParams["AppTypeOther"]; ok {
+			createParams.AppTypeOther = appTypeOther
+		}
+	}
+}
+
 // CheckSize validates that size is correct and returns size in bytes
 func (*SCSICreator) CheckSize(ctx context.Context, cr *csi.CapacityRange) (int64, error) {
 	minSize := cr.GetRequiredBytes()
@@ -134,8 +155,11 @@ func (sc *SCSICreator) Create(ctx context.Context, req *csi.CreateVolumeRequest,
 	reqParams := &gopowerstore.VolumeCreate{Name: &name, Size: &sizeInBytes}
 	if sc.vg != nil {
 		reqParams.VolumeGroupID = sc.vg.ID
+	} else if vgId, ok := req.Parameters["VolumeGroupId"]; ok {
+		reqParams.VolumeGroupID = vgId
 	}
 	setMetaData(req.Parameters, reqParams)
+	setVolumeAttributes(req.Parameters, reqParams)
 	return client.CreateVolume(ctx, reqParams)
 }
 

@@ -22,6 +22,10 @@ package interceptors
 import (
 	"context"
 	"fmt"
+	"io"
+	"sync"
+	"time"
+
 	"github.com/akutz/gosync"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/gocsi/middleware/serialvolume"
@@ -29,9 +33,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
-	"io"
-	"sync"
-	"time"
 
 	csictx "github.com/dell/gocsi/context"
 	mwtypes "github.com/dell/gocsi/middleware/serialvolume/types"
@@ -118,6 +119,8 @@ func NewCustomSerialLock() grpc.UnaryServerInterceptor {
 
 	handle := func(ctx xctx.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 		switch t := req.(type) {
+		case *csi.CreateVolumeRequest:
+			return i.createVolume(ctx, t, info, handler)
 		case *csi.NodeStageVolumeRequest:
 			return i.nodeStageVolume(ctx, t, info, handler)
 		case *csi.NodeUnstageVolumeRequest:
@@ -165,6 +168,19 @@ func (i *interceptor) nodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 		return nil, status.Error(codes.Aborted, pending)
 	}
 	defer lock.Unlock()
+
+	return handler(ctx, req)
+}
+
+func (i *interceptor) createVolume(ctx context.Context, req *csi.CreateVolumeRequest,
+	info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (res interface{}, resErr error) {
+	var volumeLabels map[string]string
+
+	// volumeLabels = GetVolumeLabels()
+
+	for k, v := range volumeLabels {
+		req.Parameters[k] = v
+	}
 
 	return handler(ctx, req)
 }
