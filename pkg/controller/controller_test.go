@@ -1419,10 +1419,9 @@ var _ = Describe("CSIControllerService", func() {
 					SnapshotId: validBlockVolumeID,
 				}
 
-				res, err := ctrlSvc.DeleteSnapshot(context.Background(), req)
+				_, err := ctrlSvc.DeleteSnapshot(context.Background(), req)
 
 				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.DeleteSnapshotResponse{}))
 			})
 		})
 	})
