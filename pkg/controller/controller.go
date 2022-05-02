@@ -937,9 +937,17 @@ func (s *Service) DeleteSnapshot(ctx context.Context, req *csi.DeleteSnapshotReq
 			return nil, err
 		}
 	} else {
-		_, err = arr.GetClient().GetSnapshot(ctx, id)
+		snap, err := arr.GetClient().GetSnapshot(ctx, id)
 		if err == nil {
-			_, err := arr.GetClient().DeleteSnapshot(ctx, nil, id)
+			// we will check whether this snapshot is a part of volume group snapshot, if yes then we will delete the volume group snapshot
+			vgs, err := arr.GetClient().GetVolumeGroupsByVolumeID(ctx, snap.ID)
+			if len(vgs.VolumeGroup) != 0 && err == nil { // This means this snap is a part of VGS
+				_, err = arr.GetClient().DeleteVolumeGroup(ctx, vgs.VolumeGroup[0].ID)
+				if err == nil {
+					return &csi.DeleteSnapshotResponse{}, nil
+				}
+			}
+			_, err = arr.GetClient().DeleteSnapshot(ctx, nil, id)
 			if err == nil {
 				return &csi.DeleteSnapshotResponse{}, nil
 			}
