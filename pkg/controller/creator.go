@@ -84,21 +84,21 @@ func setMetaData(reqParams map[string]string, createParams interface{}) {
 }
 
 func setVolumeAttributes(reqParams map[string]string, createParams *gopowerstore.VolumeCreate) {
-	if applianceId, ok := reqParams["ApplianceID"]; ok {
+	if applianceId, ok := reqParams["applianceId"]; ok {
 		createParams.ApplianceID = applianceId
 	}
-	if description, ok := reqParams["Description"]; ok {
+	if description, ok := reqParams["description"]; ok {
 		createParams.Description = description
 	}
-	if protectionPolicyId, ok := reqParams["ProtectionPolicyID"]; ok {
+	if protectionPolicyId, ok := reqParams["protectionPolicyId"]; ok {
 		createParams.ProtectionPolicyID = protectionPolicyId
 	}
-	if performancePolicyId, ok := reqParams["PerformancePolicyID"]; ok {
+	if performancePolicyId, ok := reqParams["performancePolicyId"]; ok {
 		createParams.PerformancePolicyID = performancePolicyId
 	}
-	if appType, ok := reqParams["AppType"]; ok {
+	if appType, ok := reqParams["appType"]; ok {
 		createParams.AppType = appType
-		if appTypeOther, ok := reqParams["AppTypeOther"]; ok {
+		if appTypeOther, ok := reqParams["appTypeOther"]; ok {
 			createParams.AppTypeOther = appTypeOther
 		}
 	}
