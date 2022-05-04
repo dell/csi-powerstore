@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"github.com/dell/gonvme"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"path"
 	"path/filepath"
@@ -1349,9 +1350,29 @@ func (s *Service) createHost(ctx context.Context, initiators []string, client go
 	osType := gopowerstore.OSTypeEnumLinux
 	reqInitiators := s.buildInitiatorsArray(initiators)
 	description := fmt.Sprintf("k8s node: %s", s.opts.KubeNodeName)
-	createParams := gopowerstore.HostCreate{Name: &s.nodeID, OsType: &osType, Initiators: &reqInitiators,
-		Description: &description}
+	metadata := map[string]string{
+		"k8s_node_name": s.opts.KubeNodeName,
+	}
+	var createParams gopowerstore.HostCreate
+	defaultHeaders := client.GetCustomHTTPHeaders()
+	if defaultHeaders == nil {
+		defaultHeaders = make(http.Header)
+	}
+	customHeaders := defaultHeaders
+	k8sMetadataSupported := common.IsK8sMetadataSupported(client)
+	if k8sMetadataSupported {
+		customHeaders.Add("DELL-VISIBILITY", "internal")
+		client.SetCustomHTTPHeaders(customHeaders)
+		createParams = gopowerstore.HostCreate{Name: &s.nodeID, OsType: &osType, Initiators: &reqInitiators,
+			Description: &description, Metadata: &metadata}
+	} else {
+		createParams = gopowerstore.HostCreate{Name: &s.nodeID, OsType: &osType, Initiators: &reqInitiators,
+			Description: &description}
+	}
 	resp, err := client.CreateHost(ctx, &createParams)
+	// reset custom header
+	customHeaders.Del("DELL-VISIBILITY")
+	client.SetCustomHTTPHeaders(customHeaders)
 	if err != nil {
 		return id, err
 	}

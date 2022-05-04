@@ -149,6 +149,9 @@ var _ = Describe("CSIControllerService", func() {
 	Describe("calling CreateVolume()", func() {
 		When("creating block volume", func() {
 			It("should successfully create block volume", func() {
+				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+				clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
+				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 				clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
 
 				req := getTypicalCreateVolumeRequest("my-vol", validVolSize)
@@ -183,6 +186,9 @@ var _ = Describe("CSIControllerService", func() {
 			})
 
 			It("should create volume and volumeGroup if policy exists", func() {
+				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+				clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
+				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 				// all entities not exists
 				clientMock.On("GetVolumeGroupByName", mock.Anything, validGroupName).
 					Return(gopowerstore.VolumeGroup{}, gopowerstore.NewNotFoundError())
@@ -238,7 +244,9 @@ var _ = Describe("CSIControllerService", func() {
 				createGroupRequest := &gopowerstore.VolumeGroupCreate{Name: validNamespacedGroupName, ProtectionPolicyID: validPolicyID}
 				clientMock.On("CreateVolumeGroup", mock.Anything, createGroupRequest).Return(gopowerstore.CreateResponse{ID: validGroupID}, nil)
 				clientMock.On("GetVolumeGroup", mock.Anything, validGroupID).Return(gopowerstore.VolumeGroup{ID: validGroupID, ProtectionPolicyID: validPolicyID}, nil)
-
+				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+				clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
+				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 				clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
 
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
@@ -265,7 +273,9 @@ var _ = Describe("CSIControllerService", func() {
 			It("should create new volume with existing volumeGroup with policy", func() {
 				clientMock.On("GetVolumeGroupByName", mock.Anything, validGroupName).
 					Return(gopowerstore.VolumeGroup{ID: validGroupID, ProtectionPolicyID: validPolicyID}, nil)
-
+				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+				clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
+				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 				clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
 
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
@@ -294,7 +304,9 @@ var _ = Describe("CSIControllerService", func() {
 					Return(gopowerstore.VolumeGroup{ID: validGroupID, ProtectionPolicyID: validPolicyID}, nil)
 
 				EnsureProtectionPolicyExistsMock()
-
+				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+				clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
+				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 				clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
 
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
@@ -520,6 +532,9 @@ var _ = Describe("CSIControllerService", func() {
 		When("volume name already in use", func() {
 			It("should return existing volume [Block]", func() {
 				volName := "my-vol"
+				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+				clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
+				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 				clientMock.On("CreateVolume", mock.Anything, mock.Anything).
 					Return(gopowerstore.CreateResponse{}, gopowerstore.APIError{
 						ErrorMsg: &api.ErrorMsg{
@@ -590,6 +605,9 @@ var _ = Describe("CSIControllerService", func() {
 			When("existing volume size is smaller", func() {
 				It("should fail [Block]", func() {
 					volName := "my-vol"
+					clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+					clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
+					clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 					clientMock.On("CreateVolume", mock.Anything, mock.Anything).
 						Return(gopowerstore.CreateResponse{}, gopowerstore.APIError{
 							ErrorMsg: &api.ErrorMsg{
@@ -808,6 +826,9 @@ var _ = Describe("CSIControllerService", func() {
 
 		When("there is no array IP in storage class", func() {
 			It("should use default array", func() {
+				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+				clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
+				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 				clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
 
 				req := getTypicalCreateVolumeRequest("my-vol", validVolSize)
