@@ -5,9 +5,9 @@ go 1.17
 require (
 	github.com/akutz/gosync v0.1.0
 	github.com/container-storage-interface/spec v1.5.0
-	github.com/dell/dell-csi-extensions/common v1.0.0
-	github.com/dell/dell-csi-extensions/replication v1.1.0
-	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.1.0
+	github.com/dell/dell-csi-extensions/common v1.0.1-0.20220418113927-d5623b98b6d5
+	github.com/dell/dell-csi-extensions/replication v1.1.1-0.20220418113927-d5623b98b6d5
+	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.1.1-0.20220421100820-8fb97476d796
 	github.com/dell/gobrick v1.3.1-0.20220428084717-c92bddbbdb79
 	github.com/dell/gocsi v1.5.1
 	github.com/dell/gofsutil v1.8.0
