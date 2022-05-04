@@ -65,12 +65,12 @@ type Opts struct {
 type Service struct {
 	Fs fs.Interface
 
-	ctrlSvc          controller.Interface
-	iscsiConnector   ISCSIConnector
-	fcConnector      FcConnector
-	nvmeConnector 	 NVMEConnector
-	iscsiLib         goiscsi.ISCSIinterface
-	nvmeLib          gonvme.NVMEinterface
+	ctrlSvc        controller.Interface
+	iscsiConnector ISCSIConnector
+	fcConnector    FcConnector
+	nvmeConnector  NVMEConnector
+	iscsiLib       goiscsi.ISCSIinterface
+	nvmeLib        gonvme.NVMEinterface
 
 	opts   Opts
 	nodeID string
@@ -117,13 +117,13 @@ func (s *Service) Init() error {
 		switch arr.BlockProtocol {
 		case common.NVMETCPTransport:
 			if len(nvmeInitiators) == 0 {
-				return fmt.Errorf("NVMe/TCP transport was requested but NVMe initiator is not available")
+				return fmt.Errorf("NVMeTCP transport was requested but NVMe initiator is not available")
 			}
 			s.useNVME = true
 			s.useFC = false
 		case common.NVMEFCTransport:
 			if len(nvmeInitiators) == 0 {
-				return fmt.Errorf("NVMe/FC transport was requested but NVMe initiator is not available")
+				return fmt.Errorf("NVMeFC transport was requested but NVMe initiator is not available")
 			}
 			s.useNVME = true
 			s.useFC = true
@@ -240,7 +240,6 @@ func (s *Service) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeR
 		req.PublishContext[fmt.Sprintf("%s%d", common.PublishContextNVMETCPPortalsPrefix, i)] = t.Portal + ":4420"
 	}
 
-
 	id, arrayID, protocol, _ := array.ParseVolumeID(ctx, id, s.DefaultArray(), req.VolumeCapability)
 
 	var stager VolumeStager
@@ -256,11 +255,11 @@ func (s *Service) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeR
 		}
 	} else {
 		stager = &SCSIStager{
-			useFC:            s.useFC,
-			useNVME:          s.useNVME,
-			iscsiConnector:   s.iscsiConnector,
-			nvmeConnector: 	  s.nvmeConnector,
-			fcConnector:      s.fcConnector,
+			useFC:          s.useFC,
+			useNVME:        s.useNVME,
+			iscsiConnector: s.iscsiConnector,
+			nvmeConnector:  s.nvmeConnector,
+			fcConnector:    s.fcConnector,
 		}
 	}
 
@@ -1000,7 +999,7 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 				if s.useFC {
 					nvmefcInfo, err := common.GetNVMEFCTargetInfoFromStorage(arr.GetClient(), "")
 					if err != nil {
-						log.Error("couldn't get targets from the array: %s", err.Error())
+						log.Errorf("couldn't get targets from the array: %s", err.Error())
 					}
 
 					log.Infof("Discovering NVMeFC targets")
@@ -1011,6 +1010,9 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 						} else {
 							for _, target := range NVMeFCTargets {
 								err = s.nvmeLib.NVMeFCConnect(target)
+								if err != nil {
+									log.Errorf("couldn't connect to NVMeFC target")
+								}
 							}
 						}
 					}
@@ -1030,8 +1032,8 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 					} else {
 						for _, target := range nvmeTargets {
 							err = s.nvmeLib.NVMeTCPConnect(target)
-							if err == nil {
-								log.Infof("NVMe connection successful")
+							if err != nil {
+								log.Infof("couldn't connect to NVMeTCP targets")
 							}
 						}
 					}
