@@ -65,6 +65,8 @@ type Service struct {
 	replicationContextPrefix string
 	replicationPrefix        string
 	isHealthMonitorEnabled   bool
+
+	K8sVisibilityAutoRegistration bool
 }
 
 // Init is a method that initializes internal variables of controller service
@@ -91,6 +93,10 @@ func (s *Service) Init() error {
 		if nfsAcls != "" {
 			s.nfsAcls = nfsAcls
 		}
+	}
+
+	if isk8sVisibilityAutoRegistrationEnabled, ok := csictx.LookupEnv(ctx, common.EnvK8sVisibilityAutoRegistration); ok {
+		s.K8sVisibilityAutoRegistration, _ = strconv.ParseBool(isk8sVisibilityAutoRegistrationEnabled)
 	}
 
 	return nil
@@ -931,9 +937,17 @@ func (s *Service) DeleteSnapshot(ctx context.Context, req *csi.DeleteSnapshotReq
 			return nil, err
 		}
 	} else {
-		_, err = arr.GetClient().GetSnapshot(ctx, id)
+		snap, err := arr.GetClient().GetSnapshot(ctx, id)
 		if err == nil {
-			_, err := arr.GetClient().DeleteSnapshot(ctx, nil, id)
+			// we will check whether this snapshot is a part of volume group snapshot, if yes then we will delete the volume group snapshot
+			vgs, err := arr.GetClient().GetVolumeGroupsByVolumeID(ctx, snap.ID)
+			if len(vgs.VolumeGroup) != 0 && err == nil { // This means this snap is a part of VGS
+				_, err = arr.GetClient().DeleteVolumeGroup(ctx, vgs.VolumeGroup[0].ID)
+				if err == nil {
+					return &csi.DeleteSnapshotResponse{}, nil
+				}
+			}
+			_, err = arr.GetClient().DeleteSnapshot(ctx, nil, id)
 			if err == nil {
 				return &csi.DeleteSnapshotResponse{}, nil
 			}
@@ -1144,11 +1158,6 @@ func (s *Service) ProbeController(ctx context.Context, req *commonext.ProbeContr
 	return rep, nil
 }
 
-// CreateVolumeGroupSnapshot creates snapshots of the volume group
-func (s *Service) CreateVolumeGroupSnapshot(ctx context.Context, request *vgsext.CreateVolumeGroupSnapshotRequest) (*vgsext.CreateVolumeGroupSnapshotResponse, error) {
-	panic("implement me")
-}
-
 func (s *Service) listPowerStoreVolumes(ctx context.Context, startToken, maxEntries int) ([]gopowerstore.Volume, string, error) {
 	var volumes []gopowerstore.Volume
 
@@ -1256,6 +1265,7 @@ func (s *Service) listPowerStoreSnapshots(ctx context.Context, startToken, maxEn
 		}
 	} else {
 		log.Infof("Requested snapshot via source id %s", srcID)
+		// This works VGS on single default array, But for multiple array scenario this default array should be changed to dynamic array
 		id, arrayID, protocol, err := array.ParseVolumeID(ctx, srcID, s.DefaultArray(), nil)
 		if err != nil {
 			log.Error(err)

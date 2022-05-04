@@ -1332,8 +1332,10 @@ var _ = Describe("CSIControllerService", func() {
 	Describe("calling DeleteSnapshot()", func() {
 		When("parameters are correct", func() {
 			It("should successfully delete snapshot [Block]", func() {
-				clientMock.On("GetSnapshot", mock.Anything, validBaseVolID).Return(gopowerstore.Volume{}, nil)
-
+				clientMock.On("GetSnapshot", mock.Anything, validBaseVolID).Return(gopowerstore.Volume{ID: validBaseVolID}, nil)
+				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).
+					Return(gopowerstore.VolumeGroups{VolumeGroup: []gopowerstore.VolumeGroup{{ID: validGroupID, Name: validVolumeGroupName}}}, nil)
+				clientMock.On("DeleteVolumeGroup", mock.Anything, validGroupID).Return(gopowerstore.EmptyResponse(""), nil)
 				clientMock.On("DeleteSnapshot", mock.Anything,
 					mock.AnythingOfType("*gopowerstore.VolumeDelete"), validBaseVolID).Return(gopowerstore.EmptyResponse(""), nil)
 
@@ -1366,7 +1368,9 @@ var _ = Describe("CSIControllerService", func() {
 		When("there is no snapshot", func() {
 			It("should return no error [Block]", func() {
 				clientMock.On("GetSnapshot", mock.Anything, validBaseVolID).Return(gopowerstore.Volume{}, nil)
-
+				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, "").
+					Return(gopowerstore.VolumeGroups{VolumeGroup: []gopowerstore.VolumeGroup{}}, nil)
+				clientMock.On("DeleteVolumeGroup", mock.Anything, "").Return(gopowerstore.EmptyResponse(""), nil)
 				clientMock.On("DeleteSnapshot", mock.Anything,
 					mock.AnythingOfType("*gopowerstore.VolumeDelete"), validBaseVolID).Return(gopowerstore.EmptyResponse(""), gopowerstore.APIError{
 					ErrorMsg: &api.ErrorMsg{
@@ -1411,15 +1415,13 @@ var _ = Describe("CSIControllerService", func() {
 						StatusCode: http.StatusNotFound,
 					},
 				})
-
 				req := &csi.DeleteSnapshotRequest{
 					SnapshotId: validBlockVolumeID,
 				}
 
-				res, err := ctrlSvc.DeleteSnapshot(context.Background(), req)
+				_, err := ctrlSvc.DeleteSnapshot(context.Background(), req)
 
 				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.DeleteSnapshotResponse{}))
 			})
 		})
 	})
