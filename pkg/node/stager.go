@@ -51,11 +51,11 @@ type VolumeStager interface {
 
 // SCSIStager implementation of NodeVolumeStager for SCSI based (FC, iSCSI) volumes
 type SCSIStager struct {
-	useFC            bool
-	useNVME          bool
-	iscsiConnector   ISCSIConnector
-	nvmeConnector    NVMEConnector
-	fcConnector      FcConnector
+	useFC          bool
+	useNVME        bool
+	iscsiConnector ISCSIConnector
+	nvmeConnector  NVMEConnector
+	fcConnector    FcConnector
 }
 
 // Stage stages volume by connecting it through either FC or iSCSI and creating bind mount to staging path
@@ -272,7 +272,7 @@ func readSCSIInfoFromPublishContext(publishContext map[string]string, useFC bool
 		return data, status.Error(codes.InvalidArgument, "NVMeFC Targets data must be in publish context")
 	}
 	fcTargets := readFCTargetsFromPublishContext(publishContext)
-	if len(fcTargets) == 0 && useFC && !useNVMe{
+	if len(fcTargets) == 0 && useFC && !useNVMe {
 		return data, status.Error(codes.InvalidArgument, "fcTargets data must be in publish context")
 	}
 	return scsiPublishContextData{deviceWWN: deviceWWN, volumeLUNAddress: volumeLUNAddress,

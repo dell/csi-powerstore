@@ -264,7 +264,7 @@ func GetFCTargetsInfoFromStorage(client gopowerstore.Client, volumeApplianceID s
 }
 
 // GetNVMEFCTargetInfoFromStorage returns a list of gobrick compatible NVMeFC targets by quering Powerstore Array
-func GetNVMEFCTargetInfoFromStorage (client gopowerstore.Client, volumeApplianceID string ) ([]gobrick.NVMeTargetInfo, error) {
+func GetNVMEFCTargetInfoFromStorage(client gopowerstore.Client, volumeApplianceID string) ([]gobrick.NVMeTargetInfo, error) {
 	clusterInfo, err := client.GetCluster(context.Background())
 	nvmeNQN := clusterInfo.NVMeNQN
 
