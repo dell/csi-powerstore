@@ -1016,6 +1016,7 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 							}
 						}
 					}
+					resp.AccessibleTopology.Segments[common.Name+"/"+arr.GetIP()+"-nvmefc"] = "true"
 				} else {
 					infoList, err := common.GetISCSITargetsInfoFromStorage(arr.GetClient(), "")
 					if err != nil {
@@ -1037,8 +1038,8 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 							}
 						}
 					}
+					resp.AccessibleTopology.Segments[common.Name+"/"+arr.GetIP()+"-nvmetcp"] = "true"
 				}
-				resp.AccessibleTopology.Segments[common.Name+"/"+arr.GetIP()+"-nvme"] = "true"
 
 			} else if s.useFC {
 				// Check node initiators connection to array
