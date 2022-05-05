@@ -257,6 +257,7 @@ func GetFCTargetsInfoFromStorage(client gopowerstore.Client, volumeApplianceID s
 	return result, nil
 }
 
+// IsK8sMetadataSupported returns info whether Metadata is supported or not
 func IsK8sMetadataSupported(client gopowerstore.Client) bool {
 	k8sMetadataSupported := false
 	majorMinorVersion, err := client.GetSoftwareMajorMinorVersion(context.Background())
