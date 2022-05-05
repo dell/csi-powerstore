@@ -304,7 +304,7 @@ func (s *Locker) RegisterK8sCluster(fs fs.Interface) error {
 	}
 
 	for _, array := range s.arrays {
-		if !isK8sVisibilitySupported(array.Client) {
+		if !isK8sClusterAPISupported(array.Client) {
 			continue
 		}
 
