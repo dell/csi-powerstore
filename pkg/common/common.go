@@ -97,11 +97,11 @@ const (
 	// PublishContextNVMETCPPortalsPrefix indicates publish context NVMeTCP portals prefix
 	PublishContextNVMETCPPortalsPrefix = "NVMETCPPORTAL"
 	// PublishContextNVMETCPTargetsPrefix indicates publish context NVMe targets prefix
-	PublishContextNVMETCPTargetsPrefix = "NVMEFCTARGET"
-	// PublishContextNVMEFCTargetsPrefix indicates publish context NVMe targets prefix
-	PublishContextNVMEFCTargetsPrefix = "NVMEFCTARGET"
+	PublishContextNVMETCPTargetsPrefix = "NVMETCPTARGET"
 	// PublishContextNVMEFCPortalsPrefix indicates publish context NVMe targets prefix
 	PublishContextNVMEFCPortalsPrefix = "NVMEFCPORTAL"
+	// PublishContextNVMEFCTargetsPrefix indicates publish context NVMe targets prefix
+	PublishContextNVMEFCTargetsPrefix = "NVMEFCTARGET"
 	// NVMETCPTransport indicates that NVMe/TCP is chosen as the transport protocol
 	NVMETCPTransport TransportType = "NVMETCP"
 	// NVMEFCTransport indicates that NVMe/FC is chosen as the transport protocol
@@ -264,7 +264,7 @@ func GetFCTargetsInfoFromStorage(client gopowerstore.Client, volumeApplianceID s
 }
 
 // GetNVMEFCTargetInfoFromStorage returns a list of gobrick compatible NVMeFC targets by quering Powerstore Array
-func GetNVMEFCTargetInfoFromStorage(client gopowerstore.Client, volumeApplianceID string) ([]gobrick.NVMeTargetInfo, error) {
+func GetNVMEFCTargetInfoFromStorage (client gopowerstore.Client, volumeApplianceID string ) ([]gobrick.NVMeTargetInfo, error) {
 	clusterInfo, err := client.GetCluster(context.Background())
 	nvmeNQN := clusterInfo.NVMeNQN
 
