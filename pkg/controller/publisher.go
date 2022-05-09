@@ -181,6 +181,15 @@ func (s *SCSIPublisher) addTargetsInfoToPublishContext(
 		publishContext[fmt.Sprintf("%s%d", common.PublishContextFCWWPNPrefix, i)] = t.WWPN
 	}
 
+	nvmefcTargetInfo, err := common.GetNVMEFCTargetInfoFromStorage(client, volumeApplianceID)
+	if err != nil {
+		return err
+	}
+	for i, t := range nvmefcTargetInfo {
+		publishContext[fmt.Sprintf("%s%d", common.PublishContextNVMEFCPortalsPrefix, i)] = t.Portal
+		publishContext[fmt.Sprintf("%s%d", common.PublishContextNVMEFCTargetsPrefix, i)] = t.Target
+	}
+
 	return nil
 }
 

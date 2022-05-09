@@ -126,41 +126,19 @@ func getK8sClusterInfo(fs fs.Interface) ([]K8sClusterInfo, error) {
 	return k8sClusters, nil
 }
 
-func isK8sVisibilitySupported(client gopowerstore.Client) bool {
-	k8sVisibilitySupported := false
-	resp, err := client.GetSoftwareInstalled(context.Background())
+func isK8sClusterAPISupported(client gopowerstore.Client) bool {
+	k8sClusterAPISupported := false
+	majorMinorVersion, err := client.GetSoftwareMajorMinorVersion(context.Background())
 	if err != nil {
 		log.Errorf("couldn't get the software version installed on the PowerStore array: %v", err)
-		return k8sVisibilitySupported
+		return k8sClusterAPISupported
 	}
 
-	for _, softwareInstalled := range resp {
-		if softwareInstalled.IsCluster {
-			versionString := softwareInstalled.BuildVersion
-			versions := strings.Split(versionString, ".")
-			if len(versions) > 2 {
-				var majorMinorVersion float32
-				var majorVersion, minorVersion int
-
-				if majorVersion, err = strconv.Atoi(versions[0]); err != nil {
-					log.Errorf("couldn't get the software major version installed on the PowerStore array: %v", err)
-					break
-				}
-				if minorVersion, err = strconv.Atoi(versions[1]); err != nil {
-					log.Errorf("couldn't get the software minor version installed on the PowerStore array: %v", err)
-					break
-				}
-
-				majorMinorVersion = float32(majorVersion) + float32(minorVersion)*0.1
-				if majorMinorVersion >= 3.1 {
-					k8sVisibilitySupported = true
-				} else {
-					log.Debugf("Software version installed on the PowerStore array: %v\n", majorMinorVersion)
-				}
-			}
-			break
-		}
+	if majorMinorVersion >= 4.0 {
+		k8sClusterAPISupported = true
+	} else {
+		log.Debugf("Software version installed on the PowerStore array: %v\n", majorMinorVersion)
 	}
 
-	return k8sVisibilitySupported
+	return k8sClusterAPISupported
 }

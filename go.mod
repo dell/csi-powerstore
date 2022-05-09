@@ -1,6 +1,6 @@
 module github.com/dell/csi-powerstore
 
-go 1.17
+go 1.18
 
 require (
 	github.com/akutz/gosync v0.1.0
@@ -8,12 +8,12 @@ require (
 	github.com/dell/dell-csi-extensions/common v1.0.1-0.20220418113927-d5623b98b6d5
 	github.com/dell/dell-csi-extensions/replication v1.1.1-0.20220418113927-d5623b98b6d5
 	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.1.1-0.20220421100820-8fb97476d796
-	github.com/dell/gobrick v1.3.0
+	github.com/dell/gobrick v1.3.1-0.20220428084717-c92bddbbdb79
 	github.com/dell/gocsi v1.5.1
 	github.com/dell/gofsutil v1.8.0
 	github.com/dell/goiscsi v1.3.0
-	github.com/dell/gonvme v1.0.0
-	github.com/dell/gopowerstore v1.7.1-0.20220428085940-8275430a0fbf
+	github.com/dell/gonvme v1.0.1-0.20220426061320-8d11e6dd604a
+	github.com/dell/gopowerstore v1.7.1-0.20220509074044-207ed75341d4
 	github.com/fsnotify/fsnotify v1.4.9
 	github.com/golang/mock v1.6.0
 	github.com/golang/protobuf v1.5.2
