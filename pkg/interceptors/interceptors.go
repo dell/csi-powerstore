@@ -174,7 +174,22 @@ func (i *interceptor) nodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 
 func (i *interceptor) createVolume(ctx context.Context, req *csi.CreateVolumeRequest,
 	info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (res interface{}, resErr error) {
-	var volumeLabels map[string]string
+
+	lock, err := i.opts.locker.GetLockWithID(ctx, req.Name)
+	if err != nil {
+		return nil, err
+	}
+
+	if closer, ok := lock.(io.Closer); ok {
+		defer closer.Close()
+	}
+
+	if !lock.TryLock(i.opts.timeout) {
+		return nil, status.Error(codes.Aborted, pending)
+	}
+	defer lock.Unlock()
+
+	volumeLabels := make(map[string]string)
 
 	// volumeLabels = GetVolumeLabels()
 

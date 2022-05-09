@@ -21,6 +21,7 @@ package controller
 import (
 	"context"
 	"net/http"
+	"strconv"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/gopowerstore"
@@ -83,25 +84,96 @@ func setMetaData(reqParams map[string]string, createParams interface{}) {
 	}
 }
 
-func setVolumeAttributes(reqParams map[string]string, createParams *gopowerstore.VolumeCreate) {
-	if applianceId, ok := reqParams["applianceId"]; ok {
+func setVolumeCreateAttributes(reqParams map[string]string, createParams *gopowerstore.VolumeCreate) {
+	if applianceId, ok := reqParams["appliance_id"]; ok {
 		createParams.ApplianceID = applianceId
 	}
 	if description, ok := reqParams["description"]; ok {
 		createParams.Description = description
 	}
-	if protectionPolicyId, ok := reqParams["protectionPolicyId"]; ok {
+	if protectionPolicyId, ok := reqParams["protection_policy_id"]; ok {
 		createParams.ProtectionPolicyID = protectionPolicyId
 	}
-	if performancePolicyId, ok := reqParams["performancePolicyId"]; ok {
+	if performancePolicyId, ok := reqParams["performance_policy_id"]; ok {
 		createParams.PerformancePolicyID = performancePolicyId
 	}
-	if appType, ok := reqParams["appType"]; ok {
+	if appType, ok := reqParams["app_type"]; ok {
 		createParams.AppType = appType
-		if appTypeOther, ok := reqParams["appTypeOther"]; ok {
+		if appTypeOther, ok := reqParams["app_type_other"]; ok {
 			createParams.AppTypeOther = appTypeOther
 		}
 	}
+}
+
+func validateHostIOSize(hostIOSize string) string {
+
+	switch hostIOSize {
+	case gopowerstore.VMware8K,
+		gopowerstore.VMware16K,
+		gopowerstore.VMware32K,
+		gopowerstore.VMware64K:
+		return hostIOSize
+	}
+
+	return gopowerstore.VMware8K
+}
+
+func setFLRAttributes(reqParams map[string]string, createParams *gopowerstore.FsCreate) {
+	flrMode, flrModeFound := reqParams["flr_attributes.flr_create.mode"]
+	flrDefaultRetention, flrDefaultRetentionFound := reqParams["flr_attributes.flr_create.default_retention"]
+	flrMinimumRetention, flrMinimumRetentionFound := reqParams["flr_attributes.flr_create.minimum_retention"]
+	flrMaximumRetention, flrMaximumRetentionFound := reqParams["flr_attributes.flr_create.maximum_retention"]
+
+	if flrModeFound ||
+		flrDefaultRetentionFound ||
+		flrMaximumRetentionFound ||
+		flrMinimumRetentionFound {
+		if flrModeFound {
+			createParams.FlrCreate.Mode = flrMode
+		}
+		if flrDefaultRetentionFound {
+			createParams.FlrCreate.DefaultRetention = flrDefaultRetention
+		}
+		if flrMinimumRetentionFound {
+			createParams.FlrCreate.MinimumRetention = flrMinimumRetention
+		}
+		if flrMaximumRetentionFound {
+			createParams.FlrCreate.MaximumRetention = flrMaximumRetention
+		}
+	}
+}
+
+func setNFSCreateAttributes(reqParams map[string]string, createParams *gopowerstore.FsCreate) {
+	if description, ok := reqParams["description"]; ok {
+		createParams.Description = description
+	}
+	if configType, ok := reqParams["config_type"]; ok {
+		createParams.ConfigType = configType
+	}
+	if accessPolicy, ok := reqParams["access_policy"]; ok {
+		createParams.AccessPolicy = accessPolicy
+	}
+	if lockingPolicy, ok := reqParams["locking_policy"]; ok {
+		createParams.LockingPolicy = lockingPolicy
+	}
+	if folderRenamePolicy, ok := reqParams["folder_rename_policy"]; ok {
+		createParams.FolderRenamePolicy = folderRenamePolicy
+	}
+	if isAsyncMTimeEnabled, ok := reqParams["is_async_mtime_enabled"]; ok {
+		if val, err := strconv.ParseBool(isAsyncMTimeEnabled); err == nil {
+			createParams.IsAsyncMTimeEnabled = val
+		}
+	}
+	if protectionPolicyId, ok := reqParams["protection_policy_id"]; ok {
+		createParams.ProtectionPolicyId = protectionPolicyId
+	}
+	if fileEventsPublishingMode, ok := reqParams["file_events_publishing_mode"]; ok {
+		createParams.FileEventsPublishingMode = fileEventsPublishingMode
+	}
+	if hostIOSize, ok := reqParams["host_io_size"]; ok {
+		createParams.HostIOSize = validateHostIOSize(hostIOSize)
+	}
+	setFLRAttributes(reqParams, createParams)
 }
 
 // CheckSize validates that size is correct and returns size in bytes
@@ -155,11 +227,11 @@ func (sc *SCSICreator) Create(ctx context.Context, req *csi.CreateVolumeRequest,
 	reqParams := &gopowerstore.VolumeCreate{Name: &name, Size: &sizeInBytes}
 	if sc.vg != nil {
 		reqParams.VolumeGroupID = sc.vg.ID
-	} else if vgId, ok := req.Parameters["VolumeGroupId"]; ok {
+	} else if vgId, ok := req.Parameters["volume_group_id"]; ok {
 		reqParams.VolumeGroupID = vgId
 	}
 	setMetaData(req.Parameters, reqParams)
-	setVolumeAttributes(req.Parameters, reqParams)
+	setVolumeCreateAttributes(req.Parameters, reqParams)
 	return client.CreateVolume(ctx, reqParams)
 }
 
@@ -326,6 +398,7 @@ func (c *NfsCreator) Create(ctx context.Context, req *csi.CreateVolumeRequest, s
 		Size:        sizeInBytes + ReservedSize,
 	}
 	setMetaData(req.Parameters, reqParams)
+	setNFSCreateAttributes(req.Parameters, reqParams)
 	return client.CreateFS(ctx, reqParams)
 }
 
