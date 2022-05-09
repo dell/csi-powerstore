@@ -1609,8 +1609,13 @@ var _ = Describe("CSIControllerService", func() {
 						{
 							IsLinkUp: true,
 							Wwn:      "58:cc:f0:93:48:a0:03:a3",
+							WwnNVMe:  "58ccf091492b0c22",
+							WwnNode:  "58ccf090c9200c22",
 						},
 					}, nil)
+
+				clientMock.On("GetCluster", mock.Anything).
+					Return(gopowerstore.Cluster{Name: validClusterName, NVMeNQN: "nqn"}, nil)
 
 				req := getTypicalControllerPublishVolumeRequest("single-writer", validNodeID, validBlockVolumeID)
 				req.VolumeContext = map[string]string{controller.KeyFsType: "xfs"}
@@ -1620,11 +1625,13 @@ var _ = Describe("CSIControllerService", func() {
 				Expect(err).To(BeNil())
 				Expect(res).To(Equal(&csi.ControllerPublishVolumeResponse{
 					PublishContext: map[string]string{
-						"PORTAL0":     "192.168.1.1:3260",
-						"TARGET0":     "iqn",
-						"DEVICE_WWN":  "68ccf098003ceb5e4577a20be6d11bf9",
-						"LUN_ADDRESS": "1",
-						"FCWWPN0":     "58ccf09348a003a3",
+						"PORTAL0":       "192.168.1.1:3260",
+						"TARGET0":       "iqn",
+						"NVMEFCPORTAL0": "nn-0x58ccf090c9200c22:pn-0x58ccf091492b0c22",
+						"NVMEFCTARGET0": "nqn",
+						"DEVICE_WWN":    "68ccf098003ceb5e4577a20be6d11bf9",
+						"LUN_ADDRESS":   "1",
+						"FCWWPN0":       "58ccf09348a003a3",
 					},
 				}))
 			})
@@ -1727,6 +1734,9 @@ var _ = Describe("CSIControllerService", func() {
 							Wwn: "58:cc:f0:93:48:a0:03:a3",
 						},
 					}, nil)
+
+				clientMock.On("GetCluster", mock.Anything).
+					Return(gopowerstore.Cluster{Name: validClusterName}, nil)
 
 				req := getTypicalControllerPublishVolumeRequest("single-writer", validNodeID, validBlockVolumeID)
 				req.VolumeContext = map[string]string{controller.KeyFsType: "xfs"}
@@ -1835,6 +1845,9 @@ var _ = Describe("CSIControllerService", func() {
 							},
 						}, nil)
 
+					clientMock.On("GetCluster", mock.Anything).
+						Return(gopowerstore.Cluster{Name: validClusterName}, nil)
+
 					req := getTypicalControllerPublishVolumeRequest("single-writer", validNodeID, validBlockVolumeID)
 					req.VolumeContext = map[string]string{controller.KeyFsType: "xfs"}
 
@@ -1877,6 +1890,9 @@ var _ = Describe("CSIControllerService", func() {
 								Wwn: "58:cc:f0:93:48:a0:03:a3",
 							},
 						}, nil)
+
+					clientMock.On("GetCluster", mock.Anything).
+						Return(gopowerstore.Cluster{Name: validClusterName}, nil)
 
 					req := getTypicalControllerPublishVolumeRequest("single-writer", validNodeID, validBlockVolumeID)
 					req.VolumeContext = map[string]string{controller.KeyFsType: "xfs"}
@@ -1921,6 +1937,9 @@ var _ = Describe("CSIControllerService", func() {
 								Wwn: "58:cc:f0:93:48:a0:03:a3",
 							},
 						}, nil)
+
+					clientMock.On("GetCluster", mock.Anything).
+						Return(gopowerstore.Cluster{Name: validClusterName}, nil)
 
 					req := getTypicalControllerPublishVolumeRequest("multiple-writer", validNodeID, validBlockVolumeID)
 					req.VolumeContext = map[string]string{controller.KeyFsType: "xfs"}
