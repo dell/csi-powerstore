@@ -85,17 +85,17 @@ func setMetaData(reqParams map[string]string, createParams interface{}) {
 }
 
 func setVolumeCreateAttributes(reqParams map[string]string, createParams *gopowerstore.VolumeCreate) {
-	if applianceId, ok := reqParams["appliance_id"]; ok {
-		createParams.ApplianceID = applianceId
+	if applianceID, ok := reqParams["appliance_id"]; ok {
+		createParams.ApplianceID = applianceID
 	}
 	if description, ok := reqParams["description"]; ok {
 		createParams.Description = description
 	}
-	if protectionPolicyId, ok := reqParams["protection_policy_id"]; ok {
-		createParams.ProtectionPolicyID = protectionPolicyId
+	if protectionPolicyID, ok := reqParams["protection_policy_id"]; ok {
+		createParams.ProtectionPolicyID = protectionPolicyID
 	}
-	if performancePolicyId, ok := reqParams["performance_policy_id"]; ok {
-		createParams.PerformancePolicyID = performancePolicyId
+	if performancePolicyID, ok := reqParams["performance_policy_id"]; ok {
+		createParams.PerformancePolicyID = performancePolicyID
 	}
 	if appType, ok := reqParams["app_type"]; ok {
 		createParams.AppType = appType
@@ -164,8 +164,8 @@ func setNFSCreateAttributes(reqParams map[string]string, createParams *gopowerst
 			createParams.IsAsyncMTimeEnabled = val
 		}
 	}
-	if protectionPolicyId, ok := reqParams["protection_policy_id"]; ok {
-		createParams.ProtectionPolicyId = protectionPolicyId
+	if protectionPolicyID, ok := reqParams["protection_policy_id"]; ok {
+		createParams.ProtectionPolicyId = protectionPolicyID
 	}
 	if fileEventsPublishingMode, ok := reqParams["file_events_publishing_mode"]; ok {
 		createParams.FileEventsPublishingMode = fileEventsPublishingMode
@@ -227,8 +227,8 @@ func (sc *SCSICreator) Create(ctx context.Context, req *csi.CreateVolumeRequest,
 	reqParams := &gopowerstore.VolumeCreate{Name: &name, Size: &sizeInBytes}
 	if sc.vg != nil {
 		reqParams.VolumeGroupID = sc.vg.ID
-	} else if vgId, ok := req.Parameters["volume_group_id"]; ok {
-		reqParams.VolumeGroupID = vgId
+	} else if vgID, ok := req.Parameters["volume_group_id"]; ok {
+		reqParams.VolumeGroupID = vgID
 	}
 	setMetaData(req.Parameters, reqParams)
 	setVolumeCreateAttributes(req.Parameters, reqParams)
