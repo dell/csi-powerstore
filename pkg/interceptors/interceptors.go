@@ -191,6 +191,7 @@ func (i *interceptor) createVolume(ctx context.Context, req *csi.CreateVolumeReq
 
 	volumeLabels := make(map[string]string)
 
+	// TODO: to be replaced by sidecar call
 	// volumeLabels = GetVolumeLabels()
 
 	for k, v := range volumeLabels {

@@ -128,18 +128,20 @@ func setFLRAttributes(reqParams map[string]string, createParams *gopowerstore.Fs
 		flrDefaultRetentionFound ||
 		flrMaximumRetentionFound ||
 		flrMinimumRetentionFound {
+		flrCreate := new(gopowerstore.FLRCreate)
 		if flrModeFound {
-			createParams.FlrCreate.Mode = flrMode
+			flrCreate.Mode = flrMode
 		}
 		if flrDefaultRetentionFound {
-			createParams.FlrCreate.DefaultRetention = flrDefaultRetention
+			flrCreate.DefaultRetention = flrDefaultRetention
 		}
 		if flrMinimumRetentionFound {
-			createParams.FlrCreate.MinimumRetention = flrMinimumRetention
+			flrCreate.MinimumRetention = flrMinimumRetention
 		}
 		if flrMaximumRetentionFound {
-			createParams.FlrCreate.MaximumRetention = flrMaximumRetention
+			flrCreate.MaximumRetention = flrMaximumRetention
 		}
+		createParams.FlrCreate = *flrCreate
 	}
 }
 
