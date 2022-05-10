@@ -36,8 +36,13 @@ var _ = Describe("csi-extension-server", func() {
 			It("should create volume group snapshot successfully", func() {
 				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).
 					Return(gopowerstore.VolumeGroups{VolumeGroup: []gopowerstore.VolumeGroup{{ID: validGroupID, ProtectionPolicyID: validPolicyID}}}, nil)
+				clientMock.On("CreateVolumeGroupSnapshot", mock.Anything, validGroupID, mock.Anything).
+					Return(gopowerstore.CreateResponse{ID: validGroupID}, nil)
+				clientMock.On("GetVolumeGroup", mock.Anything, validGroupID).
+					Return(gopowerstore.VolumeGroup{ID: validGroupID, ProtectionPolicyID: validPolicyID}, nil)
+
 				var sourceVols []string
-				sourceVols = append(sourceVols, validBaseVolID+"/arr/scsi")
+				sourceVols = append(sourceVols, validBaseVolID+"/"+firstValidID+"/scsi")
 				req := vgsext.CreateVolumeGroupSnapshotRequest{
 					Name:            validGroupName,
 					SourceVolumeIDs: sourceVols,
