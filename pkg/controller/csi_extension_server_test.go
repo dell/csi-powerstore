@@ -27,6 +27,8 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
+const stateReady = "Ready"
+
 var _ = Describe("csi-extension-server", func() {
 	BeforeEach(func() {
 		setVariables()
@@ -39,7 +41,11 @@ var _ = Describe("csi-extension-server", func() {
 				clientMock.On("CreateVolumeGroupSnapshot", mock.Anything, validGroupID, mock.Anything).
 					Return(gopowerstore.CreateResponse{ID: validGroupID}, nil)
 				clientMock.On("GetVolumeGroup", mock.Anything, validGroupID).
-					Return(gopowerstore.VolumeGroup{ID: validGroupID, ProtectionPolicyID: validPolicyID}, nil)
+					Return(gopowerstore.VolumeGroup{
+						ID:                 validGroupID,
+						ProtectionPolicyID: validPolicyID,
+						Volumes:            []gopowerstore.Volume{{ID: validBaseVolID, State: stateReady}},
+					}, nil)
 
 				var sourceVols []string
 				sourceVols = append(sourceVols, validBaseVolID+"/"+firstValidID+"/scsi")
@@ -51,6 +57,127 @@ var _ = Describe("csi-extension-server", func() {
 
 				Expect(err).To(BeNil())
 				Expect(res.SnapshotGroupID).To(Equal(validGroupID))
+			})
+		})
+		When("there is no existing volume group created", func() {
+			It("should create volume group and snapshot successfully", func() {
+				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).
+					Return(gopowerstore.VolumeGroups{}, nil)
+				clientMock.On("CreateVolumeGroupSnapshot", mock.Anything, validGroupID, mock.Anything).
+					Return(gopowerstore.CreateResponse{ID: validGroupID}, nil)
+				clientMock.On("GetVolumeGroup", mock.Anything, validGroupID).
+					Return(gopowerstore.VolumeGroup{
+						ID:                 validGroupID,
+						ProtectionPolicyID: validPolicyID,
+						Volumes:            []gopowerstore.Volume{{ID: validBaseVolID, State: stateReady}},
+					}, nil)
+
+				createGroupRequest := &gopowerstore.VolumeGroupCreate{
+					Name:      validGroupName,
+					VolumeIds: []string{validBaseVolID},
+				}
+				clientMock.On("CreateVolumeGroup", mock.Anything, createGroupRequest).
+					Return(gopowerstore.CreateResponse{ID: validGroupID}, nil)
+
+				var sourceVols []string
+				sourceVols = append(sourceVols, validBaseVolID+"/"+firstValidID+"/scsi")
+				req := vgsext.CreateVolumeGroupSnapshotRequest{
+					Name:            validGroupName,
+					SourceVolumeIDs: sourceVols,
+				}
+				res, err := ctrlSvc.CreateVolumeGroupSnapshot(context.Background(), &req)
+
+				Expect(err).To(BeNil())
+				Expect(res.SnapshotGroupID).To(Equal(validGroupID))
+			})
+		})
+		When("member volumes are not present", func() {
+			It("should not create volume group snapshot successfully", func() {
+				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).
+					Return(gopowerstore.VolumeGroups{VolumeGroup: []gopowerstore.VolumeGroup{{ID: validGroupID, ProtectionPolicyID: validPolicyID}}}, nil)
+				clientMock.On("CreateVolumeGroupSnapshot", mock.Anything, validGroupID, mock.Anything).
+					Return(gopowerstore.CreateResponse{ID: validGroupID}, nil)
+				clientMock.On("GetVolumeGroup", mock.Anything, validGroupID).
+					Return(gopowerstore.VolumeGroup{
+						ID:                 validGroupID,
+						ProtectionPolicyID: validPolicyID,
+						Volumes:            []gopowerstore.Volume{{ID: validBaseVolID, State: stateReady}},
+					}, nil)
+
+				var sourceVols []string
+				sourceVols = append(sourceVols, validBaseVolID+"/"+firstValidID+"/scsi")
+				req := vgsext.CreateVolumeGroupSnapshotRequest{
+					Name: validGroupName,
+				}
+				res, err := ctrlSvc.CreateVolumeGroupSnapshot(context.Background(), &req)
+
+				Expect(err).Error()
+				Expect(res).To(BeNil())
+			})
+		})
+		When("volume group name is empty", func() {
+			It("should not create volume group snapshot successfully", func() {
+				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).
+					Return(gopowerstore.VolumeGroups{VolumeGroup: []gopowerstore.VolumeGroup{{ID: validGroupID, ProtectionPolicyID: validPolicyID}}}, nil)
+				clientMock.On("CreateVolumeGroupSnapshot", mock.Anything, validGroupID, mock.Anything).
+					Return(gopowerstore.CreateResponse{ID: validGroupID}, nil)
+				clientMock.On("GetVolumeGroup", mock.Anything, validGroupID).
+					Return(gopowerstore.VolumeGroup{
+						ID:                 validGroupID,
+						ProtectionPolicyID: validPolicyID,
+						Volumes:            []gopowerstore.Volume{{ID: validBaseVolID, State: stateReady}},
+					}, nil)
+
+				var sourceVols []string
+				sourceVols = append(sourceVols, validBaseVolID+"/"+firstValidID+"/scsi")
+				res, err := ctrlSvc.CreateVolumeGroupSnapshot(context.Background(), &vgsext.CreateVolumeGroupSnapshotRequest{})
+
+				Expect(err).Error()
+				Expect(res).To(BeNil())
+			})
+		})
+		When("volume group name length is greater than 27", func() {
+			It("should not create volume group snapshot successfully", func() {
+				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).
+					Return(gopowerstore.VolumeGroups{VolumeGroup: []gopowerstore.VolumeGroup{{ID: validGroupID, ProtectionPolicyID: validPolicyID}}}, nil)
+				clientMock.On("CreateVolumeGroupSnapshot", mock.Anything, validGroupID, mock.Anything).
+					Return(gopowerstore.CreateResponse{ID: validGroupID}, nil)
+				clientMock.On("GetVolumeGroup", mock.Anything, validGroupID).
+					Return(gopowerstore.VolumeGroup{
+						ID:                 validGroupID,
+						ProtectionPolicyID: validPolicyID,
+						Volumes:            []gopowerstore.Volume{{ID: validBaseVolID, State: stateReady}},
+					}, nil)
+
+				var sourceVols []string
+				sourceVols = append(sourceVols, validBaseVolID+"/"+firstValidID+"/scsi")
+				res, err := ctrlSvc.CreateVolumeGroupSnapshot(context.Background(), &vgsext.CreateVolumeGroupSnapshotRequest{
+					Name: "1234561111111111111111111112",
+				})
+
+				Expect(err).Error()
+				Expect(res).To(BeNil())
+			})
+		})
+		When("get volume group fails", func() {
+			It("should not create volume group snapshot successfully", func() {
+				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).
+					Return(gopowerstore.VolumeGroups{VolumeGroup: []gopowerstore.VolumeGroup{{ID: validGroupID, ProtectionPolicyID: validPolicyID}}}, nil)
+				clientMock.On("CreateVolumeGroupSnapshot", mock.Anything, validGroupID, mock.Anything).
+					Return(gopowerstore.CreateResponse{ID: validGroupID}, nil)
+				clientMock.On("GetVolumeGroup", mock.Anything, validGroupID).
+					Return(gopowerstore.VolumeGroup{}, gopowerstore.NewNotFoundError())
+
+				var sourceVols []string
+				sourceVols = append(sourceVols, validBaseVolID+"/"+firstValidID+"/scsi")
+				req := vgsext.CreateVolumeGroupSnapshotRequest{
+					Name:            validGroupName,
+					SourceVolumeIDs: sourceVols,
+				}
+				res, err := ctrlSvc.CreateVolumeGroupSnapshot(context.Background(), &req)
+
+				Expect(err).Error()
+				Expect(res).To(BeNil())
 			})
 		})
 	})
