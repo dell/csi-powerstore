@@ -62,6 +62,8 @@ const (
 	KeyNasName = "nasName"
 	// KeyCSIPVCNamespace represents key for csi pvc namespace
 	KeyCSIPVCNamespace = "csi.storage.k8s.io/pvc/namespace"
+	// KeyCSIPVCName represents key for csi pvc name
+	KeyCSIPVCName = "csi.storage.k8s.io/pvc/name"
 )
 
 func volumeNameValidation(volumeName string) error {
@@ -163,4 +165,11 @@ func checkValidAccessTypes(vcs []*csi.VolumeCapability) bool {
 		return false
 	}
 	return true
+}
+
+func getDescription(params map[string]string) string {
+	if description, ok := params["description"]; ok {
+		return description
+	}
+	return params[KeyCSIPVCName] + "-" + params[KeyCSIPVCNamespace]
 }

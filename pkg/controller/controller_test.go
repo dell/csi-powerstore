@@ -156,6 +156,8 @@ var _ = Describe("CSIControllerService", func() {
 
 				req := getTypicalCreateVolumeRequest("my-vol", validVolSize)
 				req.Parameters[common.KeyArrayID] = firstValidID
+				req.Parameters[controller.KeyCSIPVCName] = req.Name
+				req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
 
 				Expect(err).To(BeNil())
@@ -164,9 +166,12 @@ var _ = Describe("CSIControllerService", func() {
 						CapacityBytes: validVolSize,
 						VolumeId:      filepath.Join(validBaseVolID, firstValidID, "scsi"),
 						VolumeContext: map[string]string{
-							common.KeyArrayID:         firstValidID,
-							common.KeyArrayVolumeName: "my-vol",
-							common.KeyProtocol:        "scsi",
+							common.KeyArrayID:             firstValidID,
+							common.KeyArrayVolumeName:     "my-vol",
+							common.KeyProtocol:            "scsi",
+							common.KeyVolumeDescription:   req.Name + "-" + validNamespaceName,
+							controller.KeyCSIPVCName:      req.Name,
+							controller.KeyCSIPVCNamespace: validNamespaceName,
 						},
 					},
 				}))
@@ -183,6 +188,8 @@ var _ = Describe("CSIControllerService", func() {
 				req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationRemoteSystem)] = validRemoteSystemName
 				req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationIgnoreNamespaces)] = "true"
 				req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationVGPrefix)] = "csi"
+				req.Parameters[controller.KeyCSIPVCName] = req.Name
+				req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
 			})
 
 			It("should create volume and volumeGroup if policy exists", func() {
@@ -211,6 +218,9 @@ var _ = Describe("CSIControllerService", func() {
 							common.KeyArrayVolumeName:                                 "my-vol",
 							common.KeyProtocol:                                        "scsi",
 							common.KeyArrayID:                                         firstValidID,
+							common.KeyVolumeDescription:                               req.Name + "-" + validNamespaceName,
+							controller.KeyCSIPVCName:                                  req.Name,
+							controller.KeyCSIPVCNamespace:                             validNamespaceName,
 							ctrlSvc.WithRP(controller.KeyReplicationEnabled):          "true",
 							ctrlSvc.WithRP(controller.KeyReplicationRPO):              validRPO,
 							ctrlSvc.WithRP(controller.KeyReplicationRemoteSystem):     validRemoteSystemName,
@@ -223,6 +233,7 @@ var _ = Describe("CSIControllerService", func() {
 
 			It("should create vg with namespace if namespaces not ignored", func() {
 				req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationIgnoreNamespaces)] = "false"
+				req.Parameters[controller.KeyCSIPVCName] = req.Name
 				req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
 
 				defer func() {
@@ -259,12 +270,14 @@ var _ = Describe("CSIControllerService", func() {
 							common.KeyArrayVolumeName:                                 "my-vol",
 							common.KeyProtocol:                                        "scsi",
 							common.KeyArrayID:                                         firstValidID,
+							common.KeyVolumeDescription:                               req.Name + "-" + validNamespaceName,
+							controller.KeyCSIPVCName:                                  req.Name,
+							controller.KeyCSIPVCNamespace:                             validNamespaceName,
 							ctrlSvc.WithRP(controller.KeyReplicationEnabled):          "true",
 							ctrlSvc.WithRP(controller.KeyReplicationRPO):              validRPO,
 							ctrlSvc.WithRP(controller.KeyReplicationRemoteSystem):     validRemoteSystemName,
 							ctrlSvc.WithRP(controller.KeyReplicationIgnoreNamespaces): "false",
 							ctrlSvc.WithRP(controller.KeyReplicationVGPrefix):         "csi",
-							controller.KeyCSIPVCNamespace:                             validNamespaceName,
 						},
 					},
 				}))
@@ -273,6 +286,9 @@ var _ = Describe("CSIControllerService", func() {
 			It("should create new volume with existing volumeGroup with policy", func() {
 				clientMock.On("GetVolumeGroupByName", mock.Anything, validGroupName).
 					Return(gopowerstore.VolumeGroup{ID: validGroupID, ProtectionPolicyID: validPolicyID}, nil)
+
+				req.Parameters[controller.KeyCSIPVCName] = req.Name
+				req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
 				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
 				clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
 				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
@@ -288,6 +304,9 @@ var _ = Describe("CSIControllerService", func() {
 							common.KeyArrayVolumeName:                                 "my-vol",
 							common.KeyProtocol:                                        "scsi",
 							common.KeyArrayID:                                         firstValidID,
+							common.KeyVolumeDescription:                               req.Name + "-" + validNamespaceName,
+							controller.KeyCSIPVCName:                                  req.Name,
+							controller.KeyCSIPVCNamespace:                             validNamespaceName,
 							ctrlSvc.WithRP(controller.KeyReplicationEnabled):          "true",
 							ctrlSvc.WithRP(controller.KeyReplicationRPO):              validRPO,
 							ctrlSvc.WithRP(controller.KeyReplicationRemoteSystem):     validRemoteSystemName,
@@ -304,6 +323,9 @@ var _ = Describe("CSIControllerService", func() {
 					Return(gopowerstore.VolumeGroup{ID: validGroupID, ProtectionPolicyID: validPolicyID}, nil)
 
 				EnsureProtectionPolicyExistsMock()
+
+				req.Parameters[controller.KeyCSIPVCName] = req.Name
+				req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
 				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
 				clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
 				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
@@ -319,6 +341,9 @@ var _ = Describe("CSIControllerService", func() {
 							common.KeyArrayVolumeName:                                 "my-vol",
 							common.KeyProtocol:                                        "scsi",
 							common.KeyArrayID:                                         firstValidID,
+							common.KeyVolumeDescription:                               req.Name + "-" + validNamespaceName,
+							controller.KeyCSIPVCName:                                  req.Name,
+							controller.KeyCSIPVCNamespace:                             validNamespaceName,
 							ctrlSvc.WithRP(controller.KeyReplicationEnabled):          "true",
 							ctrlSvc.WithRP(controller.KeyReplicationRPO):              validRPO,
 							ctrlSvc.WithRP(controller.KeyReplicationRemoteSystem):     validRemoteSystemName,
@@ -393,6 +418,9 @@ var _ = Describe("CSIControllerService", func() {
 				req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
 				req.Parameters[common.KeyArrayID] = secondValidID
 
+				req.Parameters[controller.KeyCSIPVCName] = req.Name
+				req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
+
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
 				Expect(err).To(BeNil())
 				Expect(res).To(Equal(&csi.CreateVolumeResponse{
@@ -400,11 +428,14 @@ var _ = Describe("CSIControllerService", func() {
 						CapacityBytes: validVolSize,
 						VolumeId:      filepath.Join(validBaseVolID, secondValidID, "nfs"),
 						VolumeContext: map[string]string{
-							common.KeyArrayVolumeName: "my-vol",
-							common.KeyProtocol:        "nfs",
-							common.KeyArrayID:         secondValidID,
-							common.KeyNfsACL:          "A::OWNER@:RWX",
-							common.KeyNasName:         validNasName,
+							common.KeyArrayVolumeName:     "my-vol",
+							common.KeyProtocol:            "nfs",
+							common.KeyArrayID:             secondValidID,
+							common.KeyNfsACL:              "A::OWNER@:RWX",
+							common.KeyNasName:             validNasName,
+							common.KeyVolumeDescription:   req.Name + "-" + validNamespaceName,
+							controller.KeyCSIPVCName:      req.Name,
+							controller.KeyCSIPVCNamespace: validNamespaceName,
 						},
 					},
 				}))
@@ -422,6 +453,8 @@ var _ = Describe("CSIControllerService", func() {
 				req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
 				req.Parameters[common.KeyNfsACL] = "0777"
 				req.Parameters[common.KeyArrayID] = secondValidID
+				req.Parameters[controller.KeyCSIPVCName] = req.Name
+				req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
 
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
 				Expect(err).To(BeNil())
@@ -430,11 +463,14 @@ var _ = Describe("CSIControllerService", func() {
 						CapacityBytes: validVolSize,
 						VolumeId:      filepath.Join(validBaseVolID, secondValidID, "nfs"),
 						VolumeContext: map[string]string{
-							common.KeyArrayVolumeName: "my-vol",
-							common.KeyProtocol:        "nfs",
-							common.KeyArrayID:         secondValidID,
-							common.KeyNfsACL:          "0777",
-							common.KeyNasName:         validNasName,
+							common.KeyArrayVolumeName:     "my-vol",
+							common.KeyProtocol:            "nfs",
+							common.KeyArrayID:             secondValidID,
+							common.KeyNfsACL:              "0777",
+							common.KeyNasName:             validNasName,
+							common.KeyVolumeDescription:   req.Name + "-" + validNamespaceName,
+							controller.KeyCSIPVCName:      req.Name,
+							controller.KeyCSIPVCNamespace: validNamespaceName,
 						},
 					},
 				}))
@@ -451,6 +487,8 @@ var _ = Describe("CSIControllerService", func() {
 
 				req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
 				req.Parameters[common.KeyArrayID] = secondValidID
+				req.Parameters[controller.KeyCSIPVCName] = req.Name
+				req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
 
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
 				Expect(err).To(BeNil())
@@ -459,11 +497,14 @@ var _ = Describe("CSIControllerService", func() {
 						CapacityBytes: validVolSize,
 						VolumeId:      filepath.Join(validBaseVolID, secondValidID, "nfs"),
 						VolumeContext: map[string]string{
-							common.KeyArrayVolumeName: "my-vol",
-							common.KeyProtocol:        "nfs",
-							common.KeyArrayID:         secondValidID,
-							common.KeyNfsACL:          "A::GROUP@:RWX",
-							common.KeyNasName:         validNasName,
+							common.KeyArrayVolumeName:     "my-vol",
+							common.KeyProtocol:            "nfs",
+							common.KeyArrayID:             secondValidID,
+							common.KeyNfsACL:              "A::GROUP@:RWX",
+							common.KeyNasName:             validNasName,
+							common.KeyVolumeDescription:   req.Name + "-" + validNamespaceName,
+							controller.KeyCSIPVCName:      req.Name,
+							controller.KeyCSIPVCNamespace: validNamespaceName,
 						},
 					},
 				}))
@@ -478,6 +519,8 @@ var _ = Describe("CSIControllerService", func() {
 
 				req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
 				req.Parameters[common.KeyArrayID] = secondValidID
+				req.Parameters[controller.KeyCSIPVCName] = req.Name
+				req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
 
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
 				Expect(err).To(BeNil())
@@ -486,11 +529,14 @@ var _ = Describe("CSIControllerService", func() {
 						CapacityBytes: validVolSize,
 						VolumeId:      filepath.Join(validBaseVolID, secondValidID, "nfs"),
 						VolumeContext: map[string]string{
-							common.KeyArrayVolumeName: "my-vol",
-							common.KeyProtocol:        "nfs",
-							common.KeyArrayID:         secondValidID,
-							common.KeyNfsACL:          "A::OWNER@:RWX",
-							common.KeyNasName:         validNasName,
+							common.KeyArrayVolumeName:     "my-vol",
+							common.KeyProtocol:            "nfs",
+							common.KeyArrayID:             secondValidID,
+							common.KeyNfsACL:              "A::OWNER@:RWX",
+							common.KeyNasName:             validNasName,
+							common.KeyVolumeDescription:   req.Name + "-" + validNamespaceName,
+							controller.KeyCSIPVCName:      req.Name,
+							controller.KeyCSIPVCNamespace: validNamespaceName,
 						},
 					},
 				}))
@@ -505,6 +551,8 @@ var _ = Describe("CSIControllerService", func() {
 
 				req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
 				req.Parameters[common.KeyArrayID] = secondValidID
+				req.Parameters[controller.KeyCSIPVCName] = req.Name
+				req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
 
 				ctrlSvc.Arrays()[secondValidID].NfsAcls = ""
 				csictx.Setenv(context.Background(), common.EnvNfsAcls, "")
@@ -518,11 +566,14 @@ var _ = Describe("CSIControllerService", func() {
 						CapacityBytes: validVolSize,
 						VolumeId:      filepath.Join(validBaseVolID, secondValidID, "nfs"),
 						VolumeContext: map[string]string{
-							common.KeyArrayVolumeName: "my-vol",
-							common.KeyProtocol:        "nfs",
-							common.KeyArrayID:         secondValidID,
-							common.KeyNfsACL:          "",
-							common.KeyNasName:         validNasName,
+							common.KeyArrayVolumeName:     "my-vol",
+							common.KeyProtocol:            "nfs",
+							common.KeyArrayID:             secondValidID,
+							common.KeyNfsACL:              "",
+							common.KeyNasName:             validNasName,
+							common.KeyVolumeDescription:   req.Name + "-" + validNamespaceName,
+							controller.KeyCSIPVCName:      req.Name,
+							controller.KeyCSIPVCNamespace: validNamespaceName,
 						},
 					},
 				}))
@@ -550,6 +601,8 @@ var _ = Describe("CSIControllerService", func() {
 
 				req := getTypicalCreateVolumeRequest(volName, validVolSize)
 				req.Parameters[common.KeyArrayID] = firstValidID
+				req.Parameters[controller.KeyCSIPVCName] = req.Name
+				req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
 
 				Expect(err).To(BeNil())
@@ -558,9 +611,12 @@ var _ = Describe("CSIControllerService", func() {
 						CapacityBytes: validVolSize,
 						VolumeId:      filepath.Join(validBaseVolID, firstValidID, "scsi"),
 						VolumeContext: map[string]string{
-							common.KeyArrayVolumeName: "my-vol",
-							common.KeyProtocol:        "scsi",
-							common.KeyArrayID:         firstValidID,
+							common.KeyArrayVolumeName:     "my-vol",
+							common.KeyProtocol:            "scsi",
+							common.KeyArrayID:             firstValidID,
+							common.KeyVolumeDescription:   req.Name + "-" + validNamespaceName,
+							controller.KeyCSIPVCName:      req.Name,
+							controller.KeyCSIPVCNamespace: validNamespaceName,
 						},
 					},
 				}))
@@ -584,6 +640,8 @@ var _ = Describe("CSIControllerService", func() {
 
 				req := getTypicalCreateVolumeNFSRequest(volName, validVolSize)
 				req.Parameters[common.KeyArrayID] = secondValidID
+				req.Parameters[controller.KeyCSIPVCName] = req.Name
+				req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
 
 				Expect(err).To(BeNil())
@@ -592,11 +650,14 @@ var _ = Describe("CSIControllerService", func() {
 						CapacityBytes: validVolSize,
 						VolumeId:      filepath.Join(validBaseVolID, secondValidID, "nfs"),
 						VolumeContext: map[string]string{
-							common.KeyArrayVolumeName: "my-vol",
-							common.KeyProtocol:        "nfs",
-							common.KeyArrayID:         secondValidID,
-							common.KeyNfsACL:          "A::OWNER@:RWX",
-							common.KeyNasName:         validNasName,
+							common.KeyArrayVolumeName:     "my-vol",
+							common.KeyProtocol:            "nfs",
+							common.KeyArrayID:             secondValidID,
+							common.KeyNfsACL:              "A::OWNER@:RWX",
+							common.KeyNasName:             validNasName,
+							common.KeyVolumeDescription:   req.Name + "-" + validNamespaceName,
+							controller.KeyCSIPVCName:      req.Name,
+							controller.KeyCSIPVCNamespace: validNamespaceName,
 						},
 					},
 				}))
@@ -840,9 +901,10 @@ var _ = Describe("CSIControllerService", func() {
 						CapacityBytes: validVolSize,
 						VolumeId:      filepath.Join(validBaseVolID, firstValidID, "scsi"),
 						VolumeContext: map[string]string{
-							common.KeyArrayVolumeName: "my-vol",
-							common.KeyProtocol:        "scsi",
-							common.KeyArrayID:         firstValidID,
+							common.KeyArrayVolumeName:   "my-vol",
+							common.KeyProtocol:          "scsi",
+							common.KeyArrayID:           firstValidID,
+							common.KeyVolumeDescription: "-",
 						},
 					},
 				}))
