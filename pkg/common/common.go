@@ -265,6 +265,22 @@ func GetFCTargetsInfoFromStorage(client gopowerstore.Client, volumeApplianceID s
 	return result, nil
 }
 
+// IsK8sMetadataSupported returns info whether Metadata is supported or not
+func IsK8sMetadataSupported(client gopowerstore.Client) bool {
+	k8sMetadataSupported := false
+	majorMinorVersion, err := client.GetSoftwareMajorMinorVersion(context.Background())
+	if err != nil {
+		log.Errorf("couldn't get the software version installed on the PowerStore array: %v", err)
+		return k8sMetadataSupported
+	}
+	if majorMinorVersion >= 3.0 {
+		k8sMetadataSupported = true
+	} else {
+		log.Debugf("Software version installed on the PowerStore array: %v\n", majorMinorVersion)
+	}
+	return k8sMetadataSupported
+}
+
 // GetNVMEFCTargetInfoFromStorage returns a list of gobrick compatible NVMeFC targets by quering Powerstore Array
 func GetNVMEFCTargetInfoFromStorage(client gopowerstore.Client, volumeApplianceID string) ([]gobrick.NVMeTargetInfo, error) {
 	clusterInfo, err := client.GetCluster(context.Background())

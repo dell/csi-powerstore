@@ -231,6 +231,9 @@ var _ = Describe("CSINodeService", func() {
 						}},
 						Name: "host-name",
 					}}, nil)
+				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+				clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
+				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 				clientMock.On("CreateHost", mock.Anything, mock.Anything).
 					Return(gopowerstore.CreateResponse{ID: validHostID}, nil)
 				nodeSvc.opts.NodeNamePrefix = ""
@@ -494,6 +497,9 @@ var _ = Describe("CSINodeService", func() {
 						}},
 						Name: "host-name",
 					}}, nil)
+				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+				clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
+				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 				clientMock.On("CreateHost", mock.Anything, mock.Anything).
 					Return(gopowerstore.CreateResponse{ID: validHostID}, nil)
 
@@ -2868,6 +2874,9 @@ var _ = Describe("CSINodeService", func() {
 					}},
 					Name: "host-name",
 				}}, nil)
+			clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+			clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
+			clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 			clientMock.On("CreateHost", mock.Anything, mock.Anything).
 				Return(gopowerstore.CreateResponse{ID: validHostID}, nil)
 			nodeSvc.opts.NodeNamePrefix = ""

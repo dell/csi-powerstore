@@ -20,6 +20,7 @@ package controller
 
 import (
 	"context"
+	"github.com/dell/csi-powerstore/pkg/common"
 	"net/http"
 	"strconv"
 
@@ -226,7 +227,25 @@ func (*SCSICreator) CheckIfAlreadyExists(ctx context.Context, name string, sizeI
 // Create creates new block volume on storage array
 func (sc *SCSICreator) Create(ctx context.Context, req *csi.CreateVolumeRequest, sizeInBytes int64, client gopowerstore.Client) (gopowerstore.CreateResponse, error) {
 	name := req.GetName()
-	reqParams := &gopowerstore.VolumeCreate{Name: &name, Size: &sizeInBytes}
+	metadata := map[string]string{
+		"k8s_pvol_name":       req.Parameters[CSIPersistentVolumeName],
+		"k8s_claim_name":      req.Parameters[CSIPersistentVolumeClaimName],
+		"k8s_claim_namespace": req.Parameters[CSIPersistentVolumeClaimNamespace],
+	}
+	var reqParams *gopowerstore.VolumeCreate
+	defaultHeaders := client.GetCustomHTTPHeaders()
+	if defaultHeaders == nil {
+		defaultHeaders = make(http.Header)
+	}
+	customHeaders := defaultHeaders
+	k8sMetadataSupported := common.IsK8sMetadataSupported(client)
+	if k8sMetadataSupported {
+		customHeaders.Add("DELL-VISIBILITY", "internal")
+		client.SetCustomHTTPHeaders(customHeaders)
+		reqParams = &gopowerstore.VolumeCreate{Name: &name, Size: &sizeInBytes, Metadata: &metadata}
+	} else {
+		reqParams = &gopowerstore.VolumeCreate{Name: &name, Size: &sizeInBytes}
+	}
 	if sc.vg != nil {
 		reqParams.VolumeGroupID = sc.vg.ID
 	} else if vgID, ok := req.Parameters["volume_group_id"]; ok {
@@ -234,7 +253,12 @@ func (sc *SCSICreator) Create(ctx context.Context, req *csi.CreateVolumeRequest,
 	}
 	setMetaData(req.Parameters, reqParams)
 	setVolumeCreateAttributes(req.Parameters, reqParams)
-	return client.CreateVolume(ctx, reqParams)
+
+	resp, err := client.CreateVolume(ctx, reqParams)
+	// reset custom header
+	customHeaders.Del("DELL-VISIBILITY")
+	client.SetCustomHTTPHeaders(customHeaders)
+	return resp, err
 }
 
 // CreateVolumeFromSnapshot create a volume from an existing snapshot.
