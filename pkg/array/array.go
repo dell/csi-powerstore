@@ -205,6 +205,7 @@ func GetPowerStoreArrays(fs fs.Interface, filePath string) (map[string]*PowerSto
 		}
 		c.SetCustomHTTPHeaders(http.Header{
 			"Application-Type": {fmt.Sprintf("%s/%s", common.VerboseName, core.SemVer)}})
+
 		c.SetLogger(&common.CustomLogger{})
 		array.Client = c
 
