@@ -86,7 +86,7 @@ func (s *Service) CreateVolumeGroupSnapshot(ctx context.Context, request *vgsext
 			}
 		}
 		etime, _ := time.Parse(time.RFC3339, volGroup.CreationTimeStamp)
-		int64CreationTime = etime.Unix()
+		int64CreationTime = etime.Unix() * 1000000000 // we need to convert to nano seconds
 
 		for _, v := range volGroup.Volumes {
 			var snapState bool
