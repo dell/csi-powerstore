@@ -51,9 +51,16 @@ nfsAcls: "0777"
 
 # controller: configure controller specific parameters
 controller:
-  #  To enable/disable Volume group snapshot feature
   vgsnapshot:
-    enabled: true
+    # enabled: Enable/Disable volume-group-snapshot feature
+    # Allowed values:
+    #   true: enable volume-group-snapshot feature(install vg-snapshotter sidecar)
+    #   false: disable volume-group-snapshot feature(do not install vg-snapshotter sidecar)
+    # Default value: false
+    enabled: false
+    # image: Image to use for dell-csi-replicator. This shouldn't be changed
+    # Allowed values: string
+    # Default value: dellemc/csi-volumegroup-snapshotter:v1.0.0
     image: dellemc/csi-volumegroup-snapshotter:v1.0.0
 
   # controllerCount: defines the number of csi-powerscale controller pods to deploy to
