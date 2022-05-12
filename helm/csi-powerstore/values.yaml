@@ -51,6 +51,19 @@ nfsAcls: "0777"
 
 # controller: configure controller specific parameters
 controller:
+  # controllerCount: defines the number of csi-powerscale controller pods to deploy to
+  # the Kubernetes release.
+  # Allowed values: n, where n > 0
+  # Default value: None
+  controllerCount: 2
+
+  # volumeNamePrefix: defines a string prepended to each volume created by the CSI driver.
+  # Allowed values: string
+  # Default value: None
+  volumeNamePrefix: csivol
+
+  # vgsnapshot: allows to configure volume-group-snapshot
+  # volume-group-snapshot CRDs must be installed before installing driver
   vgsnapshot:
     # enabled: Enable/Disable volume-group-snapshot feature
     # Allowed values:
@@ -63,18 +76,8 @@ controller:
     # Default value: dellemc/csi-volumegroup-snapshotter:v1.0.0
     image: dellemc/csi-volumegroup-snapshotter:v1.0.0
 
-  # controllerCount: defines the number of csi-powerscale controller pods to deploy to
-  # the Kubernetes release.
-  # Allowed values: n, where n > 0
-  # Default value: None
-  controllerCount: 2
-
-  # volumeNamePrefix: defines a string prepended to each volume created by the CSI driver.
-  # Allowed values: string
-  # Default value: None
-  volumeNamePrefix: csivol
-
   # snapshot: allows to enable/disable snapshot feature
+  # snapshot CRDs needs to be installed before enabling this feature
   snapshot:
     # enabled: Enable/Disable volume snapshot feature
     # Allowed values:
@@ -87,14 +90,13 @@ controller:
     # Allowed values: string
     # Default value: None
     snapNamePrefix: csisnap
-
   # resizer: allows to enable/disable resizer feature
   resizer:
     # enabled: Enable/Disable volume expansion feature
     # Allowed values:
     #   true: enable volume expansion feature(install resizer sidecar)
     #   false: disable volume expansion feature(do not install resizer sidecar)
-    # Default value: None
+    # Default value: true
     enabled: true
 
   healthMonitor:
@@ -102,7 +104,7 @@ controller:
     # Allowed values:
     #   true: enable checking of health condition of CSI volumes
     #   false: disable checking of health condition of CSI volumes
-    # Default value: None
+    # Default value: false
     enabled: false
 
     # healthMonitorInterval: Interval of monitoring volume health condition
