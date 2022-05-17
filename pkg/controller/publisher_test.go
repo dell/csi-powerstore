@@ -118,7 +118,7 @@ func TestVolumePublisher_Publish(t *testing.T) {
 		})
 
 		t.Run("failed to get iscsiTargets", func(t *testing.T) {
-			e := errors.New("random-api-error")
+			e := errors.New("unable to get targets for any protocol")
 
 			clientMock := new(mocks.Client)
 
@@ -127,9 +127,16 @@ func TestVolumePublisher_Publish(t *testing.T) {
 
 			clientMock.On("GetHostVolumeMappingByVolumeID", mock.Anything, validBaseVolID).
 				Return([]gopowerstore.HostVolumeMapping{}, nil).Once()
-
 			clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
 				Return([]gopowerstore.IPPoolAddress{}, e)
+			clientMock.On("GetFCPorts", mock.Anything).
+				Return([]gopowerstore.FcPort{}, nil)
+			clientMock.On("GetCluster", mock.Anything).
+				Return(gopowerstore.Cluster{Name: validClusterName, NVMeNQN: "nqn"}, nil)
+			clientMock.On("AttachVolumeToHost", mock.Anything, validHostID, mock.Anything).
+				Return(gopowerstore.EmptyResponse(""), nil)
+			clientMock.On("GetHostVolumeMappingByVolumeID", mock.Anything, validBaseVolID).
+				Return([]gopowerstore.HostVolumeMapping{{HostID: validHostID, LogicalUnitNumber: 1}}, nil).Once()
 
 			_, err := sp.Publish(context.Background(), nil, clientMock, validNodeID, validBaseVolID)
 			assert.Error(t, err)
