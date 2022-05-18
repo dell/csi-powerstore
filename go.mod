@@ -2,12 +2,10 @@ module github.com/dell/csi-powerstore
 
 go 1.18
 
-replace github.com/dell/csi-metadata-retriever v0.0.0 => ../csi-metadata-retriever
-
 require (
 	github.com/akutz/gosync v0.1.0
 	github.com/container-storage-interface/spec v1.5.0
-	github.com/dell/csi-metadata-retriever v0.0.0
+	github.com/dell/csi-metadata-retriever v0.0.0-20220518094017-8442f4fcd51f
 	github.com/dell/dell-csi-extensions/common v1.0.1-0.20220418113927-d5623b98b6d5
 	github.com/dell/dell-csi-extensions/replication v1.1.1-0.20220418113927-d5623b98b6d5
 	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.1.1-0.20220421100820-8fb97476d796

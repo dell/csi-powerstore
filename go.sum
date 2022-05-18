@@ -103,6 +103,8 @@ github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ3
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
+github.com/dell/csi-metadata-retriever v0.0.0-20220518094017-8442f4fcd51f h1:7l5WvgMdptQHttXllmYBdlDye1bdyjOVyTEYy1cMros=
+github.com/dell/csi-metadata-retriever v0.0.0-20220518094017-8442f4fcd51f/go.mod h1:S1bgT3lco2wUAyODBTog0byJdes38DOuvq7TT+XWQf0=
 github.com/dell/dell-csi-extensions/common v1.0.0/go.mod h1:HCs4rWiZJ1hcwfhCsr5sBsi+/5E8zuBZ+VG7qwiHOsU=
 github.com/dell/dell-csi-extensions/common v1.0.1-0.20220418113927-d5623b98b6d5 h1:MbEUE+mLB04Cdy/snYxUM2uQpntgB5f2cvZFUmTAVGQ=
 github.com/dell/dell-csi-extensions/common v1.0.1-0.20220418113927-d5623b98b6d5/go.mod h1:HCs4rWiZJ1hcwfhCsr5sBsi+/5E8zuBZ+VG7qwiHOsU=
