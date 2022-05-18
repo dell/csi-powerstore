@@ -292,8 +292,6 @@ spec:
             {{- end }}
             - name: CSI_ENDPOINT
               value: /var/run/csi/csi.sock
-            - name: CSI_RETRIEVER_ENDPOINT
-              value: /var/run/csi/csi_retriever.sock
             - name: X_CSI_MODE
               value: controller
             - name: X_CSI_DRIVER_NAME
