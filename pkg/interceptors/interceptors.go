@@ -159,6 +159,8 @@ func (i *interceptor) createMetadataRetrieverClient(ctx context.Context) {
 		}
 
 		i.opts.MetadataSidecarClient = retrieverClient
+	} else {
+		log.Warn("env var not found: ", common.EnvMetadataRetrieverEndpoint)
 	}
 }
 
@@ -227,7 +229,7 @@ func (i *interceptor) createVolume(ctx context.Context, req *csi.CreateVolumeReq
 	if i.opts.MetadataSidecarClient != nil {
 		metadataRes, err := i.opts.MetadataSidecarClient.GetPVCLabels(ctx, metadataReq)
 		if err != nil {
-			log.Errorf("Cannot retriever labels for PVC %s in namespace: %s, error: %v",
+			log.Errorf("Cannot retrieve labels for PVC %s in namespace: %s, error: %v",
 				controller.KeyCSIPVCName,
 				controller.KeyCSIPVCNamespace,
 				err.Error())

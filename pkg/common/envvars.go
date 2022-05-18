@@ -94,5 +94,5 @@ const (
 	EnvK8sVisibilityAutoRegistration = "X_CSI_K8S_VISIBILITY_AUTO_REGISTRATION"
 
 	// EnvMetadataRetrieverEndpoint specifies the endpoint address for csi-metadata-retriever sidecar
-	EnvMetadataRetrieverEndpoint = "X_CSI_RETRIEVER_ENDPOINT"
+	EnvMetadataRetrieverEndpoint = "CSI_RETRIEVER_ENDPOINT"
 )
