@@ -77,6 +77,8 @@ github.com/dell/gobrick v1.3.1-0.20220428084717-c92bddbbdb79 h1:6byj3HptEZr9hFfo
 github.com/dell/gobrick v1.3.1-0.20220428084717-c92bddbbdb79/go.mod h1:Fm0VTBjHkbanAGAMuwkxSCNGMtDkKq9RKTJKZ1wY0hM=
 github.com/dell/gobrick v1.3.1-0.20220518002046-d0c13458d533 h1:uFvQIjvIJDlIKIxrwsXCD+XID8OElYTJ/DibBpnBtQM=
 github.com/dell/gobrick v1.3.1-0.20220518002046-d0c13458d533/go.mod h1:sIZsUrWSr1Zsct7tzW/yJdtphrTwr73iKS5JKD0jCeU=
+github.com/dell/gobrick v1.3.1-0.20220518052648-ef986ad57e86 h1:J3QgR6VKIa5yVWHoz1/idxEz4uhjBqkKFqZP605jWS4=
+github.com/dell/gobrick v1.3.1-0.20220518052648-ef986ad57e86/go.mod h1:sIZsUrWSr1Zsct7tzW/yJdtphrTwr73iKS5JKD0jCeU=
 github.com/dell/gocsi v1.5.1 h1:rBpQ6sWLOHCcWAteMYHybBaeEIqgpT0vmU4B/6WG6f4=
 github.com/dell/gocsi v1.5.1/go.mod h1:GoNFNluCYj7i9AcPQy4CLFF1FQoLsD5rlnDttVesnzk=
 github.com/dell/gofsutil v1.8.0 h1:YqsTQF3n6GAlCLVjxLkD6GmHG4mKX2SLpD64mpsAdY8=
