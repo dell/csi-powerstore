@@ -92,4 +92,7 @@ const (
 
 	// EnvK8sVisibilityAutoRegistration specifies if k8s cluster should be automatically registered to PowerStore Array
 	EnvK8sVisibilityAutoRegistration = "X_CSI_K8S_VISIBILITY_AUTO_REGISTRATION"
+
+	// EnvMetadataRetrieverEndpoint specifies the endpoint address for csi-metadata-retriever sidecar
+	EnvMetadataRetrieverEndpoint = "X_CSI_RETRIEVER_ENDPOINT"
 )
