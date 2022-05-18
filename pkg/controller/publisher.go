@@ -88,7 +88,7 @@ func (s *SCSIPublisher) Publish(ctx context.Context, req *csi.ControllerPublishV
 
 	err = s.addTargetsInfoToPublishContext(publishContext, volume.ApplianceID, client)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "could not get iscsiTargets: %s", err.Error())
+		return nil, status.Errorf(codes.Internal, "could not get scsi Targets: %s", err.Error())
 	}
 
 	mappingCount := len(mapping)
@@ -167,7 +167,7 @@ func (s *SCSIPublisher) addTargetsInfoToPublishContext(
 	publishContext map[string]string, volumeApplianceID string, client gopowerstore.Client) error {
 	iscsiTargetsInfo, err := common.GetISCSITargetsInfoFromStorage(client, volumeApplianceID)
 	if err != nil {
-		return err
+		log.Error("error unable to get iSCSI targets from array", err)
 	}
 	for i, t := range iscsiTargetsInfo {
 		publishContext[fmt.Sprintf("%s%d", common.PublishContextISCSIPortalsPrefix, i)] = t.Portal
@@ -175,21 +175,25 @@ func (s *SCSIPublisher) addTargetsInfoToPublishContext(
 	}
 	fcTargetsInfo, err := common.GetFCTargetsInfoFromStorage(client, volumeApplianceID)
 	if err != nil {
-		return err
+		log.Error("error unable to get FC targets from array", err)
 	}
 	for i, t := range fcTargetsInfo {
 		publishContext[fmt.Sprintf("%s%d", common.PublishContextFCWWPNPrefix, i)] = t.WWPN
 	}
 
+	// There is no API availble for NVMeTCP and hence targets are added in node staging using goNVMe
 	nvmefcTargetInfo, err := common.GetNVMEFCTargetInfoFromStorage(client, volumeApplianceID)
 	if err != nil {
-		return err
+		log.Error("error unable to get NVMeFC targets from array", err)
 	}
 	for i, t := range nvmefcTargetInfo {
 		publishContext[fmt.Sprintf("%s%d", common.PublishContextNVMEFCPortalsPrefix, i)] = t.Portal
 		publishContext[fmt.Sprintf("%s%d", common.PublishContextNVMEFCTargetsPrefix, i)] = t.Target
 	}
-
+	// If the system is not capable of any protocol, then we will through the error
+	if len(iscsiTargetsInfo) == 0 && len(fcTargetsInfo) == 0 && len(nvmefcTargetInfo) == 0 {
+		return errors.New("unable to get targets for any protocol")
+	}
 	return nil
 }
 
