@@ -28,6 +28,8 @@ import (
 
 	"github.com/akutz/gosync"
 	"github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/dell/csi-powerstore/pkg/common"
+	controller "github.com/dell/csi-powerstore/pkg/controller"
 	"github.com/dell/gocsi/middleware/serialvolume"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -36,7 +38,12 @@ import (
 
 	csictx "github.com/dell/gocsi/context"
 	mwtypes "github.com/dell/gocsi/middleware/serialvolume/types"
+	log "github.com/sirupsen/logrus"
 	xctx "golang.org/x/net/context"
+
+	"github.com/dell/csi-metadata-retriever/retriever"
+	"github.com/kubernetes-csi/csi-lib-utils/connection"
+	"github.com/kubernetes-csi/csi-lib-utils/metrics"
 )
 
 type rewriteRequestIDInterceptor struct{}
@@ -98,8 +105,9 @@ func (i *lockProvider) GetLockWithName(ctx context.Context, name string) (gosync
 }
 
 type opts struct {
-	timeout time.Duration
-	locker  mwtypes.VolumeLockerProvider
+	timeout               time.Duration
+	locker                mwtypes.VolumeLockerProvider
+	MetadataSidecarClient retriever.MetadataRetrieverClient
 }
 
 type interceptor struct {
@@ -117,6 +125,8 @@ func NewCustomSerialLock() grpc.UnaryServerInterceptor {
 
 	i := &interceptor{opts{locker: locker, timeout: 0}}
 
+	i.createMetadataRetrieverClient(context.Background())
+
 	handle := func(ctx xctx.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 		switch t := req.(type) {
 		case *csi.CreateVolumeRequest:
@@ -130,6 +140,28 @@ func NewCustomSerialLock() grpc.UnaryServerInterceptor {
 		}
 	}
 	return handle
+}
+
+func (i *interceptor) createMetadataRetrieverClient(ctx context.Context) {
+	metricsManager := metrics.NewCSIMetricsManagerWithOptions("csi-metadata-retriever",
+		metrics.WithProcessStartTime(false),
+		metrics.WithSubsystem(metrics.SubsystemSidecar))
+
+	if retrieverAddress, ok := csictx.LookupEnv(ctx, common.EnvMetadataRetrieverEndpoint); ok {
+		rpcConn, err := connection.Connect(retrieverAddress, metricsManager, connection.OnConnectionLoss(connection.ExitOnConnectionLoss()))
+		if err != nil {
+			log.Error(err.Error())
+		}
+
+		retrieverClient := retriever.NewMetadataRetrieverClient(rpcConn, 100*time.Second)
+		if retrieverClient == nil {
+			log.Error("Cannot get csi-metadata-retriever client")
+		}
+
+		i.opts.MetadataSidecarClient = retrieverClient
+	} else {
+		log.Warn("env var not found: ", common.EnvMetadataRetrieverEndpoint)
+	}
 }
 
 const pending = "pending"
@@ -189,13 +221,23 @@ func (i *interceptor) createVolume(ctx context.Context, req *csi.CreateVolumeReq
 	}
 	defer lock.Unlock()
 
-	volumeLabels := make(map[string]string)
+	metadataReq := &retriever.GetPVCLabelsRequest{
+		Name:      req.Parameters[controller.KeyCSIPVCName],
+		NameSpace: req.Parameters[controller.KeyCSIPVCNamespace],
+	}
 
-	// TODO: to be replaced by sidecar call
-	// volumeLabels = GetVolumeLabels()
+	if i.opts.MetadataSidecarClient != nil {
+		metadataRes, err := i.opts.MetadataSidecarClient.GetPVCLabels(ctx, metadataReq)
+		if err != nil {
+			log.Errorf("Cannot retrieve labels for PVC %s in namespace: %s, error: %v",
+				controller.KeyCSIPVCName,
+				controller.KeyCSIPVCNamespace,
+				err.Error())
+		}
 
-	for k, v := range volumeLabels {
-		req.Parameters[k] = v
+		for k, v := range metadataRes.Parameters {
+			req.Parameters[k] = v
+		}
 	}
 
 	return handler(ctx, req)
