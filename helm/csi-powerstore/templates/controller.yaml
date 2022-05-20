@@ -280,6 +280,21 @@ spec:
               mountPath: /var/run/csi
         {{- end }}
         {{- end }}
+        - name: csi-metadata-retriever
+          image: {{ required "Must provide the CSI Metadata retriever container image." .Values.images.metadataretriever }}
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
+          command: [ "/csi-metadata-retriever" ]
+          env:
+            {{- if hasKey .Values "dev" }}
+            - name: ENABLE_TRACING
+              value: {{ .Values.dev.enableTracing | quote }}
+            {{ if .Values.dev.enableTracing }}{{- include "pstore.tracingenvvars" . | nindent 12 }}{{ end }}
+            {{- end }}
+            - name: CSI_RETRIEVER_ENDPOINT
+              value: /var/run/csi/csi_retriever.sock
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /var/run/csi
         - name: driver
           image: {{ required "Must provide the PowerStore driver container image." .Values.images.driver }}
           imagePullPolicy: {{ .Values.imagePullPolicy }}
@@ -292,6 +307,8 @@ spec:
             {{- end }}
             - name: CSI_ENDPOINT
               value: /var/run/csi/csi.sock
+            - name: CSI_RETRIEVER_ENDPOINT
+              value: /var/run/csi/csi_retriever.sock
             - name: X_CSI_MODE
               value: controller
             - name: X_CSI_DRIVER_NAME
