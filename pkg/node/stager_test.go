@@ -43,6 +43,14 @@ func getValidPublishContext() map[string]string {
 		common.PublishContextISCSITargetsPrefix + "1": validISCSITargets[1],
 		common.PublishContextFCWWPNPrefix + "0":       validFCTargetsWWPN[0],
 		common.PublishContextFCWWPNPrefix + "1":       validFCTargetsWWPN[1],
+		common.PublishContextNVMEFCPortalsPrefix + "0": validNVMEFCPortals[0],
+		common.PublishContextNVMEFCPortalsPrefix + "1": validNVMEFCPortals[1],
+		common.PublishContextNVMEFCTargetsPrefix + "0": validNVMEFCTargets[0],
+		common.PublishContextNVMEFCTargetsPrefix + "1": validNVMEFCTargets[1],
+		common.PublishContextNVMETCPPortalsPrefix + "0": validNVMETCPPortals[0],
+		common.PublishContextNVMETCPPortalsPrefix + "1": validNVMETCPPortals[1],
+		common.PublishContextNVMETCPTargetsPrefix + "0": validNVMETCPTargets[0],
+		common.PublishContextNVMETCPTargetsPrefix + "1": validNVMETCPTargets[1],
 	}
 }
 
