@@ -423,7 +423,7 @@ func (s *SCSIStager) connectNVMEDevice(ctx context.Context,
 	return s.nvmeConnector.ConnectVolume(connectorCtx, gobrick.NVMeVolumeInfo{
 		Targets: targets,
 		WWN:     wwn,
-	})
+	}, useFC)
 }
 
 func (s *SCSIStager) connectFCDevice(ctx context.Context,
