@@ -1010,7 +1010,7 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 							log.Errorf("couldn't discover NVMeFC targets")
 						} else {
 							for _, target := range NVMeFCTargets {
-								err = s.nvmeLib.NVMeFCConnect(target)
+								err = s.nvmeLib.NVMeFCConnect(target, false)
 								if err != nil {
 									log.Errorf("couldn't connect to NVMeFC target")
 								}
@@ -1033,7 +1033,7 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 						continue
 					} else {
 						for _, target := range nvmeTargets {
-							err = s.nvmeLib.NVMeTCPConnect(target)
+							err = s.nvmeLib.NVMeTCPConnect(target, false)
 							if err != nil {
 								log.Infof("couldn't connect to NVMeTCP targets")
 							}
