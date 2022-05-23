@@ -100,8 +100,11 @@ var (
 		"iqn.2015-10.com.dell:dellemc-powerstore-fnm00180700173-b-10de15a5"}
 	validNVMEInitiators = []string{"nqn.2014-08.org.nvmexpress:uuid:02a08600-57d6-4089-8736-bf1f7326990e",
 		"nqn.2014-08.org.nvmexpress:uuid:fa363a22-1c74-44f3-9932-1c35d5cf5c4d"}
-	validNVMEPortals = []string{"192.168.1.1:4420", "192.168.1.2:4420"}
-	validNVMETargets = []string{"nqn.1988-11.com.dell:powerstore:00:e6e2d5b871f1403E169D",
+	validNVMETCPPortals = []string{"192.168.1.1:4420", "192.168.1.2:4420"}
+	validNVMETCPTargets = []string{"nqn.1988-11.com.dell:powerstore:00:e6e2d5b871f1403E169D",
+		"nqn.1988-11.com.dell:powerstore:00:e6e2d5b871f1403E169D"}
+	validNVMEFCPortals = []string{"nn-0x11ccf090c9200b1a:pn-0x11ccf09149280b1a", "nn-0x11ccf090c9200b1a:pn-0x11ccf09149280b1a"}
+	validNVMEFCTargets = []string{"nqn.1988-11.com.dell:powerstore:00:e6e2d5b871f1403E169D",
 		"nqn.1988-11.com.dell:powerstore:00:e6e2d5b871f1403E169D"}
 	validISCSITargetInfo = []gobrick.ISCSITargetInfo{
 		{Portal: validISCSIPortals[0], Target: validISCSITargets[0]},
@@ -112,14 +115,23 @@ var (
 				Target: validISCSITargetInfo[0].Target},
 			{Portal: validISCSITargetInfo[1].Portal, Target: validISCSITargetInfo[1].Target}},
 		Lun: validLUNIDINT}
-	validNVMETargetInfo = []gobrick.NVMeTargetInfo{
-		{Portal: validNVMEPortals[0], Target: validNVMETargets[0]},
-		{Portal: validNVMEPortals[1], Target: validNVMETargets[1]}}
-	validGobrickNVMEVolumeINFO = gobrick.NVMeVolumeInfo{
+	validNVMETCPTargetInfo = []gobrick.NVMeTargetInfo{
+		{Portal: validNVMETCPPortals[0], Target: validNVMETCPTargets[0]},
+		{Portal: validNVMETCPPortals[1], Target: validNVMETCPTargets[1]}}
+	validGobrickNVMETCPVolumeINFO = gobrick.NVMeVolumeInfo{
 		Targets: []gobrick.NVMeTargetInfo{
-			{Portal: validNVMETargetInfo[0].Portal,
-				Target: validNVMETargetInfo[0].Target},
-			{Portal: validNVMETargetInfo[1].Portal, Target: validNVMETargetInfo[1].Target}},
+			{Portal: validNVMETCPTargetInfo[0].Portal,
+				Target: validNVMETCPTargetInfo[0].Target},
+			{Portal: validNVMETCPTargetInfo[1].Portal, Target: validNVMETCPTargetInfo[1].Target}},
+		WWN: validDeviceWWN}
+	validNVMEFCTargetInfo = []gobrick.NVMeTargetInfo{
+		{Portal: validNVMEFCPortals[0], Target: validNVMEFCTargets[0]},
+		{Portal: validNVMEFCPortals[1], Target: validNVMEFCTargets[1]}}
+	validGobrickNVMEFCVolumeINFO = gobrick.NVMeVolumeInfo{
+		Targets: []gobrick.NVMeTargetInfo{
+			{Portal: validNVMEFCTargetInfo[0].Portal,
+				Target: validNVMEFCTargetInfo[0].Target},
+			{Portal: validNVMEFCTargetInfo[1].Portal, Target: validNVMEFCTargetInfo[1].Target}},
 		WWN: validDeviceWWN}
 	validGobrickFCVolumeINFO = gobrick.FCVolumeInfo{
 		Targets: []gobrick.FCTargetInfo{
@@ -532,6 +544,28 @@ var _ = Describe("CSINodeService", func() {
 			})
 		})
 
+		When("using NVMeFC", func() {
+			It("should successfully stage NVMeFC volume", func() {
+				nodeSvc.useNVME = true
+				nodeSvc.useFC = true
+				nvmeConnectorMock.On("ConnectVolume", mock.Anything, gobrick.NVMeVolumeInfo{
+					Targets: validNVMEFCTargetInfo,
+					WWN:     validDeviceWWN,
+				}, true).Return(gobrick.Device{}, nil)
+
+				scsiStageVolumeOK(utilMock, fsMock)
+				res, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
+					VolumeId:          validBlockVolumeID,
+					PublishContext:    getValidPublishContext(),
+					StagingTargetPath: nodeStagePrivateDir,
+					VolumeCapability: getCapabilityWithVoltypeAccessFstype(
+						"mount", "single-writer", "ext4"),
+				})
+				Expect(err).To(BeNil())
+				Expect(res).To(Equal(&csi.NodeStageVolumeResponse{}))
+			})
+		})
+
 		When("using FC", func() {
 			It("should successfully stage FC volume", func() {
 				nodeSvc.useFC = true
@@ -802,6 +836,24 @@ var _ = Describe("CSINodeService", func() {
 			})
 		})
 
+		It("should fail [NVMeFCTargets]", func() {
+			nodeSvc.useNVME = true
+			nodeSvc.useFC = true
+			res, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
+				VolumeId: validBlockVolumeID,
+				PublishContext: map[string]string{
+					common.PublishContextDeviceWWN:  validDeviceWWN,
+					common.PublishContextLUNAddress: validLUNID,
+				},
+				StagingTargetPath: nodeStagePrivateDir,
+				VolumeCapability: getCapabilityWithVoltypeAccessFstype(
+					"mount", "single-writer", "ext4"),
+			})
+			Expect(err).ToNot(BeNil())
+			Expect(res).To(BeNil())
+			Expect(err.Error()).To(ContainSubstring("NVMeFC Targets data must be in publish context"))
+		})
+
 		When("can not connect device", func() {
 			It("should fail", func() {
 				e := errors.New("connection-error")
@@ -1017,6 +1069,38 @@ var _ = Describe("CSINodeService", func() {
 				fsMock.On("WriteFile", path.Join(nodeSvc.opts.TmpDir, validBaseVolumeID), []byte(validDevName), os.FileMode(0640)).Return(nil)
 
 				fcConnectorMock.On("DisconnectVolumeByDeviceName", mock.Anything, validDevName).Return(nil)
+
+				fsMock.On("Remove", path.Join(nodeSvc.opts.TmpDir, validBaseVolumeID)).Return(nil)
+				fsMock.On("IsNotExist", mock.Anything).Return(false)
+
+				res, err := nodeSvc.NodeUnstageVolume(context.Background(), &csi.NodeUnstageVolumeRequest{
+					VolumeId:          validBlockVolumeID,
+					StagingTargetPath: nodeStagePrivateDir,
+				})
+				Expect(err).To(BeNil())
+				Expect(res).To(Equal(&csi.NodeUnstageVolumeResponse{}))
+			})
+
+			It("should succeed [NVMeFC]", func() {
+				nodeSvc.useNVME = true
+				nodeSvc.useFC = true
+				mountInfo := []gofsutil.Info{
+					{
+						Device: validDevName,
+						Path:   stagingPath,
+					},
+				}
+
+				fsMock.On("GetUtil").Return(utilMock)
+				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
+				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return(mountInfo, nil)
+
+				utilMock.On("Unmount", mock.Anything, stagingPath).Return(nil)
+
+				fsMock.On("Remove", stagingPath).Return(nil)
+				fsMock.On("WriteFile", path.Join(nodeSvc.opts.TmpDir, validBaseVolumeID), []byte(validDevName), os.FileMode(0640)).Return(nil)
+
+				nvmeConnectorMock.On("DisconnectVolumeByDeviceName", mock.Anything, validDevName).Return(nil)
 
 				fsMock.On("Remove", path.Join(nodeSvc.opts.TmpDir, validBaseVolumeID)).Return(nil)
 				fsMock.On("IsNotExist", mock.Anything).Return(false)
