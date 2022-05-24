@@ -20,9 +20,10 @@ package controller
 
 import (
 	"context"
-	"github.com/dell/csi-powerstore/pkg/common"
 	"net/http"
 	"strconv"
+
+	"github.com/dell/csi-powerstore/pkg/common"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/gopowerstore"
@@ -239,7 +240,10 @@ func (sc *SCSICreator) Create(ctx context.Context, req *csi.CreateVolumeRequest,
 	}
 	customHeaders := defaultHeaders
 	k8sMetadataSupported := common.IsK8sMetadataSupported(client)
-	if k8sMetadataSupported {
+	if k8sMetadataSupported &&
+		metadata["k8s_pvol_name"] != "" &&
+		metadata["k8s_claim_name"] != "" &&
+		metadata["k8s_claim_namespace"] != "" {
 		customHeaders.Add("DELL-VISIBILITY", "internal")
 		client.SetCustomHTTPHeaders(customHeaders)
 		reqParams = &gopowerstore.VolumeCreate{Name: &name, Size: &sizeInBytes, Metadata: &metadata}
