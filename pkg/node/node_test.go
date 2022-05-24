@@ -1081,9 +1081,8 @@ var _ = Describe("CSINodeService", func() {
 				Expect(res).To(Equal(&csi.NodeUnstageVolumeResponse{}))
 			})
 
-			It("should succeed [NVMeFC]", func() {
+			It("should succeed [NVMe]", func() {
 				nodeSvc.useNVME = true
-				nodeSvc.useFC = true
 				mountInfo := []gofsutil.Info{
 					{
 						Device: validDevName,
