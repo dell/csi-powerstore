@@ -5,7 +5,7 @@ go 1.18
 require (
 	github.com/akutz/gosync v0.1.0
 	github.com/container-storage-interface/spec v1.5.0
-	github.com/dell/csi-metadata-retriever v0.0.0-20220523064950-abc79cea96cc
+	github.com/dell/csi-metadata-retriever v0.0.0-20220524105353-48d4d415e30f
 	github.com/dell/dell-csi-extensions/common v1.0.1-0.20220418113927-d5623b98b6d5
 	github.com/dell/dell-csi-extensions/replication v1.1.1-0.20220418113927-d5623b98b6d5
 	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.1.1-0.20220421100820-8fb97476d796
