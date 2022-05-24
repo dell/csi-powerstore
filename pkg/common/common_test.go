@@ -116,3 +116,14 @@ func TestGetFCTargetsInfoFromStorage(t *testing.T) {
 		assert.EqualError(t, err, e.Error())
 	})
 }
+
+func TestGetNVMEFCTargetInfoFromStorage(t *testing.T) {
+	t.Run("api error", func(t *testing.T) {
+		e := errors.New("some error")
+		clientMock := new(gopowerstoremock.Client)
+		clientMock.On("GetCluster", context.Background()).Return(gopowerstore.Cluster{}, e)
+		clientMock.On("GetFCPorts", context.Background()).Return([]gopowerstore.FcPort{}, e)
+		_, err := common.GetNVMEFCTargetInfoFromStorage(clientMock, "A1")
+		assert.EqualError(t, err, e.Error())
+	})
+}
