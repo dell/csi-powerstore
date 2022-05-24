@@ -1090,11 +1090,13 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 				if err != nil {
 					log.Error("couldn't discover targets")
 					continue
-				}
-				for _, target := range iscsiTargets {
-					err = s.iscsiLib.PerformLogin(target)
-					if err != nil {
-						log.Errorf("couldn't connect to the iscsi target")
+				} else {
+					for _, target := range iscsiTargets {
+						log.Info("Iscsi target", target)
+						err = s.iscsiLib.PerformLogin(target)
+						if err != nil {
+							log.Errorf("couldn't connect to the iscsi target")
+						}
 					}
 				}
 				resp.AccessibleTopology.Segments[common.Name+"/"+arr.GetIP()+"-iscsi"] = "true"
