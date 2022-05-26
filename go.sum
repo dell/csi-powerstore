@@ -119,8 +119,8 @@ github.com/dell/gofsutil v1.8.1-0.20220525051559-d7c03aebebfc h1:VksgrLWoPv0eqvf
 github.com/dell/gofsutil v1.8.1-0.20220525051559-d7c03aebebfc/go.mod h1:yEFm5EJGxTjs8OC4KBGHnE2/lx/QyHkTd8+4vEBFCsE=
 github.com/dell/goiscsi v1.3.1-0.20220525051619-3944cb24c7f4 h1:ZuRLoaIeXQkRKnXPBVtqkVL8QddOD5rpNU/l8YCpleU=
 github.com/dell/goiscsi v1.3.1-0.20220525051619-3944cb24c7f4/go.mod h1:oDkUXDPAYqSOc0t6PpU+BpOqF45mzv+9eLFRkAoQYKs=
-github.com/dell/gonvme v1.0.1-0.20220520152834-0080a57f5475 h1:LLbK5RWgH6UkMSkOCMkoUs/WlsSp7yJXKGypz35GLeM=
-github.com/dell/gonvme v1.0.1-0.20220520152834-0080a57f5475/go.mod h1:Ky5h++ibT7tzC6Qrregry0oKqcBEYZXzHNr4LuyMbww=
+github.com/dell/gonvme v1.0.1-0.20220526050447-89ebd26eee00 h1:a1oRu6OUAYBRBqvY9+l1F6jh0BOmIFL5wkjm+Dksgz4=
+github.com/dell/gonvme v1.0.1-0.20220526050447-89ebd26eee00/go.mod h1:qLlZNduxrt1hLR/JaU6OXe8+QkU6dtwa5wHM8EWQ58Y=
 github.com/dell/gopowerstore v1.7.1-0.20220510112522-aa262d88c5af h1:1mPUklvufMhzK4oy5KtX99gGoC822eBiIOXBOukLdgI=
 github.com/dell/gopowerstore v1.7.1-0.20220510112522-aa262d88c5af/go.mod h1:w4dbjpFLi6pgAQJTR58jiBp9ouNTSHsVQRpF/A0AeeA=
 github.com/dgrijalva/jwt-go v3.2.0+incompatible/go.mod h1:E3ru+11k8xSBh+hMPgOLZmtrrCbhqsmaPHjLKYnJCaQ=
