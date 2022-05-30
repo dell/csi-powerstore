@@ -1,7 +1,7 @@
 # Dockerfile to build PowerStore CSI Driver
 # based on UBI standard image.
 # Alternative way without RHEL host/subscription, using centos.repo
-FROM registry.access.redhat.com/ubi8/ubi:8.5-230
+FROM registry.access.redhat.com/ubi8/ubi-minimal:8.6-751
 
 LABEL vendor="Dell Inc." \
       name="csi-powerstore" \
