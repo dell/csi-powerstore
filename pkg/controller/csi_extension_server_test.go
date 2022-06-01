@@ -20,6 +20,7 @@ package controller_test
 
 import (
 	"context"
+
 	vgsext "github.com/dell/dell-csi-extensions/volumeGroupSnapshot"
 	"github.com/dell/gopowerstore"
 	. "github.com/onsi/ginkgo"
@@ -40,6 +41,13 @@ var _ = Describe("csi-extension-server", func() {
 					Return(gopowerstore.VolumeGroups{VolumeGroup: []gopowerstore.VolumeGroup{{ID: validGroupID, ProtectionPolicyID: validPolicyID}}}, nil)
 				clientMock.On("CreateVolumeGroupSnapshot", mock.Anything, validGroupID, mock.Anything).
 					Return(gopowerstore.CreateResponse{ID: validGroupID}, nil)
+				clientMock.On("GetVolumeGroupByName", mock.Anything, validGroupName).
+					Return(gopowerstore.VolumeGroup{ID: validGroupID, ProtectionPolicyID: validPolicyID}, nil)
+				clientMock.On("AddMembersToVolumeGroup",
+					mock.Anything,
+					mock.AnythingOfType("*gopowerstore.VolumeGroupMembers"),
+					validGroupID).
+					Return(gopowerstore.EmptyResponse(""), nil)
 				clientMock.On("GetVolumeGroup", mock.Anything, validGroupID).
 					Return(gopowerstore.VolumeGroup{
 						ID:                 validGroupID,
@@ -63,8 +71,15 @@ var _ = Describe("csi-extension-server", func() {
 			It("should create volume group and snapshot successfully", func() {
 				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).
 					Return(gopowerstore.VolumeGroups{}, nil)
+				clientMock.On("GetVolumeGroupByName", mock.Anything, validGroupName).
+					Return(gopowerstore.VolumeGroup{ID: validGroupID, ProtectionPolicyID: validPolicyID}, nil)
 				clientMock.On("CreateVolumeGroupSnapshot", mock.Anything, validGroupID, mock.Anything).
 					Return(gopowerstore.CreateResponse{ID: validGroupID}, nil)
+				clientMock.On("AddMembersToVolumeGroup",
+					mock.Anything,
+					mock.AnythingOfType("*gopowerstore.VolumeGroupMembers"),
+					validGroupID).
+					Return(gopowerstore.EmptyResponse(""), nil)
 				clientMock.On("GetVolumeGroup", mock.Anything, validGroupID).
 					Return(gopowerstore.VolumeGroup{
 						ID:                 validGroupID,
@@ -97,12 +112,19 @@ var _ = Describe("csi-extension-server", func() {
 					Return(gopowerstore.VolumeGroups{VolumeGroup: []gopowerstore.VolumeGroup{{ID: validGroupID, ProtectionPolicyID: validPolicyID}}}, nil)
 				clientMock.On("CreateVolumeGroupSnapshot", mock.Anything, validGroupID, mock.Anything).
 					Return(gopowerstore.CreateResponse{ID: validGroupID}, nil)
+				clientMock.On("GetVolumeGroupByName", mock.Anything, validGroupName).
+					Return(gopowerstore.VolumeGroup{ID: validGroupID, ProtectionPolicyID: validPolicyID}, nil)
 				clientMock.On("GetVolumeGroup", mock.Anything, validGroupID).
 					Return(gopowerstore.VolumeGroup{
 						ID:                 validGroupID,
 						ProtectionPolicyID: validPolicyID,
 						Volumes:            []gopowerstore.Volume{{ID: validBaseVolID, State: stateReady}},
 					}, nil)
+				clientMock.On("AddMembersToVolumeGroup",
+					mock.Anything,
+					mock.AnythingOfType("*gopowerstore.VolumeGroupMembers"),
+					validGroupID).
+					Return(gopowerstore.EmptyResponse(""), nil)
 
 				var sourceVols []string
 				sourceVols = append(sourceVols, validBaseVolID+"/"+firstValidID+"/scsi")
@@ -121,6 +143,11 @@ var _ = Describe("csi-extension-server", func() {
 					Return(gopowerstore.VolumeGroups{VolumeGroup: []gopowerstore.VolumeGroup{{ID: validGroupID, ProtectionPolicyID: validPolicyID}}}, nil)
 				clientMock.On("CreateVolumeGroupSnapshot", mock.Anything, validGroupID, mock.Anything).
 					Return(gopowerstore.CreateResponse{ID: validGroupID}, nil)
+				clientMock.On("AddMembersToVolumeGroup",
+					mock.Anything,
+					mock.AnythingOfType("*gopowerstore.VolumeGroupMembers"),
+					validGroupID).
+					Return(gopowerstore.EmptyResponse(""), nil)
 				clientMock.On("GetVolumeGroup", mock.Anything, validGroupID).
 					Return(gopowerstore.VolumeGroup{
 						ID:                 validGroupID,
@@ -142,6 +169,11 @@ var _ = Describe("csi-extension-server", func() {
 					Return(gopowerstore.VolumeGroups{VolumeGroup: []gopowerstore.VolumeGroup{{ID: validGroupID, ProtectionPolicyID: validPolicyID}}}, nil)
 				clientMock.On("CreateVolumeGroupSnapshot", mock.Anything, validGroupID, mock.Anything).
 					Return(gopowerstore.CreateResponse{ID: validGroupID}, nil)
+				clientMock.On("AddMembersToVolumeGroup",
+					mock.Anything,
+					mock.AnythingOfType("*gopowerstore.VolumeGroupMembers"),
+					validGroupID).
+					Return(gopowerstore.EmptyResponse(""), nil)
 				clientMock.On("GetVolumeGroup", mock.Anything, validGroupID).
 					Return(gopowerstore.VolumeGroup{
 						ID:                 validGroupID,
@@ -165,6 +197,13 @@ var _ = Describe("csi-extension-server", func() {
 					Return(gopowerstore.VolumeGroups{VolumeGroup: []gopowerstore.VolumeGroup{{ID: validGroupID, ProtectionPolicyID: validPolicyID}}}, nil)
 				clientMock.On("CreateVolumeGroupSnapshot", mock.Anything, validGroupID, mock.Anything).
 					Return(gopowerstore.CreateResponse{ID: validGroupID}, nil)
+				clientMock.On("GetVolumeGroupByName", mock.Anything, validGroupName).
+					Return(gopowerstore.VolumeGroup{}, nil)
+				clientMock.On("AddMembersToVolumeGroup",
+					mock.Anything,
+					mock.AnythingOfType("*gopowerstore.VolumeGroupMembers"),
+					validGroupID).
+					Return(gopowerstore.EmptyResponse(""), nil)
 				clientMock.On("GetVolumeGroup", mock.Anything, validGroupID).
 					Return(gopowerstore.VolumeGroup{}, gopowerstore.NewNotFoundError())
 

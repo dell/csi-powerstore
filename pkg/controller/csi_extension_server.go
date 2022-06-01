@@ -48,29 +48,46 @@ func (s *Service) CreateVolumeGroupSnapshot(ctx context.Context, request *vgsext
 		Description: request.GetDescription(),
 		VolumeIds:   sourceVols,
 	}
-	volGroups, err := s.Arrays()[arr].GetClient().GetVolumeGroupsByVolumeID(ctx, sourceVols[0])
+
+	gotVg, err := s.Arrays()[arr].GetClient().GetVolumeGroupByName(ctx, request.GetName())
 	if err != nil {
-		if apiError, ok := err.(gopowerstore.APIError); !(ok && apiError.VolumeNameIsAlreadyUse()) {
-			return nil, status.Errorf(codes.Internal, "Error getting volume group by volume ID: %s", err.Error())
+		if apiError, ok := err.(gopowerstore.APIError); !(ok && apiError.NotFound()) {
+			return nil, status.Errorf(codes.Internal, "Error getting volume group by name: %s", err.Error())
 		}
 	}
 
 	// Check whether volume group already exists, if yes proceed to create a snapshot else create a new volume group
-	if len(volGroups.VolumeGroup) >= 1 {
-		// one volume can be present only in one group and hence we will take only the first entry
-		existingVgID = volGroups.VolumeGroup[0].ID
-	} else {
-		resp, err := s.Arrays()[arr].GetClient().CreateVolumeGroup(ctx, &vgParams)
+	if gotVg.ID != "" {
+		// taking the existing volume group to re-create
+		existingVgID = gotVg.ID
+		// add members to existing volume group before taking snapshot
+		_, err := s.Arrays()[arr].GetClient().AddMembersToVolumeGroup(ctx, &gopowerstore.VolumeGroupMembers{VolumeIds: sourceVols}, existingVgID)
 		if err != nil {
 			if apiError, ok := err.(gopowerstore.APIError); !(ok && apiError.VolumeNameIsAlreadyUse()) {
-				return nil, status.Errorf(codes.Internal, "Error creating volume group: %s", err.Error())
+				return nil, status.Errorf(codes.Internal, "Error adding volume group members: %s", err.Error())
 			}
 		}
-		if resp.ID != "" {
-			existingVgID = resp.ID
+	} else {
+		r, err := s.Arrays()[arr].GetClient().GetVolumeGroupsByVolumeID(ctx, vgParams.VolumeIds[0])
+		if err != nil {
+			if apiError, ok := err.(gopowerstore.APIError); !(ok && apiError.NotFound()) {
+				return nil, status.Errorf(codes.Internal, "Error getting volume group by volume ID: %s", err.Error())
+			}
+		}
+		if len(r.VolumeGroup) == 0 {
+			resp, err := s.Arrays()[arr].GetClient().CreateVolumeGroup(ctx, &vgParams)
+			if err != nil {
+				if apiError, ok := err.(gopowerstore.APIError); !(ok && apiError.VolumeNameIsAlreadyUse()) {
+					return nil, status.Errorf(codes.Internal, "Error creating volume group: %s", err.Error())
+				}
+			}
+			if resp.ID != "" {
+				existingVgID = resp.ID
+			}
+		} else {
+			existingVgID = r.VolumeGroup[0].ID
 		}
 	}
-
 	if existingVgID != "" {
 		resp, err := s.Arrays()[arr].GetClient().CreateVolumeGroupSnapshot(ctx, existingVgID, &reqParams)
 		if err != nil {

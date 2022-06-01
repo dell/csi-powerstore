@@ -2,6 +2,8 @@ module github.com/dell/csi-powerstore
 
 go 1.18
 
+replace github.com/dell/gopowerstore v1.7.1-0.20220530072139-a75b638ae28e => ../gopowerstore
+
 require (
 	github.com/akutz/gosync v0.1.0
 	github.com/container-storage-interface/spec v1.5.0

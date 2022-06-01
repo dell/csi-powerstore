@@ -1026,7 +1026,7 @@ var _ = Describe("CSIControllerService", func() {
 
 				clientMock.On("RemoveMembersFromVolumeGroup",
 					mock.Anything,
-					mock.AnythingOfType("*gopowerstore.VolumeGroupRemoveMember"),
+					mock.AnythingOfType("*gopowerstore.VolumeGroupMembers"),
 					validGroupID).
 					Return(gopowerstore.EmptyResponse(""), nil)
 				clientMock.On("ModifyVolume",
