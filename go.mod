@@ -9,10 +9,10 @@ require (
 	github.com/dell/dell-csi-extensions/common v1.0.1-0.20220526070836-43b4ac597bf3
 	github.com/dell/dell-csi-extensions/replication v1.1.1-0.20220526070836-43b4ac597bf3
 	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.1.1-0.20220526070836-43b4ac597bf3
-	github.com/dell/gobrick v1.3.1-0.20220525051543-433fed5396a4
+	github.com/dell/gobrick v1.3.1-0.20220601062320-bf912dc80f24
 	github.com/dell/gocsi v1.5.2-0.20220525142554-48ff29a07e1e
 	github.com/dell/gofsutil v1.8.1-0.20220525051559-d7c03aebebfc
-	github.com/dell/goiscsi v1.3.1-0.20220525051619-3944cb24c7f4
+	github.com/dell/goiscsi v1.3.1-0.20220531112302-5896396c3c66
 	github.com/dell/gonvme v1.0.1-0.20220526050447-89ebd26eee00
 	github.com/dell/gopowerstore v1.7.1-0.20220530072139-a75b638ae28e
 	github.com/fsnotify/fsnotify v1.4.9
