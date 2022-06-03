@@ -117,8 +117,8 @@ github.com/dell/goiscsi v1.3.1-0.20220602105959-3ba7fba52ffd h1:HKxrHDZA+YWuejFv
 github.com/dell/goiscsi v1.3.1-0.20220602105959-3ba7fba52ffd/go.mod h1:oDkUXDPAYqSOc0t6PpU+BpOqF45mzv+9eLFRkAoQYKs=
 github.com/dell/gonvme v1.0.1-0.20220526050447-89ebd26eee00 h1:a1oRu6OUAYBRBqvY9+l1F6jh0BOmIFL5wkjm+Dksgz4=
 github.com/dell/gonvme v1.0.1-0.20220526050447-89ebd26eee00/go.mod h1:qLlZNduxrt1hLR/JaU6OXe8+QkU6dtwa5wHM8EWQ58Y=
-github.com/dell/gopowerstore v1.7.1-0.20220602063546-f831b54f1f4a h1:1vquWQb4oVCe7xkVOs5yskXk5IUPywp42KB2TWnRQ5c=
-github.com/dell/gopowerstore v1.7.1-0.20220602063546-f831b54f1f4a/go.mod h1:JSqpk8zKcpQlKVAKFCiP6pxmeKDkPow7SVLfCCb+/HM=
+github.com/dell/gopowerstore v1.7.1-0.20220603111838-a33a4c452804 h1:x/81lMEOt0KZnXdaxKK/CGKbfSqeKQdPAvmWvrdizq8=
+github.com/dell/gopowerstore v1.7.1-0.20220603111838-a33a4c452804/go.mod h1:ROY3Uj8gMLQ1XGp9BogXZnjY+L7Vtmn4G6CVeLwiKpE=
 github.com/dgrijalva/jwt-go v3.2.0+incompatible/go.mod h1:E3ru+11k8xSBh+hMPgOLZmtrrCbhqsmaPHjLKYnJCaQ=
 github.com/docopt/docopt-go v0.0.0-20180111231733-ee0de3bc6815/go.mod h1:WwZ+bS3ebgob9U8Nd0kOddGdZWjyMGR8Wziv+TBNwSE=
 github.com/dustin/go-humanize v1.0.0/go.mod h1:HtrtbFcZ19U5GC7JDqmcUSB87Iq5E25KnS6fMYU6eOk=
@@ -266,7 +266,7 @@ github.com/hpcloud/tail v1.0.0/go.mod h1:ab1qPbhIpdTxEkNHXyeSf5vhxWSCs/tWer42PpO
 github.com/ianlancetaylor/demangle v0.0.0-20181102032728-5e5cf60278f6/go.mod h1:aSSvb/t6k1mPoxDqO4vJh6VOCGPwU4O0C2/Eqndh1Sc=
 github.com/ianlancetaylor/demangle v0.0.0-20200824232613-28f6c0f3b639/go.mod h1:aSSvb/t6k1mPoxDqO4vJh6VOCGPwU4O0C2/Eqndh1Sc=
 github.com/imdario/mergo v0.3.5/go.mod h1:2EnlNZ0deacrJVfApfmtdGgDfMuh/nq6Ok1EcJh5FfA=
-github.com/jarcoal/httpmock v1.0.4 h1:jp+dy/+nonJE4g4xbVtl9QdrUNbn6/3hDT5R4nDIZnA=
+github.com/jarcoal/httpmock v1.2.0 h1:gSvTxxFR/MEMfsGrvRbdfpRUMBStovlSRLw0Ep1bwwc=
 github.com/jpillora/backoff v1.0.0/go.mod h1:J/6gKK9jxlEcS3zixgDgUAsiuZ7yrSoa/FX5e0EB2j4=
 github.com/json-iterator/go v1.1.6/go.mod h1:+SdeFBvtyEkXs7REEP0seUULqWtbJapLOCVDaaPEHmU=
 github.com/json-iterator/go v1.1.10/go.mod h1:KdQUCv79m/52Kvf8AW2vK1V8akMuk1QjK/uOdHXbAo4=
