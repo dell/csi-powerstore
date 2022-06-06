@@ -92,8 +92,8 @@ const (
 
 var (
 	validFCTargetsWWPN           = []string{"58ccf09348a003a3", "58ccf09348a002a3"}
-	validFCTargetWWNNVMe         = []string{"58ccf090496008aa","58ccf090496008aa"}
-	validFCTargetWWNNode         = []string{"58ccf090c96008aa","58ccf090c96008aa"}
+	validFCTargetWWNNVMe         = []string{"58ccf090496008aa", "58ccf090496008aa"}
+	validFCTargetWWNNode         = []string{"58ccf090c96008aa", "58ccf090c96008aa"}
 	validFCTargetsWWPNPowerstore = []string{"58:cc:f0:93:48:a0:03:a3", "58:cc:f0:93:48:a0:02:a3"}
 	validFCTargetsInfo           = []gobrick.FCTargetInfo{{WWPN: validFCTargetsWWPN[0]},
 		{WWPN: validFCTargetsWWPN[1]}}
@@ -3001,9 +3001,9 @@ var _ = Describe("CSINodeService", func() {
 					NodeId: nodeSvc.nodeID,
 					AccessibleTopology: &csi.Topology{
 						Segments: map[string]string{
-							common.Name + "/" + firstValidIP + "-nfs":  "true",
+							common.Name + "/" + firstValidIP + "-nfs":    "true",
 							common.Name + "/" + firstValidIP + "-nvmefc": "true",
-							common.Name + "/" + secondValidIP + "-nfs": "true",
+							common.Name + "/" + secondValidIP + "-nfs":   "true",
 						},
 					},
 				}))
@@ -3032,9 +3032,9 @@ var _ = Describe("CSINodeService", func() {
 					NodeId: nodeSvc.nodeID,
 					AccessibleTopology: &csi.Topology{
 						Segments: map[string]string{
-							common.Name + "/" + firstValidIP + "-nfs":   "true",
+							common.Name + "/" + firstValidIP + "-nfs":     "true",
 							common.Name + "/" + firstValidIP + "-nvmetcp": "true",
-							common.Name + "/" + secondValidIP + "-nfs":  "true",
+							common.Name + "/" + secondValidIP + "-nfs":    "true",
 						},
 					},
 				}))
