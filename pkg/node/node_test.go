@@ -21,13 +21,14 @@ package node
 import (
 	"context"
 	"errors"
-	"github.com/dell/gonvme"
 	"net"
 	"net/http"
 	"os"
 	"path"
 	"path/filepath"
 	"testing"
+
+	"github.com/dell/gonvme"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-powerstore/mocks"
@@ -661,6 +662,86 @@ var _ = Describe("CSINodeService", func() {
 
 				Expect(err).To(BeNil())
 				Expect(res).To(Equal(&csi.NodeStageVolumeResponse{}))
+			})
+		})
+
+		When("using NFS with posix acls", func() {
+			It("should successfully stage NFS volume", func() {
+				nfsv4ACLsMock := new(mocks.NFSv4ACLsInterface)
+
+				stagingPath := filepath.Join(nodeStagePrivateDir, validBaseVolumeID)
+				utilMock.On("Mount", mock.Anything, validNfsExportPath, stagingPath, "").Return(nil)
+				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
+				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
+				fsMock.On("MkdirAll", stagingPath, mock.Anything).Return(nil).Once()
+				fsMock.On("MkdirAll", filepath.Join(stagingPath, commonNfsVolumeFolder), mock.Anything).Return(nil).Once()
+				fsMock.On("Chmod", filepath.Join(stagingPath, commonNfsVolumeFolder), os.ModeSticky|os.ModePerm).Return(nil)
+				fsMock.On("GetUtil").Return(utilMock)
+
+				publishContext := getValidPublishContext()
+				publishContext["NfsExportPath"] = validNfsExportPath
+				publishContext[common.KeyNasName] = validNasName
+				publishContext[common.KeyNfsACL] = "0777"
+
+				nfsServers := []gopowerstore.NFSServerInstance{
+					{
+						Id:             validNfsServerID,
+						IsNFSv4Enabled: true,
+					},
+				}
+
+				clientMock.On("GetNfsServer", mock.Anything, validNasName).Return(gopowerstore.NFSServerInstance{Id: validNfsServerID, IsNFSv4Enabled: true}, nil)
+				clientMock.On("GetNASByName", mock.Anything, validNasName).Return(gopowerstore.NAS{ID: validNasID, NfsServers: nfsServers}, nil)
+				nfsv4ACLsMock.On("SetNfsv4Acls", mock.Anything, mock.Anything).Return(nil)
+
+				res, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
+					VolumeId:          validNfsVolumeID,
+					PublishContext:    publishContext,
+					StagingTargetPath: nodeStagePrivateDir,
+					VolumeCapability: getCapabilityWithVoltypeAccessFstype(
+						"mount", "multi-writer", "nfs"),
+				})
+
+				Expect(err).To(BeNil())
+				Expect(res).To(Equal(&csi.NodeStageVolumeResponse{}))
+			})
+		})
+
+		When("using NFS with NFSv4 acls", func() {
+			It("should successfully stage NFS volume", func() {
+				nfsv4ACLsMock := new(mocks.NFSv4ACLsInterface)
+
+				stagingPath := filepath.Join(nodeStagePrivateDir, validBaseVolumeID)
+				utilMock.On("Mount", mock.Anything, validNfsExportPath, stagingPath, "").Return(nil)
+				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
+				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
+				fsMock.On("MkdirAll", stagingPath, mock.Anything).Return(nil).Once()
+				fsMock.On("MkdirAll", filepath.Join(stagingPath, commonNfsVolumeFolder), mock.Anything).Return(nil).Once()
+				fsMock.On("Chmod", filepath.Join(stagingPath, commonNfsVolumeFolder), os.ModeSticky|os.ModePerm).Return(nil)
+				fsMock.On("GetUtil").Return(utilMock)
+
+				publishContext := getValidPublishContext()
+				publishContext["NfsExportPath"] = validNfsExportPath
+				publishContext[common.KeyNfsACL] = "A::OWNER@:RWX"
+
+				nfsServers := []gopowerstore.NFSServerInstance{
+					{
+						Id:             validNfsServerID,
+						IsNFSv4Enabled: true,
+					},
+				}
+
+				nfsv4ACLsMock.On("SetNfsv4Acls", mock.Anything, mock.Anything).Return(nil)
+				clientMock.On("GetNASByName", mock.Anything, "").Return(gopowerstore.NAS{ID: validNasID, NfsServers: nfsServers}, nil)
+				clientMock.On("GetNfsServer", mock.Anything, mock.Anything).Return(gopowerstore.NFSServerInstance{Id: validNfsServerID, IsNFSv4Enabled: true}, nil)
+
+				nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
+					VolumeId:          validNfsVolumeID,
+					PublishContext:    publishContext,
+					StagingTargetPath: nodeStagePrivateDir,
+					VolumeCapability: getCapabilityWithVoltypeAccessFstype(
+						"mount", "multi-writer", "nfs"),
+				})
 			})
 		})
 
