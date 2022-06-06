@@ -1008,6 +1008,7 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 						NVMeFCTargets, err := s.nvmeLib.DiscoverNVMeFCTargets(info.Portal, false)
 						if err != nil {
 							log.Errorf("couldn't discover NVMeFC targets")
+							continue
 						} else {
 							for _, target := range NVMeFCTargets {
 								err = s.nvmeLib.NVMeFCConnect(target, false)

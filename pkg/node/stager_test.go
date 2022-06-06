@@ -142,4 +142,89 @@ func TestSCSIStager_Stage(t *testing.T) {
 
 		assert.Nil(t, err)
 	})
+
+	t.Run("nvmefc -- success test", func(t *testing.T) {
+		iscsiConnectorMock := new(mocks.ISCSIConnector)
+		fcConnectorMock := new(mocks.FcConnector)
+		nvmeConnectorMock := new(mocks.NVMEConnector)
+
+		stager := &SCSIStager{
+			useFC:          true,
+			useNVME:        true,
+			iscsiConnector: iscsiConnectorMock,
+			nvmeConnector:  nvmeConnectorMock,
+			fcConnector:    fcConnectorMock,
+		}
+
+		nvmeConnectorMock.On("ConnectVolume", mock.Anything, gobrick.NVMeVolumeInfo{
+			Targets: []gobrick.NVMeTargetInfo{
+				{
+					Portal: validNVMEFCPortals[0],
+					Target: validNVMEFCTargets[0],
+				},
+				{
+					Portal: validNVMEFCPortals[1],
+					Target: validNVMEFCTargets[1],
+				},
+			},
+			WWN: validDeviceWWN,
+		}, true).Return(gobrick.Device{}, nil)
+
+		utilMock := new(mocks.UtilInterface)
+		fsMock := new(mocks.FsInterface)
+
+		scsiStageVolumeOK(utilMock, fsMock)
+
+		_, err := stager.Stage(context.Background(), &csi.NodeStageVolumeRequest{
+			VolumeId:          validBlockVolumeID,
+			PublishContext:    getValidPublishContext(),
+			StagingTargetPath: nodeStagePrivateDir,
+			VolumeCapability: getCapabilityWithVoltypeAccessFstype(
+				"block", "single-writer", "none"),
+		}, log.Fields{}, fsMock, validBaseVolumeID)
+
+		assert.Nil(t, err)
+	})
+
+	t.Run("nvmetcp -- success test", func(t *testing.T) {
+		iscsiConnectorMock := new(mocks.ISCSIConnector)
+		fcConnectorMock := new(mocks.FcConnector)
+		nvmeConnectorMock := new(mocks.NVMEConnector)
+
+		stager := &SCSIStager{
+			useFC:          false,
+			useNVME:        true,
+			iscsiConnector: iscsiConnectorMock,
+			nvmeConnector:  nvmeConnectorMock,
+			fcConnector:    fcConnectorMock,
+		}
+
+		nvmeConnectorMock.On("ConnectVolume", mock.Anything, gobrick.NVMeVolumeInfo{
+			Targets: []gobrick.NVMeTargetInfo{
+				{
+					Portal: validNVMETCPPortals[0],
+					Target: validNVMETCPTargets[0],
+				},
+				{
+					Portal: validNVMETCPPortals[1],
+					Target: validNVMETCPTargets[1],
+				},
+			},
+			WWN: validDeviceWWN,
+		}, false).Return(gobrick.Device{}, nil)
+
+		utilMock := new(mocks.UtilInterface)
+		fsMock := new(mocks.FsInterface)
+
+		scsiStageVolumeOK(utilMock, fsMock)
+		_, err := stager.Stage(context.Background(), &csi.NodeStageVolumeRequest{
+			VolumeId:          validBlockVolumeID,
+			PublishContext:    getValidPublishContext(),
+			StagingTargetPath: nodeStagePrivateDir,
+			VolumeCapability: getCapabilityWithVoltypeAccessFstype(
+				"block", "single-writer", "none"),
+		}, log.Fields{}, fsMock, validBaseVolumeID)
+
+		assert.Nil(t, err)
+	})
 }

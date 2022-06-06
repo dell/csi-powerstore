@@ -63,6 +63,7 @@ var (
 const (
 	validBaseVolumeID   = "39bb1b5f-5624-490d-9ece-18f7b28a904e"
 	validBlockVolumeID  = "39bb1b5f-5624-490d-9ece-18f7b28a904e/gid1/scsi"
+	validClusterName    = "localSystemName"
 	validNfsVolumeID    = "39bb1b5f-5624-490d-9ece-18f7b28a904e/gid2/nfs"
 	validVolSize        = 16 * 1024 * 1024 * 1024
 	validLUNID          = "3"
@@ -91,6 +92,8 @@ const (
 
 var (
 	validFCTargetsWWPN           = []string{"58ccf09348a003a3", "58ccf09348a002a3"}
+	validFCTargetWWNNVMe         = []string{"58ccf090496008aa","58ccf090496008aa"}
+	validFCTargetWWNNode         = []string{"58ccf090c96008aa","58ccf090c96008aa"}
 	validFCTargetsWWPNPowerstore = []string{"58:cc:f0:93:48:a0:03:a3", "58:cc:f0:93:48:a0:02:a3"}
 	validFCTargetsInfo           = []gobrick.FCTargetInfo{{WWPN: validFCTargetsWWPN[0]},
 		{WWPN: validFCTargetsWWPN[1]}}
@@ -198,6 +201,7 @@ func setVariables() {
 		nvmeLib:        nvmeLibMock,
 		nodeID:         validNodeID,
 		useFC:          false,
+		useNVME:        false,
 		initialized:    true,
 	}
 
@@ -476,6 +480,7 @@ var _ = Describe("CSINodeService", func() {
 			It("should create FC host", func() {
 				nodeSvc.Arrays()[firstValidIP].BlockProtocol = common.FcTransport
 				nodeSvc.nodeID = ""
+				nodeSvc.useFC = true
 				conn, _ := net.Dial("udp", "127.0.0.1:80")
 				fsMock.On("NetDial", mock.Anything).Return(
 					conn,
@@ -509,6 +514,51 @@ var _ = Describe("CSINodeService", func() {
 						}},
 						Name: "host-name",
 					}}, nil)
+				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+				clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
+				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
+				clientMock.On("CreateHost", mock.Anything, mock.Anything).
+					Return(gopowerstore.CreateResponse{ID: validHostID}, nil)
+
+				err := nodeSvc.Init()
+				Expect(err).To(BeNil())
+			})
+		})
+
+		When("using NVMe", func() {
+			It("should create NVMe host", func() {
+				nodeSvc.Arrays()[firstValidIP].BlockProtocol = common.NVMEFCTransport
+				nodeSvc.nodeID = ""
+				nodeSvc.useNVME = true
+				fsMock.On("ReadFile", mock.Anything).Return([]byte("my-host-id"), nil)
+				conn, _ := net.Dial("udp", "127.0.0.1:80")
+				fsMock.On("NetDial", mock.Anything).Return(
+					conn,
+					nil,
+				)
+				iscsiConnectorMock.On("GetInitiatorName", mock.Anything).
+					Return(validISCSIInitiators, nil)
+				nvmeConnectorMock.On("GetInitiatorName", mock.Anything).
+					Return(validNVMEInitiators, nil)
+				fcConnectorMock.On("GetInitiatorPorts", mock.Anything).
+					Return(validFCTargetsWWPN, nil)
+
+				clientMock.On("GetHostByName", mock.Anything, mock.AnythingOfType("string")).
+					Return(gopowerstore.Host{}, gopowerstore.APIError{
+						ErrorMsg: &api.ErrorMsg{
+							StatusCode: http.StatusNotFound,
+						},
+					})
+				clientMock.On("GetHosts", mock.Anything).Return(
+					[]gopowerstore.Host{{
+						ID: "host-id",
+						Initiators: []gopowerstore.InitiatorInstance{{
+							PortName: "not-matching-port-name",
+							PortType: gopowerstore.InitiatorProtocolTypeEnumNVME,
+						}},
+						Name: "host-name",
+					}}, nil)
+
 				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
 				clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
 				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
@@ -818,6 +868,24 @@ var _ = Describe("CSINodeService", func() {
 				Expect(err.Error()).To(ContainSubstring("iscsiTargets data must be in publish context"))
 			})
 
+			It("should fail [nvmefcTargets]", func() {
+				nodeSvc.useNVME = true
+				nodeSvc.useFC = true
+				res, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
+					VolumeId: validBlockVolumeID,
+					PublishContext: map[string]string{
+						common.PublishContextDeviceWWN:  validDeviceWWN,
+						common.PublishContextLUNAddress: validLUNID,
+					},
+					StagingTargetPath: nodeStagePrivateDir,
+					VolumeCapability: getCapabilityWithVoltypeAccessFstype(
+						"mount", "single-writer", "ext4"),
+				})
+				Expect(err).ToNot(BeNil())
+				Expect(res).To(BeNil())
+				Expect(err.Error()).To(ContainSubstring("NVMeFC Targets data must be in publish context"))
+			})
+
 			It("should fail [fcTargets]", func() {
 				nodeSvc.useFC = true
 				res, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
@@ -834,24 +902,6 @@ var _ = Describe("CSINodeService", func() {
 				Expect(res).To(BeNil())
 				Expect(err.Error()).To(ContainSubstring("fcTargets data must be in publish context"))
 			})
-		})
-
-		It("should fail [NVMeFCTargets]", func() {
-			nodeSvc.useNVME = true
-			nodeSvc.useFC = true
-			res, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
-				VolumeId: validBlockVolumeID,
-				PublishContext: map[string]string{
-					common.PublishContextDeviceWWN:  validDeviceWWN,
-					common.PublishContextLUNAddress: validLUNID,
-				},
-				StagingTargetPath: nodeStagePrivateDir,
-				VolumeCapability: getCapabilityWithVoltypeAccessFstype(
-					"mount", "single-writer", "ext4"),
-			})
-			Expect(err).ToNot(BeNil())
-			Expect(res).To(BeNil())
-			Expect(err.Error()).To(ContainSubstring("NVMeFC Targets data must be in publish context"))
 		})
 
 		When("can not connect device", func() {
@@ -2680,6 +2730,7 @@ var _ = Describe("CSINodeService", func() {
 						},
 					},
 				}))
+				gonvme.GONVMEMock.InduceDiscoveryError = false
 			})
 		})
 
@@ -2921,6 +2972,74 @@ var _ = Describe("CSINodeService", func() {
 				})
 			})
 		})
+
+		When("using NVMeFC", func() {
+			It("should return NVMeFC topology segments", func() {
+				nodeSvc.useNVME = true
+				nodeSvc.useFC = true
+				clientMock.On("GetCluster", mock.Anything).
+					Return(gopowerstore.Cluster{
+						Name:    validClusterName,
+						NVMeNQN: validNVMEInitiators[0],
+					}, nil)
+				clientMock.On("GetFCPorts", mock.Anything).
+					Return([]gopowerstore.FcPort{
+						{
+							WwnNVMe: validFCTargetWWNNVMe[0],
+							WwnNode: validFCTargetWWNNode[0],
+						},
+					}, nil)
+				conn, _ := net.Dial("udp", "127.0.0.1:80")
+				fsMock.On("NetDial", mock.Anything).Return(
+					conn,
+					nil,
+				)
+
+				res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
+				Expect(err).To(BeNil())
+				Expect(res).To(Equal(&csi.NodeGetInfoResponse{
+					NodeId: nodeSvc.nodeID,
+					AccessibleTopology: &csi.Topology{
+						Segments: map[string]string{
+							common.Name + "/" + firstValidIP + "-nfs":  "true",
+							common.Name + "/" + firstValidIP + "-nvmefc": "true",
+							common.Name + "/" + secondValidIP + "-nfs": "true",
+						},
+					},
+				}))
+			})
+		})
+
+		When("using NVMeTCP", func() {
+			It("should return NVMeTCP topology segments", func() {
+				nodeSvc.useNVME = true
+				nodeSvc.useFC = false
+				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
+					Return([]gopowerstore.IPPoolAddress{
+						{
+							Address: "192.168.1.1",
+							IPPort:  gopowerstore.IPPortInstance{TargetIqn: "iqn"},
+						},
+					}, nil)
+				conn, _ := net.Dial("udp", "127.0.0.1:80")
+				fsMock.On("NetDial", mock.Anything).Return(
+					conn,
+					nil,
+				)
+				res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
+				Expect(err).To(BeNil())
+				Expect(res).To(Equal(&csi.NodeGetInfoResponse{
+					NodeId: nodeSvc.nodeID,
+					AccessibleTopology: &csi.Topology{
+						Segments: map[string]string{
+							common.Name + "/" + firstValidIP + "-nfs":   "true",
+							common.Name + "/" + firstValidIP + "-nvmetcp": "true",
+							common.Name + "/" + secondValidIP + "-nfs":  "true",
+						},
+					},
+				}))
+			})
+		})
 	})
 
 	Describe("Calling NodeGetCapabilities()", func() {
@@ -3009,7 +3128,7 @@ var _ = Describe("CSINodeService", func() {
 	})
 
 	Describe("Calling getInitiators()", func() {
-		When("Only iSCSI inititators are on node", func() {
+		When("Only iSCSI initiators are on node", func() {
 			It("should succeed", func() {
 				iscsiConnectorMock.On("GetInitiatorName", mock.Anything).Return(validISCSIInitiators, nil)
 				nvmeConnectorMock.On("GetInitiatorName", mock.Anything).Return([]string{}, nil)
@@ -3023,23 +3142,39 @@ var _ = Describe("CSINodeService", func() {
 				Ω(err).To(BeNil())
 			})
 		})
-		When("Both FC ans iSCSI initiators are on node", func() {
+		When("Only NVMe initiators are on node", func() {
+			It("should succeed", func() {
+				iscsiConnectorMock.On("GetInitiatorName", mock.Anything).Return([]string{}, nil)
+				nvmeConnectorMock.On("GetInitiatorName", mock.Anything).Return(validNVMEInitiators, nil)
+				fcConnectorMock.On("GetInitiatorPorts", mock.Anything).Return([]string{}, nil)
+				iinit, fcinit, nvmeinit, err := nodeSvc.getInitiators()
+				Ω(nvmeinit).To(Equal([]string{
+					"nqn.2014-08.org.nvmexpress:uuid:02a08600-57d6-4089-8736-bf1f7326990e",
+					"nqn.2014-08.org.nvmexpress:uuid:fa363a22-1c74-44f3-9932-1c35d5cf5c4d"}))
+				Ω(iinit).To(Equal([]string{}))
+				Ω(fcinit).To(BeNil())
+				Ω(err).To(BeNil())
+			})
+		})
+		When("NVMe, FC and iSCSI initiators are on node", func() {
 			It("should succeed", func() {
 				iscsiConnectorMock.On("GetInitiatorName", mock.Anything).Return(validISCSIInitiators, nil)
-				nvmeConnectorMock.On("GetInitiatorName", mock.Anything).Return([]string{}, nil)
+				nvmeConnectorMock.On("GetInitiatorName", mock.Anything).Return(validNVMEInitiators, nil)
 				fcConnectorMock.On("GetInitiatorPorts", mock.Anything).Return(validFCTargetsWWPN, nil)
 				iinit, fcinit, nvmeinit, err := nodeSvc.getInitiators()
 				Ω(iinit).To(Equal([]string{
 					"iqn.1994-05.com.redhat:4db86abbe3c",
 					"iqn.1994-05.com.redhat:2950c9ca441b"}))
-				Ω(nvmeinit).To(Equal([]string{}))
+				Ω(nvmeinit).To(Equal([]string{
+					"nqn.2014-08.org.nvmexpress:uuid:02a08600-57d6-4089-8736-bf1f7326990e",
+					"nqn.2014-08.org.nvmexpress:uuid:fa363a22-1c74-44f3-9932-1c35d5cf5c4d"}))
 				Ω(fcinit).To(Equal([]string{
 					"58:cc:f0:93:48:a0:03:a3",
 					"58:cc:f0:93:48:a0:02:a3"}))
 				Ω(err).To(BeNil())
 			})
 		})
-		When("Neither FC nor iSCSI initiators are found on node", func() {
+		When("Neither NVMe nor FC nor iSCSI initiators are found on node", func() {
 			It("should succeed [NFS only]", func() {
 				iscsiConnectorMock.On("GetInitiatorName", mock.Anything).Return([]string{}, nil)
 				nvmeConnectorMock.On("GetInitiatorName", mock.Anything).Return([]string{}, nil)
