@@ -1001,6 +1001,7 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 					nvmefcInfo, err := common.GetNVMEFCTargetInfoFromStorage(arr.GetClient(), "")
 					if err != nil {
 						log.Errorf("couldn't get targets from the array: %s", err.Error())
+						continue
 					}
 
 					log.Infof("Discovering NVMeFC targets")
