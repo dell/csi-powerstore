@@ -118,25 +118,25 @@ func (s *Service) Init() error {
 		switch arr.BlockProtocol {
 		case common.NVMETCPTransport:
 			if len(nvmeInitiators) == 0 {
-				return fmt.Errorf("NVMeTCP transport was requested but NVMe initiator is not available")
+				log.Errorf("NVMeTCP transport was requested but NVMe initiator is not available")
 			}
 			s.useNVME = true
 			s.useFC = false
 		case common.NVMEFCTransport:
 			if len(nvmeInitiators) == 0 {
-				return fmt.Errorf("NVMeFC transport was requested but NVMe initiator is not available")
+				log.Errorf("NVMeFC transport was requested but NVMe initiator is not available")
 			}
 			s.useNVME = true
 			s.useFC = true
 		case common.ISCSITransport:
 			if len(iscsiInitiators) == 0 {
-				return fmt.Errorf("iSCSI transport was requested but iSCSI initiator is not available")
+				log.Errorf("iSCSI transport was requested but iSCSI initiator is not available")
 			}
 			s.useNVME = false
 			s.useFC = false
 		case common.FcTransport:
 			if len(fcInitiators) == 0 {
-				return fmt.Errorf("FC transport was requested but FC initiator is not available")
+				log.Errorf("FC transport was requested but FC initiator is not available")
 			}
 			s.useNVME = false
 			s.useFC = true
