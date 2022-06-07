@@ -154,7 +154,7 @@ func TestValidateAndSetNfsACLs_Fail_InvalidAcls(t *testing.T) {
 
 	clientMock.On("GetNASByName", mock.Anything, validNasName).Return(gopowerstore.NAS{ID: validNasID, NfsServers: nfsServers}, nil)
 	clientMock.On("GetNfsServer", mock.Anything, mock.Anything).Return(gopowerstore.NFSServerInstance{Id: validNfsServerID, IsNFSv4Enabled: true}, nil)
-	nfsv4ACLsMock.On("setNfsv4Acls", mock.Anything, mock.Anything).Return(nil)
+	nfsv4ACLsMock.On("SetNfsv4Acls", mock.Anything, mock.Anything).Return(nil)
 
 	aclConfigured, err := validateAndSetACLs(context.Background(), nfsv4ACLsMock, validNasName, clientMock, "abcd", "dir1")
 
@@ -176,7 +176,7 @@ func TestValidateAndSetNfsACLs_Fail_GetNfsServerFail(t *testing.T) {
 
 	clientMock.On("GetNASByName", mock.Anything, validNasName).Return(gopowerstore.NAS{ID: validNasID, NfsServers: nfsServers}, nil)
 	clientMock.On("GetNfsServer", mock.Anything, mock.Anything).Return(gopowerstore.NFSServerInstance{Id: validNfsServerID, IsNFSv4Enabled: true}, errors.New("GetNfsServer_fail"))
-	nfsv4ACLsMock.On("setNfsv4Acls", mock.Anything, mock.Anything).Return(nil)
+	nfsv4ACLsMock.On("SetNfsv4Acls", mock.Anything, mock.Anything).Return(nil)
 
 	aclConfigured, err := validateAndSetACLs(context.Background(), nfsv4ACLsMock, validNasName, clientMock, "A::OWNER@:RWX", "dir1")
 
