@@ -32,6 +32,7 @@ import (
 	"github.com/dell/csi-powerstore/pkg/common"
 	"github.com/dell/csi-powerstore/pkg/common/fs"
 	commonext "github.com/dell/dell-csi-extensions/common"
+	migext "github.com/dell/dell-csi-extensions/migration"
 	csiext "github.com/dell/dell-csi-extensions/replication"
 	vgsext "github.com/dell/dell-csi-extensions/volumeGroupSnapshot"
 	csictx "github.com/dell/gocsi/context"
@@ -1144,6 +1145,7 @@ func (s *Service) ControllerGetVolume(ctx context.Context, req *csi.ControllerGe
 func (s *Service) RegisterAdditionalServers(server *grpc.Server) {
 	csiext.RegisterReplicationServer(server, s)
 	vgsext.RegisterVolumeGroupSnapshotServer(server, s)
+	migext.RegisterMigrationServer(server, s)
 }
 
 // ProbeController probes the controller service

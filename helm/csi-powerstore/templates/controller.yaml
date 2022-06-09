@@ -259,6 +259,34 @@ spec:
               mountPath: /powerstore-config-params
         {{- end }}
         {{- end }}
+        {{- if hasKey .Values.controller "migration" }}
+        {{- if eq .Values.controller.migration.enabled true }}
+        - name: dell-csi-migrator
+          image: {{ required "Must provide the Dell CSI Migrator image." .Values.controller.migration.image }}
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
+          args:
+            - "--csi-address=$(ADDRESS)"
+            - "--leader-election=true"
+            - "--worker-threads=2"
+            - "--retry-interval-start=1s"
+            - "--retry-interval-max=300s"
+            - "--timeout=300s"
+            - "--repl-prefix={{ .Values.controller.replication.replicationPrefix }}"
+            - "--prefix={{ .Values.controller.migration.migrationPrefix }}"
+          env:
+            - name: ADDRESS
+              value: /var/run/csi/csi.sock
+            - name: X_CSI_REPLICATION_CONFIG_DIR
+              value: /powerstore-config-params
+            - name: X_CSI_REPLICATION_CONFIG_FILE_NAME
+              value: driver-config-params.yaml
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /var/run/csi
+            - name: powerstore-config-params
+              mountPath: /powerstore-config-params
+        {{- end }}
+        {{- end }}
         {{- if hasKey .Values.controller "healthMonitor" }}
         {{- if eq .Values.controller.healthMonitor.enabled true}}
         - name: csi-external-health-monitor-controller
@@ -335,6 +363,8 @@ spec:
               value: "{{ .Values.controller.healthMonitor.enabled }}"
             {{- end }}
             {{- end }}
+            - name: X_CSI_MIGRATION_PREFIX
+              value: {{ .Values.controller.migration.migrationPrefix | default "migration.storage.dell.com" }}
             - name: GOPOWERSTORE_DEBUG
               value: "true"
           volumeMounts:

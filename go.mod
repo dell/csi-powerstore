@@ -7,7 +7,8 @@ require (
 	github.com/container-storage-interface/spec v1.5.0
 	github.com/dell/csi-metadata-retriever v0.0.0-20220525055110-3e096f5725fe
 	github.com/dell/dell-csi-extensions/common v1.0.1-0.20220526070836-43b4ac597bf3
-	github.com/dell/dell-csi-extensions/replication v1.1.1-0.20220526070836-43b4ac597bf3
+	github.com/dell/dell-csi-extensions/migration v1.0.1
+	github.com/dell/dell-csi-extensions/replication v1.2.1
 	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.1.1-0.20220526070836-43b4ac597bf3
 	github.com/dell/gobrick v1.3.1-0.20220601062320-bf912dc80f24
 	github.com/dell/gocsi v1.5.2-0.20220525142554-48ff29a07e1e

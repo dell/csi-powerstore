@@ -138,6 +138,21 @@ controller:
     # Default value: replication.storage.dell.com
     replicationPrefix: "replication.storage.dell.com"
 
+  # migration: allows to configure volume migration
+  # Allowed values:
+  #   "true" - migration is enabled
+  #   "false" - migration is disabled
+  # Default value: "false"
+  migration:
+    enabled: false
+    # Change this to use any specific version of the dell-csi-migrator sidecar
+    # Default value: None
+    image: dellemc/dell-csi-migrator:v1.3.0
+    # migrationPrefix: Determine if migration is enabled
+    # Default value: "migration.storage.dell.com"
+    # Examples: "migration.storage.dell.com"
+    migrationPrefix: "migration.storage.dell.com"
+
   # nodeSelector: Define node selection constraints for controller pods.
   # For the pod to be eligible to run on a node, the node must have each
   # of the indicated key-value pairs as labels.
