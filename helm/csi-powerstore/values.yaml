@@ -74,7 +74,7 @@ controller:
     # image: Image to use for volume-group-snapshotter. This shouldn't be changed
     # Allowed values: string
     # Default value: dellemc/csi-volumegroup-snapshotter:v1.0.0
-    image: dellemc/csi-volumegroup-snapshotter:v1.0.0
+    image: dellemc/csi-volumegroup-snapshotter:v1.1.0
 
   # snapshot: allows to enable/disable snapshot feature
   # snapshot CRDs needs to be installed before enabling this feature
