@@ -91,7 +91,7 @@ spec:
             capabilities:
               add: ["SYS_ADMIN"]
             allowPrivilegeEscalation: true
-          image: {{ required "Must provide the PowerStore driver container image." .Values.images.driver }}
+          image: {{ required "Must provide the Powerstore driver image repository." .Values.images.driverRepository }}/{{ .Chart.Name }}:{{ .Values.version }}
           imagePullPolicy: {{ .Values.imagePullPolicy }}
           command: [ "/csi-powerstore" ]
           env:
@@ -170,7 +170,7 @@ spec:
             - name: powerstore-config-params
               mountPath: /powerstore-config-params
         - name: registrar
-          image: {{ required "Must provide the CSI node registrar container image." .Values.images.registrar }}
+          image: {{ required "Must provide the CSI node registrar container image." ( include "csi-powerstore.registrarImage" . ) }}
           imagePullPolicy: {{ .Values.imagePullPolicy }}
           args:
             - "--v=5"
