@@ -39,7 +39,7 @@ If you want to use NFS be sure to enable it in `myvalues.yaml` or in your storag
 
 If you want to use NVMe/TCP be sure that the `nvme-cli` package is installed on your node.
 
-If you want to use NVMe/FC be sure that the NVMeFC Zoning of the Host Bus Adapters to the Fibre Channel port is done.
+If you want to use NVMe/FC be sure that the NVMeFC zoning of the Host Bus Adapters to the Fibre Channel port is done.
 
 ## Driver Installation
 Please consult the [Installation Guide](https://dell.github.io/csm-docs/docs/csidriver/installation)
