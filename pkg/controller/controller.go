@@ -65,6 +65,7 @@ type Service struct {
 	replicationContextPrefix string
 	replicationPrefix        string
 	isHealthMonitorEnabled   bool
+	isAutoRoundOffFsSizeEnabled bool
 
 	K8sVisibilityAutoRegistration bool
 }
@@ -93,6 +94,11 @@ func (s *Service) Init() error {
 		if nfsAcls != "" {
 			s.nfsAcls = nfsAcls
 		}
+	}
+
+	if isAutoRoundOffFsSizeEnabled, ok := csictx.LookupEnv(ctx, common.EnvAllowAutoRoundOffFilesystemSize); ok {
+		log.Warn("Auto round off Filesystem size has been enabled! This will round off NFS PVC size to 3Gi when the requested size is less than 3Gi.")
+		s.isAutoRoundOffFsSizeEnabled, _ = strconv.ParseBool(isAutoRoundOffFsSizeEnabled)
 	}
 
 	if isk8sVisibilityAutoRegistrationEnabled, ok := csictx.LookupEnv(ctx, common.EnvK8sVisibilityAutoRegistration); ok {
@@ -179,7 +185,7 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 		return nil, err
 	}
 
-	sizeInBytes, err := creator.CheckSize(ctx, req.GetCapacityRange())
+	sizeInBytes, err := creator.CheckSize(ctx, req.GetCapacityRange(), s.isAutoRoundOffFsSizeEnabled)
 	if err != nil {
 		return nil, err
 	}

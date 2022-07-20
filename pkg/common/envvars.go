@@ -95,4 +95,7 @@ const (
 
 	// EnvMetadataRetrieverEndpoint specifies the endpoint address for csi-metadata-retriever sidecar
 	EnvMetadataRetrieverEndpoint = "CSI_RETRIEVER_ENDPOINT"
+
+	// EnvAllowAutoRoundOffFilesystemSize specifies if auto round off minimum filesystem size is enabled
+	EnvAllowAutoRoundOffFilesystemSize = "CSI_AUTO_ROUND_OFF_FILESYSTEM_SIZE"
 )
