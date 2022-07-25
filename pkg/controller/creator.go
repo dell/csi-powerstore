@@ -52,7 +52,7 @@ const (
 // VolumeCreator allows to call Create and similar operations used in CreateVolume call
 type VolumeCreator interface {
 	// CheckSize validates that size is correct and returns size in bytes
-	CheckSize(ctx context.Context, cr *csi.CapacityRange, bool isAutoRoundOffFsSizeEnabled) (int64, error)
+	CheckSize(ctx context.Context, cr *csi.CapacityRange, isAutoRoundOffFsSizeEnabled bool) (int64, error)
 	// CheckName validates volume name
 	CheckName(ctx context.Context, name string) error
 	// CheckIfAlreadyExists queries storage array if given volume already exists
@@ -181,7 +181,7 @@ func setNFSCreateAttributes(reqParams map[string]string, createParams *gopowerst
 }
 
 // CheckSize validates that size is correct and returns size in bytes
-func (*SCSICreator) CheckSize(ctx context.Context, cr *csi.CapacityRange, bool isAutoRoundOffFsSizeEnabled) (int64, error) {
+func (*SCSICreator) CheckSize(ctx context.Context, cr *csi.CapacityRange, isAutoRoundOffFsSizeEnabled bool) (int64, error) {
 	minSize := cr.GetRequiredBytes()
 	maxSize := cr.GetLimitBytes()
 
@@ -371,7 +371,7 @@ type NfsCreator struct {
 }
 
 // CheckSize validates that size is correct and returns size in bytes
-func (*NfsCreator) CheckSize(ctx context.Context, cr *csi.CapacityRange, , bool isAutoRoundOffFsSizeEnabled) (int64, error) {
+func (*NfsCreator) CheckSize(ctx context.Context, cr *csi.CapacityRange, isAutoRoundOffFsSizeEnabled bool) (int64, error) {
 	minSize := cr.GetRequiredBytes()
 	maxSize := cr.GetLimitBytes()
 
