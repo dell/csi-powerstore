@@ -17,7 +17,8 @@ function verify-csi-powerstore() {
   verify_alpha_snap_resources
   verify_optional_replication_requirements
   verify_iscsi_installation
-  verify_nvme_installation
+  verify_nvmetcp_installation
+  verify_nvmefc_installation
   verify_helm_3
 }
 
