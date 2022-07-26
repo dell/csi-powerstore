@@ -17,7 +17,7 @@ parameters:
   #   xfs: XFS filesystem type
   #   nfs: NFS filesystem
   # Optional: true
-  # Default value: ext4
+  # Default value: None
   FsType: "nfs"
 
   # nasName: NAS server's name. If not specified, value from secret.yaml will be used
