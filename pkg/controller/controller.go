@@ -62,9 +62,9 @@ type Service struct {
 
 	array.Locker
 
-	replicationContextPrefix string
-	replicationPrefix        string
-	isHealthMonitorEnabled   bool
+	replicationContextPrefix    string
+	replicationPrefix           string
+	isHealthMonitorEnabled      bool
 	isAutoRoundOffFsSizeEnabled bool
 
 	K8sVisibilityAutoRegistration bool
