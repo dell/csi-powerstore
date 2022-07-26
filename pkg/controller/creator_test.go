@@ -40,7 +40,7 @@ func TestVolumeCreator_CheckSize(t *testing.T) {
 				LimitBytes:    0,
 			}
 
-			res, err := sc.CheckSize(context.Background(), cr)
+			res, err := sc.CheckSize(context.Background(), cr, false)
 			assert.NoError(t, err)
 			assert.Equal(t, res, int64(controller.MinVolumeSizeBytes))
 		})
@@ -51,7 +51,7 @@ func TestVolumeCreator_CheckSize(t *testing.T) {
 				LimitBytes:    0,
 			}
 
-			res, err := sc.CheckSize(context.Background(), cr)
+			res, err := sc.CheckSize(context.Background(), cr, false)
 			assert.NoError(t, err)
 			assert.Equal(t, res, int64(controller.MinVolumeSizeBytes+controller.VolumeSizeMultiple))
 		})
@@ -65,7 +65,7 @@ func TestVolumeCreator_CheckSize(t *testing.T) {
 				LimitBytes:    0,
 			}
 
-			res, err := nc.CheckSize(context.Background(), cr)
+			res, err := nc.CheckSize(context.Background(), cr, false)
 			assert.NoError(t, err)
 			assert.Equal(t, res, int64(controller.MinVolumeSizeBytes))
 		})
@@ -76,7 +76,7 @@ func TestVolumeCreator_CheckSize(t *testing.T) {
 				LimitBytes:    0,
 			}
 
-			res, err := nc.CheckSize(context.Background(), cr)
+			res, err := nc.CheckSize(context.Background(), cr, false)
 			assert.NoError(t, err)
 			assert.Equal(t, res, int64(controller.MinVolumeSizeBytes+controller.VolumeSizeMultiple))
 		})
