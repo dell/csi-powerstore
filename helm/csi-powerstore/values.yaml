@@ -242,6 +242,9 @@ logFormat: "JSON"
 # Following modes are supported: None, File and ReadWriteOnceWithFSType
 fsGroupPolicy: ReadWriteOnceWithFSType
 
+# Allows the controller to round off filesystem to 3Gi which is the minimum supported value
+allowAutoRoundOffFilesystemSize: false
+
 images:
   # "driver" defines the container image, used for the driver container.
   driverRepository: dellemc

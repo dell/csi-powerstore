@@ -52,7 +52,7 @@ const (
 // VolumeCreator allows to call Create and similar operations used in CreateVolume call
 type VolumeCreator interface {
 	// CheckSize validates that size is correct and returns size in bytes
-	CheckSize(ctx context.Context, cr *csi.CapacityRange) (int64, error)
+	CheckSize(ctx context.Context, cr *csi.CapacityRange, isAutoRoundOffFsSizeEnabled bool) (int64, error)
 	// CheckName validates volume name
 	CheckName(ctx context.Context, name string) error
 	// CheckIfAlreadyExists queries storage array if given volume already exists
@@ -181,7 +181,7 @@ func setNFSCreateAttributes(reqParams map[string]string, createParams *gopowerst
 }
 
 // CheckSize validates that size is correct and returns size in bytes
-func (*SCSICreator) CheckSize(ctx context.Context, cr *csi.CapacityRange) (int64, error) {
+func (*SCSICreator) CheckSize(ctx context.Context, cr *csi.CapacityRange, isAutoRoundOffFsSizeEnabled bool) (int64, error) {
 	minSize := cr.GetRequiredBytes()
 	maxSize := cr.GetLimitBytes()
 
@@ -371,7 +371,7 @@ type NfsCreator struct {
 }
 
 // CheckSize validates that size is correct and returns size in bytes
-func (*NfsCreator) CheckSize(ctx context.Context, cr *csi.CapacityRange) (int64, error) {
+func (*NfsCreator) CheckSize(ctx context.Context, cr *csi.CapacityRange, isAutoRoundOffFsSizeEnabled bool) (int64, error) {
 	minSize := cr.GetRequiredBytes()
 	maxSize := cr.GetLimitBytes()
 
@@ -385,6 +385,12 @@ func (*NfsCreator) CheckSize(ctx context.Context, cr *csi.CapacityRange) (int64,
 	mod := minSize % VolumeSizeMultiple
 	if mod > 0 {
 		minSize = minSize + VolumeSizeMultiple - mod
+	}
+
+	//TODO: This roundoff logic to be removed once platform supports minimum filesystem size
+	if isAutoRoundOffFsSizeEnabled && minSize < MinFilesystemSizeBytes {
+		log.Warn("Auto round off Filesystem size has been enabled! Rounding off PVC size to 3Gi.")
+		return MinFilesystemSizeBytes, nil
 	}
 
 	if err := volumeSizeValidation(minSize, maxSize); err != nil {

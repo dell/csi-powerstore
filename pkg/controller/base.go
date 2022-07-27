@@ -32,6 +32,8 @@ import (
 const (
 	// MinVolumeSizeBytes is minimal size for volume creation on PowerStore
 	MinVolumeSizeBytes = 1048576
+	// MinFilesystemSizeBytes is minimal size for Filesystem creation on PowerStore - 1.5Gi
+	MinFilesystemSizeBytes = 1610612736
 	// MaxVolumeSizeBytes is maximum size for volume creation on PowerStore
 	MaxVolumeSizeBytes = 1099511627776 * 256 // 256 TB
 	// VolumeSizeMultiple multiplier for volumes
