@@ -30,6 +30,8 @@ import (
 	"github.com/dell/csi-powerstore/pkg/common"
 	"github.com/dell/csi-powerstore/pkg/common/fs"
 	"github.com/dell/gofsutil"
+	"github.com/dell/gopowerstore"
+	gopowerstoremock "github.com/dell/gopowerstore/mocks"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -189,4 +191,279 @@ func TestLocker_UpdateArrays(t *testing.T) {
 	err := lck.UpdateArrays("./testdata/one-arr.yaml", &fs.Fs{Util: &gofsutil.FS{}})
 	assert.NoError(t, err)
 	assert.Equal(t, lck.DefaultArray().Endpoint, "https://127.0.0.1/api/rest")
+}
+
+func TestLocker_RegisterK8sCluster_Success(t *testing.T) {
+	lck := array.Locker{}
+	lck.UpdateArrays("./testdata/one-arr.yaml", &fs.Fs{Util: &gofsutil.FS{}})
+
+	path := "/etc/kubernetes/kubelet.conf"
+	fsMock := new(mocks.FsInterface)
+	fsMock.On("ReadFile", path).Return([]byte(`
+apiVersion: v1
+clusters:
+- cluster:
+    certificate-authority-data: certficate-authority-data
+    server: https://127.0.0.1:6443
+  name: kubernetes-cluster1
+contexts:
+- context:
+    cluster: kubernetes-cluster1
+    user: kubernetes-user
+  name: kubernetes-user@kubernetes
+current-context: kubernetes-user@kubernetes
+kind: Config
+preferences: {}
+users:
+- name: kubernetes-user
+  user:`), nil)
+
+	path = "/powerstore-visibility/token"
+	fsMock.On("ReadFile", path).Return([]byte("powerstore-visibility-token"), nil)
+
+	gopowerstoreClientMock := new(gopowerstoremock.Client)
+	lck.Arrays()["gid1"].Client = gopowerstoreClientMock
+	gopowerstoreClientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(4.0), nil)
+
+	gopowerstoreClientMock.On("RegisterK8sCluster", context.Background(), &gopowerstore.K8sCluster{
+		Name:      "kubernetes-cluster1",
+		IPAddress: "127.0.0.1",
+		Port:      6443,
+		Token:     "powerstore-visibility-token",
+	}).Return(gopowerstore.CreateResponse{ID: "valid-cluster-id"}, nil)
+
+	assert.Equal(t, lck.RegisterK8sCluster(fsMock), nil)
+}
+
+func TestLocker_RegisterK8sCluster_3_0_Array(t *testing.T) {
+	lck := array.Locker{}
+	lck.UpdateArrays("./testdata/one-arr.yaml", &fs.Fs{Util: &gofsutil.FS{}})
+
+	path := "/etc/kubernetes/kubelet.conf"
+	fsMock := new(mocks.FsInterface)
+	fsMock.On("ReadFile", path).Return([]byte(`
+apiVersion: v1
+clusters:
+- cluster:
+    certificate-authority-data: certficate-authority-data
+    server: https://127.0.0.1:6443
+  name: kubernetes-cluster1
+contexts:
+- context:
+    cluster: kubernetes-cluster1
+    user: kubernetes-user
+  name: kubernetes-user@kubernetes
+current-context: kubernetes-user@kubernetes
+kind: Config
+preferences: {}
+users:
+- name: kubernetes-user
+  user:`), nil)
+
+	path = "/powerstore-visibility/token"
+	fsMock.On("ReadFile", path).Return([]byte("powerstore-visibility-token"), nil)
+
+	gopowerstoreClientMock := new(gopowerstoremock.Client)
+	lck.Arrays()["gid1"].Client = gopowerstoreClientMock
+	gopowerstoreClientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
+
+	gopowerstoreClientMock.On("RegisterK8sCluster", context.Background(), &gopowerstore.K8sCluster{
+		Name:      "kubernetes-cluster1",
+		IPAddress: "127.0.0.1",
+		Port:      6443,
+		Token:     "powerstore-visibility-token",
+	}).Return(gopowerstore.CreateResponse{ID: "valid-cluster-id"}, nil)
+
+	assert.Equal(t, lck.RegisterK8sCluster(fsMock), nil)
+}
+
+func TestLocker_RegisterK8sCluster_Success_2(t *testing.T) {
+	lck := array.Locker{}
+	lck.UpdateArrays("./testdata/one-arr.yaml", &fs.Fs{Util: &gofsutil.FS{}})
+
+	path := "/etc/kubernetes/kubelet.conf"
+	fsMock := new(mocks.FsInterface)
+	fsMock.On("ReadFile", path).Return([]byte("invalid-yaml"), gopowerstore.NewAPIError())
+
+	path = "/etc/kubernetes/admin.conf"
+	fsMock.On("ReadFile", path).Return([]byte(`
+apiVersion: v1
+clusters:
+- cluster:
+    certificate-authority-data: certficate-authority-data
+    server: https://127.0.0.1:6443
+  name: kubernetes-cluster1
+contexts:
+- context:
+    cluster: kubernetes-cluster1
+    user: kubernetes-user
+  name: kubernetes-user@kubernetes
+current-context: kubernetes-user@kubernetes
+kind: Config
+preferences: {}
+users:
+- name: kubernetes-user
+  user:`), nil)
+
+	path = "/powerstore-visibility/token"
+	fsMock.On("ReadFile", path).Return([]byte("powerstore-visibility-token"), nil)
+
+	gopowerstoreClientMock := new(gopowerstoremock.Client)
+	lck.Arrays()["gid1"].Client = gopowerstoreClientMock
+	gopowerstoreClientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(4.0), nil)
+
+	gopowerstoreClientMock.On("RegisterK8sCluster", context.Background(), &gopowerstore.K8sCluster{
+		Name:      "kubernetes-cluster1",
+		IPAddress: "127.0.0.1",
+		Port:      6443,
+		Token:     "powerstore-visibility-token",
+	}).Return(gopowerstore.CreateResponse{ID: "valid-cluster-id"}, nil)
+
+	assert.Equal(t, lck.RegisterK8sCluster(fsMock), nil)
+}
+
+func TestLocker_RegisterK8sCluster_Failure(t *testing.T) {
+	lck := array.Locker{}
+	lck.UpdateArrays("./testdata/one-arr.yaml", &fs.Fs{Util: &gofsutil.FS{}})
+
+	path := "/etc/kubernetes/kubelet.conf"
+	fsMock := new(mocks.FsInterface)
+	fsMock.On("ReadFile", path).Return([]byte("invalid-yaml-content"), nil)
+
+	gopowerstoreClientMock := new(gopowerstoremock.Client)
+	lck.Arrays()["gid1"].Client = gopowerstoreClientMock
+	gopowerstoreClientMock.On("RegisterK8sCluster", context.Background(), &gopowerstore.K8sCluster{
+		Name:      "kubernetes-cluster1",
+		IPAddress: "127.0.0.1",
+		Port:      6443,
+		Token:     "powerstore-visibility-token",
+	}).Return(nil, nil)
+
+	assert.NotEqual(t, lck.RegisterK8sCluster(fsMock), nil)
+}
+
+func TestLocker_RegisterK8sCluster_Version_API_Failure(t *testing.T) {
+	lck := array.Locker{}
+	lck.UpdateArrays("./testdata/one-arr.yaml", &fs.Fs{Util: &gofsutil.FS{}})
+
+	path := "/etc/kubernetes/kubelet.conf"
+	fsMock := new(mocks.FsInterface)
+	fsMock.On("ReadFile", path).Return([]byte(`
+apiVersion: v1
+clusters:
+- cluster:
+    certificate-authority-data: certficate-authority-data
+    server: https://127.0.0.1:6443
+  name: kubernetes-cluster1
+contexts:
+- context:
+    cluster: kubernetes-cluster1
+    user: kubernetes-user
+  name: kubernetes-user@kubernetes
+current-context: kubernetes-user@kubernetes
+kind: Config
+preferences: {}
+users:
+- name: kubernetes-user
+  user:`), nil)
+
+	path = "/powerstore-visibility/token"
+	fsMock.On("ReadFile", path).Return([]byte("powerstore-visibility-token"), nil)
+
+	gopowerstoreClientMock := new(gopowerstoremock.Client)
+	lck.Arrays()["gid1"].Client = gopowerstoreClientMock
+	gopowerstoreClientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), gopowerstore.NewAPIError())
+
+	gopowerstoreClientMock.On("RegisterK8sCluster", context.Background(), &gopowerstore.K8sCluster{
+		Name:      "kubernetes-cluster1",
+		IPAddress: "127.0.0.1",
+		Port:      6443,
+		Token:     "powerstore-visibility-token",
+	}).Return(nil, nil)
+
+	assert.Equal(t, lck.RegisterK8sCluster(fsMock), nil)
+}
+
+func TestLocker_RegisterK8sCluster_Invalid_Yaml_Failure(t *testing.T) {
+	lck := array.Locker{}
+	lck.UpdateArrays("./testdata/one-arr.yaml", &fs.Fs{Util: &gofsutil.FS{}})
+
+	path := "/etc/kubernetes/kubelet.conf"
+	fsMock := new(mocks.FsInterface)
+	fsMock.On("ReadFile", path).Return([]byte(`
+apiVersion: v1
+clusters:
+- cluster:
+    certificate-authority-data: certficate-authority-data
+    server: https://127.0.0.1
+  name: kubernetes-cluster1
+contexts:
+- context:
+    cluster: kubernetes-cluster1
+    user: kubernetes-user
+  name: kubernetes-user@kubernetes
+current-context: kubernetes-user@kubernetes
+kind: Config
+preferences: {}
+users:
+- name: kubernetes-user
+  user:`), nil)
+
+	path = "/powerstore-visibility/token"
+	fsMock.On("ReadFile", path).Return([]byte("powerstore-visibility-token"), nil)
+
+	gopowerstoreClientMock := new(gopowerstoremock.Client)
+	lck.Arrays()["gid1"].Client = gopowerstoreClientMock
+	gopowerstoreClientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), gopowerstore.NewAPIError())
+
+	gopowerstoreClientMock.On("RegisterK8sCluster", context.Background(), &gopowerstore.K8sCluster{
+		Name:      "kubernetes-cluster1",
+		IPAddress: "127.0.0.1",
+		Port:      6443,
+		Token:     "powerstore-visibility-token",
+	}).Return(nil, nil)
+
+	assert.Equal(t, lck.RegisterK8sCluster(fsMock), nil)
+}
+
+func TestLocker_RegisterK8sCluster_Invalid_Port_Failure(t *testing.T) {
+	lck := array.Locker{}
+	lck.UpdateArrays("./testdata/one-arr.yaml", &fs.Fs{Util: &gofsutil.FS{}})
+
+	path := "/etc/kubernetes/kubelet.conf"
+	fsMock := new(mocks.FsInterface)
+	fsMock.On("ReadFile", path).Return([]byte(`
+apiVersion: v1
+clusters:
+- cluster:
+    certificate-authority-data: certficate-authority-data
+    server: https://127.0.0.1:ab
+  name: kubernetes-cluster1
+contexts:
+- context:
+    cluster: kubernetes-cluster1
+    user: kubernetes-user
+  name: kubernetes-user@kubernetes
+current-context: kubernetes-user@kubernetes
+kind: Config
+preferences: {}
+users:
+- name: kubernetes-user
+  user:`), nil)
+
+	path = "/powerstore-visibility/token"
+	fsMock.On("ReadFile", path).Return([]byte("powerstore-visibility-token"), nil)
+
+	gopowerstoreClientMock := new(gopowerstoremock.Client)
+	lck.Arrays()["gid1"].Client = gopowerstoreClientMock
+	gopowerstoreClientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), gopowerstore.NewAPIError())
+
+	gopowerstoreClientMock.On("RegisterK8sCluster", context.Background(), &gopowerstore.K8sCluster{
+		Name:      "kubernetes-cluster1",
+		IPAddress: "127.0.0.1",
+		Port:      6443,
+		Token:     "powerstore-visibility-token",
+	}).Return(nil, nil)
+
+	assert.Equal(t, lck.RegisterK8sCluster(fsMock), nil)
 }

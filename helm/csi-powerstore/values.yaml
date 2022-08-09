@@ -6,6 +6,9 @@
 # Default value: None
 driverName: "csi-powerstore.dellemc.com"
 
+# Driver version required to pull the latest driver image
+version: "v2.4.0"
+
 # Specify kubelet config dir path.
 # Ensure that the config.yaml file is present at this path.
 # Default value: None
@@ -62,7 +65,22 @@ controller:
   # Default value: None
   volumeNamePrefix: csivol
 
+  # vgsnapshot: allows to configure volume-group-snapshot
+  # volume-group-snapshot CRDs must be installed before installing driver
+  vgsnapshot:
+    # enabled: Enable/Disable volume-group-snapshot feature
+    # Allowed values:
+    #   true: enable volume-group-snapshot feature(install vg-snapshotter sidecar)
+    #   false: disable volume-group-snapshot feature(do not install vg-snapshotter sidecar)
+    # Default value: false
+    enabled: false
+    # image: Image to use for volume-group-snapshotter. This shouldn't be changed
+    # Allowed values: string
+    # Default value: dellemc/csi-volumegroup-snapshotter:v1.1.0
+    image: dellemc/csi-volumegroup-snapshotter:v1.1.0
+
   # snapshot: allows to enable/disable snapshot feature
+  # snapshot CRDs needs to be installed before enabling this feature
   snapshot:
     # enabled: Enable/Disable volume snapshot feature
     # Allowed values:
@@ -75,14 +93,13 @@ controller:
     # Allowed values: string
     # Default value: None
     snapNamePrefix: csisnap
-
   # resizer: allows to enable/disable resizer feature
   resizer:
     # enabled: Enable/Disable volume expansion feature
     # Allowed values:
     #   true: enable volume expansion feature(install resizer sidecar)
     #   false: disable volume expansion feature(do not install resizer sidecar)
-    # Default value: None
+    # Default value: true
     enabled: true
 
   healthMonitor:
@@ -90,7 +107,7 @@ controller:
     # Allowed values:
     #   true: enable checking of health condition of CSI volumes
     #   false: disable checking of health condition of CSI volumes
-    # Default value: None
+    # Default value: false
     enabled: false
 
     # healthMonitorInterval: Interval of monitoring volume health condition
@@ -112,7 +129,7 @@ controller:
     # image: Image to use for dell-csi-replicator. This shouldn't be changed
     # Allowed values: string
     # Default value: None
-    image: dellemc/dell-csi-replicator:v1.2.0
+    image: dellemc/dell-csi-replicator:v1.3.0
 
     # replicationContextPrefix: prefix to use for naming of resources created by replication feature
     # Allowed values: string
@@ -124,24 +141,34 @@ controller:
     # Default value: replication.storage.dell.com
     replicationPrefix: "replication.storage.dell.com"
 
+  # Image for csi-metadata-retriever
+  metadataretriever: dellemc/csi-metadata-retriever:v1.0.0
+
   # nodeSelector: Define node selection constraints for controller pods.
   # For the pod to be eligible to run on a node, the node must have each
   # of the indicated key-value pairs as labels.
   # Leave as blank to consider all nodes
   # Allowed values: map of key-value pairs
   # Default value: None
-  # Examples:
-  #   node-role.kubernetes.io/master: ""
   nodeSelector:
-  #   node-role.kubernetes.io/master: ""
+  # Uncomment if nodes you wish to use have the node-role.kubernetes.io/master taint
+  #  node-role.kubernetes.io/master
+  # Uncomment if nodes you wish to use have the node-role.kubernetes.io/control-plane taint
+  #  node-role.kubernetes.io/control-plane
 
   # tolerations: Define tolerations for the controllers, if required.
   # Leave as blank to install controller on worker nodes
   # Default value: None
   tolerations:
-  #  - key: "node-role.kubernetes.io/master"
-  #    operator: "Exists"
-  #    effect: "NoSchedule"
+  # Uncomment if nodes you wish to use have the node-role.kubernetes.io/master taint
+  # - key: "node-role.kubernetes.io/master"
+  #   operator: "Exists"
+  #   effect: "NoSchedule"
+  # Uncomment if nodes you wish to use have the node-role.kubernetes.io/control-plane taint
+  # tolerations:
+  # - key: "node-role.kubernetes.io/control-plane"
+  #   operator: "Exists"
+  #   effect: "NoSchedule"
 
 # node: configure node pod specific parameters
 node:
@@ -169,18 +196,25 @@ node:
   # Leave as blank to consider all nodes
   # Allowed values: map of key-value pairs
   # Default value: None
-  # Examples:
-  #   node-role.kubernetes.io/master: ""
   nodeSelector:
-  #   node-role.kubernetes.io/master: ""
+  # Uncomment if nodes you wish to use have the node-role.kubernetes.io/master taint
+  #  node-role.kubernetes.io/master
+  # Uncomment if nodes you wish to use have the node-role.kubernetes.io/control-plane taint
+  #  node-role.kubernetes.io/control-plane
 
   # tolerations: Define tolerations for the node pods, if required.
   # Leave as blank to consider all worker nodes
   # Default value: None
   tolerations:
-  #  - key: "node-role.kubernetes.io/master"
-  #    operator: "Exists"
-  #    effect: "NoSchedule"
+  # Uncomment if nodes you wish to use have the node-role.kubernetes.io/master taint
+  # - key: "node-role.kubernetes.io/master"
+  #   operator: "Exists"
+  #   effect: "NoSchedule"
+  # Uncomment if nodes you wish to use have the node-role.kubernetes.io/control-plane taint
+  # tolerations:
+  # - key: "node-role.kubernetes.io/control-plane"
+  #   operator: "Exists"
+  #   effect: "NoSchedule"
 
 ## PLATFORM ATTRIBUTES
 ######################
@@ -207,3 +241,10 @@ logFormat: "JSON"
 
 # Following modes are supported: None, File and ReadWriteOnceWithFSType
 fsGroupPolicy: ReadWriteOnceWithFSType
+
+# Allows the controller to round off filesystem to 3Gi which is the minimum supported value
+allowAutoRoundOffFilesystemSize: false
+
+images:
+  # "driver" defines the container image, used for the driver container.
+  driverRepository: dellemc

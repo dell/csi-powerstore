@@ -84,6 +84,11 @@ func (sp *SCSIPublisher) publishMount(ctx context.Context, logFields log.Fields,
 		return nil, status.Error(codes.Unimplemented, "Mount volumes do not support AccessMode MULTI_NODE_MULTI_WRITER")
 	}
 
+	if cap.GetAccessMode().GetMode() == csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY {
+		// Warning in case of MULTI_NODE_READER_ONLY for mount volumes
+		log.Warningf("Mount volume with the AccessMode ReadOnlyMany")
+	}
+
 	var opts []string
 	mountCap := cap.GetMount()
 	mountFsType := mountCap.GetFsType()

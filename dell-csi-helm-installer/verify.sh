@@ -96,7 +96,7 @@ function header() {
 }
 
 # Check if the NVMe client is installed
-function verify_nvme_installation() {
+function verify_nvmetcp_installation() {
   if [ ${NODE_VERIFY} -eq 0 ]; then
     return
   fi
@@ -116,13 +116,40 @@ function verify_nvme_installation() {
     rv=$?
     if [ $rv -ne 0 ]; then
       error=1
-      found_warning "Either NVMe module is not loaded on node: $node or not able to verify"
+      found_warning "Either NVMeTCP module is not loaded on node: $node or not able to verify"
     fi
   done
 
   check_error error
 }
 
+# Check if the NVMe client is installed
+function verify_nvmefc_installation() {
+  if [ ${NODE_VERIFY} -eq 0 ]; then
+    return
+  fi
+
+  log smart_step "Verifying NVMe installation" "$1"
+
+  error=0
+  for node in $MINION_NODES; do
+    # check if the NVMe client is installed
+    run_command ssh ${NODEUSER}@"${node}" "cat /etc/nvme/hostnqn" >/dev/null 2>&1
+    rv=$?
+    if [ $rv -ne 0 ]; then
+      error=1
+      found_warning "Either NVMe client was not found on node: $node or not able to verify"
+    fi
+    run_command ssh ${NODEUSER}@"${node}" lsmod | grep nvme_fc &>/dev/null
+    rv=$?
+    if [ $rv -ne 0 ]; then
+      error=1
+      found_warning "Either NVMeFC module is not loaded on node: $node or not able to verify"
+    fi
+  done
+
+  check_error error
+}
 
 # Check if the iSCSI client is installed
 function verify_iscsi_installation() {
@@ -253,7 +280,7 @@ function verify_openshift_versions() {
   log arrow
   log smart_step "Verifying minimum OpenShift version" "small"
   error=0
-  if [[ ${V} < ${MIN} ]]; then
+  if (( ${V%%.*} < ${MIN%%.*} || ( ${V%%.*} == ${MIN%%.*} && ${V##*.} < ${MIN##*.} ) )) ; then
     error=1
     found_error "OpenShift version ${V} is too old. Minimum required version is: ${MIN}"
   fi
@@ -263,7 +290,7 @@ function verify_openshift_versions() {
   log arrow
   log smart_step "Verifying maximum OpenShift version" "small"
   error=0
-  if [[ ${V} > ${MAX} ]]; then
+  if (( ${V%%.*} > ${MAX%%.*} || ( ${V%%.*} == ${MAX%%.*} && ${V##*.} > ${MAX##*.} ) )) ; then
     error=1
     found_warning "OpenShift version ${V} is newer than the version that has been tested. Latest tested version is: ${MAX}"
   fi

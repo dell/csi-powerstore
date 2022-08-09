@@ -76,6 +76,8 @@ const (
 	KeyNfsACL = "nfsAcls"
 	// KeyNasName key value to specify NAS server name
 	KeyNasName = "nasName"
+	// KeyVolumeDescription key value to specify volume description
+	KeyVolumeDescription = "description"
 	// VerboseName longer description of the driver
 	VerboseName = "CSI Driver for Dell EMC PowerStore"
 	// FcTransport indicates that FC is chosen as a SCSI transport protocol
@@ -94,12 +96,18 @@ const (
 	PublishContextISCSIPortalsPrefix = "PORTAL"
 	// PublishContextISCSITargetsPrefix indicates publish context iSCSI targets prefix
 	PublishContextISCSITargetsPrefix = "TARGET"
-	// PublishContextNVMEPortalsPrefix indicates publish context NVMe portals prefix
-	PublishContextNVMEPortalsPrefix = "NVMEPORTAL"
-	// PublishContextNVMETargetsPrefix indicates publish context NVMe targets prefix
-	PublishContextNVMETargetsPrefix = "NVMETARGET"
-	// NVMETransport indicates that NVMe is chosen as a transport protocol
-	NVMETransport TransportType = "NVMETCP"
+	// PublishContextNVMETCPPortalsPrefix indicates publish context NVMeTCP portals prefix
+	PublishContextNVMETCPPortalsPrefix = "NVMETCPPORTAL"
+	// PublishContextNVMETCPTargetsPrefix indicates publish context NVMe targets prefix
+	PublishContextNVMETCPTargetsPrefix = "NVMETCPTARGET"
+	// PublishContextNVMEFCPortalsPrefix indicates publish context NVMe targets prefix
+	PublishContextNVMEFCPortalsPrefix = "NVMEFCPORTAL"
+	// PublishContextNVMEFCTargetsPrefix indicates publish context NVMe targets prefix
+	PublishContextNVMEFCTargetsPrefix = "NVMEFCTARGET"
+	// NVMETCPTransport indicates that NVMe/TCP is chosen as the transport protocol
+	NVMETCPTransport TransportType = "NVMETCP"
+	// NVMEFCTransport indicates that NVMe/FC is chosen as the transport protocol
+	NVMEFCTransport TransportType = "NVMEFC"
 	// PublishContextFCWWPNPrefix indicates publish context FC WWPN prefix
 	PublishContextFCWWPNPrefix = "FCWWPN"
 	// WWNPrefix indicates WWN prefix
@@ -252,6 +260,42 @@ func GetFCTargetsInfoFromStorage(client gopowerstore.Client, volumeApplianceID s
 	for _, t := range fcPorts {
 		if t.IsLinkUp && t.ApplianceID == volumeApplianceID {
 			result = append(result, gobrick.FCTargetInfo{WWPN: strings.Replace(t.Wwn, ":", "", -1)})
+		}
+	}
+	return result, nil
+}
+
+// IsK8sMetadataSupported returns info whether Metadata is supported or not
+func IsK8sMetadataSupported(client gopowerstore.Client) bool {
+	k8sMetadataSupported := false
+	majorMinorVersion, err := client.GetSoftwareMajorMinorVersion(context.Background())
+	if err != nil {
+		log.Errorf("couldn't get the software version installed on the PowerStore array: %v", err)
+		return k8sMetadataSupported
+	}
+	if majorMinorVersion >= 3.0 {
+		k8sMetadataSupported = true
+	} else {
+		log.Debugf("Software version installed on the PowerStore array: %v\n", majorMinorVersion)
+	}
+	return k8sMetadataSupported
+}
+
+// GetNVMEFCTargetInfoFromStorage returns a list of gobrick compatible NVMeFC targets by quering Powerstore Array
+func GetNVMEFCTargetInfoFromStorage(client gopowerstore.Client, volumeApplianceID string) ([]gobrick.NVMeTargetInfo, error) {
+	clusterInfo, err := client.GetCluster(context.Background())
+	nvmeNQN := clusterInfo.NVMeNQN
+
+	fcPorts, err := client.GetFCPorts(context.Background())
+	if err != nil {
+		log.Error(err.Error())
+		return nil, err
+	}
+	var result []gobrick.NVMeTargetInfo
+	for _, t := range fcPorts {
+		if t.IsLinkUp && (t.ApplianceID == volumeApplianceID || volumeApplianceID == "") {
+			targetAddress := strings.Replace(fmt.Sprintf("nn-0x%s:pn-0x%s", strings.Replace(t.WwnNode, ":", "", -1), strings.Replace(t.WwnNVMe, ":", "", -1)), "\n", "", -1)
+			result = append(result, gobrick.NVMeTargetInfo{Target: nvmeNQN, Portal: targetAddress})
 		}
 	}
 	return result, nil

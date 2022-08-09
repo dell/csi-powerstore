@@ -21,7 +21,6 @@ parameters:
   # Else defaultFsType value mentioned in values.yaml
   # will be used as default value
   csi.storage.k8s.io/fstype: "xfs"
-
 # reclaimPolicy: PVs that are dynamically created by a StorageClass will have the reclaim policy specified here
 # Allowed values:
 #   Reclaim: retain the PV after PVC deletion

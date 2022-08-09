@@ -49,7 +49,7 @@ allowVolumeExpansion: true
 volumeBindingMode: WaitForFirstConsumer
 
 # allowedTopologies: helps scheduling pods on worker nodes which match all of below expressions.
-# replace "-iscsi" with "-fc", "-nvme", or "-nfs" at the end to use FC, NVME, or NFS enabled hosts
+# replace "-iscsi" with "-fc", "-nvmetcp", "-nvmefc" or "-nfs" at the end to use FC, NVMeTCP, NVMeFC, or NFS enabled hosts
 # replace "12.34.56.78" with PowerStore endpoint IP
 # Optional: true
 allowedTopologies:

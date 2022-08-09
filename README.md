@@ -10,7 +10,7 @@
 ## Description
 CSI Driver for PowerStore is part of the [CSM (Container Storage Modules)](https://github.com/dell/csm) open-source suite of Kubernetes storage enablers for Dell products. CSI Driver for PowerStore is a Container Storage Interface (CSI) driver that provides support for provisioning persistent storage using Dell PowerStore storage array. 
 
-It supports CSI specification version 1.3.
+It supports CSI specification version 1.5.
 
 This project may be compiled as a stand-alone binary using Golang that, when run, provides a valid CSI endpoint. It also can be used as a precompiled container image.
 
@@ -36,6 +36,10 @@ If you want to use iSCSI as a transport protocol be sure that `iscsi-initiator-u
 If you want to use FC be sure that zoning of Host Bus Adapters to the FC port directors was done. 
 
 If you want to use NFS be sure to enable it in `myvalues.yaml` or in your storage classes, and configure corresponding NAS servers on PowerStore.
+
+If you want to use NVMe/TCP be sure that the `nvme-cli` package is installed on your node.
+
+If you want to use NVMe/FC be sure that the NVMeFC zoning of the Host Bus Adapters to the Fibre Channel port is done.
 
 ## Driver Installation
 Please consult the [Installation Guide](https://dell.github.io/csm-docs/docs/csidriver/installation)

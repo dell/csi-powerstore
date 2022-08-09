@@ -35,6 +35,13 @@ rules:
   - apiGroups: [""]
     resources: ["secrets"]
     verbs: ["get", "list"]
+  {{- if hasKey .Values.controller "vgsnapshot" }}
+  {{- if eq .Values.controller.vgsnapshot.enabled true }}
+  - apiGroups: ["volumegroup.storage.dell.com"]
+    resources: ["dellcsivolumegroupsnapshots","dellcsivolumegroupsnapshots/status"]
+    verbs: ["create", "list", "watch", "delete", "update"]
+  {{- end }}
+  {{- end }} 
   - apiGroups: ["snapshot.storage.k8s.io"]
     resources: ["volumesnapshotclasses"]
     verbs: ["get", "list", "watch"]
@@ -46,7 +53,13 @@ rules:
     verbs: ["update", "patch"]
   - apiGroups: ["snapshot.storage.k8s.io"]
     resources: ["volumesnapshots", "volumesnapshots/status"]
+  {{- if hasKey .Values.controller "vgsnapshot" }}
+  {{- if eq .Values.controller.vgsnapshot.enabled true }}
+    verbs: ["get", "list", "watch", "update", "create", "delete"]
+  {{- else }}
     verbs: ["get", "list", "watch", "update"]
+  {{- end }}
+  {{- end }}    
   - apiGroups: ["storage.k8s.io"]
     resources: ["volumeattachments/status"]
     verbs: ["patch"]
@@ -137,7 +150,7 @@ spec:
         {{ if .Values.dev.enableTracing }}{{- include "pstore.tracing" . | nindent 8 }}{{ end }}
         {{- end }}
         - name: attacher
-          image: {{ required "Must provide the CSI attacher container image." .Values.images.attacher }}
+          image: {{ required "Must provide the CSI attacher container image." ( include "csi-powerstore.attacherImage" . ) }}
           imagePullPolicy: {{ .Values.imagePullPolicy }}
           args:
             - "--csi-address=$(ADDRESS)"
@@ -155,7 +168,7 @@ spec:
         {{- if hasKey .Values.controller "resizer" }}
         {{- if eq .Values.controller.resizer.enabled true }}
         - name: resizer
-          image: {{ required "Must provide the CSI resizer container image." .Values.images.resizer }}
+          image: {{ required "Must provide the CSI resizer container image."  ( include "csi-powerstore.resizerImage" . ) }}
           imagePullPolicy: {{ .Values.imagePullPolicy }}
           args:
             - "--csi-address=$(ADDRESS)"
@@ -170,7 +183,7 @@ spec:
         {{end}}
         {{end}}
         - name: provisioner
-          image: {{ required "Must provide the CSI provisioner container image." .Values.images.provisioner }}
+          image: {{ required "Must provide the CSI provisioner container image." ( include "csi-powerstore.provisionerImage" . ) }}
           imagePullPolicy: {{ .Values.imagePullPolicy }}
           args:
             - "--csi-address=$(ADDRESS)"
@@ -190,7 +203,7 @@ spec:
         {{- if hasKey .Values.controller "snapshot" }}
         {{- if eq .Values.controller.snapshot.enabled true }}
         - name: snapshotter
-          image: {{ required "Must provide the CSI snapshotter container image." .Values.images.snapshotter }}
+          image: {{ required "Must provide the CSI snapshotter container image." ( include "csi-powerstore.snapshotterImage" . ) }}
           imagePullPolicy: {{ .Values.imagePullPolicy }}
           args:
             - "--csi-address=$(ADDRESS)"
@@ -205,6 +218,19 @@ spec:
               mountPath: /var/run/csi
         {{end}}
         {{end}}
+        {{- if hasKey .Values.controller "vgsnapshot" }}
+        {{- if eq .Values.controller.vgsnapshot.enabled true }}
+        - name: vg-snapshotter
+          image: {{ required "Must provide the vgsnapshotter container image." .Values.controller.vgsnapshot.image }}
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
+          env:
+            - name: ADDRESS
+              value: /var/run/csi/csi.sock
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /var/run/csi
+        {{- end }}
+        {{- end }}
         {{- if hasKey .Values.controller "replication" }}
         {{- if eq .Values.controller.replication.enabled true}}
         - name: dell-csi-replicator
@@ -236,7 +262,7 @@ spec:
         {{- if hasKey .Values.controller "healthMonitor" }}
         {{- if eq .Values.controller.healthMonitor.enabled true}}
         - name: csi-external-health-monitor-controller
-          image: {{ required "Must provide the CSI external health monitor controller image." .Values.images.externalhealthmonitorcontroller}}
+          image: {{ required "Must provide the CSI external health monitor controller image." ( include "csi-powerstore.healthmonitorImage" . ) }}
           imagePullPolicy: {{ .Values.imagePullPolicy }}
           args:
             - "--v=5"
@@ -254,8 +280,23 @@ spec:
               mountPath: /var/run/csi
         {{- end }}
         {{- end }}
+        - name: csi-metadata-retriever
+          image: {{ required "Must provide the CSI Metadata retriever container image." .Values.controller.metadataretriever }}
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
+          command: [ "/csi-metadata-retriever" ]
+          env:
+            {{- if hasKey .Values "dev" }}
+            - name: ENABLE_TRACING
+              value: {{ .Values.dev.enableTracing | quote }}
+            {{ if .Values.dev.enableTracing }}{{- include "pstore.tracingenvvars" . | nindent 12 }}{{ end }}
+            {{- end }}
+            - name: CSI_RETRIEVER_ENDPOINT
+              value: /var/run/csi/csi_retriever.sock
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /var/run/csi
         - name: driver
-          image: {{ required "Must provide the PowerStore driver container image." .Values.images.driver }}
+          image: {{ required "Must provide the PowerStore driver image repository." .Values.images.driverRepository }}/{{ .Chart.Name }}:{{ .Values.version }}
           imagePullPolicy: {{ .Values.imagePullPolicy }}
           command: [ "/csi-powerstore" ]
           env:
@@ -266,6 +307,8 @@ spec:
             {{- end }}
             - name: CSI_ENDPOINT
               value: /var/run/csi/csi.sock
+            - name: CSI_RETRIEVER_ENDPOINT
+              value: /var/run/csi/csi_retriever.sock
             - name: X_CSI_MODE
               value: controller
             - name: X_CSI_DRIVER_NAME
@@ -294,6 +337,8 @@ spec:
             {{- end }}
             - name: GOPOWERSTORE_DEBUG
               value: "true"
+            - name: CSI_AUTO_ROUND_OFF_FILESYSTEM_SIZE
+              value: "{{ .Values.allowAutoRoundOffFilesystemSize | default false }}"
           volumeMounts:
             - name: socket-dir
               mountPath: /var/run/csi

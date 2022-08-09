@@ -35,14 +35,22 @@ import (
 
 func getValidPublishContext() map[string]string {
 	return map[string]string{
-		common.PublishContextLUNAddress:               validLUNID,
-		common.PublishContextDeviceWWN:                validDeviceWWN,
-		common.PublishContextISCSIPortalsPrefix + "0": validISCSIPortals[0],
-		common.PublishContextISCSIPortalsPrefix + "1": validISCSIPortals[1],
-		common.PublishContextISCSITargetsPrefix + "0": validISCSITargets[0],
-		common.PublishContextISCSITargetsPrefix + "1": validISCSITargets[1],
-		common.PublishContextFCWWPNPrefix + "0":       validFCTargetsWWPN[0],
-		common.PublishContextFCWWPNPrefix + "1":       validFCTargetsWWPN[1],
+		common.PublishContextLUNAddress:                 validLUNID,
+		common.PublishContextDeviceWWN:                  validDeviceWWN,
+		common.PublishContextISCSIPortalsPrefix + "0":   validISCSIPortals[0],
+		common.PublishContextISCSIPortalsPrefix + "1":   validISCSIPortals[1],
+		common.PublishContextISCSITargetsPrefix + "0":   validISCSITargets[0],
+		common.PublishContextISCSITargetsPrefix + "1":   validISCSITargets[1],
+		common.PublishContextNVMEFCPortalsPrefix + "0":  validNVMEFCPortals[0],
+		common.PublishContextNVMEFCPortalsPrefix + "1":  validNVMEFCPortals[1],
+		common.PublishContextNVMEFCTargetsPrefix + "0":  validNVMEFCTargets[0],
+		common.PublishContextNVMEFCTargetsPrefix + "1":  validNVMEFCTargets[1],
+		common.PublishContextNVMETCPPortalsPrefix + "0": validNVMETCPPortals[0],
+		common.PublishContextNVMETCPPortalsPrefix + "1": validNVMETCPPortals[1],
+		common.PublishContextNVMETCPTargetsPrefix + "0": validNVMETCPTargets[0],
+		common.PublishContextNVMETCPTargetsPrefix + "1": validNVMETCPTargets[1],
+		common.PublishContextFCWWPNPrefix + "0":         validFCTargetsWWPN[0],
+		common.PublishContextFCWWPNPrefix + "1":         validFCTargetsWWPN[1],
 	}
 }
 
@@ -95,14 +103,14 @@ func TestSCSIStager_Stage(t *testing.T) {
 	t.Run("iscsi -- success test", func(t *testing.T) {
 		iscsiConnectorMock := new(mocks.ISCSIConnector)
 		fcConnectorMock := new(mocks.FcConnector)
-		nvmetcpConnectorMock := new(mocks.NVMETCPConnector)
+		nvmeConnectorMock := new(mocks.NVMEConnector)
 
 		stager := &SCSIStager{
-			useFC:            false,
-			useISCSI:         true,
-			iscsiConnector:   iscsiConnectorMock,
-			nvmetcpConnector: nvmetcpConnectorMock,
-			fcConnector:      fcConnectorMock,
+			useFC:          false,
+			useNVME:        false,
+			iscsiConnector: iscsiConnectorMock,
+			nvmeConnector:  nvmeConnectorMock,
+			fcConnector:    fcConnectorMock,
 		}
 
 		iscsiConnectorMock.On("ConnectVolume", mock.Anything, gobrick.ISCSIVolumeInfo{
@@ -124,6 +132,91 @@ func TestSCSIStager_Stage(t *testing.T) {
 
 		scsiStageVolumeOK(utilMock, fsMock)
 
+		_, err := stager.Stage(context.Background(), &csi.NodeStageVolumeRequest{
+			VolumeId:          validBlockVolumeID,
+			PublishContext:    getValidPublishContext(),
+			StagingTargetPath: nodeStagePrivateDir,
+			VolumeCapability: getCapabilityWithVoltypeAccessFstype(
+				"block", "single-writer", "none"),
+		}, log.Fields{}, fsMock, validBaseVolumeID)
+
+		assert.Nil(t, err)
+	})
+
+	t.Run("nvmefc -- success test", func(t *testing.T) {
+		iscsiConnectorMock := new(mocks.ISCSIConnector)
+		fcConnectorMock := new(mocks.FcConnector)
+		nvmeConnectorMock := new(mocks.NVMEConnector)
+
+		stager := &SCSIStager{
+			useFC:          true,
+			useNVME:        true,
+			iscsiConnector: iscsiConnectorMock,
+			nvmeConnector:  nvmeConnectorMock,
+			fcConnector:    fcConnectorMock,
+		}
+
+		nvmeConnectorMock.On("ConnectVolume", mock.Anything, gobrick.NVMeVolumeInfo{
+			Targets: []gobrick.NVMeTargetInfo{
+				{
+					Portal: validNVMEFCPortals[0],
+					Target: validNVMEFCTargets[0],
+				},
+				{
+					Portal: validNVMEFCPortals[1],
+					Target: validNVMEFCTargets[1],
+				},
+			},
+			WWN: validDeviceWWN,
+		}, true).Return(gobrick.Device{}, nil)
+
+		utilMock := new(mocks.UtilInterface)
+		fsMock := new(mocks.FsInterface)
+
+		scsiStageVolumeOK(utilMock, fsMock)
+
+		_, err := stager.Stage(context.Background(), &csi.NodeStageVolumeRequest{
+			VolumeId:          validBlockVolumeID,
+			PublishContext:    getValidPublishContext(),
+			StagingTargetPath: nodeStagePrivateDir,
+			VolumeCapability: getCapabilityWithVoltypeAccessFstype(
+				"block", "single-writer", "none"),
+		}, log.Fields{}, fsMock, validBaseVolumeID)
+
+		assert.Nil(t, err)
+	})
+
+	t.Run("nvmetcp -- success test", func(t *testing.T) {
+		iscsiConnectorMock := new(mocks.ISCSIConnector)
+		fcConnectorMock := new(mocks.FcConnector)
+		nvmeConnectorMock := new(mocks.NVMEConnector)
+
+		stager := &SCSIStager{
+			useFC:          false,
+			useNVME:        true,
+			iscsiConnector: iscsiConnectorMock,
+			nvmeConnector:  nvmeConnectorMock,
+			fcConnector:    fcConnectorMock,
+		}
+
+		nvmeConnectorMock.On("ConnectVolume", mock.Anything, gobrick.NVMeVolumeInfo{
+			Targets: []gobrick.NVMeTargetInfo{
+				{
+					Portal: validNVMETCPPortals[0],
+					Target: validNVMETCPTargets[0],
+				},
+				{
+					Portal: validNVMETCPPortals[1],
+					Target: validNVMETCPTargets[1],
+				},
+			},
+			WWN: validDeviceWWN,
+		}, false).Return(gobrick.Device{}, nil)
+
+		utilMock := new(mocks.UtilInterface)
+		fsMock := new(mocks.FsInterface)
+
+		scsiStageVolumeOK(utilMock, fsMock)
 		_, err := stager.Stage(context.Background(), &csi.NodeStageVolumeRequest{
 			VolumeId:          validBlockVolumeID,
 			PublishContext:    getValidPublishContext(),

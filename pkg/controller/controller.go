@@ -62,9 +62,12 @@ type Service struct {
 
 	array.Locker
 
-	replicationContextPrefix string
-	replicationPrefix        string
-	isHealthMonitorEnabled   bool
+	replicationContextPrefix    string
+	replicationPrefix           string
+	isHealthMonitorEnabled      bool
+	isAutoRoundOffFsSizeEnabled bool
+
+	K8sVisibilityAutoRegistration bool
 }
 
 // Init is a method that initializes internal variables of controller service
@@ -91,6 +94,15 @@ func (s *Service) Init() error {
 		if nfsAcls != "" {
 			s.nfsAcls = nfsAcls
 		}
+	}
+
+	if isAutoRoundOffFsSizeEnabled, ok := csictx.LookupEnv(ctx, common.EnvAllowAutoRoundOffFilesystemSize); ok {
+		log.Warn("Auto round off Filesystem size has been enabled! This will round off NFS PVC size to 3Gi when the requested size is less than 3Gi.")
+		s.isAutoRoundOffFsSizeEnabled, _ = strconv.ParseBool(isAutoRoundOffFsSizeEnabled)
+	}
+
+	if isk8sVisibilityAutoRegistrationEnabled, ok := csictx.LookupEnv(ctx, common.EnvK8sVisibilityAutoRegistration); ok {
+		s.K8sVisibilityAutoRegistration, _ = strconv.ParseBool(isk8sVisibilityAutoRegistrationEnabled)
 	}
 
 	return nil
@@ -173,7 +185,7 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 		return nil, err
 	}
 
-	sizeInBytes, err := creator.CheckSize(ctx, req.GetCapacityRange())
+	sizeInBytes, err := creator.CheckSize(ctx, req.GetCapacityRange(), s.isAutoRoundOffFsSizeEnabled)
 	if err != nil {
 		return nil, err
 	}
@@ -304,6 +316,8 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 		}
 	}
 
+	params["description"] = getDescription(req.GetParameters())
+
 	var volumeResponse *csi.Volume
 	resp, err := creator.Create(ctx, req, sizeInBytes, arr.GetClient())
 	if err != nil {
@@ -401,7 +415,7 @@ func (s *Service) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest
 			// Remove volume from volume group
 			// TODO: If volume has multiple volume group then how we should find ours?
 			// TODO: Maybe adding volumegroup id/name to volume id can help?
-			_, err := arr.GetClient().RemoveMembersFromVolumeGroup(ctx, &gopowerstore.VolumeGroupRemoveMember{VolumeIds: []string{id}}, vgs.VolumeGroup[0].ID)
+			_, err := arr.GetClient().RemoveMembersFromVolumeGroup(ctx, &gopowerstore.VolumeGroupMembers{VolumeIds: []string{id}}, vgs.VolumeGroup[0].ID)
 			if err != nil {
 				// TODO: check for idempotency cases
 				return nil, err
@@ -931,9 +945,17 @@ func (s *Service) DeleteSnapshot(ctx context.Context, req *csi.DeleteSnapshotReq
 			return nil, err
 		}
 	} else {
-		_, err = arr.GetClient().GetSnapshot(ctx, id)
+		snap, err := arr.GetClient().GetSnapshot(ctx, id)
 		if err == nil {
-			_, err := arr.GetClient().DeleteSnapshot(ctx, nil, id)
+			// we will check whether this snapshot is a part of volume group snapshot, if yes then we will delete the volume group snapshot
+			vgs, err := arr.GetClient().GetVolumeGroupsByVolumeID(ctx, snap.ID)
+			if len(vgs.VolumeGroup) != 0 && err == nil { // This means this snap is a part of VGS
+				_, err = arr.GetClient().DeleteVolumeGroup(ctx, vgs.VolumeGroup[0].ID)
+				if err == nil {
+					return &csi.DeleteSnapshotResponse{}, nil
+				}
+			}
+			_, err = arr.GetClient().DeleteSnapshot(ctx, nil, id)
 			if err == nil {
 				return &csi.DeleteSnapshotResponse{}, nil
 			}
@@ -1144,11 +1166,6 @@ func (s *Service) ProbeController(ctx context.Context, req *commonext.ProbeContr
 	return rep, nil
 }
 
-// CreateVolumeGroupSnapshot creates snapshots of the volume group
-func (s *Service) CreateVolumeGroupSnapshot(ctx context.Context, request *vgsext.CreateVolumeGroupSnapshotRequest) (*vgsext.CreateVolumeGroupSnapshotResponse, error) {
-	panic("implement me")
-}
-
 func (s *Service) listPowerStoreVolumes(ctx context.Context, startToken, maxEntries int) ([]gopowerstore.Volume, string, error) {
 	var volumes []gopowerstore.Volume
 
@@ -1256,6 +1273,7 @@ func (s *Service) listPowerStoreSnapshots(ctx context.Context, startToken, maxEn
 		}
 	} else {
 		log.Infof("Requested snapshot via source id %s", srcID)
+		// This works VGS on single default array, But for multiple array scenario this default array should be changed to dynamic array
 		id, arrayID, protocol, err := array.ParseVolumeID(ctx, srcID, s.DefaultArray(), nil)
 		if err != nil {
 			log.Error(err)

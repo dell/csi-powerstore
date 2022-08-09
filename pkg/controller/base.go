@@ -32,6 +32,8 @@ import (
 const (
 	// MinVolumeSizeBytes is minimal size for volume creation on PowerStore
 	MinVolumeSizeBytes = 1048576
+	// MinFilesystemSizeBytes is minimal size for Filesystem creation on PowerStore - 1.5Gi
+	MinFilesystemSizeBytes = 1610612736
 	// MaxVolumeSizeBytes is maximum size for volume creation on PowerStore
 	MaxVolumeSizeBytes = 1099511627776 * 256 // 256 TB
 	// VolumeSizeMultiple multiplier for volumes
@@ -62,6 +64,8 @@ const (
 	KeyNasName = "nasName"
 	// KeyCSIPVCNamespace represents key for csi pvc namespace
 	KeyCSIPVCNamespace = "csi.storage.k8s.io/pvc/namespace"
+	// KeyCSIPVCName represents key for csi pvc name
+	KeyCSIPVCName = "csi.storage.k8s.io/pvc/name"
 )
 
 func volumeNameValidation(volumeName string) error {
@@ -163,4 +167,11 @@ func checkValidAccessTypes(vcs []*csi.VolumeCapability) bool {
 		return false
 	}
 	return true
+}
+
+func getDescription(params map[string]string) string {
+	if description, ok := params["description"]; ok {
+		return description
+	}
+	return params[KeyCSIPVCName] + "-" + params[KeyCSIPVCNamespace]
 }

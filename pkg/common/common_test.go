@@ -107,12 +107,43 @@ func TestGetLogFields(t *testing.T) {
 	})
 }
 
+func TestGetISCSITargetsInfoFromStorage(t *testing.T) {
+	t.Run("api error", func(t *testing.T) {
+		e := errors.New("some error")
+		clientMock := new(gopowerstoremock.Client)
+		clientMock.On("GetStorageISCSITargetAddresses", context.Background()).Return([]gopowerstore.IPPoolAddress{}, e)
+		_, err := common.GetISCSITargetsInfoFromStorage(clientMock, "A1")
+		assert.EqualError(t, err, e.Error())
+	})
+}
+
 func TestGetFCTargetsInfoFromStorage(t *testing.T) {
 	t.Run("api error", func(t *testing.T) {
 		e := errors.New("some error")
 		clientMock := new(gopowerstoremock.Client)
 		clientMock.On("GetFCPorts", context.Background()).Return([]gopowerstore.FcPort{}, e)
 		_, err := common.GetFCTargetsInfoFromStorage(clientMock, "A1")
+		assert.EqualError(t, err, e.Error())
+	})
+}
+
+func TestIsK8sMetadataSupported(t *testing.T) {
+	t.Run("api error", func(t *testing.T) {
+		e := errors.New("some error")
+		clientMock := new(gopowerstoremock.Client)
+		clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(0.0), e)
+		version := common.IsK8sMetadataSupported(clientMock)
+		assert.Equal(t, version, false)
+	})
+}
+
+func TestGetNVMEFCTargetInfoFromStorage(t *testing.T) {
+	t.Run("api error", func(t *testing.T) {
+		e := errors.New("some error")
+		clientMock := new(gopowerstoremock.Client)
+		clientMock.On("GetCluster", context.Background()).Return(gopowerstore.Cluster{}, e)
+		clientMock.On("GetFCPorts", context.Background()).Return([]gopowerstore.FcPort{}, e)
+		_, err := common.GetNVMEFCTargetInfoFromStorage(clientMock, "A1")
 		assert.EqualError(t, err, e.Error())
 	})
 }
