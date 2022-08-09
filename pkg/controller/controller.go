@@ -574,7 +574,9 @@ func (s *Service) ControllerUnpublishVolume(ctx context.Context, req *csi.Contro
 		}
 
 		// Parse volumeID to get an IP
+		log.Debug("----kubeNode ID:", kubeNodeID)
 		ipList := common.GetIPListFromString(kubeNodeID)
+		log.Debug("----IP List :", ipList)
 		if ipList == nil {
 			return nil, errors.New("can't find IP in nodeID")
 		}
@@ -612,6 +614,18 @@ func (s *Service) ControllerUnpublishVolume(ctx context.Context, req *csi.Contro
 		if len(export.RWHosts) > 0 {
 			if index >= 0 {
 				modifyHostPayload.RemoveRWHosts = []string{ip + "/255.255.255.255"} // we can't remove without netmask
+
+				// if NAT(ExternalAccess) is enabled then we have to remove the NAT IP also from the NFS Share
+				log.Debug("--externalAcc: ", s.externalAccess)
+				if s.externalAccess != "" {
+					externalAccess, err := common.GetIPListWithMaskFromString(s.externalAccess)
+					if err != nil {
+						return nil, status.Errorf(codes.InvalidArgument, "can't find IP in X_CSI_POWERSTORE_EXTERNAL_ACCESS variable")
+					}
+					log.Debug("----external-access parsed IP:", externalAccess)
+					modifyHostPayload.RemoveRWHosts = append(modifyHostPayload.RemoveRWHosts, externalAccess)
+				}
+				log.Debug("----export---", export.RWHosts)
 			}
 		}
 
@@ -620,9 +634,21 @@ func (s *Service) ControllerUnpublishVolume(ctx context.Context, req *csi.Contro
 		if len(export.RWRootHosts) > 0 {
 			if index >= 0 {
 				modifyHostPayload.RemoveRWRootHosts = []string{ip + "/255.255.255.255"} // we can't remove without netmask
+
+				// if NAT(ExternalAccess) is enabled then we have to remove the NAT IP also from the NFS Share
+				log.Debug("--externalAcc: ", s.externalAccess)
+				if s.externalAccess != "" {
+					externalAccess, err := common.GetIPListWithMaskFromString(s.externalAccess)
+					if err != nil {
+						return nil, status.Errorf(codes.InvalidArgument, "can't find IP in X_CSI_POWERSTORE_EXTERNAL_ACCESS variable")
+					}
+					log.Debug("----external-access parsed IP:", externalAccess)
+					modifyHostPayload.RemoveRWRootHosts = append(modifyHostPayload.RemoveRWRootHosts, externalAccess)
+				}
+				log.Debug("----export---", export.RWRootHosts)
 			}
 		}
-
+		log.Debug("--modifyhost payload:", modifyHostPayload)
 		// Detach host from nfs export
 		_, err = arr.GetClient().ModifyNFSExport(ctx, &modifyHostPayload, export.ID)
 		if err != nil {
