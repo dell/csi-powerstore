@@ -25,6 +25,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"regexp"
 	"sort"
@@ -33,6 +34,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/apparentlymart/go-cidr/cidr"
 	"github.com/dell/csi-powerstore/core"
 	"github.com/dell/csi-powerstore/pkg/common/fs"
 	"github.com/dell/gobrick"
@@ -299,4 +301,28 @@ func GetNVMEFCTargetInfoFromStorage(client gopowerstore.Client, volumeApplianceI
 		}
 	}
 	return result, nil
+}
+
+func ParseCIDR(externalAccessCIDR string) (string, error) {
+	ip, ipnet, err := net.ParseCIDR(externalAccessCIDR)
+	if err != nil {
+		return "", err
+	}
+	log.Debug(externalAccessCIDR, "-> ip:", ip, " net:", ipnet)
+	start, _ := cidr.AddressRange(ipnet)
+	log.Debug("startAddress:", start)
+
+	extAcc := strings.Split(externalAccessCIDR, "/")
+	var externalAccess string
+	switch extAcc[1] {
+	case "8":
+		externalAccess = start.String() + "/255.0.0.0"
+	case "16":
+		externalAccess = start.String() + "/255.255.0.0"
+	case "24":
+		externalAccess = start.String() + "/255.255.255.0"
+	default:
+		externalAccess = start.String() + "/255.255.255.255"
+	}
+	return externalAccess, nil
 }

@@ -618,14 +618,14 @@ func (s *Service) ControllerUnpublishVolume(ctx context.Context, req *csi.Contro
 				// if NAT(ExternalAccess) is enabled then we have to remove the NAT IP also from the NFS Share
 				log.Debug("--externalAcc: ", s.externalAccess)
 				if s.externalAccess != "" {
-					externalAccess, err := common.GetIPListWithMaskFromString(s.externalAccess)
+					externalAccess, err := common.ParseCIDR(s.externalAccess)
 					if err != nil {
-						return nil, status.Errorf(codes.InvalidArgument, "can't find IP in X_CSI_POWERSTORE_EXTERNAL_ACCESS variable")
+						return nil, status.Errorf(codes.InvalidArgument, "error parsing CIDR")
 					}
-					log.Debug("----external-access parsed IP:", externalAccess)
+					log.Debug("----external-access removal IP:", externalAccess)
 					modifyHostPayload.RemoveRWHosts = append(modifyHostPayload.RemoveRWHosts, externalAccess)
 				}
-				log.Debug("----export---", export.RWHosts)
+				log.Debug("----export---", export.RWRootHosts)
 			}
 		}
 
@@ -638,11 +638,11 @@ func (s *Service) ControllerUnpublishVolume(ctx context.Context, req *csi.Contro
 				// if NAT(ExternalAccess) is enabled then we have to remove the NAT IP also from the NFS Share
 				log.Debug("--externalAcc: ", s.externalAccess)
 				if s.externalAccess != "" {
-					externalAccess, err := common.GetIPListWithMaskFromString(s.externalAccess)
+					externalAccess, err := common.ParseCIDR(s.externalAccess)
 					if err != nil {
-						return nil, status.Errorf(codes.InvalidArgument, "can't find IP in X_CSI_POWERSTORE_EXTERNAL_ACCESS variable")
+						return nil, status.Errorf(codes.InvalidArgument, "error parsing CIDR")
 					}
-					log.Debug("----external-access parsed IP:", externalAccess)
+					log.Debug("----external-access removal IP:", externalAccess)
 					modifyHostPayload.RemoveRWRootHosts = append(modifyHostPayload.RemoveRWRootHosts, externalAccess)
 				}
 				log.Debug("----export---", export.RWRootHosts)
