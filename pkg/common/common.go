@@ -303,26 +303,23 @@ func GetNVMEFCTargetInfoFromStorage(client gopowerstore.Client, volumeApplianceI
 	return result, nil
 }
 
+// ParseCIDR parses the CIDR address to the valid start IP range with Mask
 func ParseCIDR(externalAccessCIDR string) (string, error) {
 	ip, ipnet, err := net.ParseCIDR(externalAccessCIDR)
 	if err != nil {
 		return "", err
 	}
-	log.Debug(externalAccessCIDR, "-> ip:", ip, " net:", ipnet)
+	log.Debug("Parsed CIDR:", externalAccessCIDR, "-> ip:", ip, " net:", ipnet)
 	start, _ := cidr.AddressRange(ipnet)
 	log.Debug("startAddress:", start)
-
-	extAcc := strings.Split(externalAccessCIDR, "/")
-	var externalAccess string
-	switch extAcc[1] {
-	case "8":
-		externalAccess = start.String() + "/255.0.0.0"
-	case "16":
-		externalAccess = start.String() + "/255.255.0.0"
-	case "24":
-		externalAccess = start.String() + "/255.255.255.0"
-	default:
-		externalAccess = start.String() + "/255.255.255.255"
+	fromString, err := GetIPListWithMaskFromString(externalAccessCIDR)
+	if err != nil {
+		return "", err
 	}
+	log.Debug("IP with Mask:", fromString)
+	s := strings.Split(fromString, "/")
+	log.Debug("Mask:", s[1])
+	externalAccess := start.String() + "/" + s[1]
+
 	return externalAccess, nil
 }

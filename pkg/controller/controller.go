@@ -625,7 +625,7 @@ func (s *Service) ControllerUnpublishVolume(ctx context.Context, req *csi.Contro
 					log.Debug("----external-access removal IP:", externalAccess)
 					modifyHostPayload.RemoveRWHosts = append(modifyHostPayload.RemoveRWHosts, externalAccess)
 				}
-				log.Debug("----export---", export.RWRootHosts)
+				log.Debug("----export from array---", export.RWRootHosts)
 			}
 		}
 
@@ -645,7 +645,7 @@ func (s *Service) ControllerUnpublishVolume(ctx context.Context, req *csi.Contro
 					log.Debug("----external-access removal IP:", externalAccess)
 					modifyHostPayload.RemoveRWRootHosts = append(modifyHostPayload.RemoveRWRootHosts, externalAccess)
 				}
-				log.Debug("----export---", export.RWRootHosts)
+				log.Debug("----export from array---", export.RWRootHosts)
 			}
 		}
 		log.Debug("--modifyhost payload:", modifyHostPayload)
