@@ -235,8 +235,14 @@ func (i *interceptor) createVolume(ctx context.Context, req *csi.CreateVolumeReq
 				err.Error())
 		}
 
-		for k, v := range metadataRes.Parameters {
-			req.Parameters[k] = v
+		if metadataRes != nil {
+			for k, v := range metadataRes.Parameters {
+				req.Parameters[k] = v
+			}
+		} else {
+			log.Warnf("Metadata retrieved is nil for PVC %s in namespace: %s",
+				controller.KeyCSIPVCName,
+				controller.KeyCSIPVCNamespace)
 		}
 	}
 

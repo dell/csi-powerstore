@@ -23,7 +23,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/dell/gonvme"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -32,6 +31,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/dell/gonvme"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-powerstore/pkg/array"
@@ -1120,6 +1121,10 @@ func (s *Service) updateNodeID() error {
 		}
 
 		// Check connection to array and get ip
+		defaultArray := s.DefaultArray()
+		if defaultArray == nil {
+			return status.Errorf(codes.FailedPrecondition, "Could not fetch default PowerStore array")
+		}
 		ip, err := getOutboundIP(s.DefaultArray().GetIP(), s.Fs)
 		if err != nil {
 			log.WithFields(log.Fields{
