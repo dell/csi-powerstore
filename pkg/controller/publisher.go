@@ -228,7 +228,7 @@ func (n *NfsPublisher) Publish(ctx context.Context, req *csi.ControllerPublishVo
 		if err != nil {
 			return nil, status.Errorf(codes.InvalidArgument, "can't find IP in X_CSI_POWERSTORE_EXTERNAL_ACCESS variable")
 		}
-		log.Debug("----external-access parsed IP:", externalAccess)
+		log.Debug("externalAccess parsed IP:", externalAccess)
 		ipWithNat = append(ipWithNat, externalAccess)
 	}
 
@@ -275,16 +275,13 @@ func (n *NfsPublisher) Publish(ctx context.Context, req *csi.ControllerPublishVo
 	}
 	publishContext[KeyNasName] = nas.Name // we need to pass that to node part of the driver
 	publishContext[common.KeyNfsExportPath] = fileInterface.IpAddress + ":/" + export.Name
-	log.Debug("----NAT IP Array:", ipWithNat)
 	publishContext[common.KeyHostIP] = ipWithNat[0]
-	log.Debug("-----external-access-value:", n.ExternalAccess)
 	if n.ExternalAccess != "" {
 		publishContext[common.KeyNatIP] = ipWithNat[1]
 	}
 	publishContext[common.KeyExportID] = export.ID
 	publishContext[common.KeyAllowRoot] = req.VolumeContext[common.KeyAllowRoot]
 	publishContext[common.KeyNfsACL] = req.VolumeContext[common.KeyNfsACL]
-	log.Debug("Publish context obj:", publishContext)
 	return &csi.ControllerPublishVolumeResponse{PublishContext: publishContext}, nil
 }
 

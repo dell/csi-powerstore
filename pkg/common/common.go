@@ -311,14 +311,14 @@ func ParseCIDR(externalAccessCIDR string) (string, error) {
 	}
 	log.Debug("Parsed CIDR:", externalAccessCIDR, "-> ip:", ip, " net:", ipnet)
 	start, _ := cidr.AddressRange(ipnet)
-	log.Debug("startAddress:", start)
 	fromString, err := GetIPListWithMaskFromString(externalAccessCIDR)
 	if err != nil {
 		return "", err
 	}
 	log.Debug("IP with Mask:", fromString)
 	s := strings.Split(fromString, "/")
-	log.Debug("Mask:", s[1])
+
+	// ExernalAccess IP consists of Starting range IP of CIDR+Mask and hence concatenating the same to remove from the array
 	externalAccess := start.String() + "/" + s[1]
 
 	return externalAccess, nil
