@@ -147,3 +147,11 @@ func TestGetNVMEFCTargetInfoFromStorage(t *testing.T) {
 		assert.EqualError(t, err, e.Error())
 	})
 }
+
+func TestParseCIDR(t *testing.T) {
+	t.Run("parse CIDR", func(t *testing.T) {
+		parsedIP, err := common.ParseCIDR("10.0.0.0/24")
+		assert.NoError(t, err, "CIDR Parsed successfully")
+		assert.NotEmpty(t, parsedIP)
+	})
+}
