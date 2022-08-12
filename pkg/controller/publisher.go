@@ -228,6 +228,7 @@ func (n *NfsPublisher) Publish(ctx context.Context, req *csi.ControllerPublishVo
 		if err != nil {
 			return nil, status.Errorf(codes.InvalidArgument, "can't find IP in X_CSI_POWERSTORE_EXTERNAL_ACCESS variable")
 		}
+		log.Debug("externalAccess parsed IP:", externalAccess)
 		ipWithNat = append(ipWithNat, externalAccess)
 	}
 

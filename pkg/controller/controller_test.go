@@ -1754,6 +1754,75 @@ var _ = Describe("CSIControllerService", func() {
 					},
 				}))
 			})
+			It("should succeed [NFS] with externalAccess", func() {
+				//setting externalAccess environment variable
+				err := csictx.Setenv(context.Background(), common.EnvExternalAccess, "10.0.0.0/24")
+				Expect(err).To(BeNil())
+				_ = ctrlSvc.Init()
+
+				clientMock.On("GetFS", mock.Anything, validBaseVolID).
+					Return(gopowerstore.FileSystem{
+						ID:          validBaseVolID,
+						Name:        fsName,
+						NasServerID: nasID,
+					}, nil)
+
+				apiError := gopowerstore.NewAPIError()
+				apiError.StatusCode = http.StatusNotFound
+
+				clientMock.On("GetNFSExportByFileSystemID", mock.Anything, mock.Anything).
+					Return(gopowerstore.NFSExport{}, *apiError).Once()
+
+				nfsExportCreate := &gopowerstore.NFSExportCreate{
+					Name:         fsName,
+					FileSystemID: validBaseVolID,
+					Path:         "/" + fsName,
+				}
+				clientMock.On("CreateNFSExport", mock.Anything, nfsExportCreate).
+					Return(gopowerstore.CreateResponse{ID: nfsID}, nil)
+
+				clientMock.On("GetNFSExportByFileSystemID", mock.Anything, mock.Anything).
+					Return(gopowerstore.NFSExport{ID: nfsID}, nil).Once()
+
+				clientMock.On("ModifyNFSExport", mock.Anything, &gopowerstore.NFSExportModify{
+					AddRWRootHosts: []string{
+						"127.0.0.1",
+						"10.0.0.0/255.255.255.0",
+					},
+				}, nfsID).Return(gopowerstore.CreateResponse{}, nil)
+
+				clientMock.On("GetNAS", mock.Anything, nasID).
+					Return(gopowerstore.NAS{
+						Name:                            validNasName,
+						CurrentPreferredIPv4InterfaceId: interfaceID,
+					}, nil)
+
+				clientMock.On("GetFileInterface", mock.Anything, interfaceID).
+					Return(gopowerstore.FileInterface{IpAddress: secondValidID}, nil)
+
+				req := getTypicalControllerPublishVolumeRequest("multiple-writer", validNodeID, validNfsVolumeID)
+				req.VolumeCapability = getVolumeCapabilityNFS()
+				req.VolumeContext = map[string]string{controller.KeyFsType: "nfs"}
+
+				res, err := ctrlSvc.ControllerPublishVolume(context.Background(), req)
+
+				Expect(err).To(BeNil())
+				Expect(res).To(Equal(&csi.ControllerPublishVolumeResponse{
+					PublishContext: map[string]string{
+						common.KeyNasName:       validNasName,
+						common.KeyNfsExportPath: secondValidID + ":/",
+						common.KeyExportID:      nfsID,
+						common.KeyAllowRoot:     "",
+						common.KeyHostIP:        "127.0.0.1",
+						common.KeyNfsACL:        "",
+						common.KeyNatIP:         "10.0.0.0/255.255.255.0",
+					},
+				}))
+				// Removing externalAccess environment variable after our tests are completed
+				err = csictx.Setenv(context.Background(), common.EnvExternalAccess, "")
+				Expect(err).To(BeNil())
+				_ = ctrlSvc.Init()
+			})
 		})
 
 		When("host name does not contain ip", func() {
@@ -2218,6 +2287,41 @@ var _ = Describe("CSIControllerService", func() {
 				res, err := ctrlSvc.ControllerUnpublishVolume(context.Background(), req)
 				Expect(err).To(BeNil())
 				Expect(res).To(Equal(&csi.ControllerUnpublishVolumeResponse{}))
+			})
+
+			It("should succeed [NFS] with external access", func() {
+				//setting externalAccess environment variable
+				err := csictx.Setenv(context.Background(), common.EnvExternalAccess, "10.0.0.0/24")
+				Expect(err).To(BeNil())
+				_ = ctrlSvc.Init()
+
+				exportID := "some-export-id"
+
+				clientMock.On("GetFS", mock.Anything, validBaseVolID).
+					Return(gopowerstore.FileSystem{
+						ID: validBaseVolID,
+					}, nil)
+
+				clientMock.On("GetNFSExportByFileSystemID", mock.Anything, validBaseVolID).
+					Return(gopowerstore.NFSExport{
+						ID:          exportID,
+						RWRootHosts: []string{"127.0.0.1", "10.0.0.0/255.255.255.0"},
+						RWHosts:     []string{"127.0.0.1", "10.0.0.0/255.255.255.0"},
+					}, nil)
+
+				clientMock.On("ModifyNFSExport", mock.Anything,
+					mock.Anything, exportID).Return(gopowerstore.CreateResponse{}, nil)
+
+				req := &csi.ControllerUnpublishVolumeRequest{VolumeId: validNfsVolumeID, NodeId: validNodeID}
+
+				res, err := ctrlSvc.ControllerUnpublishVolume(context.Background(), req)
+				Expect(err).To(BeNil())
+				Expect(res).To(Equal(&csi.ControllerUnpublishVolumeResponse{}))
+
+				//setting externalAccess environment variable
+				err = csictx.Setenv(context.Background(), common.EnvExternalAccess, "")
+				Expect(err).To(BeNil())
+				_ = ctrlSvc.Init()
 			})
 		})
 

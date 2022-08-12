@@ -25,6 +25,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"regexp"
 	"sort"
@@ -33,6 +34,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/apparentlymart/go-cidr/cidr"
 	"github.com/dell/csi-powerstore/core"
 	"github.com/dell/csi-powerstore/pkg/common/fs"
 	"github.com/dell/gobrick"
@@ -299,4 +301,25 @@ func GetNVMEFCTargetInfoFromStorage(client gopowerstore.Client, volumeApplianceI
 		}
 	}
 	return result, nil
+}
+
+// ParseCIDR parses the CIDR address to the valid start IP range with Mask
+func ParseCIDR(externalAccessCIDR string) (string, error) {
+	ip, ipnet, err := net.ParseCIDR(externalAccessCIDR)
+	if err != nil {
+		return "", err
+	}
+	log.Debug("Parsed CIDR:", externalAccessCIDR, "-> ip:", ip, " net:", ipnet)
+	start, _ := cidr.AddressRange(ipnet)
+	fromString, err := GetIPListWithMaskFromString(externalAccessCIDR)
+	if err != nil {
+		return "", err
+	}
+	log.Debug("IP with Mask:", fromString)
+	s := strings.Split(fromString, "/")
+
+	// ExernalAccess IP consists of Starting range IP of CIDR+Mask and hence concatenating the same to remove from the array
+	externalAccess := start.String() + "/" + s[1]
+
+	return externalAccess, nil
 }
