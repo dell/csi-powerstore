@@ -1006,6 +1006,7 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 					}
 
 					log.Infof("Discovering NVMeFC targets")
+					nvmefcConnectCount := 0
 					for _, info := range nvmefcInfo {
 						NVMeFCTargets, err := s.nvmeLib.DiscoverNVMeFCTargets(info.Portal, false)
 						if err != nil {
@@ -1016,11 +1017,15 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 								err = s.nvmeLib.NVMeFCConnect(target, false)
 								if err != nil {
 									log.Errorf("couldn't connect to NVMeFC target")
+								} else {
+									nvmefcConnectCount = nvmefcConnectCount + 1
 								}
 							}
 						}
 					}
-					resp.AccessibleTopology.Segments[common.Name+"/"+arr.GetIP()+"-nvmefc"] = "true"
+					if nvmefcConnectCount != 0 {
+						resp.AccessibleTopology.Segments[common.Name+"/"+arr.GetIP()+"-nvmefc"] = "true"
+					}
 				} else {
 					infoList, err := common.GetISCSITargetsInfoFromStorage(arr.GetClient(), "")
 					if err != nil {
@@ -1029,6 +1034,7 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 					}
 
 					log.Infof("Discovering NVMeTCP targets")
+					nvmetcpConnectCount := 0
 					nvmeIP := strings.Split(infoList[0].Portal, ":")
 					nvmeTargets, err := s.nvmeLib.DiscoverNVMeTCPTargets(nvmeIP[0], false)
 					if err != nil {
@@ -1039,10 +1045,14 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 							err = s.nvmeLib.NVMeTCPConnect(target, false)
 							if err != nil {
 								log.Infof("couldn't connect to NVMeTCP targets")
+							} else {
+								nvmetcpConnectCount = nvmetcpConnectCount + 1
 							}
 						}
 					}
-					resp.AccessibleTopology.Segments[common.Name+"/"+arr.GetIP()+"-nvmetcp"] = "true"
+					if nvmetcpConnectCount != 0 {
+						resp.AccessibleTopology.Segments[common.Name+"/"+arr.GetIP()+"-nvmetcp"] = "true"
+					}
 				}
 
 			} else if s.useFC {
