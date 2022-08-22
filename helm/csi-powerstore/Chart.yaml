@@ -2,7 +2,7 @@ name: csi-powerstore
 apiVersion: v2
 version: 2.4.0
 appVersion: "2.4.0"
-kubeVersion: ">= 1.21.0 < 1.25.0"
+kubeVersion: ">= 1.21.0-0 < 1.25.0-0"
 description: |
   PowerStore CSI (Container Storage Interface) driver Kubernetes
   integration. This chart includes everything required to provision via CSI as
