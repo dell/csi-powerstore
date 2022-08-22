@@ -3066,8 +3066,9 @@ var _ = Describe("CSINodeService", func() {
 				clientMock.On("GetFCPorts", mock.Anything).
 					Return([]gopowerstore.FcPort{
 						{
-							WwnNVMe: validFCTargetWWNNVMe[0],
-							WwnNode: validFCTargetWWNNode[0],
+							WwnNVMe:  validFCTargetWWNNVMe[0],
+							WwnNode:  validFCTargetWWNNode[0],
+							IsLinkUp: true,
 						},
 					}, nil)
 				conn, _ := net.Dial("udp", "127.0.0.1:80")
@@ -3088,6 +3089,42 @@ var _ = Describe("CSINodeService", func() {
 						},
 					},
 				}))
+			})
+
+			When("NVMeFC targets cannot be discovered", func() {
+				It("should not return NVMeFC topology segments", func() {
+					nodeSvc.useNVME = true
+					nodeSvc.useFC = true
+					clientMock.On("GetCluster", mock.Anything).
+						Return(gopowerstore.Cluster{
+							Name:    validClusterName,
+							NVMeNQN: validNVMEInitiators[0],
+						}, nil)
+					clientMock.On("GetFCPorts", mock.Anything).
+						Return([]gopowerstore.FcPort{
+							{
+								WwnNVMe: validFCTargetWWNNVMe[0],
+								WwnNode: validFCTargetWWNNode[0],
+							},
+						}, nil)
+					conn, _ := net.Dial("udp", "127.0.0.1:80")
+					fsMock.On("NetDial", mock.Anything).Return(
+						conn,
+						nil,
+					)
+
+					res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
+					Expect(err).To(BeNil())
+					Expect(res).To(Equal(&csi.NodeGetInfoResponse{
+						NodeId: nodeSvc.nodeID,
+						AccessibleTopology: &csi.Topology{
+							Segments: map[string]string{
+								common.Name + "/" + firstValidIP + "-nfs":  "true",
+								common.Name + "/" + secondValidIP + "-nfs": "true",
+							},
+						},
+					}))
+				})
 			})
 		})
 
@@ -3119,6 +3156,32 @@ var _ = Describe("CSINodeService", func() {
 						},
 					},
 				}))
+			})
+
+			When("we cannot get NVMeTCP targets from the array", func() {
+				It("should not return NVMeTCP topology segments", func() {
+					nodeSvc.useNVME = true
+					nodeSvc.useFC = false
+					e := "internalerror"
+					clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
+						Return([]gopowerstore.IPPoolAddress{}, errors.New(e))
+					conn, _ := net.Dial("udp", "127.0.0.1:80")
+					fsMock.On("NetDial", mock.Anything).Return(
+						conn,
+						nil,
+					)
+					res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
+					Expect(err).To(BeNil())
+					Expect(res).To(Equal(&csi.NodeGetInfoResponse{
+						NodeId: nodeSvc.nodeID,
+						AccessibleTopology: &csi.Topology{
+							Segments: map[string]string{
+								common.Name + "/" + firstValidIP + "-nfs":  "true",
+								common.Name + "/" + secondValidIP + "-nfs": "true",
+							},
+						},
+					}))
+				})
 			})
 		})
 	})
