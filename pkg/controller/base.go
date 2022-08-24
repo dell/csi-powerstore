@@ -133,7 +133,7 @@ func detachVolumeFromHost(ctx context.Context, hostID string, volumeID string, c
 		if apiError.HostIsNotExist() {
 			return status.Errorf(codes.NotFound, "host with ID '%s' not found", hostID)
 		}
-		if !apiError.VolumeIsNotAttachedToHost() && !apiError.HostIsNotAttachedToVolume() && !apiError.NotFound() {
+		if !apiError.VolumeIsNotAttachedToHost() && !apiError.HostIsNotAttachedToVolume() && !apiError.NotFound() && !apiError.VolumeDetachedFromHost() {
 			return status.Errorf(codes.Unknown, "unexpected api error when detaching volume from host:%s", err.Error())
 		}
 
