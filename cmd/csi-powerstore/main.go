@@ -220,6 +220,10 @@ func updateDriverConfigParams(v *viper.Viper) {
 			}
 		}
 	}
+	if level == log.DebugLevel {
+		// this adds the caller as 'method' in the log
+		log.SetReportCaller(true)
+	}
 	log.SetLevel(level)
 }
 
