@@ -91,7 +91,7 @@ type UtilInterface interface {
 	IssueLIPToAllFCHosts(ctx context.Context) error
 	GetSysBlockDevicesForVolumeWWN(ctx context.Context, volumeWWN string) ([]string, error)
 	DeviceRescan(ctx context.Context, devicePath string) error
-	ResizeFS(ctx context.Context, volumePath, devicePath, mpathDevice, fsType string) error
+	ResizeFS(ctx context.Context, volumePath, devicePath, ppathDevice, mpathDevice, fsType string) error
 	GetMountInfoFromDevice(ctx context.Context, devID string) (*gofsutil.DeviceMountInfo, error)
 	ResizeMultipath(ctx context.Context, deviceName string) error
 	FindFSType(ctx context.Context, mountpoint string) (fsType string, err error)
