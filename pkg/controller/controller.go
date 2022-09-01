@@ -234,7 +234,7 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 		volResp.VolumeId = volResp.VolumeId + "/" + arr.GetGlobalID() + "/" + protocol
 		if useNFS {
 			topology = common.GetNfsTopology(arr.GetIP())
-			log.Info("Modified topology to nfs for %s", req.GetName())
+			log.Infof("Modified topology to nfs for %s", req.GetName())
 		}
 		volResp.AccessibleTopology = topology
 		return &csi.CreateVolumeResponse{
@@ -353,7 +353,7 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 		volumeResponse.VolumeContext[common.KeyNfsACL] = nfsAcls
 		volumeResponse.VolumeContext[common.KeyNasName] = arr.GetNasName()
 		topology = common.GetNfsTopology(arr.GetIP())
-		log.Info("Modified topology to nfs for %s", req.GetName())
+		log.Infof("Modified topology to nfs for %s", req.GetName())
 	}
 
 	volumeResponse.VolumeId = volumeResponse.VolumeId + "/" + arr.GetGlobalID() + "/" + protocol

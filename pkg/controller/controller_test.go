@@ -439,6 +439,7 @@ var _ = Describe("CSIControllerService", func() {
 							controller.KeyCSIPVCName:      req.Name,
 							controller.KeyCSIPVCNamespace: validNamespaceName,
 						},
+						AccessibleTopology: []*csi.Topology{{Segments: map[string]string{common.Name + "/" + ctrlSvc.Arrays()[secondValidID].GetIP() + "-nfs": "true"}}},
 					},
 				}))
 			})
@@ -474,6 +475,7 @@ var _ = Describe("CSIControllerService", func() {
 							controller.KeyCSIPVCName:      req.Name,
 							controller.KeyCSIPVCNamespace: validNamespaceName,
 						},
+						AccessibleTopology: []*csi.Topology{{Segments: map[string]string{common.Name + "/" + ctrlSvc.Arrays()[secondValidID].GetIP() + "-nfs": "true"}}},
 					},
 				}))
 			})
@@ -508,6 +510,7 @@ var _ = Describe("CSIControllerService", func() {
 							controller.KeyCSIPVCName:      req.Name,
 							controller.KeyCSIPVCNamespace: validNamespaceName,
 						},
+						AccessibleTopology: []*csi.Topology{{Segments: map[string]string{common.Name + "/" + ctrlSvc.Arrays()[secondValidID].GetIP() + "-nfs": "true"}}},
 					},
 				}))
 			})
@@ -540,6 +543,7 @@ var _ = Describe("CSIControllerService", func() {
 							controller.KeyCSIPVCName:      req.Name,
 							controller.KeyCSIPVCNamespace: validNamespaceName,
 						},
+						AccessibleTopology: []*csi.Topology{{Segments: map[string]string{common.Name + "/" + ctrlSvc.Arrays()[secondValidID].GetIP() + "-nfs": "true"}}},
 					},
 				}))
 			})
@@ -577,6 +581,7 @@ var _ = Describe("CSIControllerService", func() {
 							controller.KeyCSIPVCName:      req.Name,
 							controller.KeyCSIPVCNamespace: validNamespaceName,
 						},
+						AccessibleTopology: []*csi.Topology{{Segments: map[string]string{common.Name + "/" + ctrlSvc.Arrays()[secondValidID].GetIP() + "-nfs": "true"}}},
 					},
 				}))
 			})
@@ -590,7 +595,10 @@ var _ = Describe("CSIControllerService", func() {
 				req.Parameters[controller.KeyCSIPVCName] = req.Name
 				req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
 
-				req.AccessibilityRequirements = nil
+				iscsiTopology := &csi.Topology{Segments: map[string]string{common.Name + "/" + ctrlSvc.Arrays()[secondValidID].GetIP() + "-iscsi": "true"}}
+				preferred := []*csi.Topology{iscsiTopology}
+				accessibilityRequirements := &csi.TopologyRequirement{Preferred: preferred}
+				req.AccessibilityRequirements = accessibilityRequirements
 
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
 
@@ -715,6 +723,7 @@ var _ = Describe("CSIControllerService", func() {
 							controller.KeyCSIPVCName:      req.Name,
 							controller.KeyCSIPVCNamespace: validNamespaceName,
 						},
+						AccessibleTopology: []*csi.Topology{{Segments: map[string]string{common.Name + "/" + ctrlSvc.Arrays()[secondValidID].GetIP() + "-nfs": "true"}}},
 					},
 				}))
 			})
@@ -851,7 +860,8 @@ var _ = Describe("CSIControllerService", func() {
 						VolumeContext: map[string]string{
 							common.KeyArrayID: secondValidID,
 						},
-						ContentSource: contentSource,
+						ContentSource:      contentSource,
+						AccessibleTopology: []*csi.Topology{{Segments: map[string]string{common.Name + "/" + ctrlSvc.Arrays()[secondValidID].GetIP() + "-nfs": "true"}}},
 					},
 				}))
 			})
@@ -935,7 +945,8 @@ var _ = Describe("CSIControllerService", func() {
 						VolumeContext: map[string]string{
 							common.KeyArrayID: secondValidID,
 						},
-						ContentSource: contentSource,
+						ContentSource:      contentSource,
+						AccessibleTopology: []*csi.Topology{{Segments: map[string]string{common.Name + "/" + ctrlSvc.Arrays()[secondValidID].GetIP() + "-nfs": "true"}}},
 					},
 				}))
 			})
