@@ -105,6 +105,7 @@ func setVariables() {
 		Insecure:      true,
 		IsDefault:     true,
 		Client:        clientMock,
+		IP:            "192.168.0.1",
 	}
 	second := &array.PowerStoreArray{
 		Endpoint:      "https://192.168.0.2/api/rest",
@@ -115,6 +116,7 @@ func setVariables() {
 		BlockProtocol: common.NoneTransport,
 		Insecure:      true,
 		Client:        clientMock,
+		IP:            "192.168.0.2",
 	}
 
 	arrays[firstValidID] = first
@@ -575,6 +577,60 @@ var _ = Describe("CSIControllerService", func() {
 							controller.KeyCSIPVCName:      req.Name,
 							controller.KeyCSIPVCNamespace: validNamespaceName,
 						},
+					},
+				}))
+			})
+		})
+
+		When("creating nfs volume without nfs topology in AccessibilityRequirements", func() {
+			It("should fail", func() {
+				req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
+				req.Parameters[common.KeyArrayID] = secondValidID
+
+				req.Parameters[controller.KeyCSIPVCName] = req.Name
+				req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
+
+				req.AccessibilityRequirements = nil
+
+				res, err := ctrlSvc.CreateVolume(context.Background(), req)
+
+				Expect(res).To(BeNil())
+				Expect(err).ToNot(BeNil())
+				Expect(err.Error()).To(ContainSubstring("invalid topology requested for NFS Volume. Please validate your storage class has nfs topology."))
+			})
+		})
+
+		When("creating nfs volume with more than one topology in AccessibilityRequirements", func() {
+			It("should return only nfs topology", func() {
+				clientMock.On("GetNASByName", mock.Anything, validNasName).Return(gopowerstore.NAS{ID: validNasID}, nil)
+				clientMock.On("CreateFS", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
+
+				req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
+				req.Parameters[common.KeyArrayID] = secondValidID
+
+				req.Parameters[controller.KeyCSIPVCName] = req.Name
+				req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
+
+				iscsiTopology := &csi.Topology{Segments: map[string]string{common.Name + "/" + ctrlSvc.Arrays()[secondValidID].GetIP() + "-iscis": "true"}}
+				req.AccessibilityRequirements.Preferred = append(req.AccessibilityRequirements.Preferred, iscsiTopology)
+
+				res, err := ctrlSvc.CreateVolume(context.Background(), req)
+				Expect(err).To(BeNil())
+				Expect(res).To(Equal(&csi.CreateVolumeResponse{
+					Volume: &csi.Volume{
+						CapacityBytes: validVolSize,
+						VolumeId:      filepath.Join(validBaseVolID, secondValidID, "nfs"),
+						VolumeContext: map[string]string{
+							common.KeyArrayVolumeName:     "my-vol",
+							common.KeyProtocol:            "nfs",
+							common.KeyArrayID:             secondValidID,
+							common.KeyNfsACL:              "A::OWNER@:RWX",
+							common.KeyNasName:             validNasName,
+							common.KeyVolumeDescription:   req.Name + "-" + validNamespaceName,
+							controller.KeyCSIPVCName:      req.Name,
+							controller.KeyCSIPVCNamespace: validNamespaceName,
+						},
+						AccessibleTopology: []*csi.Topology{{Segments: map[string]string{common.Name + "/" + ctrlSvc.Arrays()[secondValidID].GetIP() + "-nfs": "true"}}},
 					},
 				}))
 			})
@@ -3848,6 +3904,11 @@ func getTypicalCreateVolumeNFSRequest(name string, size int64) *csi.CreateVolume
 	capabilities := make([]*csi.VolumeCapability, 0)
 	capabilities = append(capabilities, getVolumeCapabilityNFS())
 	req.VolumeCapabilities = capabilities
+
+	nfsTopology := &csi.Topology{Segments: map[string]string{common.Name + "/" + ctrlSvc.Arrays()[secondValidID].GetIP() + "-nfs": "true"}}
+	preferred := []*csi.Topology{nfsTopology}
+	accessibilityRequirements := &csi.TopologyRequirement{Preferred: preferred}
+	req.AccessibilityRequirements = accessibilityRequirements
 	return req
 }
 
