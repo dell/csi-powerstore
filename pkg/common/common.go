@@ -35,6 +35,7 @@ import (
 	"time"
 
 	"github.com/apparentlymart/go-cidr/cidr"
+	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-powerstore/core"
 	"github.com/dell/csi-powerstore/pkg/common/fs"
 	"github.com/dell/gobrick"
@@ -322,4 +323,26 @@ func ParseCIDR(externalAccessCIDR string) (string, error) {
 	externalAccess := start.String() + "/" + s[1]
 
 	return externalAccess, nil
+}
+
+// Checks if requiredTopology is present in the topology array and is true
+func HasRequiredTopology(topologies []*csi.Topology, arrIP string, requiredTopology string) bool {
+	if len(topologies) == 0 || len(arrIP) == 0 || len(requiredTopology) == 0 {
+		return false
+	}
+
+	topologyKey := Name + "/" + arrIP + "-" + strings.ToLower(requiredTopology)
+	for _, topology := range topologies {
+		if value, ok := topology.Segments[topologyKey]; ok && strings.EqualFold(value, "true") {
+			return true
+		}
+	}
+	return false
+}
+
+// Returns a topology array with only nfs
+func GetNfsTopology(arrIP string) []*csi.Topology {
+	nfsTopology := new(csi.Topology)
+	nfsTopology.Segments = map[string]string{Name + "/" + arrIP + "-nfs": "true"}
+	return []*csi.Topology{nfsTopology}
 }
