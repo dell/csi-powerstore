@@ -325,7 +325,7 @@ func ParseCIDR(externalAccessCIDR string) (string, error) {
 	return externalAccess, nil
 }
 
-// Checks if requiredTopology is present in the topology array and is true
+// HasRequiredTopology Checks if requiredTopology is present in the topology array and is true
 func HasRequiredTopology(topologies []*csi.Topology, arrIP string, requiredTopology string) bool {
 	if len(topologies) == 0 || len(arrIP) == 0 || len(requiredTopology) == 0 {
 		return false
@@ -340,7 +340,7 @@ func HasRequiredTopology(topologies []*csi.Topology, arrIP string, requiredTopol
 	return false
 }
 
-// Returns a topology array with only nfs
+// GetNfsTopology Returns a topology array with only nfs
 func GetNfsTopology(arrIP string) []*csi.Topology {
 	nfsTopology := new(csi.Topology)
 	nfsTopology.Segments = map[string]string{Name + "/" + arrIP + "-nfs": "true"}
