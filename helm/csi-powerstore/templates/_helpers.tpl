@@ -44,7 +44,7 @@ Return the appropriate sidecar images based on k8s version
 {{- define "csi-powerstore.healthmonitorImage" -}}
   {{- if eq .Capabilities.KubeVersion.Major "1" }}
     {{- if and (ge (trimSuffix "+" .Capabilities.KubeVersion.Minor) "21") (le (trimSuffix "+" .Capabilities.KubeVersion.Minor) "24") -}}
-      {{- print "gcr.io/k8s-staging-sig-storage/csi-external-health-monitor-controller:v0.5.0" -}}
+      {{- print "gcr.io/k8s-staging-sig-storage/csi-external-health-monitor-controller:v0.6.0" -}}
     {{- end -}}
   {{- end -}}
 {{- end -}}
