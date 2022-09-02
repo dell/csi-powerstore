@@ -149,6 +149,13 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 		}
 	}
 
+	// Prevent user from creating an NFS volume with incorrect topology(e.g. iscsi, nvme). At least one entry for nfs should be present in the topology, otherwise return an error
+	if useNFS && req.AccessibilityRequirements != nil {
+		if ok := common.HasRequiredTopology(req.AccessibilityRequirements.Preferred, arr.GetIP(), "nfs"); !ok {
+			return nil, status.Errorf(codes.InvalidArgument, "invalid topology requested for NFS Volume. Please validate your storage class has nfs topology.")
+		}
+	}
+
 	var creator VolumeCreator
 	var protocol string
 
@@ -225,6 +232,10 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 			return nil, err
 		}
 		volResp.VolumeId = volResp.VolumeId + "/" + arr.GetGlobalID() + "/" + protocol
+		if useNFS {
+			topology = common.GetNfsTopology(arr.GetIP())
+			log.Infof("Modified topology to nfs for %s", req.GetName())
+		}
 		volResp.AccessibleTopology = topology
 		return &csi.CreateVolumeResponse{
 			Volume: volResp,
@@ -341,6 +352,8 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 	if useNFS {
 		volumeResponse.VolumeContext[common.KeyNfsACL] = nfsAcls
 		volumeResponse.VolumeContext[common.KeyNasName] = arr.GetNasName()
+		topology = common.GetNfsTopology(arr.GetIP())
+		log.Infof("Modified topology to nfs for %s", req.GetName())
 	}
 
 	volumeResponse.VolumeId = volumeResponse.VolumeId + "/" + arr.GetGlobalID() + "/" + protocol
