@@ -885,14 +885,16 @@ func (s *Service) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolum
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	if fsType == "xfs" && xfsNew {
-		err = s.Fs.GetUtil().ResizeFS(context.Background(), devMnt.MountPoint, devicePath, "", fsType)
+		// Passing empty string for ppathDevice since we don't need the powerpath device
+		err = s.Fs.GetUtil().ResizeFS(context.Background(), devMnt.MountPoint, devicePath, "", "", fsType)
 		if err != nil {
 			log.Errorf("Failed to resize filesystem: mountpoint (%s) device (%s) with error (%s)",
 				devMnt.MountPoint, devicePath, err.Error())
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 	} else {
-		err = s.Fs.GetUtil().ResizeFS(context.Background(), devMnt.MountPoint, devicePath, devMnt.MPathName, fsType)
+		// Passing empty string for ppathDevice since we don't need the powerpath device
+		err = s.Fs.GetUtil().ResizeFS(context.Background(), devMnt.MountPoint, devicePath, "", devMnt.MPathName, fsType)
 		if err != nil {
 			log.Errorf("Failed to resize filesystem: mountpoint (%s) device (%s) with error (%s)",
 				devMnt.MountPoint, devicePath, err.Error())
