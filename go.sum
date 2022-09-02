@@ -107,8 +107,8 @@ github.com/dell/dell-csi-extensions/common v1.1.0 h1:BFWoXdAennOs+fFiYqsGo02AU27
 github.com/dell/dell-csi-extensions/common v1.1.0/go.mod h1:x68COjv2yqphSmGWZDPV9WcBENA9+e8v21aGFO5i3PQ=
 github.com/dell/dell-csi-extensions/replication v1.2.0 h1:zOJgSMvZOXl4fVJzP98vh26J2i17cbdMARm2bi/b++w=
 github.com/dell/dell-csi-extensions/replication v1.2.0/go.mod h1:FU2kzS8/29GlK9iCdS+E70cyeWun63eNP44aHwg7jW8=
-github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.2.0 h1:uFt9JnQ/Wdvka3Lwov65NYqdbTsUAZPpNVOcAKBJlig=
-github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.2.0/go.mod h1:etLWwS1G2IqHDuArHqB0OWQvpdcztuBxopWrRE+mpk0=
+github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.2.2-0.20220823070737-c80a2164070b h1:PIKiU3qwTIUb4vSLUghB3hsgbuRUA84jaePt/Ds8r5c=
+github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.2.2-0.20220823070737-c80a2164070b/go.mod h1:etLWwS1G2IqHDuArHqB0OWQvpdcztuBxopWrRE+mpk0=
 github.com/dell/gobrick v1.4.1-0.20220830073454-aa4b5fdf0c0f h1:jsA5qHyTUAh6cp4VW38JnADJ4j33yRTujm6cXGZpRLg=
 github.com/dell/gobrick v1.4.1-0.20220830073454-aa4b5fdf0c0f/go.mod h1:lOMT+a9zXYa6bPH/Dj7/wgb/z+dmO3VizxokmZMF2Hs=
 github.com/dell/gocsi v1.6.0 h1:ZmoMi17v1jK0RE0OGEivu52/RqHbOhP5cqs9SHExqa0=
