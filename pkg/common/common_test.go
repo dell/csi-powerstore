@@ -25,6 +25,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-powerstore/mocks"
 	"github.com/dell/csi-powerstore/pkg/common"
 	csictx "github.com/dell/gocsi/context"
@@ -153,5 +154,54 @@ func TestParseCIDR(t *testing.T) {
 		parsedIP, err := common.ParseCIDR("10.0.0.0/24")
 		assert.NoError(t, err, "CIDR Parsed successfully")
 		assert.NotEmpty(t, parsedIP)
+	})
+}
+
+func TestHasRequiredTopology(t *testing.T) {
+	nfsTopology := &csi.Topology{Segments: map[string]string{"csi-powerstore.dellemc.com/10.0.0.0-nfs": "true"}}
+	iscsiTopology := &csi.Topology{Segments: map[string]string{"csi-powerstore.dellemc.com/10.0.0.0-iscsi": "true"}}
+
+	type args struct {
+		topologies       []*csi.Topology
+		arrIP            string
+		requiredTopology string
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		{
+			name: "only nfs is present in topologies",
+			args: args{topologies: []*csi.Topology{nfsTopology}, arrIP: "10.0.0.0", requiredTopology: "nfs"},
+			want: true,
+		},
+		{
+			name: "nfs & iscsi is present in topologies",
+			args: args{topologies: []*csi.Topology{iscsiTopology, nfsTopology}, arrIP: "10.0.0.0", requiredTopology: "nfs"},
+			want: true,
+		},
+		{
+			name: "nfs is not present in topologies",
+			args: args{topologies: []*csi.Topology{iscsiTopology}, arrIP: "10.0.0.0", requiredTopology: "nfs"},
+			want: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equalf(t, tt.want, common.HasRequiredTopology(tt.args.topologies, tt.args.arrIP, tt.args.requiredTopology), "HasRequiredTopology(%v, %v, %v)", tt.args.topologies, tt.args.arrIP, tt.args.requiredTopology)
+		})
+	}
+}
+
+func TestGetNfsTopology(t *testing.T) {
+	t.Run("nfs topology is true", func(t *testing.T) {
+		topology := common.GetNfsTopology("10.0.0.0")
+		assert.Equal(t, topology, []*csi.Topology{{Segments: map[string]string{"csi-powerstore.dellemc.com/10.0.0.0-nfs": "true"}}})
+	})
+
+	t.Run("nfs topology should not be false", func(t *testing.T) {
+		topology := common.GetNfsTopology("10.0.0.0")
+		assert.NotEqual(t, topology, []*csi.Topology{{Segments: map[string]string{"csi-powerstore.dellemc.com/10.0.0.0-nfs": "false"}}})
 	})
 }
