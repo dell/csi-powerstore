@@ -12,7 +12,7 @@ require (
 	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.2.2-0.20220823070737-c80a2164070b
 	github.com/dell/gobrick v1.5.1
 	github.com/dell/gocsi v1.6.0
-	github.com/dell/gofsutil v1.9.1-0.20220826112338-7e76776fb6cb
+	github.com/dell/gofsutil v1.10.0
 	github.com/dell/goiscsi v1.5.0
 	github.com/dell/gonvme v1.2.0
 	github.com/dell/gopowerstore v1.9.0
