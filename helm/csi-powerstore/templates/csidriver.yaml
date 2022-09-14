@@ -3,6 +3,7 @@ kind: CSIDriver
 metadata:
   name: {{ .Values.driverName }}
 spec:
+  storageCapacity: true
   podInfoOnMount: true
   fsGroupPolicy: {{ .Values.fsGroupPolicy }}
   volumeLifecycleModes:
