@@ -627,7 +627,7 @@ func (s *Service) ControllerUnpublishVolume(ctx context.Context, req *csi.Contro
 			if index >= 0 {
 				modifyHostPayload.RemoveRWHosts = []string{ip + "/255.255.255.255"} // we can't remove without netmask
 
-				// if NAT(ExternalAccess) is enabled then we have to remove the NAT IP also from the NFS Share
+				/* // if NAT(ExternalAccess) is enabled then we have to remove the NAT IP also from the NFS Share
 				if s.externalAccess != "" {
 					externalAccess, err := common.ParseCIDR(s.externalAccess)
 					if err != nil {
@@ -635,7 +635,7 @@ func (s *Service) ControllerUnpublishVolume(ctx context.Context, req *csi.Contro
 					}
 					log.Debug("externalAccess removal IP with mask:", externalAccess)
 					modifyHostPayload.RemoveRWHosts = append(modifyHostPayload.RemoveRWHosts, externalAccess)
-				}
+				} */
 			}
 		}
 		log.Debug("Adarsh - Before modifyHostPayload.RemoveRWRootHosts ", modifyHostPayload.RemoveRWRootHosts)
@@ -646,14 +646,14 @@ func (s *Service) ControllerUnpublishVolume(ctx context.Context, req *csi.Contro
 				modifyHostPayload.RemoveRWRootHosts = []string{ip + "/255.255.255.255"} // we can't remove without netmask
 
 				// if NAT(ExternalAccess) is enabled then we have to remove the NAT IP also from the NFS Share
-				if s.externalAccess != "" {
+				/* if s.externalAccess != "" {
 					externalAccess, err := common.ParseCIDR(s.externalAccess)
 					if err != nil {
 						return nil, status.Errorf(codes.InvalidArgument, "error parsing CIDR")
 					}
 					log.Debug("externalAccess removal IP with mask:", externalAccess)
 					modifyHostPayload.RemoveRWRootHosts = append(modifyHostPayload.RemoveRWRootHosts, externalAccess)
-				}
+				} */
 			}
 		}
 		log.Debug("Adarsh - Before modifyHostPayload.RemoveRWRootHosts ", modifyHostPayload.RemoveRWRootHosts)
