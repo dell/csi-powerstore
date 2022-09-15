@@ -513,6 +513,7 @@ func (s *Service) ControllerPublishVolume(ctx context.Context, req *csi.Controll
 		publisher = &NfsPublisher{
 			ExternalAccess: s.externalAccess,
 		}
+		log.Debug("Adarsh - publisher.ExternalAccess is", s.externalAccess)
 	} else {
 		publisher = &SCSIPublisher{}
 	}
@@ -637,7 +638,7 @@ func (s *Service) ControllerUnpublishVolume(ctx context.Context, req *csi.Contro
 				}
 			}
 		}
-
+		log.Debug("Adarsh - Before modifyHostPayload.RemoveRWRootHosts ", modifyHostPayload.RemoveRWRootHosts)
 		sort.Strings(export.RWRootHosts)
 		index = sort.SearchStrings(export.RWRootHosts, ip)
 		if len(export.RWRootHosts) > 0 {
@@ -655,6 +656,7 @@ func (s *Service) ControllerUnpublishVolume(ctx context.Context, req *csi.Contro
 				}
 			}
 		}
+		log.Debug("Adarsh - Before modifyHostPayload.RemoveRWRootHosts ", modifyHostPayload.RemoveRWRootHosts)
 		// Detach host from nfs export
 		_, err = arr.GetClient().ModifyNFSExport(ctx, &modifyHostPayload, export.ID)
 		if err != nil {

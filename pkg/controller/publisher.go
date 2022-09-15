@@ -231,7 +231,7 @@ func (n *NfsPublisher) Publish(ctx context.Context, req *csi.ControllerPublishVo
 		log.Debug("externalAccess parsed IP:", externalAccess)
 		ipWithNat = append(ipWithNat, externalAccess)
 	}
-
+	log.Debug("Adarsh - ipWithNat is", ipWithNat)
 	// Create NFS export if it doesn't exist
 	_, err = client.GetNFSExportByFileSystemID(ctx, fs.ID)
 	if err != nil {
@@ -256,6 +256,7 @@ func (n *NfsPublisher) Publish(ctx context.Context, req *csi.ControllerPublishVo
 	}
 
 	// Add host IP to existing nfs export
+	log.Debug("Adarsh - ipWithNat that will get updated on the array as HostAccess", ipWithNat)
 	_, err = client.ModifyNFSExport(ctx, &gopowerstore.NFSExportModify{
 		AddRWRootHosts: ipWithNat,
 	}, export.ID)
