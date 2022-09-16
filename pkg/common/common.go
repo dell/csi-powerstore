@@ -306,6 +306,12 @@ func GetNVMEFCTargetInfoFromStorage(client gopowerstore.Client, volumeApplianceI
 
 // ParseCIDR parses the CIDR address to the valid start IP range with Mask
 func ParseCIDR(externalAccessCIDR string) (string, error) {
+	// check if externalAccess has netmask bit or not
+	if !strings.Contains(externalAccessCIDR, "/") {
+		// if externalAccess is a plane ip we can add /32 from our end
+		externalAccessCIDR += "/32"
+		log.Debug("externalAccess after appending netMask bit:", externalAccessCIDR)
+	}
 	ip, ipnet, err := net.ParseCIDR(externalAccessCIDR)
 	if err != nil {
 		return "", err
