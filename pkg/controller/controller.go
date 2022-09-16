@@ -407,7 +407,9 @@ func (s *Service) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest
 				log.Debug("Trying to remove externalAccess IP with mask while deleting the volume:", externalAccess)
 				// we need to construct the payload dynamically otherwise 400 error will be thrown
 				var modifyHostPayload gopowerstore.NFSExportModify
+				// Removing it from RWHosts as well as RWRootHosts... just for future reference
 				modifyHostPayload.RemoveRWHosts = []string{externalAccess}
+				modifyHostPayload.RemoveRWRootHosts = []string{externalAccess}
 				_, err = arr.GetClient().ModifyNFSExport(ctx, &modifyHostPayload, nfsExportResp.ID)
 				if err != nil {
 					if apiError, ok := err.(gopowerstore.APIError); !(ok && apiError.HostAlreadyRemovedFromNFSExport()) {
