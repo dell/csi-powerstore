@@ -205,3 +205,53 @@ func TestGetNfsTopology(t *testing.T) {
 		assert.NotEqual(t, topology, []*csi.Topology{{Segments: map[string]string{"csi-powerstore.dellemc.com/10.0.0.0-nfs": "false"}}})
 	})
 }
+
+func Test_contains(t *testing.T) {
+	type args struct {
+		slice   []string
+		element string
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		{"elementPresent", args{slice: []string{"firstElement", "secondElement"}, element: "secondElement"}, true},
+		{"elementNotPresent", args{slice: []string{"firstElement", "secondElement"}, element: "thirdElement"}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := common.Contains(tt.args.slice, tt.args.element); got != tt.want {
+				t.Errorf("contains() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestExternalAccessAlreadyAdded(t *testing.T) {
+	type args struct {
+		export         gopowerstore.NFSExport
+		externalAccess string
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		{"externalAccessPresentInRWHosts", args{export: gopowerstore.NFSExport{RWHosts: []string{"10.0.0.0"}}, externalAccess: "10.0.0.0"}, true},
+		{"externalAccessNotPresentInRWHosts", args{export: gopowerstore.NFSExport{RWHosts: []string{"10.0.0.0"}}, externalAccess: "10.10.0.0"}, true},
+		{"externalAccessPresentInROHosts", args{export: gopowerstore.NFSExport{ROHosts: []string{"10.0.0.0"}}, externalAccess: "10.0.0.0"}, true},
+		{"externalAccessNotPresentInROHosts", args{export: gopowerstore.NFSExport{ROHosts: []string{"10.0.0.0"}}, externalAccess: "10.10.0.0"}, true},
+		{"externalAccessPresentInRWRootHosts", args{export: gopowerstore.NFSExport{RWRootHosts: []string{"10.0.0.0"}}, externalAccess: "10.0.0.0"}, true},
+		{"externalAccessNotPresentInRWRootHosts", args{export: gopowerstore.NFSExport{RWRootHosts: []string{"10.0.0.0"}}, externalAccess: "10.10.0.0"}, true},
+		{"externalAccessPresentInRORootHosts", args{export: gopowerstore.NFSExport{RORootHosts: []string{"10.0.0.0"}}, externalAccess: "10.0.0.0"}, true},
+		{"externalAccessNotPresentInRORootHosts", args{export: gopowerstore.NFSExport{RORootHosts: []string{"10.0.0.0"}}, externalAccess: "10.10.0.0"}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := common.ExternalAccessAlreadyAdded(tt.args.export, tt.args.externalAccess); got != tt.want {
+				t.Errorf("ExternalAccessAlreadyAdded() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

@@ -352,3 +352,24 @@ func GetNfsTopology(arrIP string) []*csi.Topology {
 	nfsTopology.Segments = map[string]string{Name + "/" + arrIP + "-nfs": "true"}
 	return []*csi.Topology{nfsTopology}
 }
+
+// Contains return true if element is present in the slice
+func Contains(slice []string, element string) bool {
+	for _, a := range slice {
+		if a == element {
+			return true
+		}
+	}
+	return false
+}
+
+// ExternalAccessAlreadyAdded return true if externalAccess is present on ARRAY in any access mode type
+func ExternalAccessAlreadyAdded(export gopowerstore.NFSExport, externalAccess string) bool {
+	externalAccess, _ = ParseCIDR(externalAccess)
+	if Contains(export.RWRootHosts, externalAccess) || Contains(export.RWHosts, externalAccess) || Contains(export.RORootHosts, externalAccess) || Contains(export.ROHosts, externalAccess) {
+		log.Debug("ExternalAccess %s is already added into Host Access list on array", externalAccess)
+		return true
+	}
+	log.Debug("Going to add externalAccess %s into Host Access list on array", externalAccess)
+	return false
+}
