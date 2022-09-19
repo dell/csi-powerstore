@@ -679,7 +679,7 @@ func (s *Service) ControllerUnpublishVolume(ctx context.Context, req *csi.Contro
 		_, err = arr.GetClient().ModifyNFSExport(ctx, &modifyHostPayload, export.ID)
 		if err != nil {
 			if apiError, ok := err.(gopowerstore.APIError); !(ok && apiError.HostAlreadyRemovedFromNFSExport()) {
-				log.Debug("Error %s occured while modifying NFS export during UnPublishVolume", err.Error())
+				log.Debug("Error occured while modifying NFS export during UnPublishVolume", err.Error())
 				return nil, status.Errorf(codes.Internal,
 					"failure when removing new host to nfs export: %s", err.Error())
 			}

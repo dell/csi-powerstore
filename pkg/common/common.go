@@ -367,7 +367,7 @@ func Contains(slice []string, element string) bool {
 func ExternalAccessAlreadyAdded(export gopowerstore.NFSExport, externalAccess string) bool {
 	externalAccess, _ = ParseCIDR(externalAccess)
 	if Contains(export.RWRootHosts, externalAccess) || Contains(export.RWHosts, externalAccess) || Contains(export.RORootHosts, externalAccess) || Contains(export.ROHosts, externalAccess) {
-		log.Debug("ExternalAccess %s is already added into Host Access list on array", externalAccess)
+		log.Debug("ExternalAccess is already added into Host Access list on array: ", externalAccess)
 		return true
 	}
 	log.Debug("Going to add externalAccess into Host Access list on array: ", externalAccess)

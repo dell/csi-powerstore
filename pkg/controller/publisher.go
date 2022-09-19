@@ -260,7 +260,7 @@ func (n *NfsPublisher) Publish(ctx context.Context, req *csi.ControllerPublishVo
 		AddRWRootHosts: ipWithNat,
 	}, export.ID)
 	if err != nil {
-		log.Debug("Error %s while PublishVolume", err.Error())
+		log.Debug("Error while PublishVolume: ", err.Error())
 		if apiError, ok := err.(gopowerstore.APIError); !(ok && (apiError.NotFound() || apiError.HostAlreadyPresentInNFSExport())) {
 			return nil, status.Errorf(codes.Internal, "failure when adding new host to nfs export: %s", err.Error())
 		}

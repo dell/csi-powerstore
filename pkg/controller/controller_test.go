@@ -2392,6 +2392,80 @@ var _ = Describe("CSIControllerService", func() {
 			})
 		})
 
+		It("should succeed [NFS] by removing external access from the HostAccessList", func() {
+			//setting externalAccess environment variable
+			err := csictx.Setenv(context.Background(), common.EnvExternalAccess, "10.0.0.0/16")
+			Expect(err).To(BeNil())
+			_ = ctrlSvc.Init()
+			clientMock.On("GetFsSnapshotsByVolumeID", mock.Anything, validBaseVolID).Return([]gopowerstore.FileSystem{}, nil)
+
+			exportID := "some-export-id"
+
+			clientMock.On("GetFS", mock.Anything, validBaseVolID).
+				Return(gopowerstore.FileSystem{
+					ID: validBaseVolID,
+				}, nil)
+
+			clientMock.On("GetNFSExportByFileSystemID", mock.Anything, validBaseVolID).
+				Return(gopowerstore.NFSExport{
+					ID:          exportID,
+					RWRootHosts: []string{"10.0.0.0/255.255.0.0"},
+				}, nil)
+
+			clientMock.On("ModifyNFSExport", mock.Anything,
+				mock.Anything, exportID).Return(gopowerstore.CreateResponse{}, nil)
+
+			clientMock.On("DeleteFS",
+				mock.AnythingOfType("*context.emptyCtx"),
+				validBaseVolID).
+				Return(gopowerstore.EmptyResponse(""), nil)
+			req := &csi.DeleteVolumeRequest{VolumeId: validNfsVolumeID}
+
+			res, err := ctrlSvc.DeleteVolume(context.Background(), req)
+
+			Expect(err).To(BeNil())
+			Expect(res).To(Equal(&csi.DeleteVolumeResponse{}))
+
+			//setting externalAccess environment variable
+			err = csictx.Setenv(context.Background(), common.EnvExternalAccess, "")
+
+			Expect(err).To(BeNil())
+			_ = ctrlSvc.Init()
+		})
+
+		It("should return error since HostAccessList contain external as well as Host IP too", func() {
+			//setting externalAccess environment variable
+			err := csictx.Setenv(context.Background(), common.EnvExternalAccess, "10.0.0.0/16")
+			Expect(err).To(BeNil())
+			_ = ctrlSvc.Init()
+			clientMock.On("GetFsSnapshotsByVolumeID", mock.Anything, validBaseVolID).Return([]gopowerstore.FileSystem{}, nil)
+
+			exportID := "some-export-id"
+
+			clientMock.On("GetFS", mock.Anything, validBaseVolID).
+				Return(gopowerstore.FileSystem{
+					ID: validBaseVolID,
+				}, nil)
+
+			clientMock.On("GetNFSExportByFileSystemID", mock.Anything, validBaseVolID).
+				Return(gopowerstore.NFSExport{
+					ID:          exportID,
+					RWRootHosts: []string{"10.0.0.0/255.255.0.0", "10.225.0.0/255.255.255.255"},
+				}, nil)
+
+			req := &csi.DeleteVolumeRequest{VolumeId: validNfsVolumeID}
+
+			_, err = ctrlSvc.DeleteVolume(context.Background(), req)
+
+			Expect(err).ToNot(BeNil())
+			Expect(err.Error()).To(ContainSubstring("cannot be deleted as it has associated NFS or SMB shares"))
+			//setting externalAccess environment variable
+			err = csictx.Setenv(context.Background(), common.EnvExternalAccess, "")
+
+			Expect(err).To(BeNil())
+			_ = ctrlSvc.Init()
+		})
+
 		When("volume do not exist", func() {
 			It("should succeed", func() {
 				clientMock.On("GetFS", mock.Anything, validBaseVolID).
