@@ -370,6 +370,6 @@ func ExternalAccessAlreadyAdded(export gopowerstore.NFSExport, externalAccess st
 		log.Debug("ExternalAccess %s is already added into Host Access list on array", externalAccess)
 		return true
 	}
-	log.Debug("Going to add externalAccess %s into Host Access list on array", externalAccess)
+	log.Debug("Going to add externalAccess into Host Access list on array: ", externalAccess)
 	return false
 }
