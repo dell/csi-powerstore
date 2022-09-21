@@ -245,6 +245,15 @@ fsGroupPolicy: ReadWriteOnceWithFSType
 # Allows the controller to round off filesystem to 3Gi which is the minimum supported value
 allowAutoRoundOffFilesystemSize: false
 
+# Storage Capacity Tracking
+storageCapacity:
+  # enabled : Enable/Disable storage capacity tracking
+  # Allowed values:
+  #   true: enable storage capacity tracking
+  #   false: disable storage capacity tracking
+  # Default value: true
+  enabled: true
+
 images:
   # "driver" defines the container image, used for the driver container.
   driverRepository: dellemc
