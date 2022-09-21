@@ -6,7 +6,7 @@ require (
 	github.com/akutz/gosync v0.1.0
 	github.com/apparentlymart/go-cidr v1.1.0
 	github.com/container-storage-interface/spec v1.5.0
-	github.com/dell/csi-metadata-retriever v1.0.0
+	github.com/dell/csi-metadata-retriever v1.1.0
 	github.com/dell/dell-csi-extensions/common v1.1.0
 	github.com/dell/dell-csi-extensions/replication v1.2.0
 	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.2.2-0.20220823070737-c80a2164070b
