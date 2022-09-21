@@ -103,6 +103,8 @@ github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/dell/csi-metadata-retriever v1.0.0 h1:h317lVeU14VZ9pI1tnQnA7rb5UeQD7p1ol9Q4s01GO8=
 github.com/dell/csi-metadata-retriever v1.0.0/go.mod h1:Sj3aeCgIIbH/v6wTgmwt3n2BNTW/PpiBZBt0ppb0VcI=
+github.com/dell/csi-metadata-retriever v1.1.0 h1:w5Laf2AqdIPz7cHCq2im7LcyyZvilCILT1EMid2vius=
+github.com/dell/csi-metadata-retriever v1.1.0/go.mod h1:Sj3aeCgIIbH/v6wTgmwt3n2BNTW/PpiBZBt0ppb0VcI=
 github.com/dell/dell-csi-extensions/common v1.1.0 h1:BFWoXdAennOs+fFiYqsGo02AU27YEYT4jT7YKjWghnw=
 github.com/dell/dell-csi-extensions/common v1.1.0/go.mod h1:x68COjv2yqphSmGWZDPV9WcBENA9+e8v21aGFO5i3PQ=
 github.com/dell/dell-csi-extensions/replication v1.2.0 h1:zOJgSMvZOXl4fVJzP98vh26J2i17cbdMARm2bi/b++w=
