@@ -208,6 +208,7 @@ spec:
             - "--feature-gates=Topology=true"
             - "--enable-capacity={{ (include "csi-powerstore.isStorageCapacitySupported" .) | default false }}"
             - "--capacity-ownerref-level=2"
+            - "--capacity-poll-interval={{ .Values.storageCapacity.pollInterval | default "5m" }}"
           env:
             - name: ADDRESS
               value: /var/run/csi/csi.sock
