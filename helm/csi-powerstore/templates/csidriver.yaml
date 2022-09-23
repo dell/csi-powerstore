@@ -3,7 +3,7 @@ kind: CSIDriver
 metadata:
   name: {{ .Values.driverName }}
 spec:
-  storageCapacity: {{ .Values.storageCapacity.enabled }}
+  storageCapacity: {{ (include "csi-powerstore.isStorageCapacitySupported" .) | default false }}
   podInfoOnMount: true
   fsGroupPolicy: {{ .Values.fsGroupPolicy }}
   volumeLifecycleModes:

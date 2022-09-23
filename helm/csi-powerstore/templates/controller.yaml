@@ -91,6 +91,7 @@ rules:
   {{- end}}
   {{- end}}
   # Permissions for CSIStorageCapacity
+  {{- if eq (include "csi-powerstore.isStorageCapacitySupported" .) "true" }}
   - apiGroups: ["storage.k8s.io"]
     resources: ["csistoragecapacities"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
@@ -100,6 +101,7 @@ rules:
   - apiGroups: ["apps"]
     resources: ["replicasets"]
     verbs: ["get"]
+  {{- end }}
 ---
 
 kind: ClusterRoleBinding
@@ -204,7 +206,7 @@ spec:
             - "--default-fstype={{ .Values.defaultFsType | default "ext4" }}"
             - "--extra-create-metadata"
             - "--feature-gates=Topology=true"
-            - "--enable-capacity"
+            - "--enable-capacity={{ (include "csi-powerstore.isStorageCapacitySupported" .) | default false }}"
             - "--capacity-ownerref-level=2"
           env:
             - name: ADDRESS

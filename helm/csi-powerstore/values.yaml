@@ -246,6 +246,7 @@ fsGroupPolicy: ReadWriteOnceWithFSType
 allowAutoRoundOffFilesystemSize: false
 
 # Storage Capacity Tracking
+# Note: Capacity tracking is supported in kubernetes v1.24 and above, this feature will be automatically disabled in older versions.
 storageCapacity:
   # enabled : Enable/Disable storage capacity tracking
   # Allowed values:
