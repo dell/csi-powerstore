@@ -270,7 +270,7 @@ spec:
             - "--leader-election"
             - "--http-endpoint=:8080"
             - "--enable-node-watcher=true"
-            - "--monitor-interval={{ .Values.controller.healthMonitor.healthMonitorInterval | default "60s" }}"
+            - "--monitor-interval={{ .Values.controller.healthMonitor.interval | default "60s" }}"
             - "--timeout=180s"
           env:
             - name: ADDRESS
