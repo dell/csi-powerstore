@@ -149,14 +149,6 @@ func TestGetNVMEFCTargetInfoFromStorage(t *testing.T) {
 	})
 }
 
-func TestParseCIDR(t *testing.T) {
-	t.Run("parse CIDR", func(t *testing.T) {
-		parsedIP, err := common.ParseCIDR("10.0.0.0/24")
-		assert.NoError(t, err, "CIDR Parsed successfully")
-		assert.NotEmpty(t, parsedIP)
-	})
-}
-
 func TestHasRequiredTopology(t *testing.T) {
 	nfsTopology := &csi.Topology{Segments: map[string]string{"csi-powerstore.dellemc.com/10.0.0.0-nfs": "true"}}
 	iscsiTopology := &csi.Topology{Segments: map[string]string{"csi-powerstore.dellemc.com/10.0.0.0-iscsi": "true"}}
@@ -204,4 +196,82 @@ func TestGetNfsTopology(t *testing.T) {
 		topology := common.GetNfsTopology("10.0.0.0")
 		assert.NotEqual(t, topology, []*csi.Topology{{Segments: map[string]string{"csi-powerstore.dellemc.com/10.0.0.0-nfs": "false"}}})
 	})
+}
+
+func Test_contains(t *testing.T) {
+	type args struct {
+		slice   []string
+		element string
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		{"elementPresent", args{slice: []string{"firstElement", "secondElement"}, element: "secondElement"}, true},
+		{"elementNotPresent", args{slice: []string{"firstElement", "secondElement"}, element: "thirdElement"}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := common.Contains(tt.args.slice, tt.args.element); got != tt.want {
+				t.Errorf("contains() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestExternalAccessAlreadyAdded(t *testing.T) {
+	type args struct {
+		export         gopowerstore.NFSExport
+		externalAccess string
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		{"externalAccessPresentInRWHosts", args{export: gopowerstore.NFSExport{RWHosts: []string{"10.0.0.0/255.255.255.255"}}, externalAccess: "10.0.0.0"}, true},
+		{"externalAccessNotPresentInRWHosts", args{export: gopowerstore.NFSExport{RWHosts: []string{"10.232.0.0/255.255.255.255"}}, externalAccess: "10.10.0.0"}, false},
+		{"externalAccessPresentInROHosts", args{export: gopowerstore.NFSExport{ROHosts: []string{"10.0.0.0/255.255.255.255"}}, externalAccess: "10.0.0.0"}, true},
+		{"externalAccessNotPresentInROHosts", args{export: gopowerstore.NFSExport{ROHosts: []string{"10.232.0.0/255.255.255.255"}}, externalAccess: "10.10.0.0"}, false},
+		{"externalAccessPresentInRWRootHosts", args{export: gopowerstore.NFSExport{RWRootHosts: []string{"10.0.0.0/255.255.255.255"}}, externalAccess: "10.0.0.0"}, true},
+		{"externalAccessNotPresentInRWRootHosts", args{export: gopowerstore.NFSExport{RWRootHosts: []string{"10.232.0.0/255.255.255.255"}}, externalAccess: "10.10.0.0"}, false},
+		{"externalAccessPresentInRORootHosts", args{export: gopowerstore.NFSExport{RORootHosts: []string{"10.0.0.0/255.255.255.255"}}, externalAccess: "10.0.0.0"}, true},
+		{"externalAccessNotPresentInRORootHosts", args{export: gopowerstore.NFSExport{RORootHosts: []string{"10.232.0.0/255.255.255.255"}}, externalAccess: "10.10.0.0"}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := common.ExternalAccessAlreadyAdded(tt.args.export, tt.args.externalAccess); got != tt.want {
+				t.Errorf("ExternalAccessAlreadyAdded() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestParseCIDR(t *testing.T) {
+	type args struct {
+		externalAccessCIDR string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    string
+		wantErr bool
+	}{
+		{"Valid IP with net mask", args{externalAccessCIDR: "10.232.58.2/16"}, "10.232.0.0/255.255.0.0", false},
+		{"Valid IP without net mask", args{externalAccessCIDR: "10.232.58.2"}, "10.232.58.2/255.255.255.255", false},
+		{"InValid IP without net mask", args{externalAccessCIDR: "10.232.58"}, "", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := common.ParseCIDR(tt.args.externalAccessCIDR)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ParseCIDR() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("ParseCIDR() = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }

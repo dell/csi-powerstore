@@ -306,6 +306,12 @@ func GetNVMEFCTargetInfoFromStorage(client gopowerstore.Client, volumeApplianceI
 
 // ParseCIDR parses the CIDR address to the valid start IP range with Mask
 func ParseCIDR(externalAccessCIDR string) (string, error) {
+	// check if externalAccess has netmask bit or not
+	if !strings.Contains(externalAccessCIDR, "/") {
+		// if externalAccess is a plane ip we can add /32 from our end
+		externalAccessCIDR += "/32"
+		log.Debug("externalAccess after appending netMask bit:", externalAccessCIDR)
+	}
 	ip, ipnet, err := net.ParseCIDR(externalAccessCIDR)
 	if err != nil {
 		return "", err
@@ -345,4 +351,25 @@ func GetNfsTopology(arrIP string) []*csi.Topology {
 	nfsTopology := new(csi.Topology)
 	nfsTopology.Segments = map[string]string{Name + "/" + arrIP + "-nfs": "true"}
 	return []*csi.Topology{nfsTopology}
+}
+
+// Contains return true if element is present in the slice
+func Contains(slice []string, element string) bool {
+	for _, a := range slice {
+		if a == element {
+			return true
+		}
+	}
+	return false
+}
+
+// ExternalAccessAlreadyAdded return true if externalAccess is present on ARRAY in any access mode type
+func ExternalAccessAlreadyAdded(export gopowerstore.NFSExport, externalAccess string) bool {
+	externalAccess, _ = ParseCIDR(externalAccess)
+	if Contains(export.RWRootHosts, externalAccess) || Contains(export.RWHosts, externalAccess) || Contains(export.RORootHosts, externalAccess) || Contains(export.ROHosts, externalAccess) {
+		log.Debug("ExternalAccess is already added into Host Access list on array: ", externalAccess)
+		return true
+	}
+	log.Debug("Going to add externalAccess into Host Access list on array: ", externalAccess)
+	return false
 }
