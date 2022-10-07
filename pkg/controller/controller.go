@@ -396,13 +396,57 @@ func (s *Service) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest
 
 		// Validate if filesystem has any NFS or SMB shares or snapshots attached
 		nfsExportResp, _ := arr.GetClient().GetNFSExportByFileSystemID(ctx, id)
+
 		if len(nfsExportResp.ROHosts) > 0 ||
 			len(nfsExportResp.RORootHosts) > 0 ||
 			len(nfsExportResp.RWHosts) > 0 ||
 			len(nfsExportResp.RWRootHosts) > 0 {
-			return nil, status.Errorf(codes.FailedPrecondition,
-				"filesystem %s cannot be deleted as it has associated NFS or SMB shares.",
-				id)
+			// if one entry is there for RWRootHosts or RWHosts, check if this is the same externalAccess defined in value.yaml
+			// if yes modifyNFSExport and remove externalAccess from the HostAcceesList on the array
+			if (len(nfsExportResp.RWRootHosts) == 1 || len(nfsExportResp.RWHosts) == 1) && s.externalAccess != "" {
+				externalAccess, err := common.ParseCIDR(s.externalAccess)
+				if err != nil {
+					log.Debug("error occurred  while parsing externalAccess: ", err.Error(), s.externalAccess)
+					return nil, status.Errorf(codes.FailedPrecondition,
+						"filesystem %s cannot be deleted as it has associated NFS or SMB shares.",
+						id)
+				}
+				modifyNFSExport := false
+				// we need to construct the payload dynamically otherwise 400 error will be thrown
+				var modifyHostPayload gopowerstore.NFSExportModify
+				// Removing externalAccess from RWHosts as well as RWRootHosts
+				if len(nfsExportResp.RWRootHosts) == 1 && externalAccess == nfsExportResp.RWRootHosts[0] {
+					log.Debug("Trying to remove externalAccess IP with mask having RWRootHosts access while deleting the volume: ", externalAccess)
+					modifyNFSExport = true
+					modifyHostPayload.RemoveRWRootHosts = []string{externalAccess}
+				}
+				if len(nfsExportResp.RWHosts) == 1 && externalAccess == nfsExportResp.RWHosts[0] {
+					log.Debug("Trying to remove externalAccess IP with mask having RWHosts access while deleting the volume: ", externalAccess)
+					modifyNFSExport = true
+					modifyHostPayload.RemoveRWHosts = []string{externalAccess}
+				}
+				// call ModifyNFSExport API only when payload is not empty i.e.  something is there to modify
+				if modifyNFSExport {
+					_, err = arr.GetClient().ModifyNFSExport(ctx, &modifyHostPayload, nfsExportResp.ID)
+					if err != nil {
+						log.Debug("failure when removing externalAccess from nfs export: ", err.Error())
+						if apiError, ok := err.(gopowerstore.APIError); !(ok && apiError.HostAlreadyRemovedFromNFSExport()) {
+							return nil, status.Errorf(codes.FailedPrecondition,
+								"filesystem %s cannot be deleted as it has associated NFS or SMB shares.",
+								id)
+						}
+					}
+				} else {
+					// either of RWRootHosts or RWHosts has one entry but it is not externalAccess
+					return nil, status.Errorf(codes.FailedPrecondition,
+						"filesystem %s cannot be deleted as it has associated NFS or SMB shares.",
+						id)
+				}
+			} else {
+				return nil, status.Errorf(codes.FailedPrecondition,
+					"filesystem %s cannot be deleted as it has associated NFS or SMB shares.",
+					id)
+			}
 		}
 		_, err = arr.GetClient().DeleteFS(ctx, id)
 		if err == nil {
@@ -609,6 +653,7 @@ func (s *Service) ControllerUnpublishVolume(ctx context.Context, req *csi.Contro
 		if len(export.ROHosts) > 0 {
 			if index >= 0 {
 				modifyHostPayload.RemoveROHosts = []string{ip + "/255.255.255.255"} // we can't remove without netmask
+				log.Debug("Going to remove IP from ROHosts: ", modifyHostPayload.RemoveROHosts[0])
 			}
 		}
 
@@ -617,48 +662,24 @@ func (s *Service) ControllerUnpublishVolume(ctx context.Context, req *csi.Contro
 		if len(export.RORootHosts) > 0 {
 			if index >= 0 {
 				modifyHostPayload.RemoveRORootHosts = []string{ip + "/255.255.255.255"} // we can't remove without netmask
+				log.Debug("Going to remove IP from RORootHosts: ", modifyHostPayload.RemoveRORootHosts[0])
 			}
 		}
 
-		sort.Strings(export.RWHosts)
-		index = sort.SearchStrings(export.RWHosts, ip)
-		if len(export.RWHosts) > 0 {
-			if index >= 0 {
-				modifyHostPayload.RemoveRWHosts = []string{ip + "/255.255.255.255"} // we can't remove without netmask
-
-				// if NAT(ExternalAccess) is enabled then we have to remove the NAT IP also from the NFS Share
-				if s.externalAccess != "" {
-					externalAccess, err := common.ParseCIDR(s.externalAccess)
-					if err != nil {
-						return nil, status.Errorf(codes.InvalidArgument, "error parsing CIDR")
-					}
-					log.Debug("externalAccess removal IP with mask:", externalAccess)
-					modifyHostPayload.RemoveRWHosts = append(modifyHostPayload.RemoveRWHosts, externalAccess)
-				}
-			}
+		if common.Contains(export.RWHosts, ip+"/255.255.255.255") {
+			modifyHostPayload.RemoveRWHosts = []string{ip + "/255.255.255.255"} // we can't remove without netmask
+			log.Debug("Going to remove IP from RWHosts: ", modifyHostPayload.RemoveRWHosts[0])
 		}
 
-		sort.Strings(export.RWRootHosts)
-		index = sort.SearchStrings(export.RWRootHosts, ip)
-		if len(export.RWRootHosts) > 0 {
-			if index >= 0 {
-				modifyHostPayload.RemoveRWRootHosts = []string{ip + "/255.255.255.255"} // we can't remove without netmask
-
-				// if NAT(ExternalAccess) is enabled then we have to remove the NAT IP also from the NFS Share
-				if s.externalAccess != "" {
-					externalAccess, err := common.ParseCIDR(s.externalAccess)
-					if err != nil {
-						return nil, status.Errorf(codes.InvalidArgument, "error parsing CIDR")
-					}
-					log.Debug("externalAccess removal IP with mask:", externalAccess)
-					modifyHostPayload.RemoveRWRootHosts = append(modifyHostPayload.RemoveRWRootHosts, externalAccess)
-				}
-			}
+		if common.Contains(export.RWRootHosts, ip+"/255.255.255.255") {
+			modifyHostPayload.RemoveRWRootHosts = []string{ip + "/255.255.255.255"} // we can't remove without netmask
+			log.Debug("Going to remove IP from RWRootHosts: ", modifyHostPayload.RemoveRWRootHosts[0])
 		}
 		// Detach host from nfs export
 		_, err = arr.GetClient().ModifyNFSExport(ctx, &modifyHostPayload, export.ID)
 		if err != nil {
 			if apiError, ok := err.(gopowerstore.APIError); !(ok && apiError.HostAlreadyRemovedFromNFSExport()) {
+				log.Debug("Error occured while modifying NFS export during UnPublishVolume", err.Error())
 				return nil, status.Errorf(codes.Internal,
 					"failure when removing new host to nfs export: %s", err.Error())
 			}

@@ -190,20 +190,6 @@ func TestVolumePublisher_Publish(t *testing.T) {
 			assert.Contains(t, err.Error(), "can't find IP in node ID")
 		})
 
-		t.Run("incorrect externalAccess provided", func(t *testing.T) {
-			np.ExternalAccess = "no-ip-found-here"
-			defer func() {
-				np.ExternalAccess = ""
-			}()
-			clientMock := new(mocks.Client)
-
-			getFSOK(clientMock)
-
-			_, err := np.Publish(context.Background(), nil, clientMock, validNodeID, validBaseVolID)
-			assert.Error(t, err)
-			assert.Contains(t, err.Error(), "can't find IP in X_CSI_POWERSTORE_EXTERNAL_ACCESS variable")
-		})
-
 		t.Run("can't check nfs export status", func(t *testing.T) {
 			e := errors.New("random-api-error")
 			clientMock := new(mocks.Client)

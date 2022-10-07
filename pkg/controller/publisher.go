@@ -223,14 +223,6 @@ func (n *NfsPublisher) Publish(ctx context.Context, req *csi.ControllerPublishVo
 
 	ipWithNat := make([]string, 0, 2)
 	ipWithNat = append(ipWithNat, ip)
-	if n.ExternalAccess != "" {
-		externalAccess, err := common.GetIPListWithMaskFromString(n.ExternalAccess)
-		if err != nil {
-			return nil, status.Errorf(codes.InvalidArgument, "can't find IP in X_CSI_POWERSTORE_EXTERNAL_ACCESS variable")
-		}
-		log.Debug("externalAccess parsed IP:", externalAccess)
-		ipWithNat = append(ipWithNat, externalAccess)
-	}
 
 	// Create NFS export if it doesn't exist
 	_, err = client.GetNFSExportByFileSystemID(ctx, fs.ID)
@@ -255,11 +247,20 @@ func (n *NfsPublisher) Publish(ctx context.Context, req *csi.ControllerPublishVo
 		return nil, status.Errorf(codes.Internal, "failure getting nfs export: %s", err.Error())
 	}
 
+	if n.ExternalAccess != "" && !common.ExternalAccessAlreadyAdded(export, n.ExternalAccess) {
+		externalAccess, err := common.GetIPListWithMaskFromString(n.ExternalAccess)
+		if err != nil {
+			return nil, status.Errorf(codes.InvalidArgument, "can't find IP in X_CSI_POWERSTORE_EXTERNAL_ACCESS variable")
+		}
+		log.Debug("externalAccess parsed IP:", externalAccess)
+		ipWithNat = append(ipWithNat, externalAccess)
+	}
 	// Add host IP to existing nfs export
 	_, err = client.ModifyNFSExport(ctx, &gopowerstore.NFSExportModify{
 		AddRWRootHosts: ipWithNat,
 	}, export.ID)
 	if err != nil {
+		log.Debug("Error while PublishVolume: ", err.Error())
 		if apiError, ok := err.(gopowerstore.APIError); !(ok && (apiError.NotFound() || apiError.HostAlreadyPresentInNFSExport())) {
 			return nil, status.Errorf(codes.Internal, "failure when adding new host to nfs export: %s", err.Error())
 		}
@@ -277,7 +278,8 @@ func (n *NfsPublisher) Publish(ctx context.Context, req *csi.ControllerPublishVo
 	publishContext[common.KeyNfsExportPath] = fileInterface.IpAddress + ":/" + export.Name
 	publishContext[common.KeyHostIP] = ipWithNat[0]
 	if n.ExternalAccess != "" {
-		publishContext[common.KeyNatIP] = ipWithNat[1]
+		parsedExternalAccess, _ := common.GetIPListWithMaskFromString(n.ExternalAccess)
+		publishContext[common.KeyNatIP] = parsedExternalAccess
 	}
 	publishContext[common.KeyExportID] = export.ID
 	publishContext[common.KeyAllowRoot] = req.VolumeContext[common.KeyAllowRoot]
