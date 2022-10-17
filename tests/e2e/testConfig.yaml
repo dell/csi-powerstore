@@ -1,0 +1,6 @@
+TestConfig: 
+  ExternalAccess:
+    UserName: "admin"
+    Password: "Password"
+    ExternalAccessIp: "0.0.0.0"
+    Endpoint: "https://0.0.0.0/api/rest"
