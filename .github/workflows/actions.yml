@@ -24,6 +24,7 @@ jobs:
       - name: Run gosec to check for security vulnerabilities
         uses: dell/common-github-actions/gosec-runner@main
         with:
+          exclude-dir: "tests/e2e"
           directories: "./..."
   malware_security_scan:
     name: Malware Scanner
