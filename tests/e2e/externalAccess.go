@@ -2,8 +2,9 @@ package e2etest
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
-	"math/rand"
+	"math/big"
 	"strconv"
 	"time"
 
@@ -44,6 +45,7 @@ var (
 	extCredential    ExternaAccess
 )
 
+// ExternaAccess for storing ExternalAccess credentials
 type ExternaAccess struct {
 	EndPoint         string
 	UserName         string
@@ -89,7 +91,9 @@ var _ = ginkgo.Describe("External Access Test", func() {
 	// Test for external Access feature check
 	ginkgo.It("[csi-externalAccess] Verify Host Access List for exteral access", func() {
 		curtime := time.Now().Unix()
-		randomValue := rand.Int()
+		nBig, err := rand.Int(rand.Reader, big.NewInt(27))
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		randomValue := nBig.Int64()
 		val := strconv.FormatInt(int64(randomValue), 10)
 		val = string(val[1:3])
 		curtimestring := strconv.FormatInt(curtime, 10)
@@ -151,11 +155,11 @@ var _ = ginkgo.Describe("External Access Test", func() {
 
 		gomega.Expect(err).NotTo(gomega.HaveOccurred(),
 			fmt.Sprintf("Failed to connect with PowerStore Array, err: %v", err))
-		checkExternalAccessPresence(clientForArray, ctx, extCredential.ExternalAccessIP, v.GetName(), true)
+		checkExternalAccessPresence(ctx, clientForArray, extCredential.ExternalAccessIP, v.GetName(), true)
 
 		// now in NFS Export only externalIP will be present and other node's IP will be deleted
 		ScaleDownDeployment(client, deploymentObject, namespace, 0)
-		checkExternalAccessPresence(clientForArray, ctx, extCredential.ExternalAccessIP, v.GetName(), true)
+		checkExternalAccessPresence(ctx, clientForArray, extCredential.ExternalAccessIP, v.GetName(), true)
 
 		err = fpv.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred(),
@@ -239,7 +243,7 @@ var _ = ginkgo.Describe("External Access Test", func() {
 				}
 			}
 
-			checkExternalAccessPresence(clientForArray, ctx, extCredential.ExternalAccessIP, pv.GetName(), true)
+			checkExternalAccessPresence(ctx, clientForArray, extCredential.ExternalAccessIP, pv.GetName(), true)
 
 			// deleting all pods
 			replicas = 0
@@ -269,7 +273,7 @@ func getExternalAccessCredential(credential interface{}) (ext ExternaAccess) {
 	return ext
 }
 
-func checkExternalAccessPresence(clientForArray gopowerstore.Client, ctx context.Context, externalAccessIP string, vol string, shouldBePresent bool) {
+func checkExternalAccessPresence(ctx context.Context, clientForArray gopowerstore.Client, externalAccessIP string, vol string, shouldBePresent bool) {
 	nfsExport, err := clientForArray.GetNFSExportByName(ctx, vol)
 	gomega.Expect(err).NotTo(gomega.HaveOccurred(),
 		fmt.Sprintf("Failed to GET NFS export details from Array, err: %v", err))

@@ -63,9 +63,10 @@ func getPvFromClaim(client clientset.Interface, namespace string, claimName stri
 func DeleteDeployment(client clientset.Interface, deploymentObject *apps.Deployment, namespace string) {
 	deletePolicy := metav1.DeletePropagationForeground
 	deploymentsClient := client.AppsV1().Deployments(namespace)
-	deploymentsClient.Delete(context.TODO(), deploymentObject.Name, metav1.DeleteOptions{
+	err := deploymentsClient.Delete(context.TODO(), deploymentObject.Name, metav1.DeleteOptions{
 		PropagationPolicy: &deletePolicy,
 	})
+	framework.ExpectNoError(err)
 }
 
 // ScaleDownDeployment : Decreasing the replica count
@@ -108,7 +109,7 @@ func CreateStatefulSet(ns string, ss *apps.StatefulSet, c clientset.Interface) {
 	fss.WaitForRunningAndReady(c, *ss.Spec.Replicas, ss)
 }
 
-// CreateStatefulSet creates a StatefulSet from the manifest at manifestPath in the given namespace.
+// CreateDeployment creates a deployment in the provided namespace
 func CreateDeployment() (ns string, ss *apps.Deployment, c clientset.Interface) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -310,7 +311,7 @@ func getPersistentVolumeClaimSpecWithStorageClass(namespace string, ds string, s
 }
 
 func readYaml(values string) (map[interface{}]interface{}, error) {
-	yfile, err := os.ReadFile(values)
+	yfile, err := os.ReadFile(filepath.Clean(values))
 	if err != nil {
 		return nil, err
 	}
