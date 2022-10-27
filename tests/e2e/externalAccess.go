@@ -95,7 +95,6 @@ var _ = ginkgo.Describe("External Access Test", func() {
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		randomValue := nBig.Int64()
 		val := strconv.FormatInt(int64(randomValue), 10)
-		val = string(val[1:3])
 		curtimestring := strconv.FormatInt(curtime, 10)
 		scName := "exteral-access-sc-" + curtimestring + val
 
