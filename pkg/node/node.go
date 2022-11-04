@@ -79,6 +79,7 @@ type Service struct {
 
 	useFC                  bool
 	useNVME                bool
+	useDPU                 bool
 	initialized            bool
 	reusedHost             bool
 	isHealthMonitorEnabled bool
@@ -106,6 +107,11 @@ func (s *Service) Init() error {
 
 	if len(iscsiInitiators) == 0 && len(fcInitiators) == 0 && len(nvmeInitiators) == 0 {
 		return nil
+	}
+
+	if len(nvmeInitiators) > 0 {
+		// TODO - Call ConnectNVMe(DPU) API Here
+		s.useDPU = true
 	}
 
 	// Setup host on each of available arrays
@@ -1027,6 +1033,9 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 					}
 					if nvmefcConnectCount != 0 {
 						resp.AccessibleTopology.Segments[common.Name+"/"+arr.GetIP()+"-nvmefc"] = "true"
+						if s.useDPU {
+							resp.AccessibleTopology.Segments[common.Name+"/"+arr.GetIP()+"-nvmefcdpu"] = "true"
+						}
 					}
 				} else {
 					infoList, err := common.GetISCSITargetsInfoFromStorage(arr.GetClient(), "")
@@ -1054,6 +1063,9 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 					}
 					if nvmetcpConnectCount != 0 {
 						resp.AccessibleTopology.Segments[common.Name+"/"+arr.GetIP()+"-nvmetcp"] = "true"
+						if s.useDPU {
+							resp.AccessibleTopology.Segments[common.Name+"/"+arr.GetIP()+"-nvmetcpdpu"] = "true"
+						}
 					}
 				}
 
