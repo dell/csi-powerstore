@@ -4,20 +4,20 @@
 FROM registry.access.redhat.com/ubi8/ubi-minimal:8.6-994
 
 LABEL vendor="Dell Inc." \
-      name="csi-powerstore" \
-      summary="CSI Driver for Dell EMC PowerStore" \
-      description="CSI Driver for provisioning persistent storage from Dell EMC PowerStore" \
-      version="2.5.0" \
-      license="Apache-2.0"
+	name="csi-powerstore" \
+	summary="CSI Driver for Dell EMC PowerStore" \
+	description="CSI Driver for provisioning persistent storage from Dell EMC PowerStore" \
+	version="2.5.0" \
+	license="Apache-2.0"
 
 COPY licenses /licenses
 
 # Adding Centos.repo file
 RUN echo $'[centos] \n\
-name=centos \n\
-baseurl=http://mirror.centos.org/centos-8/8/BaseOS/x86_64/os \n\
-enabled=1 \n\
-gpgcheck=0' > /etc/yum.repos.d/centos.repo
+	name=centos \n\
+	baseurl=http://mirror.centos.org/centos-8/8/BaseOS/x86_64/os \n\
+	enabled=1 \n\
+	gpgcheck=0' > /etc/yum.repos.d/centos.repo
 
 # dependencies, following by cleaning the cache
 RUN yum -y update && \
