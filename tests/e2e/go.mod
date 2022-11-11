@@ -15,7 +15,7 @@ require (
 
 require (
 	github.com/dell/csi-powerstore v1.4.1
-	github.com/dell/gopowerstore v1.9.1-0.20221004062336-0c5a119d65a0
+	github.com/dell/gopowerstore v1.9.1-0.20221111063542-e9a00cb9876c
 	gopkg.in/yaml.v2 v2.4.0
 )
 
@@ -29,11 +29,11 @@ require (
 	github.com/container-storage-interface/spec v1.5.0 // indirect
 	github.com/cyphar/filepath-securejoin v0.2.3 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/dell/gobrick v1.5.1 // indirect
+	github.com/dell/gobrick v1.5.2-0.20221111070858-42c3a4484fa7 // indirect
 	github.com/dell/gocsi v1.6.0 // indirect
 	github.com/dell/gofsutil v1.10.0 // indirect
 	github.com/dell/goiscsi v1.5.0 // indirect
-	github.com/dell/gonvme v1.2.0 // indirect
+	github.com/dell/gonvme v1.2.1-0.20221111064610-e2ea406d3203 // indirect
 	github.com/docker/distribution v2.8.0+incompatible // indirect
 	github.com/evanphx/json-patch v5.6.0+incompatible // indirect
 	github.com/felixge/httpsnoop v1.0.1 // indirect
@@ -63,7 +63,7 @@ require (
 	github.com/nxadm/tail v1.4.8 // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
-	github.com/opencontainers/runc v1.1.0 // indirect
+	github.com/opencontainers/runc v1.1.4 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/prometheus/client_golang v1.12.2 // indirect
 	github.com/prometheus/client_model v0.2.0 // indirect
