@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"sort"
 	"strconv"
+	"strings"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-powerstore/core"
@@ -344,10 +345,14 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 		volumeResponse = getCSIVolume(resp.ID, sizeInBytes)
 	}
 
+	// Fetch the service tag
+	var serviceTag = GetServiceTag(ctx, req, arr, resp.ID, protocol)
+
 	volumeResponse.VolumeContext = req.Parameters
 	volumeResponse.VolumeContext[common.KeyArrayID] = arr.GetGlobalID()
 	volumeResponse.VolumeContext[common.KeyArrayVolumeName] = req.Name
 	volumeResponse.VolumeContext[common.KeyProtocol] = protocol
+	volumeResponse.VolumeContext[common.KeyServiceTag] = serviceTag
 
 	if useNFS {
 		volumeResponse.VolumeContext[common.KeyNfsACL] = nfsAcls
@@ -688,6 +693,43 @@ func (s *Service) ControllerUnpublishVolume(ctx context.Context, req *csi.Contro
 	}
 
 	return nil, status.Errorf(codes.InvalidArgument, "can't figure out protocol")
+}
+
+// GetServiceTag returns the service tag associated with an appliance
+func GetServiceTag(ctx context.Context, req *csi.CreateVolumeRequest, arr *array.PowerStoreArray, volID string, protocol string) string {
+	var ap gopowerstore.ApplianceInstance
+	var vol gopowerstore.Volume
+	var f gopowerstore.FileSystem
+	var nas gopowerstore.NAS
+	var applianceName string
+
+	if applianceID, ok := (req.Parameters)["appliance_id"]; ok {
+		ap, _ = arr.Client.GetAppliance(ctx, applianceID)
+	} else {
+		if protocol != "nfs" {
+			vol, _ = arr.Client.GetVolume(ctx, volID)
+			if vol.ApplianceID == "" {
+				log.Warn("Unable to fetch ApplianceID from the volume")
+			} else {
+				ap, _ = arr.Client.GetAppliance(ctx, vol.ApplianceID)
+			}
+		} else {
+			f, _ = arr.Client.GetFS(ctx, volID)
+			if f.NasServerID == "" {
+				log.Warn("Unable to fetch the NasServerID from the file system")
+			} else {
+				nas, _ = arr.Client.GetNAS(ctx, f.NasServerID)
+				if nas.CurrentNodeId == "" {
+					log.Warn("Unable to fetch the CurrentNodeId from the nas server")
+				} else {
+					//Removing "-node-X" from the end of CurrentNodeId to get Appliance Name
+					applianceName = strings.Split(nas.CurrentNodeId, "-node-")[0]
+					ap, _ = arr.Client.GetApplianceByName(ctx, applianceName)
+				}
+			}
+		}
+	}
+	return ap.ServiceTag
 }
 
 // ValidateVolumeCapabilities checks if capabilities found in request are supported by driver.

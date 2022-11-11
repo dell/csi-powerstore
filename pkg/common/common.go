@@ -81,6 +81,8 @@ const (
 	KeyNasName = "nasName"
 	// KeyVolumeDescription key value to specify volume description
 	KeyVolumeDescription = "description"
+	// KeyServiceTag has the service tag associated to an Appliance
+	KeyServiceTag = "serviceTag"
 	// VerboseName longer description of the driver
 	VerboseName = "CSI Driver for Dell EMC PowerStore"
 	// FcTransport indicates that FC is chosen as a SCSI transport protocol
