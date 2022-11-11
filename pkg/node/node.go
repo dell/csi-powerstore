@@ -39,6 +39,8 @@ import (
 	"github.com/dell/csi-powerstore/pkg/common"
 	"github.com/dell/csi-powerstore/pkg/common/fs"
 	"github.com/dell/csi-powerstore/pkg/controller"
+	"github.com/opiproject/goopicsi"
+
 	"github.com/dell/gobrick"
 	csictx "github.com/dell/gocsi/context"
 	"github.com/dell/gofsutil"
@@ -109,9 +111,13 @@ func (s *Service) Init() error {
 		return nil
 	}
 
-	if len(nvmeInitiators) > 0 {
-		// TODO - Call ConnectNVMe(DPU) API Here
-		s.useDPU = true
+	if len(nvmeInitiators) > 0 || len(fcInitiators) > 0 {
+		err := goopicsi.NVMeConnect("", s.nodeID, "", 4)
+		if err != nil {
+			s.useDPU = true
+		} else {
+			s.useDPU = true
+		}
 	}
 
 	// Setup host on each of available arrays
@@ -177,6 +183,10 @@ func (s *Service) Init() error {
 	}
 
 	return nil
+}
+
+func ConnectToRemoteAndExpose(s string) {
+	panic("unimplemented")
 }
 
 func (s *Service) initConnectors() {

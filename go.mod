@@ -24,13 +24,14 @@ require (
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.19.0
 	github.com/opentracing/opentracing-go v1.2.0
+	github.com/opiproject/goopicsi v0.0.0-20221107142548-f7f80cded4d7
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/viper v1.12.0
 	github.com/stretchr/testify v1.7.1
 	github.com/uber/jaeger-client-go v2.30.0+incompatible
 	github.com/uber/jaeger-lib v2.4.1+incompatible
 	golang.org/x/net v0.0.0-20221019024206-cb67ada4b0ad
-	google.golang.org/grpc v1.47.0
+	google.golang.org/grpc v1.50.1
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -61,6 +62,7 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/nxadm/tail v1.4.8 // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
+	github.com/opiproject/opi-api v0.0.0-20221107135546-363b2ecc99eb // indirect
 	github.com/pelletier/go-toml v1.9.5 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.1 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
@@ -90,8 +92,8 @@ require (
 	golang.org/x/text v0.4.0 // indirect
 	golang.org/x/time v0.0.0-20220411224347-583f2d630306 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
-	google.golang.org/genproto v0.0.0-20220601144221-27df5f98adab // indirect
-	google.golang.org/protobuf v1.28.0 // indirect
+	google.golang.org/genproto v0.0.0-20220930163606-c98284e70a91 // indirect
+	google.golang.org/protobuf v1.28.1 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/ini.v1 v1.66.6 // indirect
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
@@ -134,3 +136,5 @@ replace (
 	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.20.2
 	k8s.io/scheduler => k8s.io/schduler v0.20.2
 )
+
+replace github.com/opiproject/goopicsi v0.0.0-20221107142548-f7f80cded4d7 => ../goopicsi
