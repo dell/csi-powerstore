@@ -25,9 +25,10 @@ require (
 	github.com/onsi/gomega v1.19.0
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/opiproject/goopicsi v0.0.0-20221107142548-f7f80cded4d7
+	github.com/opiproject/opi-api v0.0.0-20221110181853-70e9b94f0639
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/viper v1.12.0
-	github.com/stretchr/testify v1.7.1
+	github.com/stretchr/testify v1.8.1
 	github.com/uber/jaeger-client-go v2.30.0+incompatible
 	github.com/uber/jaeger-lib v2.4.1+incompatible
 	golang.org/x/net v0.0.0-20221019024206-cb67ada4b0ad
@@ -62,7 +63,6 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/nxadm/tail v1.4.8 // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
-	github.com/opiproject/opi-api v0.0.0-20221107135546-363b2ecc99eb // indirect
 	github.com/pelletier/go-toml v1.9.5 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.1 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
@@ -75,7 +75,7 @@ require (
 	github.com/spf13/cast v1.5.0 // indirect
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
-	github.com/stretchr/objx v0.4.0 // indirect
+	github.com/stretchr/objx v0.5.0 // indirect
 	github.com/subosito/gotenv v1.3.0 // indirect
 	go.etcd.io/etcd/api/v3 v3.5.4 // indirect
 	go.etcd.io/etcd/client/pkg/v3 v3.5.4 // indirect

@@ -40,6 +40,7 @@ import (
 	"github.com/dell/csi-powerstore/pkg/common/fs"
 	"github.com/dell/csi-powerstore/pkg/controller"
 	"github.com/opiproject/goopicsi"
+	pb "github.com/opiproject/opi-api/storage/v1alpha1/gen/go"
 
 	"github.com/dell/gobrick"
 	csictx "github.com/dell/gocsi/context"
@@ -81,7 +82,6 @@ type Service struct {
 
 	useFC                  bool
 	useNVME                bool
-	useDPU                 bool
 	initialized            bool
 	reusedHost             bool
 	isHealthMonitorEnabled bool
@@ -109,15 +109,6 @@ func (s *Service) Init() error {
 
 	if len(iscsiInitiators) == 0 && len(fcInitiators) == 0 && len(nvmeInitiators) == 0 {
 		return nil
-	}
-
-	if len(nvmeInitiators) > 0 || len(fcInitiators) > 0 {
-		err := goopicsi.NVMeConnect("", s.nodeID, "", 4)
-		if err != nil {
-			s.useDPU = true
-		} else {
-			s.useDPU = true
-		}
 	}
 
 	// Setup host on each of available arrays
@@ -183,10 +174,6 @@ func (s *Service) Init() error {
 	}
 
 	return nil
-}
-
-func ConnectToRemoteAndExpose(s string) {
-	panic("unimplemented")
 }
 
 func (s *Service) initConnectors() {
@@ -1025,6 +1012,8 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 
 					log.Infof("Discovering NVMeFC targets")
 					nvmefcConnectCount := 0
+					dpuConnectCount := 0
+
 					for _, info := range nvmefcInfo {
 						NVMeFCTargets, err := s.nvmeLib.DiscoverNVMeFCTargets(info.Portal, false)
 						if err != nil {
@@ -1038,13 +1027,34 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 								} else {
 									nvmefcConnectCount = nvmefcConnectCount + 1
 								}
+
+								svcID, err := strconv.ParseInt(target.TrsvcID, 10, 64)
+								if err != nil {
+									log.Errorf("DPU connect failed", err)
+								}
+
+								dpuResp, err := goopicsi.NVMeControllerConnect(&pb.NVMfRemoteController{
+									Id:      12,
+									Traddr:  target.Portal,
+									Subnqn:  target.TargetNqn,
+									Trsvcid: svcID,
+								})
+								if err != nil {
+									log.Errorf("couldn't connect to DPU ")
+								} else {
+									dpuConnectCount = dpuConnectCount + 1
+								}
+								log.Info("DPU Response--->", dpuResp)
+
 							}
 						}
 					}
 					if nvmefcConnectCount != 0 {
 						resp.AccessibleTopology.Segments[common.Name+"/"+arr.GetIP()+"-nvmefc"] = "true"
-						if s.useDPU {
-							resp.AccessibleTopology.Segments[common.Name+"/"+arr.GetIP()+"-nvmefcdpu"] = "true"
+
+						if dpuConnectCount != 0 {
+							resp.AccessibleTopology.Segments[common.Name+"/"+arr.GetIP()+"-nvmefc-dpu"] = "true"
+							log.Info("DPU FC label added--count,", dpuConnectCount)
 						}
 					}
 				} else {
@@ -1056,6 +1066,7 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 
 					log.Infof("Discovering NVMeTCP targets")
 					nvmetcpConnectCount := 0
+					dpuConnectCount := 0
 					nvmeIP := strings.Split(infoList[0].Portal, ":")
 					nvmeTargets, err := s.nvmeLib.DiscoverNVMeTCPTargets(nvmeIP[0], false)
 					if err != nil {
@@ -1069,12 +1080,31 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 							} else {
 								nvmetcpConnectCount = nvmetcpConnectCount + 1
 							}
+
+							svcID, err := strconv.ParseInt(target.TrsvcID, 10, 64)
+							if err != nil {
+								log.Errorf("DPU connect failed", err)
+							}
+
+							dpuResp, err := goopicsi.NVMeControllerConnect(&pb.NVMfRemoteController{
+								Id:      12,
+								Traddr:  target.Portal,
+								Subnqn:  target.TargetNqn,
+								Trsvcid: svcID,
+							})
+							if err != nil {
+								log.Errorf("couldn't connect to DPU ")
+							} else {
+								dpuConnectCount = dpuConnectCount + 1
+							}
+							log.Info("DPU Response--->", dpuResp)
 						}
 					}
 					if nvmetcpConnectCount != 0 {
 						resp.AccessibleTopology.Segments[common.Name+"/"+arr.GetIP()+"-nvmetcp"] = "true"
-						if s.useDPU {
-							resp.AccessibleTopology.Segments[common.Name+"/"+arr.GetIP()+"-nvmetcpdpu"] = "true"
+						if dpuConnectCount != 0 {
+							resp.AccessibleTopology.Segments[common.Name+"/"+arr.GetIP()+"-nvmetcp-dpu"] = "true"
+							log.Info("DPU TCP label added--count,", dpuConnectCount)
 						}
 					}
 				}
