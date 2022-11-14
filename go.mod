@@ -25,7 +25,6 @@ require (
 	github.com/onsi/gomega v1.19.0
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/opiproject/goopicsi v0.0.0-20221107142548-f7f80cded4d7
-	github.com/opiproject/opi-api v0.0.0-20221110181853-70e9b94f0639
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/viper v1.12.0
 	github.com/stretchr/testify v1.8.1
@@ -63,6 +62,7 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/nxadm/tail v1.4.8 // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
+	github.com/opiproject/opi-api v0.0.0-20221111230258-34e208409ec2 // indirect
 	github.com/pelletier/go-toml v1.9.5 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.1 // indirect
 	github.com/pkg/errors v0.9.1 // indirect

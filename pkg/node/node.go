@@ -40,7 +40,6 @@ import (
 	"github.com/dell/csi-powerstore/pkg/common/fs"
 	"github.com/dell/csi-powerstore/pkg/controller"
 	"github.com/opiproject/goopicsi"
-	pb "github.com/opiproject/opi-api/storage/v1alpha1/gen/go"
 
 	"github.com/dell/gobrick"
 	csictx "github.com/dell/gocsi/context"
@@ -1033,19 +1032,12 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 									log.Errorf("DPU connect failed", err)
 								}
 
-								dpuResp, err := goopicsi.NVMeControllerConnect(&pb.NVMfRemoteController{
-									Id:      12,
-									Traddr:  target.Portal,
-									Subnqn:  target.TargetNqn,
-									Trsvcid: svcID,
-								})
+								err = goopicsi.NVMeControllerConnect(12, target.Portal, target.TargetNqn, svcID)
 								if err != nil {
 									log.Errorf("couldn't connect to DPU ")
 								} else {
 									dpuConnectCount = dpuConnectCount + 1
 								}
-								log.Info("DPU Response--->", dpuResp)
-
 							}
 						}
 					}
@@ -1086,18 +1078,12 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 								log.Errorf("DPU connect failed", err)
 							}
 
-							dpuResp, err := goopicsi.NVMeControllerConnect(&pb.NVMfRemoteController{
-								Id:      12,
-								Traddr:  target.Portal,
-								Subnqn:  target.TargetNqn,
-								Trsvcid: svcID,
-							})
+							err = goopicsi.NVMeControllerConnect(12, target.Portal, target.TargetNqn, svcID)
 							if err != nil {
 								log.Errorf("couldn't connect to DPU ")
 							} else {
 								dpuConnectCount = dpuConnectCount + 1
 							}
-							log.Info("DPU Response--->", dpuResp)
 						}
 					}
 					if nvmetcpConnectCount != 0 {
