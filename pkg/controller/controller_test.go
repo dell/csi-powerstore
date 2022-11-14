@@ -77,6 +77,8 @@ const (
 	validRemoteSystemGlobalID = "PS111111111111"
 	validNfsAcls              = "A::OWNER@:RWX"
 	validNfsServerID          = "24aefac2-a796-47dc-886a-c73ff8c1a671"
+	validApplianceID          = "my-appliance"
+	validServiceTag           = "service-tag"
 )
 
 var (
@@ -155,6 +157,8 @@ var _ = Describe("CSIControllerService", func() {
 				clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
 				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 				clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
+				clientMock.On("GetVolume", context.Background(), mock.Anything).Return(gopowerstore.Volume{ApplianceID: validApplianceID}, nil)
+				clientMock.On("GetAppliance", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
 
 				req := getTypicalCreateVolumeRequest("my-vol", validVolSize)
 				req.Parameters[common.KeyArrayID] = firstValidID
@@ -174,6 +178,7 @@ var _ = Describe("CSIControllerService", func() {
 							common.KeyVolumeDescription:   req.Name + "-" + validNamespaceName,
 							controller.KeyCSIPVCName:      req.Name,
 							controller.KeyCSIPVCNamespace: validNamespaceName,
+							common.KeyServiceTag:          validServiceTag,
 						},
 					},
 				}))
@@ -209,6 +214,8 @@ var _ = Describe("CSIControllerService", func() {
 				clientMock.On("GetVolumeGroup", mock.Anything, validGroupID).Return(gopowerstore.VolumeGroup{ID: validGroupID, ProtectionPolicyID: validPolicyID}, nil)
 
 				clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
+				clientMock.On("GetVolume", context.Background(), mock.Anything).Return(gopowerstore.Volume{ApplianceID: validApplianceID}, nil)
+				clientMock.On("GetAppliance", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
 
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
 				Expect(err).To(BeNil())
@@ -221,6 +228,7 @@ var _ = Describe("CSIControllerService", func() {
 							common.KeyProtocol:                                        "scsi",
 							common.KeyArrayID:                                         firstValidID,
 							common.KeyVolumeDescription:                               req.Name + "-" + validNamespaceName,
+							common.KeyServiceTag:                                      validServiceTag,
 							controller.KeyCSIPVCName:                                  req.Name,
 							controller.KeyCSIPVCNamespace:                             validNamespaceName,
 							ctrlSvc.WithRP(controller.KeyReplicationEnabled):          "true",
@@ -261,6 +269,8 @@ var _ = Describe("CSIControllerService", func() {
 				clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
 				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 				clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
+				clientMock.On("GetVolume", context.Background(), mock.Anything).Return(gopowerstore.Volume{ApplianceID: validApplianceID}, nil)
+				clientMock.On("GetAppliance", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
 
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
 				Expect(err).To(BeNil())
@@ -273,6 +283,7 @@ var _ = Describe("CSIControllerService", func() {
 							common.KeyProtocol:                                        "scsi",
 							common.KeyArrayID:                                         firstValidID,
 							common.KeyVolumeDescription:                               req.Name + "-" + validNamespaceName,
+							common.KeyServiceTag:                                      validServiceTag,
 							controller.KeyCSIPVCName:                                  req.Name,
 							controller.KeyCSIPVCNamespace:                             validNamespaceName,
 							ctrlSvc.WithRP(controller.KeyReplicationEnabled):          "true",
@@ -295,6 +306,8 @@ var _ = Describe("CSIControllerService", func() {
 				clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
 				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 				clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
+				clientMock.On("GetVolume", context.Background(), mock.Anything).Return(gopowerstore.Volume{ApplianceID: validApplianceID}, nil)
+				clientMock.On("GetAppliance", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
 
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
 				Expect(err).To(BeNil())
@@ -307,6 +320,7 @@ var _ = Describe("CSIControllerService", func() {
 							common.KeyProtocol:                                        "scsi",
 							common.KeyArrayID:                                         firstValidID,
 							common.KeyVolumeDescription:                               req.Name + "-" + validNamespaceName,
+							common.KeyServiceTag:                                      validServiceTag,
 							controller.KeyCSIPVCName:                                  req.Name,
 							controller.KeyCSIPVCNamespace:                             validNamespaceName,
 							ctrlSvc.WithRP(controller.KeyReplicationEnabled):          "true",
@@ -332,6 +346,8 @@ var _ = Describe("CSIControllerService", func() {
 				clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
 				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 				clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
+				clientMock.On("GetVolume", context.Background(), mock.Anything).Return(gopowerstore.Volume{ApplianceID: validApplianceID}, nil)
+				clientMock.On("GetAppliance", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
 
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
 				Expect(err).To(BeNil())
@@ -344,6 +360,7 @@ var _ = Describe("CSIControllerService", func() {
 							common.KeyProtocol:                                        "scsi",
 							common.KeyArrayID:                                         firstValidID,
 							common.KeyVolumeDescription:                               req.Name + "-" + validNamespaceName,
+							common.KeyServiceTag:                                      validServiceTag,
 							controller.KeyCSIPVCName:                                  req.Name,
 							controller.KeyCSIPVCNamespace:                             validNamespaceName,
 							ctrlSvc.WithRP(controller.KeyReplicationEnabled):          "true",
@@ -416,6 +433,9 @@ var _ = Describe("CSIControllerService", func() {
 			It("should successfully create nfs volume", func() {
 				clientMock.On("GetNASByName", mock.Anything, validNasName).Return(gopowerstore.NAS{ID: validNasID}, nil)
 				clientMock.On("CreateFS", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
+				clientMock.On("GetFS", context.Background(), mock.Anything).Return(gopowerstore.FileSystem{NasServerID: validNasID}, nil)
+				clientMock.On("GetNAS", context.Background(), mock.Anything).Return(gopowerstore.NAS{CurrentNodeId: validNodeID}, nil)
+				clientMock.On("GetApplianceByName", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
 
 				req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
 				req.Parameters[common.KeyArrayID] = secondValidID
@@ -436,6 +456,7 @@ var _ = Describe("CSIControllerService", func() {
 							common.KeyNfsACL:              "A::OWNER@:RWX",
 							common.KeyNasName:             validNasName,
 							common.KeyVolumeDescription:   req.Name + "-" + validNamespaceName,
+							common.KeyServiceTag:          validServiceTag,
 							controller.KeyCSIPVCName:      req.Name,
 							controller.KeyCSIPVCNamespace: validNamespaceName,
 						},
@@ -450,6 +471,9 @@ var _ = Describe("CSIControllerService", func() {
 				clientMock.On("GetNASByName", mock.Anything, validNasName).Return(gopowerstore.NAS{ID: validNasID}, nil)
 				clientMock.On("CreateFS", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
 				clientMock.On("GetNfsServer", mock.Anything, mock.Anything).Return(gopowerstore.NFSServerInstance{Id: validNfsServerID, IsNFSv4Enabled: true}, nil)
+				clientMock.On("GetFS", context.Background(), mock.Anything).Return(gopowerstore.FileSystem{NasServerID: validNasID}, nil)
+				clientMock.On("GetNAS", context.Background(), mock.Anything).Return(gopowerstore.NAS{CurrentNodeId: validNodeID}, nil)
+				clientMock.On("GetApplianceByName", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
 
 				ctrlSvc.Arrays()[secondValidID].NfsAcls = "A::GROUP@:RWX"
 
@@ -472,6 +496,7 @@ var _ = Describe("CSIControllerService", func() {
 							common.KeyNfsACL:              "0777",
 							common.KeyNasName:             validNasName,
 							common.KeyVolumeDescription:   req.Name + "-" + validNamespaceName,
+							common.KeyServiceTag:          validServiceTag,
 							controller.KeyCSIPVCName:      req.Name,
 							controller.KeyCSIPVCNamespace: validNamespaceName,
 						},
@@ -486,6 +511,9 @@ var _ = Describe("CSIControllerService", func() {
 				clientMock.On("GetNASByName", mock.Anything, validNasName).Return(gopowerstore.NAS{ID: validNasID}, nil)
 				clientMock.On("CreateFS", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
 				clientMock.On("GetNfsServer", mock.Anything, mock.Anything).Return(gopowerstore.NFSServerInstance{Id: validNfsServerID, IsNFSv4Enabled: true}, nil)
+				clientMock.On("GetFS", context.Background(), mock.Anything).Return(gopowerstore.FileSystem{NasServerID: validNasID}, nil)
+				clientMock.On("GetNAS", context.Background(), mock.Anything).Return(gopowerstore.NAS{CurrentNodeId: validNodeID}, nil)
+				clientMock.On("GetApplianceByName", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
 
 				ctrlSvc.Arrays()[secondValidID].NfsAcls = "A::GROUP@:RWX"
 
@@ -507,6 +535,7 @@ var _ = Describe("CSIControllerService", func() {
 							common.KeyNfsACL:              "A::GROUP@:RWX",
 							common.KeyNasName:             validNasName,
 							common.KeyVolumeDescription:   req.Name + "-" + validNamespaceName,
+							common.KeyServiceTag:          validServiceTag,
 							controller.KeyCSIPVCName:      req.Name,
 							controller.KeyCSIPVCNamespace: validNamespaceName,
 						},
@@ -521,6 +550,9 @@ var _ = Describe("CSIControllerService", func() {
 				clientMock.On("GetNASByName", mock.Anything, validNasName).Return(gopowerstore.NAS{ID: validNasID}, nil)
 				clientMock.On("CreateFS", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
 				clientMock.On("GetNfsServer", mock.Anything, mock.Anything).Return(gopowerstore.NFSServerInstance{Id: validNfsServerID, IsNFSv4Enabled: true}, nil)
+				clientMock.On("GetFS", context.Background(), mock.Anything).Return(gopowerstore.FileSystem{NasServerID: validNasID}, nil)
+				clientMock.On("GetNAS", context.Background(), mock.Anything).Return(gopowerstore.NAS{CurrentNodeId: validNodeID}, nil)
+				clientMock.On("GetApplianceByName", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
 
 				req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
 				req.Parameters[common.KeyArrayID] = secondValidID
@@ -540,6 +572,7 @@ var _ = Describe("CSIControllerService", func() {
 							common.KeyNfsACL:              "A::OWNER@:RWX",
 							common.KeyNasName:             validNasName,
 							common.KeyVolumeDescription:   req.Name + "-" + validNamespaceName,
+							common.KeyServiceTag:          validServiceTag,
 							controller.KeyCSIPVCName:      req.Name,
 							controller.KeyCSIPVCNamespace: validNamespaceName,
 						},
@@ -554,6 +587,9 @@ var _ = Describe("CSIControllerService", func() {
 				clientMock.On("GetNASByName", mock.Anything, validNasName).Return(gopowerstore.NAS{ID: validNasID}, nil)
 				clientMock.On("CreateFS", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
 				clientMock.On("GetNfsServer", mock.Anything, mock.Anything).Return(gopowerstore.NFSServerInstance{Id: validNfsServerID, IsNFSv4Enabled: true}, nil)
+				clientMock.On("GetFS", context.Background(), mock.Anything).Return(gopowerstore.FileSystem{NasServerID: validNasID}, nil)
+				clientMock.On("GetNAS", context.Background(), mock.Anything).Return(gopowerstore.NAS{CurrentNodeId: validNodeID}, nil)
+				clientMock.On("GetApplianceByName", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
 
 				req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
 				req.Parameters[common.KeyArrayID] = secondValidID
@@ -578,6 +614,7 @@ var _ = Describe("CSIControllerService", func() {
 							common.KeyNfsACL:              "",
 							common.KeyNasName:             validNasName,
 							common.KeyVolumeDescription:   req.Name + "-" + validNamespaceName,
+							common.KeyServiceTag:          validServiceTag,
 							controller.KeyCSIPVCName:      req.Name,
 							controller.KeyCSIPVCNamespace: validNamespaceName,
 						},
@@ -612,6 +649,9 @@ var _ = Describe("CSIControllerService", func() {
 			It("should return only nfs topology", func() {
 				clientMock.On("GetNASByName", mock.Anything, validNasName).Return(gopowerstore.NAS{ID: validNasID}, nil)
 				clientMock.On("CreateFS", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
+				clientMock.On("GetFS", context.Background(), mock.Anything).Return(gopowerstore.FileSystem{NasServerID: validNasID}, nil)
+				clientMock.On("GetNAS", context.Background(), mock.Anything).Return(gopowerstore.NAS{CurrentNodeId: validNodeID}, nil)
+				clientMock.On("GetApplianceByName", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
 
 				req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
 				req.Parameters[common.KeyArrayID] = secondValidID
@@ -635,6 +675,7 @@ var _ = Describe("CSIControllerService", func() {
 							common.KeyNfsACL:              "A::OWNER@:RWX",
 							common.KeyNasName:             validNasName,
 							common.KeyVolumeDescription:   req.Name + "-" + validNamespaceName,
+							common.KeyServiceTag:          validServiceTag,
 							controller.KeyCSIPVCName:      req.Name,
 							controller.KeyCSIPVCNamespace: validNamespaceName,
 						},
@@ -662,6 +703,8 @@ var _ = Describe("CSIControllerService", func() {
 					Name: volName,
 					Size: validVolSize,
 				}, nil)
+				clientMock.On("GetVolume", context.Background(), mock.Anything).Return(gopowerstore.Volume{ApplianceID: validApplianceID}, nil)
+				clientMock.On("GetAppliance", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
 
 				req := getTypicalCreateVolumeRequest(volName, validVolSize)
 				req.Parameters[common.KeyArrayID] = firstValidID
@@ -679,6 +722,7 @@ var _ = Describe("CSIControllerService", func() {
 							common.KeyProtocol:            "scsi",
 							common.KeyArrayID:             firstValidID,
 							common.KeyVolumeDescription:   req.Name + "-" + validNamespaceName,
+							common.KeyServiceTag:          validServiceTag,
 							controller.KeyCSIPVCName:      req.Name,
 							controller.KeyCSIPVCNamespace: validNamespaceName,
 						},
@@ -701,6 +745,9 @@ var _ = Describe("CSIControllerService", func() {
 					Name:      volName,
 					SizeTotal: validVolSize,
 				}, nil)
+				clientMock.On("GetFS", context.Background(), mock.Anything).Return(gopowerstore.FileSystem{NasServerID: validNasID}, nil)
+				clientMock.On("GetNAS", context.Background(), mock.Anything).Return(gopowerstore.NAS{CurrentNodeId: validNodeID}, nil)
+				clientMock.On("GetApplianceByName", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
 
 				req := getTypicalCreateVolumeNFSRequest(volName, validVolSize)
 				req.Parameters[common.KeyArrayID] = secondValidID
@@ -720,6 +767,7 @@ var _ = Describe("CSIControllerService", func() {
 							common.KeyNfsACL:              "A::OWNER@:RWX",
 							common.KeyNasName:             validNasName,
 							common.KeyVolumeDescription:   req.Name + "-" + validNamespaceName,
+							common.KeyServiceTag:          validServiceTag,
 							controller.KeyCSIPVCName:      req.Name,
 							controller.KeyCSIPVCNamespace: validNamespaceName,
 						},
@@ -958,6 +1006,8 @@ var _ = Describe("CSIControllerService", func() {
 				clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
 				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 				clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
+				clientMock.On("GetVolume", context.Background(), mock.Anything).Return(gopowerstore.Volume{ApplianceID: validApplianceID}, nil)
+				clientMock.On("GetAppliance", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
 
 				req := getTypicalCreateVolumeRequest("my-vol", validVolSize)
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
@@ -972,6 +1022,7 @@ var _ = Describe("CSIControllerService", func() {
 							common.KeyProtocol:          "scsi",
 							common.KeyArrayID:           firstValidID,
 							common.KeyVolumeDescription: "-",
+							common.KeyServiceTag:        validServiceTag,
 						},
 					},
 				}))
