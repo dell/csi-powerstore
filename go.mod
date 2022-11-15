@@ -24,7 +24,7 @@ require (
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.19.0
 	github.com/opentracing/opentracing-go v1.2.0
-	github.com/opiproject/goopicsi v0.0.0-20221107142548-f7f80cded4d7
+	github.com/opiproject/goopicsi v0.0.0-20221114170048-044909a94bc6
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/viper v1.12.0
 	github.com/stretchr/testify v1.8.1
@@ -62,7 +62,7 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/nxadm/tail v1.4.8 // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
-	github.com/opiproject/opi-api v0.0.0-20221111230258-34e208409ec2 // indirect
+	github.com/opiproject/opi-api v0.0.0-20221114164938-b94e8f880124 // indirect
 	github.com/pelletier/go-toml v1.9.5 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.1 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
@@ -136,5 +136,3 @@ replace (
 	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.20.2
 	k8s.io/scheduler => k8s.io/schduler v0.20.2
 )
-
-replace github.com/opiproject/goopicsi v0.0.0-20221107142548-f7f80cded4d7 => ../goopicsi
