@@ -361,13 +361,6 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 	volumeResponse.AccessibleTopology = topology
 
 	// Send the createVolume Response to the DPU here, If the volume is created with DPU support
-	useDPU := fsType == "dpu"
-	if useDPU {
-		err := AddVolumeToDPU(volumeResponse)
-		if err != nil {
-			return nil, err
-		}
-	}
 	return &csi.CreateVolumeResponse{
 		Volume: volumeResponse,
 	}, nil
