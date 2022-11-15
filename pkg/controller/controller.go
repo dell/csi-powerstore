@@ -702,29 +702,51 @@ func GetServiceTag(ctx context.Context, req *csi.CreateVolumeRequest, arr *array
 	var f gopowerstore.FileSystem
 	var nas gopowerstore.NAS
 	var applianceName string
+	var err error
 
+	// Check if appliance id is present in PVC manifest
 	if applianceID, ok := (req.Parameters)["appliance_id"]; ok {
-		ap, _ = arr.Client.GetAppliance(ctx, applianceID)
+		// Fetching appliance information using the appliance id
+		ap, err = arr.Client.GetAppliance(ctx, applianceID)
+		if err != nil {
+			log.Warn("Received error while calling GetAppliance ", err.Error())
+		}
 	} else {
 		if protocol != "nfs" {
-			vol, _ = arr.Client.GetVolume(ctx, volID)
+			vol, err = arr.Client.GetVolume(ctx, volID)
+			if err != nil {
+				log.Warn("Received error while calling GetVolume ", err.Error())
+			}
 			if vol.ApplianceID == "" {
 				log.Warn("Unable to fetch ApplianceID from the volume")
 			} else {
-				ap, _ = arr.Client.GetAppliance(ctx, vol.ApplianceID)
+				ap, err = arr.Client.GetAppliance(ctx, vol.ApplianceID)
+				if err != nil {
+					log.Warn("Received error while calling GetAppliance ", err.Error())
+				}
 			}
 		} else {
-			f, _ = arr.Client.GetFS(ctx, volID)
+			f, err = arr.Client.GetFS(ctx, volID)
+			if err != nil {
+				log.Warn("Received error while calling GetFS ", err.Error())
+			}
 			if f.NasServerID == "" {
 				log.Warn("Unable to fetch the NasServerID from the file system")
 			} else {
-				nas, _ = arr.Client.GetNAS(ctx, f.NasServerID)
+				nas, err = arr.Client.GetNAS(ctx, f.NasServerID)
+				if err != nil {
+					log.Warn("Received error while calling GetNAS ", err.Error())
+				}
 				if nas.CurrentNodeId == "" {
 					log.Warn("Unable to fetch the CurrentNodeId from the nas server")
 				} else {
-					//Removing "-node-X" from the end of CurrentNodeId to get Appliance Name
+					// Removing "-node-X" from the end of CurrentNodeId to get Appliance Name
 					applianceName = strings.Split(nas.CurrentNodeId, "-node-")[0]
-					ap, _ = arr.Client.GetApplianceByName(ctx, applianceName)
+					// Fetching appliance information using the appliance name
+					ap, err = arr.Client.GetApplianceByName(ctx, applianceName)
+					if err != nil {
+						log.Warn("Received error while calling GetApplianceByName ", err.Error())
+					}
 				}
 			}
 		}
