@@ -39,6 +39,8 @@ import (
 	"github.com/dell/csi-powerstore/pkg/common"
 	"github.com/dell/csi-powerstore/pkg/common/fs"
 	"github.com/dell/csi-powerstore/pkg/controller"
+	"github.com/opiproject/goopicsi"
+
 	"github.com/dell/gobrick"
 	csictx "github.com/dell/gocsi/context"
 	"github.com/dell/gofsutil"
@@ -1048,6 +1050,8 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 
 					log.Infof("Discovering NVMeFC targets")
 					nvmefcConnectCount := 0
+					dpuConnectCount := 0
+
 					for _, info := range nvmefcInfo {
 						NVMeFCTargets, err := s.nvmeLib.DiscoverNVMeFCTargets(info.Portal, false)
 						if err != nil {
@@ -1061,11 +1065,28 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 								} else {
 									nvmefcConnectCount = nvmefcConnectCount + 1
 								}
+
+								svcID, err := strconv.ParseInt(target.TrsvcID, 10, 64)
+								if err != nil {
+									log.Errorf("DPU connect failed", err)
+								}
+
+								err = goopicsi.NVMeControllerConnect(12, target.Portal, target.TargetNqn, svcID)
+								if err != nil {
+									log.Errorf("couldn't connect to DPU ")
+								} else {
+									dpuConnectCount = dpuConnectCount + 1
+								}
 							}
 						}
 					}
 					if nvmefcConnectCount != 0 {
 						resp.AccessibleTopology.Segments[common.Name+"/"+arr.GetIP()+"-nvmefc"] = "true"
+
+						if dpuConnectCount != 0 {
+							resp.AccessibleTopology.Segments[common.Name+"/"+arr.GetIP()+"-nvmefc-dpu"] = "true"
+							log.Info("DPU FC label added--count,", dpuConnectCount)
+						}
 					}
 				} else {
 					infoList, err := common.GetISCSITargetsInfoFromStorage(arr.GetClient(), "")
@@ -1076,6 +1097,7 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 
 					log.Infof("Discovering NVMeTCP targets")
 					nvmetcpConnectCount := 0
+					dpuConnectCount := 0
 					nvmeIP := strings.Split(infoList[0].Portal, ":")
 					nvmeTargets, err := s.nvmeLib.DiscoverNVMeTCPTargets(nvmeIP[0], false)
 					if err != nil {
@@ -1089,10 +1111,26 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 							} else {
 								nvmetcpConnectCount = nvmetcpConnectCount + 1
 							}
+
+							svcID, err := strconv.ParseInt(target.TrsvcID, 10, 64)
+							if err != nil {
+								log.Errorf("DPU connect failed", err)
+							}
+
+							err = goopicsi.NVMeControllerConnect(12, target.Portal, target.TargetNqn, svcID)
+							if err != nil {
+								log.Errorf("couldn't connect to DPU ")
+							} else {
+								dpuConnectCount = dpuConnectCount + 1
+							}
 						}
 					}
 					if nvmetcpConnectCount != 0 {
 						resp.AccessibleTopology.Segments[common.Name+"/"+arr.GetIP()+"-nvmetcp"] = "true"
+						if dpuConnectCount != 0 {
+							resp.AccessibleTopology.Segments[common.Name+"/"+arr.GetIP()+"-nvmetcp-dpu"] = "true"
+							log.Info("DPU TCP label added--count,", dpuConnectCount)
+						}
 					}
 				}
 

@@ -6,7 +6,7 @@ require (
 	github.com/akutz/gosync v0.1.0
 	github.com/apparentlymart/go-cidr v1.1.0
 	github.com/container-storage-interface/spec v1.5.0
-	github.com/dell/csi-metadata-retriever v1.1.1-0.20221019062956-59c1c729c8c7
+	github.com/dell/csi-metadata-retriever v1.1.1-0.20221121081127-b91e2f5b48ca
 	github.com/dell/dell-csi-extensions/common v1.1.0
 	github.com/dell/dell-csi-extensions/replication v1.2.0
 	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.2.2-0.20220823070737-c80a2164070b
@@ -14,8 +14,8 @@ require (
 	github.com/dell/gocsi v1.6.0
 	github.com/dell/gofsutil v1.10.0
 	github.com/dell/goiscsi v1.5.0
-	github.com/dell/gonvme v1.2.1-0.20221111064610-e2ea406d3203
-	github.com/dell/gopowerstore v1.9.1-0.20221111123933-a2558c636185
+	github.com/dell/gonvme v1.2.1-0.20221121080733-8a4d7cbfff99
+	github.com/dell/gopowerstore v1.9.1-0.20221121153426-d34d2fc2f8c8
 	github.com/fsnotify/fsnotify v1.5.4
 	github.com/golang/mock v1.6.0
 	github.com/golang/protobuf v1.5.2
@@ -24,6 +24,7 @@ require (
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.19.0
 	github.com/opentracing/opentracing-go v1.2.0
+	github.com/opiproject/goopicsi v0.0.0-20221114170048-044909a94bc6
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/viper v1.12.0
 	github.com/stretchr/testify v1.8.1

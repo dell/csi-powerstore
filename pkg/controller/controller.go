@@ -139,6 +139,7 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 	if req.VolumeCapabilities[0].GetBlock() != nil {
 		// We need to check if user requests raw block access from nfs and prevent that
 		fsType, ok := params[KeyFsType]
+		log.Info("FS TYPE=----", fsType)
 		// FsType can be empty
 		if ok && fsType == "nfs" {
 			return nil, status.Errorf(codes.InvalidArgument, "raw block requested from NFS Volume")
@@ -363,6 +364,8 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 
 	volumeResponse.VolumeId = volumeResponse.VolumeId + "/" + arr.GetGlobalID() + "/" + protocol
 	volumeResponse.AccessibleTopology = topology
+
+	// Send the createVolume Response to the DPU here, If the volume is created with DPU support
 	return &csi.CreateVolumeResponse{
 		Volume: volumeResponse,
 	}, nil
