@@ -160,6 +160,7 @@ func (s *SCSIPublisher) addLUNIDToPublishContext(
 	mapping gopowerstore.HostVolumeMapping,
 	volume gopowerstore.Volume) {
 	publishContext[common.PublishContextDeviceWWN] = strings.TrimPrefix(volume.Wwn, common.WWNPrefix)
+	publishContext[common.PublishContextDeviceNGUID] = strings.TrimPrefix(volume.Nguid, common.PublishContextDeviceNGUID)
 	publishContext[common.PublishContextLUNAddress] = strconv.FormatInt(mapping.LogicalUnitNumber, 10)
 }
 
