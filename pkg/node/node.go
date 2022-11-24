@@ -1186,7 +1186,7 @@ func (s *Service) getInitiators() ([]string, []string, []string, error) {
 	} else if len(fcInitiators) == 0 {
 		log.Error("FC was not found or filtered with FCPortsFilterFile")
 	} else {
-		log.Error("FC initiators found on node")
+		log.Debug("FC initiators found on node")
 		fcAvailable = true
 	}
 
