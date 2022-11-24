@@ -70,7 +70,7 @@ nfsAcls: "0777"
 
 # controller: configure controller specific parameters
 controller:
-  # controllerCount: defines the number of csi-powerscale controller pods to deploy to
+  # controllerCount: defines the number of csi-powerstore controller pods to deploy to
   # the Kubernetes release.
   # Allowed values: n, where n > 0
   # Default value: None
