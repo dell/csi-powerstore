@@ -108,10 +108,6 @@ func (s *Service) Init() error {
 	if err != nil {
 		return fmt.Errorf("can't get initiators of the node: %s", err.Error())
 	}
-
-	dpuNVMeInitiators := []string{}
-	dpuNVMeInitiators = append(dpuNVMeInitiators, "nqn.2014-08.org.nvmexpress:uuid:e94b4772-88c7-434e-a371-0f687bad7b48")
-
 	/*
 		dpuEnabled := false
 		command := []string{"lspci"}
