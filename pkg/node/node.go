@@ -172,7 +172,7 @@ func (s *Service) Init() error {
 			s.useFC = len(fcInitiators) > 0
 		}
 		if s.useDPU {
-			initiators = dpuNVMeInitiators
+			//initiators = dpuNVMeInitiators
 			log.Info("NVMeTCP with DPU is requested")
 		} else if s.useNVME {
 			initiators = nvmeInitiators
