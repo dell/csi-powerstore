@@ -10,7 +10,7 @@ require (
 	github.com/dell/dell-csi-extensions/common v1.1.0
 	github.com/dell/dell-csi-extensions/replication v1.2.0
 	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.2.2-0.20220823070737-c80a2164070b
-	github.com/dell/gobrick v1.5.2-0.20221111070858-42c3a4484fa7
+	github.com/dell/gobrick v1.5.2-0.20221129112205-823fba54a104
 	github.com/dell/gocsi v1.6.0
 	github.com/dell/gofsutil v1.10.0
 	github.com/dell/goiscsi v1.5.0
@@ -19,12 +19,13 @@ require (
 	github.com/fsnotify/fsnotify v1.5.4
 	github.com/golang/mock v1.6.0
 	github.com/golang/protobuf v1.5.2
+	github.com/google/uuid v1.3.0
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0
 	github.com/kubernetes-csi/csi-lib-utils v0.11.0
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.19.0
 	github.com/opentracing/opentracing-go v1.2.0
-	github.com/opiproject/goopicsi v0.0.0-20221114170048-044909a94bc6
+	github.com/opiproject/goopicsi v0.0.0-20221123175303-ab31432c5032
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/viper v1.12.0
 	github.com/stretchr/testify v1.8.1
@@ -33,12 +34,6 @@ require (
 	golang.org/x/net v0.0.0-20221019024206-cb67ada4b0ad
 	google.golang.org/grpc v1.51.0
 	gopkg.in/yaml.v3 v3.0.1
-)
-
-replace (
-	github.com/opiproject/goopicsi => ../goopicsi
-	github.com/dell/gopowerstore => ../gopowerstore
-	github.com/dell/gobrick => ../gobrick
 )
 
 require (
@@ -57,7 +52,6 @@ require (
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/google/go-cmp v0.5.8 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
-	github.com/google/uuid v1.3.0 // indirect
 	github.com/googleapis/gnostic v0.5.5 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
@@ -68,8 +62,7 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/nxadm/tail v1.4.8 // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
-	github.com/opiproject/goopicsi v0.0.0-20221118191143-2cc8e295e23d // indirect
-	github.com/opiproject/opi-api v0.0.0-20221117170559-ca2c25b808b3 // indirect
+	github.com/opiproject/opi-api v0.0.0-20221121200811-5d2289de810a // indirect
 	github.com/pelletier/go-toml v1.9.5 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.1 // indirect
 	github.com/pkg/errors v0.9.1 // indirect

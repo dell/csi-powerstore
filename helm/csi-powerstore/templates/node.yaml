@@ -118,6 +118,8 @@ spec:
             {{- end}}
             - name: CSI_ENDPOINT
               value: unix://{{ .Values.kubeletConfigDir }}/plugins/{{ .Values.driverName }}/csi_sock
+            - name: X_CSI_DPU_NVME_NQN
+              value: {{ .Values.node.dpuNQN }}
             - name: X_CSI_MODE
               value: node
             - name: X_CSI_POWERSTORE_KUBE_NODE_NAME

@@ -98,4 +98,7 @@ const (
 
 	// EnvAllowAutoRoundOffFilesystemSize specifies if auto round off minimum filesystem size is enabled
 	EnvAllowAutoRoundOffFilesystemSize = "CSI_AUTO_ROUND_OFF_FILESYSTEM_SIZE"
+
+	// EnvDPUNVMeNQN specifies the nqn required to create NVMe Subsytem and NVMe Controller
+	EnvDPUNVMeNQN = "X_CSI_DPU_NVME_NQN"
 )

@@ -23,6 +23,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/google/uuid"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -46,7 +47,6 @@ import (
 	"github.com/dell/gofsutil"
 	"github.com/dell/goiscsi"
 	"github.com/dell/gopowerstore"
-	"github.com/opiproject/goopicsi"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -77,8 +77,9 @@ type Service struct {
 	iscsiLib       goiscsi.ISCSIinterface
 	nvmeLib        gonvme.NVMEinterface
 
-	opts   Opts
-	nodeID string
+	opts        Opts
+	nodeID      string
+	subsystemID string
 
 	useDPU                 bool
 	useFC                  bool
@@ -108,14 +109,24 @@ func (s *Service) Init() error {
 		return fmt.Errorf("can't get initiators of the node: %s", err.Error())
 	}
 
+	dpuNVMeInitiators := []string{}
+	dpuNVMeInitiators = append(dpuNVMeInitiators, "nqn.2014-08.org.nvmexpress:uuid:e94b4772-88c7-434e-a371-0f687bad7b48")
+
 	/*
-		// To be added later
-		dpuSubsystem, err := goopicsi.GetSubsytemByID(IP)
-		if err != nil {
-			return fmt.Errorf("could not find the NVMe Subsystem %s", err.Error())
+		dpuEnabled := false
+		command := []string{"lspci"}
+		cmd := exec.Command(command[0], command[1:]...)
+		outStr, err := cmd.Output()
+		if strings.Contains(string(outStr), "BlueField") {
+			dpuEnabled = true
 		}
 
-		if len(iscsiInitiators) == 0 && len(fcInitiators) == 0 && len(nvmeInitiators) == 0 and len(dpuSubsystem) == 0 {
+		// goopicsi.GetNVMeInitiators will return the hostNQN - To be added later
+		dpuNVMeInitiators, err := goopicsi.GetNVMeInitiators
+		if err != nil {
+			log.Errorf("Could not find the NVMe DPU initiators")
+		}
+		if len(iscsiInitiators) == 0 && len(fcInitiators) == 0 && len(nvmeInitiators) == 0 && len(dpuNVMeInitiators) == 0 {
 			return nil
 		}
 	*/
@@ -160,12 +171,12 @@ func (s *Service) Init() error {
 			s.useNVME = false
 			s.useFC = true
 		default:
-			// s.useDPU = len(dpuSubsystem)
+			// s.useDPU = len(dpuNVMeInitiators)
 			s.useNVME = len(nvmeInitiators) > 0
 			s.useFC = len(fcInitiators) > 0
 		}
 		if s.useDPU {
-			initiators = nvmeInitiators
+			initiators = dpuNVMeInitiators
 			log.Info("NVMeTCP with DPU is requested")
 		} else if s.useNVME {
 			initiators = nvmeInitiators
@@ -263,6 +274,7 @@ func (s *Service) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeR
 		req.PublishContext[fmt.Sprintf("%s%d", common.PublishContextNVMETCPTargetsPrefix, i)] = t.TargetNqn
 		req.PublishContext[fmt.Sprintf("%s%d", common.PublishContextNVMETCPPortalsPrefix, i)] = t.Portal + ":4420"
 	}
+	req.PublishContext[common.SubsystemID] = s.subsystemID
 
 	id, arrayID, protocol, _ := array.ParseVolumeID(ctx, id, s.DefaultArray(), req.VolumeCapability)
 
@@ -1039,7 +1051,17 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 						log.Errorf("could not connect DPU to the backend array")
 					}
 				}
+
+				// The dpuNQN required for NVMe Subsystem and controller will be modified later if required
+				dpuNQN, _ := csictx.LookupEnv(ctx, common.EnvDPUNVMeNQN)
+				s.subsystemID = uuid.New().String()
+				controllerID := uuid.New().String() // Will be added later in the goopicsi library
+				err = goopicsi.ExposeRemoteNVMe(s.subsystemID, dpuNQN, 100, controllerID)
+				if err != nil {
+					log.Errorf("could not create NVMe subsystem and controller %v", err.Error())
+				}
 				resp.AccessibleTopology.Segments[common.Name+"/"+arr.GetIP()+"-dpu"] = "true"
+
 			} else if s.useNVME {
 				if s.useFC {
 					nvmefcInfo, err := common.GetNVMEFCTargetInfoFromStorage(arr.GetClient(), "")

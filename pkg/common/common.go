@@ -119,10 +119,12 @@ const (
 	DPU TransportType = "DPU"
 	// PublishContextFCWWPNPrefix indicates publish context FC WWPN prefix
 	PublishContextFCWWPNPrefix = "FCWWPN"
+	//SubsystemID indicates the SubsystemID for DPU NVMe Subsystem and Controller
+	SubsystemID = "SubsystemID"
 	// WWNPrefix indicates WWN prefix
 	WWNPrefix = "naa."
 	// NGUIDPrefix indicates NGUID prefix
-	NGUIDPrefix = "nguid"
+	NGUIDPrefix = "nguid."
 
 	contextLogFieldsKey key = iota
 )
