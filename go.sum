@@ -338,8 +338,10 @@ github.com/onsi/gomega v1.19.0/go.mod h1:LY+I3pBVzYsTBU1AnDwOSxaYi9WoWiqgwooUqq9
 github.com/opentracing/opentracing-go v1.1.0/go.mod h1:UkNAQd3GIcIGf0SeVgPpRdFStlNbqXla1AfSYxPUl2o=
 github.com/opentracing/opentracing-go v1.2.0 h1:uEJPy/1a5RIPAJ0Ov+OIO8OxWu77jEv+1B0VhjKrZUs=
 github.com/opentracing/opentracing-go v1.2.0/go.mod h1:GxEUsuufX4nBwe+T+Wl9TAgYrxe9dPLANfrWvHYVTgc=
-github.com/opiproject/opi-api v0.0.0-20221121200811-5d2289de810a h1:dFFDDQez4aCsKEkvEnQ+yFnMu5/yZ/VWBxbIRmAvgd4=
-github.com/opiproject/opi-api v0.0.0-20221121200811-5d2289de810a/go.mod h1:92pv4ulvvPMuxCJ9ND3aYbmBfEMLx0VCjpkiR7ZTqPY=
+github.com/opiproject/goopicsi v0.0.0-20221206152144-ebc2b7bbb593 h1:jXhP34Xq/RZHvdRsl3QIUIV576SS0C8Vef2XkjrVUFQ=
+github.com/opiproject/goopicsi v0.0.0-20221206152144-ebc2b7bbb593/go.mod h1:zPaa5h5CeMYUvEn7sP1eip8lpIWsDp+zmgz5sffgzXY=
+github.com/opiproject/opi-api v0.0.0-20221129180238-b10361a9c119 h1:exwxNwGuwQtA9IRs2I/Eh22IWeeReAf3uzExgblLytY=
+github.com/opiproject/opi-api v0.0.0-20221129180238-b10361a9c119/go.mod h1:92pv4ulvvPMuxCJ9ND3aYbmBfEMLx0VCjpkiR7ZTqPY=
 github.com/pelletier/go-toml v1.9.5 h1:4yBQzkHv+7BHq2PQUZF3Mx0IYxG7LsP222s7Agd3ve8=
 github.com/pelletier/go-toml v1.9.5/go.mod h1:u1nR/EPcESfeI/szUZKdtJ0xRNbUoANCkoOuaOx1Y+c=
 github.com/pelletier/go-toml/v2 v2.0.1 h1:8e3L2cCQzLFi2CR4g7vGFuFxX7Jl1kKX8gW+iV0GUKU=

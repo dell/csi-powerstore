@@ -119,8 +119,8 @@ const (
 	DPU TransportType = "DPU"
 	// PublishContextFCWWPNPrefix indicates publish context FC WWPN prefix
 	PublishContextFCWWPNPrefix = "FCWWPN"
-	//SubsystemID indicates the SubsystemID for DPU NVMe Subsystem and Controller
-	SubsystemID = "SubsystemID"
+	//DPUSubsystemID indicates the SubsystemID for DPU NVMe Subsystem and Controller
+	DPUSubsystemID = "DPUSubsystemID"
 	// WWNPrefix indicates WWN prefix
 	WWNPrefix = "naa."
 	// NGUIDPrefix indicates NGUID prefix

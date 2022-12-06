@@ -188,9 +188,6 @@ controller:
 
 # node: configure node pod specific parameters
 node:
-  # dpuNQN: defines the NQN required for creating NVMe Subsystem and NVMe Controller
-  # Allowed values: string
-  dpuNQN:
   # nodeNamePrefix: defines a string prepended to each node registered by the CSI driver.
   # Allowed values: string
   # Default value: None

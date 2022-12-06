@@ -86,7 +86,7 @@ func (s *SCSIStager) Stage(ctx context.Context, req *csi.NodeStageVolumeRequest,
 	logFields["Lun"] = publishContext.volumeLUNAddress
 	logFields["StagingPath"] = stagingPath
 	logFields["NGUID"] = publishContext.deviceNGUID
-	logFields["SubsystemID"] = publishContext.subsystemID
+	logFields["DPUSubsystemID"] = publishContext.dpuSubsystemID
 	ctx = common.SetLogFields(ctx, logFields)
 
 	found, ready, err := isReadyToPublish(ctx, stagingPath, fs)
@@ -246,8 +246,8 @@ func (n *NFSStager) Stage(ctx context.Context, req *csi.NodeStageVolumeRequest,
 type scsiPublishContextData struct {
 	deviceWWN        string
 	deviceNGUID      string
+	dpuSubsystemID   string
 	volumeLUNAddress string
-	subsystemID      string
 	iscsiTargets     []gobrick.ISCSITargetInfo
 	nvmetcpTargets   []gobrick.NVMeTargetInfo
 	nvmefcTargets    []gobrick.NVMeTargetInfo
@@ -286,9 +286,9 @@ func readSCSIInfoFromPublishContext(publishContext map[string]string, useFC bool
 	if len(fcTargets) == 0 && useFC && !useNVMe {
 		return data, status.Error(codes.InvalidArgument, "fcTargets data must be in publish context")
 	}
-	subsystemID := publishContext[common.SubsystemID]
+	dpuSubsystemID := publishContext[common.DPUSubsystemID]
 	return scsiPublishContextData{deviceWWN: deviceWWN, deviceNGUID: deviceNGUID, volumeLUNAddress: volumeLUNAddress,
-		iscsiTargets: iscsiTargets, nvmetcpTargets: nvmeTCPTargets, nvmefcTargets: nvmeFCTargets, fcTargets: fcTargets, subsystemID: subsystemID}, nil
+		iscsiTargets: iscsiTargets, nvmetcpTargets: nvmeTCPTargets, nvmefcTargets: nvmeFCTargets, fcTargets: fcTargets, dpuSubsystemID: dpuSubsystemID}, nil
 }
 
 func readISCSITargetsFromPublishContext(pc map[string]string) []gobrick.ISCSITargetInfo {
@@ -437,7 +437,7 @@ func (s *SCSIStager) connectNVMEDevice(ctx context.Context,
 		Targets: targets,
 		WWN:     wwn,
 		NGUID:   nguid,
-	}, s.useFC, s.useDPU, data.subsystemID)
+	}, s.useFC, s.useDPU, data.dpuSubsystemID)
 }
 
 func (s *SCSIStager) connectFCDevice(ctx context.Context,
