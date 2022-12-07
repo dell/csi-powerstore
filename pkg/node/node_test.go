@@ -75,6 +75,7 @@ const (
 	validHostID         = "e8f4c5f8-c2fc-4df4-bd99-c292c12b55be"
 	testErrMsg          = "test err"
 	validDeviceWWN      = "68ccf09800e23ab798312a05426acae0"
+	validDeviceNGUID    = "3ceb5e4577a20be68ccf096800d11bf9"
 	validDevPath        = "/dev/sdag"
 	validDevName        = "sdag"
 	validNfsExportPath  = "/mnt/nfs"
@@ -602,7 +603,8 @@ var _ = Describe("CSINodeService", func() {
 				nvmeConnectorMock.On("ConnectVolume", mock.Anything, gobrick.NVMeVolumeInfo{
 					Targets: validNVMEFCTargetInfo,
 					WWN:     validDeviceWWN,
-				}, true).Return(gobrick.Device{}, nil)
+					NGUID:   validDeviceNGUID,
+				}, true, false, "").Return(gobrick.Device{}, nil)
 
 				scsiStageVolumeOK(utilMock, fsMock)
 				res, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
@@ -937,8 +939,9 @@ var _ = Describe("CSINodeService", func() {
 				res, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
 					VolumeId: validBlockVolumeID,
 					PublishContext: map[string]string{
-						common.PublishContextDeviceWWN:  validDeviceWWN,
-						common.PublishContextLUNAddress: validLUNID,
+						common.PublishContextDeviceWWN:   validDeviceWWN,
+						common.PublishContextLUNAddress:  validLUNID,
+						common.PublishContextDeviceNGUID: validDeviceNGUID,
 					},
 					StagingTargetPath: nodeStagePrivateDir,
 					VolumeCapability: getCapabilityWithVoltypeAccessFstype(
@@ -955,8 +958,9 @@ var _ = Describe("CSINodeService", func() {
 				res, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
 					VolumeId: validBlockVolumeID,
 					PublishContext: map[string]string{
-						common.PublishContextDeviceWWN:  validDeviceWWN,
-						common.PublishContextLUNAddress: validLUNID,
+						common.PublishContextDeviceWWN:   validDeviceWWN,
+						common.PublishContextLUNAddress:  validLUNID,
+						common.PublishContextDeviceNGUID: validDeviceNGUID,
 					},
 					StagingTargetPath: nodeStagePrivateDir,
 					VolumeCapability: getCapabilityWithVoltypeAccessFstype(
@@ -972,8 +976,9 @@ var _ = Describe("CSINodeService", func() {
 				res, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
 					VolumeId: validBlockVolumeID,
 					PublishContext: map[string]string{
-						common.PublishContextDeviceWWN:  validDeviceWWN,
-						common.PublishContextLUNAddress: validLUNID,
+						common.PublishContextDeviceWWN:   validDeviceWWN,
+						common.PublishContextLUNAddress:  validLUNID,
+						common.PublishContextDeviceNGUID: validDeviceNGUID,
 					},
 					StagingTargetPath: nodeStagePrivateDir,
 					VolumeCapability: getCapabilityWithVoltypeAccessFstype(
@@ -2220,14 +2225,15 @@ var _ = Describe("CSINodeService", func() {
 				}, nil)
 				ctrlMock.On("ControllerPublishVolume", mock.Anything, mock.Anything).Return(&csi.ControllerPublishVolumeResponse{
 					PublishContext: map[string]string{
-						"LUN_ADDRESS": validLUNID,
-						"DEVICE_WWN":  validDeviceWWN,
-						"PORTAL0":     validISCSIPortals[0],
-						"PORTAL1":     validISCSIPortals[1],
-						"TARGET0":     validISCSITargets[0],
-						"TARGET1":     validISCSITargets[1],
-						"FCWWPN0":     "58ccf09348a003a3",
-						"FCWWPN1":     "58ccf09348a002a3",
+						"LUN_ADDRESS":  validLUNID,
+						"DEVICE_WWN":   validDeviceWWN,
+						"DEVICE_NGUID": validDeviceNGUID,
+						"PORTAL0":      validISCSIPortals[0],
+						"PORTAL1":      validISCSIPortals[1],
+						"TARGET0":      validISCSITargets[0],
+						"TARGET1":      validISCSITargets[1],
+						"FCWWPN0":      "58ccf09348a003a3",
+						"FCWWPN1":      "58ccf09348a002a3",
 					},
 				}, nil)
 				iscsiConnectorMock.On("ConnectVolume", mock.Anything, gobrick.ISCSIVolumeInfo{
@@ -2544,14 +2550,15 @@ var _ = Describe("CSINodeService", func() {
 			}, nil)
 			ctrlMock.On("ControllerPublishVolume", mock.Anything, mock.Anything).Return(&csi.ControllerPublishVolumeResponse{
 				PublishContext: map[string]string{
-					"LUN_ADDRESS": validLUNID,
-					"DEVICE_WWN":  validDeviceWWN,
-					"PORTAL0":     validISCSIPortals[0],
-					"PORTAL1":     validISCSIPortals[1],
-					"TARGET0":     validISCSITargets[0],
-					"TARGET1":     validISCSITargets[1],
-					"FCWWPN0":     "58ccf09348a003a3",
-					"FCWWPN1":     "58ccf09348a002a3",
+					"LUN_ADDRESS":  validLUNID,
+					"DEVICE_WWN":   validDeviceWWN,
+					"DEVICE_NGUID": validDeviceNGUID,
+					"PORTAL0":      validISCSIPortals[0],
+					"PORTAL1":      validISCSIPortals[1],
+					"TARGET0":      validISCSITargets[0],
+					"TARGET1":      validISCSITargets[1],
+					"FCWWPN0":      "58ccf09348a003a3",
+					"FCWWPN1":      "58ccf09348a002a3",
 				},
 			}, nil)
 			iscsiConnectorMock.On("ConnectVolume", mock.Anything, gobrick.ISCSIVolumeInfo{
@@ -3128,6 +3135,66 @@ var _ = Describe("CSINodeService", func() {
 			})
 		})
 
+		When("using DPU", func() {
+			It("should return DPU topology segments", func() {
+				nodeSvc.useNVME = false
+				nodeSvc.useFC = false
+				nodeSvc.useDPU = true
+				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
+					Return([]gopowerstore.IPPoolAddress{
+						{
+							Address: "192.168.1.1",
+							IPPort:  gopowerstore.IPPortInstance{TargetIqn: "iqn"},
+						},
+					}, nil)
+				conn, _ := net.Dial("udp", "127.0.0.1:80")
+				fsMock.On("NetDial", mock.Anything).Return(
+					conn,
+					nil,
+					)
+				resp, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
+				Expect(err).To(BeNil())
+				Expect(resp).To(Equal(&csi.NodeGetInfoResponse{
+					NodeId: nodeSvc.nodeID,
+					AccessibleTopology: &csi.Topology{
+						Segments: map[string]string{
+							common.Name + "/" + firstValidIP + "-nfs": "true",
+							common.Name + "/" + firstValidIP + "-dpu": "true",
+							common.Name + "/" + secondValidIP + "-nfs": "true",
+						},
+					},
+				}))
+			})
+
+			When("we cannot get NVMeTCP targets from the array", func() {
+				It("should not return the DPU topology segments", func() {
+					nodeSvc.useNVME = false
+					nodeSvc.useFC = false
+					nodeSvc.useDPU = true
+					e := "internal error"
+					clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
+						Return([]gopowerstore.IPPoolAddress{}, errors.New(e))
+					conn, _ := net.Dial("udp", "127.0.0.1:80")
+					fsMock.On("NetDial", mock.Anything).Return(
+						conn,
+						nil,
+					)
+					res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
+
+					Expect(err).To(BeNil())
+					Expect(res).To(Equal(&csi.NodeGetInfoResponse{
+						NodeId: nodeSvc.nodeID,
+						AccessibleTopology: &csi.Topology{
+							Segments: map[string]string{
+								common.Name + "/" + firstValidIP + "-nfs":     "true",
+								common.Name + "/" + secondValidIP + "-nfs":     "true",
+							},
+						},
+					}))
+				})
+			})
+		})
+
 		When("using NVMeTCP", func() {
 			It("should return NVMeTCP topology segments", func() {
 				nodeSvc.useNVME = true
@@ -3162,7 +3229,7 @@ var _ = Describe("CSINodeService", func() {
 				It("should not return NVMeTCP topology segments", func() {
 					nodeSvc.useNVME = true
 					nodeSvc.useFC = false
-					e := "internalerror"
+					e := "internal error"
 					clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
 						Return([]gopowerstore.IPPoolAddress{}, errors.New(e))
 					conn, _ := net.Dial("udp", "127.0.0.1:80")
@@ -3171,6 +3238,7 @@ var _ = Describe("CSINodeService", func() {
 						nil,
 					)
 					res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
+					
 					Expect(err).To(BeNil())
 					Expect(res).To(Equal(&csi.NodeGetInfoResponse{
 						NodeId: nodeSvc.nodeID,

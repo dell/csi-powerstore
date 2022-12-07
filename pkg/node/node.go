@@ -1366,8 +1366,6 @@ func (s *Service) setupHost(initiators []string, client gopowerstore.Client, arr
 
 		s.initialized = true
 		return nil
-	} else {
-		log.Info("Host not found: %s", err)
 	}
 
 	hosts, err := client.GetHosts(context.Background())

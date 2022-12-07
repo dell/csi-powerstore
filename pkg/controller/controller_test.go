@@ -1811,6 +1811,7 @@ var _ = Describe("CSIControllerService", func() {
 						"NVMEFCTARGET0": "nqn",
 						"DEVICE_WWN":    "68ccf098003ceb5e4577a20be6d11bf9",
 						"LUN_ADDRESS":   "1",
+						"DEVICE_NGUID":  "",
 						"FCWWPN0":       "58ccf09348a003a3",
 					},
 				}))
@@ -1995,10 +1996,11 @@ var _ = Describe("CSIControllerService", func() {
 				Expect(err).To(BeNil())
 				Expect(res).To(Equal(&csi.ControllerPublishVolumeResponse{
 					PublishContext: map[string]string{
-						"PORTAL0":     "192.168.1.1:3260",
-						"TARGET0":     "iqn",
-						"DEVICE_WWN":  "68ccf098003ceb5e4577a20be6d11bf9",
-						"LUN_ADDRESS": "1",
+						"PORTAL0":      "192.168.1.1:3260",
+						"TARGET0":      "iqn",
+						"DEVICE_WWN":   "68ccf098003ceb5e4577a20be6d11bf9",
+						"DEVICE_NGUID": "",
+						"LUN_ADDRESS":  "1",
 					},
 				}))
 			})
@@ -2105,10 +2107,11 @@ var _ = Describe("CSIControllerService", func() {
 					Expect(err).To(BeNil())
 					Expect(res).To(Equal(&csi.ControllerPublishVolumeResponse{
 						PublishContext: map[string]string{
-							"PORTAL0":     "192.168.1.1:3260",
-							"TARGET0":     "iqn",
-							"DEVICE_WWN":  "68ccf098003ceb5e4577a20be6d11bf9",
-							"LUN_ADDRESS": "1",
+							"PORTAL0":      "192.168.1.1:3260",
+							"TARGET0":      "iqn",
+							"DEVICE_WWN":   "68ccf098003ceb5e4577a20be6d11bf9",
+							"DEVICE_NGUID": "",
+							"LUN_ADDRESS":  "1",
 						},
 					}))
 				})
@@ -2198,10 +2201,11 @@ var _ = Describe("CSIControllerService", func() {
 					Expect(err).To(BeNil())
 					Expect(res).To(Equal(&csi.ControllerPublishVolumeResponse{
 						PublishContext: map[string]string{
-							"PORTAL0":     "192.168.1.1:3260",
-							"TARGET0":     "iqn",
-							"DEVICE_WWN":  "68ccf098003ceb5e4577a20be6d11bf9",
-							"LUN_ADDRESS": "2",
+							"PORTAL0":      "192.168.1.1:3260",
+							"TARGET0":      "iqn",
+							"DEVICE_WWN":   "68ccf098003ceb5e4577a20be6d11bf9",
+							"DEVICE_NGUID": "",
+							"LUN_ADDRESS":  "2",
 						},
 					}))
 				})
