@@ -98,6 +98,7 @@ func (s *Service) Init() error {
 	s.opts = getNodeOptions()
 
 	s.initConnectors()
+	s.dpuSubsystemID = ""
 
 	err := s.updateNodeID()
 	if err != nil {
@@ -137,30 +138,35 @@ func (s *Service) Init() error {
 		switch arr.BlockProtocol {
 		case common.DPU:
 			s.useDPU = true
+			s.useFC = false
 		case common.NVMETCPTransport:
 			if len(nvmeInitiators) == 0 {
 				log.Errorf("NVMeTCP transport was requested but NVMe initiator is not available")
 			}
 			s.useNVME = true
 			s.useFC = false
+			s.useDPU = false
 		case common.NVMEFCTransport:
 			if len(nvmeInitiators) == 0 {
 				log.Errorf("NVMeFC transport was requested but NVMe initiator is not available")
 			}
 			s.useNVME = true
 			s.useFC = true
+			s.useDPU = false
 		case common.ISCSITransport:
 			if len(iscsiInitiators) == 0 {
 				log.Errorf("iSCSI transport was requested but iSCSI initiator is not available")
 			}
 			s.useNVME = false
 			s.useFC = false
+			s.useDPU = false
 		case common.FcTransport:
 			if len(fcInitiators) == 0 {
 				log.Errorf("FC transport was requested but FC initiator is not available")
 			}
 			s.useNVME = false
 			s.useFC = true
+			s.useDPU = false
 		default:
 			// s.useDPU = dpuEnabled
 			s.useNVME = len(nvmeInitiators) > 0
