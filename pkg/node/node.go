@@ -76,9 +76,12 @@ type Service struct {
 	iscsiLib       goiscsi.ISCSIinterface
 	nvmeLib        gonvme.NVMEinterface
 
-	opts   Opts
-	nodeID string
+	opts           Opts
+	nodeID         string
+	dpuHostNQN     string
+	dpuSubsystemID string
 
+	useDPU                 bool
 	useFC                  bool
 	useNVME                bool
 	initialized            bool
@@ -95,6 +98,7 @@ func (s *Service) Init() error {
 	s.opts = getNodeOptions()
 
 	s.initConnectors()
+	s.dpuSubsystemID = ""
 
 	err := s.updateNodeID()
 	if err != nil {
@@ -105,6 +109,19 @@ func (s *Service) Init() error {
 	if err != nil {
 		return fmt.Errorf("can't get initiators of the node: %s", err.Error())
 	}
+	/*
+		* Will be added with the real hardware
+		dpuEnabled := false
+		command := []string{"lspci"}
+		cmd := exec.Command(command[0], command[1:]...)
+		outStr, err := cmd.Output()
+		if strings.Contains(string(outStr), "BlueField") {
+			dpuEnabled = true
+		}
+		if len(iscsiInitiators) == 0 && len(fcInitiators) == 0 && len(nvmeInitiators) == 0 && dpuEnabled {
+			return nil
+		}
+	*/
 
 	if len(iscsiInitiators) == 0 && len(fcInitiators) == 0 && len(nvmeInitiators) == 0 {
 		return nil
@@ -119,35 +136,55 @@ func (s *Service) Init() error {
 		var initiators []string
 
 		switch arr.BlockProtocol {
+		case common.DPU:
+			s.useDPU = true
+			s.useFC = false
 		case common.NVMETCPTransport:
 			if len(nvmeInitiators) == 0 {
 				log.Errorf("NVMeTCP transport was requested but NVMe initiator is not available")
 			}
 			s.useNVME = true
 			s.useFC = false
+			s.useDPU = false
 		case common.NVMEFCTransport:
 			if len(nvmeInitiators) == 0 {
 				log.Errorf("NVMeFC transport was requested but NVMe initiator is not available")
 			}
 			s.useNVME = true
 			s.useFC = true
+			s.useDPU = false
 		case common.ISCSITransport:
 			if len(iscsiInitiators) == 0 {
 				log.Errorf("iSCSI transport was requested but iSCSI initiator is not available")
 			}
 			s.useNVME = false
 			s.useFC = false
+			s.useDPU = false
 		case common.FcTransport:
 			if len(fcInitiators) == 0 {
 				log.Errorf("FC transport was requested but FC initiator is not available")
 			}
 			s.useNVME = false
 			s.useFC = true
+			s.useDPU = false
 		default:
+			// s.useDPU = dpuEnabled
 			s.useNVME = len(nvmeInitiators) > 0
 			s.useFC = len(fcInitiators) > 0
 		}
-		if s.useNVME {
+
+		if s.useDPU {
+			hostInitiators, err := s.checkHostExists(arr.GetClient())
+			if err == nil && len(hostInitiators) > 0 {
+				initiators = hostInitiators
+				s.dpuHostNQN = hostInitiators[0]
+			} else {
+				s.dpuHostNQN = goopicsi.GenerateHostNQN()
+				dpuNVMeInitiators := []string{s.dpuHostNQN}
+				initiators = dpuNVMeInitiators
+			}
+			log.Infof("NVMeTCP protocol with DPU is requested")
+		} else if s.useNVME {
 			initiators = nvmeInitiators
 			if s.useFC {
 				log.Infof("NVMeFC Protocol is requested")
@@ -243,6 +280,7 @@ func (s *Service) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeR
 		req.PublishContext[fmt.Sprintf("%s%d", common.PublishContextNVMETCPTargetsPrefix, i)] = t.TargetNqn
 		req.PublishContext[fmt.Sprintf("%s%d", common.PublishContextNVMETCPPortalsPrefix, i)] = t.Portal + ":4420"
 	}
+	req.PublishContext[common.DPUSubsystemID] = s.dpuSubsystemID
 
 	id, arrayID, protocol, _ := array.ParseVolumeID(ctx, id, s.DefaultArray(), req.VolumeCapability)
 
@@ -259,6 +297,7 @@ func (s *Service) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeR
 		}
 	} else {
 		stager = &SCSIStager{
+			useDPU:         s.useDPU,
 			useFC:          s.useFC,
 			useNVME:        s.useNVME,
 			iscsiConnector: s.iscsiConnector,
@@ -1001,7 +1040,31 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 		}
 
 		if arr.BlockProtocol != common.NoneTransport {
-			if s.useNVME {
+			if s.useDPU {
+				infoList, err := common.GetISCSITargetsInfoFromStorage(arr.GetClient(), "")
+				if err != nil {
+					log.Errorf("couldn't get targets from the array: %s", err.Error())
+					continue
+				}
+				nvmeIP := strings.Split(infoList[0].Portal, ":")
+				nvmeTargets, err := s.nvmeLib.DiscoverNVMeTCPTargets(nvmeIP[0], false)
+				if err != nil {
+					log.Errorf("could not discover NVMe targets: %s", err.Error())
+				}
+				for i, target := range nvmeTargets {
+					err := goopicsi.NVMeControllerConnect(int64(i), target.Portal, target.TargetNqn, 4420, s.dpuHostNQN)
+					if err != nil {
+						log.Errorf("could not connect DPU to the backend array")
+					}
+				}
+
+				s.dpuSubsystemID, _, err = goopicsi.ExposeRemoteNVMe(s.dpuHostNQN, 100)
+				if err != nil {
+					log.Errorf("could not create NVMe subsystem and controller %v", err.Error())
+				}
+				resp.AccessibleTopology.Segments[common.Name+"/"+arr.GetIP()+"-dpu"] = "true"
+
+			} else if s.useNVME {
 				if s.useFC {
 					nvmefcInfo, err := common.GetNVMEFCTargetInfoFromStorage(arr.GetClient(), "")
 					if err != nil {
@@ -1011,7 +1074,6 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 
 					log.Infof("Discovering NVMeFC targets")
 					nvmefcConnectCount := 0
-					dpuConnectCount := 0
 
 					for _, info := range nvmefcInfo {
 						NVMeFCTargets, err := s.nvmeLib.DiscoverNVMeFCTargets(info.Portal, false)
@@ -1026,28 +1088,11 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 								} else {
 									nvmefcConnectCount = nvmefcConnectCount + 1
 								}
-
-								svcID, err := strconv.ParseInt(target.TrsvcID, 10, 64)
-								if err != nil {
-									log.Errorf("DPU connect failed", err)
-								}
-
-								err = goopicsi.NVMeControllerConnect(12, target.Portal, target.TargetNqn, svcID)
-								if err != nil {
-									log.Errorf("couldn't connect to DPU ")
-								} else {
-									dpuConnectCount = dpuConnectCount + 1
-								}
 							}
 						}
 					}
 					if nvmefcConnectCount != 0 {
 						resp.AccessibleTopology.Segments[common.Name+"/"+arr.GetIP()+"-nvmefc"] = "true"
-
-						if dpuConnectCount != 0 {
-							resp.AccessibleTopology.Segments[common.Name+"/"+arr.GetIP()+"-nvmefc-dpu"] = "true"
-							log.Info("DPU FC label added--count,", dpuConnectCount)
-						}
 					}
 				} else {
 					infoList, err := common.GetISCSITargetsInfoFromStorage(arr.GetClient(), "")
@@ -1058,7 +1103,6 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 
 					log.Infof("Discovering NVMeTCP targets")
 					nvmetcpConnectCount := 0
-					dpuConnectCount := 0
 					nvmeIP := strings.Split(infoList[0].Portal, ":")
 					nvmeTargets, err := s.nvmeLib.DiscoverNVMeTCPTargets(nvmeIP[0], false)
 					if err != nil {
@@ -1072,26 +1116,10 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 							} else {
 								nvmetcpConnectCount = nvmetcpConnectCount + 1
 							}
-
-							svcID, err := strconv.ParseInt(target.TrsvcID, 10, 64)
-							if err != nil {
-								log.Errorf("DPU connect failed", err)
-							}
-
-							err = goopicsi.NVMeControllerConnect(12, target.Portal, target.TargetNqn, svcID)
-							if err != nil {
-								log.Errorf("couldn't connect to DPU ")
-							} else {
-								dpuConnectCount = dpuConnectCount + 1
-							}
 						}
 					}
 					if nvmetcpConnectCount != 0 {
 						resp.AccessibleTopology.Segments[common.Name+"/"+arr.GetIP()+"-nvmetcp"] = "true"
-						if dpuConnectCount != 0 {
-							resp.AccessibleTopology.Segments[common.Name+"/"+arr.GetIP()+"-nvmetcp-dpu"] = "true"
-							log.Info("DPU TCP label added--count,", dpuConnectCount)
-						}
 					}
 				}
 
@@ -1409,7 +1437,7 @@ func (s *Service) setupHost(initiators []string, client gopowerstore.Client, arr
 
 func (s *Service) buildInitiatorsArray(initiators []string) []gopowerstore.InitiatorCreateModify {
 	var portType gopowerstore.InitiatorProtocolTypeEnum
-	if s.useNVME {
+	if s.useNVME || s.useDPU {
 		portType = gopowerstore.InitiatorProtocolTypeEnumNVME
 	} else if s.useFC {
 		portType = gopowerstore.InitiatorProtocolTypeEnumFC
@@ -1541,6 +1569,20 @@ func checkIQNS(IQNs []string, host gopowerstore.Host) (iqnToAdd, iqnToDelete []s
 		}
 	}
 	return
+}
+
+func (s *Service) checkHostExists(client gopowerstore.Client) ([]string, error) {
+	host, err := client.GetHostByName(context.Background(), s.nodeID)
+	hostInitiators := make([]string, 0)
+	if err == nil {
+		for _, initiator := range host.Initiators {
+			if initiator.PortType == gopowerstore.InitiatorProtocolTypeEnumNVME {
+				hostInitiators = append(hostInitiators, initiator.PortName)
+			}
+		}
+		return hostInitiators, nil
+	}
+	return hostInitiators, err
 }
 
 func (s *Service) buildInitiatorsArrayModify(initiators []string) []gopowerstore.UpdateInitiatorInHost {

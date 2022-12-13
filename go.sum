@@ -105,8 +105,8 @@ github.com/dell/dell-csi-extensions/replication v1.2.0 h1:zOJgSMvZOXl4fVJzP98vh2
 github.com/dell/dell-csi-extensions/replication v1.2.0/go.mod h1:FU2kzS8/29GlK9iCdS+E70cyeWun63eNP44aHwg7jW8=
 github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.2.2-0.20220823070737-c80a2164070b h1:PIKiU3qwTIUb4vSLUghB3hsgbuRUA84jaePt/Ds8r5c=
 github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.2.2-0.20220823070737-c80a2164070b/go.mod h1:etLWwS1G2IqHDuArHqB0OWQvpdcztuBxopWrRE+mpk0=
-github.com/dell/gobrick v1.5.2-0.20221111070858-42c3a4484fa7 h1:igIZamt4eNt8DevE/8A46W0czzlrQ4UlPb5CeSLDhEs=
-github.com/dell/gobrick v1.5.2-0.20221111070858-42c3a4484fa7/go.mod h1:noYoZoMZhsXQEjxG1IOXJ76rIs105sCwtO0yAAFL97Y=
+github.com/dell/gobrick v1.5.2-0.20221129112205-823fba54a104 h1:GXI3cpn4LTXMJPiLeNd//GdGrzfjWjrQ68llNtV+mLU=
+github.com/dell/gobrick v1.5.2-0.20221129112205-823fba54a104/go.mod h1:0ybeWDY1kUzo6otRknjJXQ1Rle9LTGI6DovYhdckmss=
 github.com/dell/gocsi v1.6.0 h1:ZmoMi17v1jK0RE0OGEivu52/RqHbOhP5cqs9SHExqa0=
 github.com/dell/gocsi v1.6.0/go.mod h1:+ihwgNYeFTv69Ym2X2Ij1idK72JYoNR8CeiWYJrrbho=
 github.com/dell/gofsutil v1.10.0 h1:BDEZj5/xeUugwyXftYTH8Xjc0kT5dvIXofQr7CGWMho=
@@ -338,10 +338,10 @@ github.com/onsi/gomega v1.19.0/go.mod h1:LY+I3pBVzYsTBU1AnDwOSxaYi9WoWiqgwooUqq9
 github.com/opentracing/opentracing-go v1.1.0/go.mod h1:UkNAQd3GIcIGf0SeVgPpRdFStlNbqXla1AfSYxPUl2o=
 github.com/opentracing/opentracing-go v1.2.0 h1:uEJPy/1a5RIPAJ0Ov+OIO8OxWu77jEv+1B0VhjKrZUs=
 github.com/opentracing/opentracing-go v1.2.0/go.mod h1:GxEUsuufX4nBwe+T+Wl9TAgYrxe9dPLANfrWvHYVTgc=
-github.com/opiproject/goopicsi v0.0.0-20221114170048-044909a94bc6 h1:34tncSxv1Ukl3CSLaIcTA1IW0s2gxe90C1y2jToBT8I=
-github.com/opiproject/goopicsi v0.0.0-20221114170048-044909a94bc6/go.mod h1:V5RuvVQhoDMp7w7lDItGWgu2yy/nkmtzsIC/vBJ5Dsw=
-github.com/opiproject/opi-api v0.0.0-20221114164938-b94e8f880124 h1:VYflLsXLNtMcNE4gpZJoME3Gu2bgWo9O6BbCtOhMajQ=
-github.com/opiproject/opi-api v0.0.0-20221114164938-b94e8f880124/go.mod h1:92pv4ulvvPMuxCJ9ND3aYbmBfEMLx0VCjpkiR7ZTqPY=
+github.com/opiproject/goopicsi v0.0.0-20221206152144-ebc2b7bbb593 h1:jXhP34Xq/RZHvdRsl3QIUIV576SS0C8Vef2XkjrVUFQ=
+github.com/opiproject/goopicsi v0.0.0-20221206152144-ebc2b7bbb593/go.mod h1:zPaa5h5CeMYUvEn7sP1eip8lpIWsDp+zmgz5sffgzXY=
+github.com/opiproject/opi-api v0.0.0-20221129180238-b10361a9c119 h1:exwxNwGuwQtA9IRs2I/Eh22IWeeReAf3uzExgblLytY=
+github.com/opiproject/opi-api v0.0.0-20221129180238-b10361a9c119/go.mod h1:92pv4ulvvPMuxCJ9ND3aYbmBfEMLx0VCjpkiR7ZTqPY=
 github.com/pelletier/go-toml v1.9.5 h1:4yBQzkHv+7BHq2PQUZF3Mx0IYxG7LsP222s7Agd3ve8=
 github.com/pelletier/go-toml v1.9.5/go.mod h1:u1nR/EPcESfeI/szUZKdtJ0xRNbUoANCkoOuaOx1Y+c=
 github.com/pelletier/go-toml/v2 v2.0.1 h1:8e3L2cCQzLFi2CR4g7vGFuFxX7Jl1kKX8gW+iV0GUKU=
@@ -819,8 +819,8 @@ google.golang.org/grpc v1.33.2/go.mod h1:JMHMWHQWaTccqQQlmk3MJZS+GWXOdAesneDmEnv
 google.golang.org/grpc v1.34.0/go.mod h1:WotjhfgOW/POjDeRt8vscBtXq+2VjORFy659qA51WJ8=
 google.golang.org/grpc v1.35.0/go.mod h1:qjiiYl8FncCW8feJPdyg3v6XW24KsRHe+dy9BAGRRjU=
 google.golang.org/grpc v1.38.0/go.mod h1:NREThFqKR1f3iQ6oBuvc5LadQuXVGo9rkm5ZGrQdJfM=
-google.golang.org/grpc v1.50.1 h1:DS/BukOZWp8s6p4Dt/tOaJaTQyPyOoCcrjroHuCeLzY=
-google.golang.org/grpc v1.50.1/go.mod h1:ZgQEeidpAuNRZ8iRrlBKXZQP1ghovWIVhdJRyCDK+GI=
+google.golang.org/grpc v1.51.0 h1:E1eGv1FTqoLIdnBCZufiSHgKjlqG6fKFf6pPWtMTh8U=
+google.golang.org/grpc v1.51.0/go.mod h1:wgNDFcnuBGmxLKI/qn4T+m5BtEBYXJPvibbUPsAIPww=
 google.golang.org/protobuf v0.0.0-20200109180630-ec00e32a8dfd/go.mod h1:DFci5gLYBciE7Vtevhsrf46CRTquxDuWsQurQQe4oz8=
 google.golang.org/protobuf v0.0.0-20200221191635-4d8936d0db64/go.mod h1:kwYJMbMJ01Woi6D6+Kah6886xMZcty6N08ah7+eCXa0=
 google.golang.org/protobuf v0.0.0-20200228230310-ab0ca4ff8a60/go.mod h1:cfTl7dwQJ+fmap5saPgwCLgHXTUD7jkjRqWcaiX5VyM=

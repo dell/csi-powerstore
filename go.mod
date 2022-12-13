@@ -10,7 +10,7 @@ require (
 	github.com/dell/dell-csi-extensions/common v1.1.0
 	github.com/dell/dell-csi-extensions/replication v1.2.0
 	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.2.2-0.20220823070737-c80a2164070b
-	github.com/dell/gobrick v1.5.2-0.20221111070858-42c3a4484fa7
+	github.com/dell/gobrick v1.5.2-0.20221129112205-823fba54a104
 	github.com/dell/gocsi v1.6.0
 	github.com/dell/gofsutil v1.10.0
 	github.com/dell/goiscsi v1.5.0
@@ -24,14 +24,14 @@ require (
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.19.0
 	github.com/opentracing/opentracing-go v1.2.0
-	github.com/opiproject/goopicsi v0.0.0-20221114170048-044909a94bc6
+	github.com/opiproject/goopicsi v0.0.0-20221206152144-ebc2b7bbb593
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/viper v1.12.0
 	github.com/stretchr/testify v1.8.1
 	github.com/uber/jaeger-client-go v2.30.0+incompatible
 	github.com/uber/jaeger-lib v2.4.1+incompatible
 	golang.org/x/net v0.0.0-20221019024206-cb67ada4b0ad
-	google.golang.org/grpc v1.50.1
+	google.golang.org/grpc v1.51.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -62,7 +62,7 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/nxadm/tail v1.4.8 // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
-	github.com/opiproject/opi-api v0.0.0-20221114164938-b94e8f880124 // indirect
+	github.com/opiproject/opi-api v0.0.0-20221129180238-b10361a9c119 // indirect
 	github.com/pelletier/go-toml v1.9.5 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.1 // indirect
 	github.com/pkg/errors v0.9.1 // indirect

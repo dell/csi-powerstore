@@ -97,6 +97,8 @@ const (
 	PublishContextDeviceWWN = "DEVICE_WWN"
 	// PublishContextLUNAddress indicates publish context LUN address
 	PublishContextLUNAddress = "LUN_ADDRESS"
+	//PublishContextDeviceNGUID indicates publish context NGUID
+	PublishContextDeviceNGUID = "DEVICE_NGUID"
 	// PublishContextISCSIPortalsPrefix indicates publish context iSCSI portals prefix
 	PublishContextISCSIPortalsPrefix = "PORTAL"
 	// PublishContextISCSITargetsPrefix indicates publish context iSCSI targets prefix
@@ -113,10 +115,16 @@ const (
 	NVMETCPTransport TransportType = "NVMETCP"
 	// NVMEFCTransport indicates that NVMe/FC is chosen as the transport protocol
 	NVMEFCTransport TransportType = "NVMEFC"
+	// DPU indicates that DPU is chosend as the protocol
+	DPU TransportType = "DPU"
 	// PublishContextFCWWPNPrefix indicates publish context FC WWPN prefix
 	PublishContextFCWWPNPrefix = "FCWWPN"
+	//DPUSubsystemID indicates the SubsystemID for DPU NVMe Subsystem and Controller
+	DPUSubsystemID = "DPUSubsystemID"
 	// WWNPrefix indicates WWN prefix
 	WWNPrefix = "naa."
+	// NGUIDPrefix indicates NGUID prefix
+	NGUIDPrefix = "nguid."
 
 	contextLogFieldsKey key = iota
 )
