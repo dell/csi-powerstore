@@ -10,7 +10,7 @@ require (
 	github.com/dell/dell-csi-extensions/common v1.1.0
 	github.com/dell/dell-csi-extensions/replication v1.2.0
 	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.2.2-0.20220823070737-c80a2164070b
-	github.com/dell/gobrick v1.5.2-0.20221129112205-823fba54a104
+	github.com/dell/gobrick v1.5.2-0.20221219061204-fe10b1988b75
 	github.com/dell/gocsi v1.6.0
 	github.com/dell/gofsutil v1.10.0
 	github.com/dell/goiscsi v1.5.0
@@ -24,16 +24,18 @@ require (
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.19.0
 	github.com/opentracing/opentracing-go v1.2.0
-	github.com/opiproject/goopicsi v0.0.0-20221206152144-ebc2b7bbb593
+	github.com/opiproject/goopicsi v0.0.0-20221217125535-0bd07b41b06f
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/viper v1.12.0
 	github.com/stretchr/testify v1.8.1
 	github.com/uber/jaeger-client-go v2.30.0+incompatible
 	github.com/uber/jaeger-lib v2.4.1+incompatible
-	golang.org/x/net v0.0.0-20221019024206-cb67ada4b0ad
+	golang.org/x/net v0.4.0
 	google.golang.org/grpc v1.51.0
 	gopkg.in/yaml.v3 v3.0.1
 )
+
+replace github.com/opiproject/goopicsi => ../goopicsi
 
 require (
 	github.com/HdrHistogram/hdrhistogram-go v1.1.2 // indirect
@@ -62,7 +64,7 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/nxadm/tail v1.4.8 // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
-	github.com/opiproject/opi-api v0.0.0-20221129180238-b10361a9c119 // indirect
+	github.com/opiproject/opi-api v0.0.0-20221216134945-6078c7e2edf6 // indirect
 	github.com/pelletier/go-toml v1.9.5 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.1 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
@@ -87,9 +89,9 @@ require (
 	golang.org/x/crypto v0.0.0-20220525230936-793ad666bf5e // indirect
 	golang.org/x/oauth2 v0.0.0-20220524215830-622c5d57e401 // indirect
 	golang.org/x/sync v0.0.0-20220601150217-0de741cfad7f // indirect
-	golang.org/x/sys v0.1.0 // indirect
-	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211 // indirect
-	golang.org/x/text v0.4.0 // indirect
+	golang.org/x/sys v0.3.0 // indirect
+	golang.org/x/term v0.3.0 // indirect
+	golang.org/x/text v0.5.0 // indirect
 	golang.org/x/time v0.0.0-20220411224347-583f2d630306 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20220930163606-c98284e70a91 // indirect

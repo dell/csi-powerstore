@@ -169,9 +169,9 @@ func TestSCSIStager_Stage(t *testing.T) {
 					Target: validNVMEFCTargets[1],
 				},
 			},
-			WWN: validDeviceWWN,
+			WWN:   validDeviceWWN,
 			NGUID: validDeviceNGUID,
-		}, true, false, "").Return(gobrick.Device{}, nil)
+		}, true, false, "", int32(0)).Return(gobrick.Device{}, nil)
 
 		utilMock := new(mocks.UtilInterface)
 		fsMock := new(mocks.FsInterface)
@@ -213,9 +213,9 @@ func TestSCSIStager_Stage(t *testing.T) {
 					Target: validNVMETCPTargets[1],
 				},
 			},
-			WWN: validDeviceWWN,
+			WWN:   validDeviceWWN,
 			NGUID: validDeviceNGUID,
-		}, false, false, "").Return(gobrick.Device{}, nil)
+		}, false, false, "", int32(0)).Return(gobrick.Device{}, nil)
 
 		utilMock := new(mocks.UtilInterface)
 		fsMock := new(mocks.FsInterface)
@@ -238,12 +238,12 @@ func TestSCSIStager_Stage(t *testing.T) {
 		nvmeConnectorMock := new(mocks.NVMEConnector)
 
 		stager := &SCSIStager{
-			useFC: false,
-			useNVME: true,
-			useDPU: true,
+			useFC:          false,
+			useNVME:        true,
+			useDPU:         true,
 			iscsiConnector: iscsiConnectorMock,
-			nvmeConnector: nvmeConnectorMock,
-			fcConnector: fcConnectorMock,
+			nvmeConnector:  nvmeConnectorMock,
+			fcConnector:    fcConnectorMock,
 		}
 
 		nvmeConnectorMock.On("ConnectVolume", mock.Anything, gobrick.NVMeVolumeInfo{
@@ -257,17 +257,17 @@ func TestSCSIStager_Stage(t *testing.T) {
 					Target: validNVMETCPTargets[1],
 				},
 			},
-			WWN: validDeviceWWN,
+			WWN:   validDeviceWWN,
 			NGUID: validDeviceNGUID,
-		}, false, true, "").Return(gobrick.Device{}, nil)
+		}, false, true, "", int32(0)).Return(gobrick.Device{}, nil)
 
 		utilMock := new(mocks.UtilInterface)
 		fsMock := new(mocks.FsInterface)
 
 		scsiStageVolumeOK(utilMock, fsMock)
 		_, err := stager.Stage(context.Background(), &csi.NodeStageVolumeRequest{
-			VolumeId:  validBlockVolumeID,
-			PublishContext: getValidPublishContext(),
+			VolumeId:          validBlockVolumeID,
+			PublishContext:    getValidPublishContext(),
 			StagingTargetPath: nodeStagePrivateDir,
 			VolumeCapability: getCapabilityWithVoltypeAccessFstype(
 				"block", "single-writer", "none"),

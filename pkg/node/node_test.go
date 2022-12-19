@@ -604,7 +604,7 @@ var _ = Describe("CSINodeService", func() {
 					Targets: validNVMEFCTargetInfo,
 					WWN:     validDeviceWWN,
 					NGUID:   validDeviceNGUID,
-				}, true, false, "").Return(gobrick.Device{}, nil)
+				}, true, false, "", int32(1)).Return(gobrick.Device{}, nil)
 
 				scsiStageVolumeOK(utilMock, fsMock)
 				res, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
@@ -3151,15 +3151,15 @@ var _ = Describe("CSINodeService", func() {
 				fsMock.On("NetDial", mock.Anything).Return(
 					conn,
 					nil,
-					)
+				)
 				resp, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
 				Expect(err).To(BeNil())
 				Expect(resp).To(Equal(&csi.NodeGetInfoResponse{
 					NodeId: nodeSvc.nodeID,
 					AccessibleTopology: &csi.Topology{
 						Segments: map[string]string{
-							common.Name + "/" + firstValidIP + "-nfs": "true",
-							common.Name + "/" + firstValidIP + "-dpu": "true",
+							common.Name + "/" + firstValidIP + "-nfs":  "true",
+							common.Name + "/" + firstValidIP + "-dpu":  "true",
 							common.Name + "/" + secondValidIP + "-nfs": "true",
 						},
 					},
@@ -3186,8 +3186,8 @@ var _ = Describe("CSINodeService", func() {
 						NodeId: nodeSvc.nodeID,
 						AccessibleTopology: &csi.Topology{
 							Segments: map[string]string{
-								common.Name + "/" + firstValidIP + "-nfs":     "true",
-								common.Name + "/" + secondValidIP + "-nfs":     "true",
+								common.Name + "/" + firstValidIP + "-nfs":  "true",
+								common.Name + "/" + secondValidIP + "-nfs": "true",
 							},
 						},
 					}))
@@ -3238,7 +3238,7 @@ var _ = Describe("CSINodeService", func() {
 						nil,
 					)
 					res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
-					
+
 					Expect(err).To(BeNil())
 					Expect(res).To(Equal(&csi.NodeGetInfoResponse{
 						NodeId: nodeSvc.nodeID,
