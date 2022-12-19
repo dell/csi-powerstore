@@ -35,8 +35,6 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 )
 
-replace github.com/opiproject/goopicsi => ../goopicsi
-
 require (
 	github.com/HdrHistogram/hdrhistogram-go v1.1.2 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20210307081110-f21760c49a8d // indirect
