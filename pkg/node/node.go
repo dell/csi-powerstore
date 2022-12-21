@@ -378,12 +378,41 @@ func unstageVolume(ctx context.Context, stagingPath, id string, logFields log.Fi
 	}
 
 	err = fs.Remove(stagingPath)
+	if err != nil && fs.IsDeviceOrResourceBusy(err) {
+		log.Warnf("failed to delete mount path %s: %s", stagingPath, err)
+		remnantDevice, e := removeRemnantMounts(ctx, stagingPath, fs, logFields)
+		if e != nil {
+			log.Errorf("%s", e)
+			return "", status.Errorf(codes.Internal, "failed to delete mount path %s: %s", stagingPath, err.Error())
+		}
+		if device == "" {
+			device = remnantDevice
+		}
+	}
 	if err != nil && !fs.IsNotExist(err) {
 		return "", status.Errorf(codes.Internal, "failed to delete mount path %s: %s", stagingPath, err.Error())
 	}
 
 	log.WithFields(logFields).Infof("target mount file deleted")
 	return device, nil
+}
+
+func removeRemnantMounts(ctx context.Context, stagingPath string, fs fs.Interface, logFields log.Fields) (string, error) {
+	log.WithFields(logFields).Infof("getting active remnant mount")
+	mounts, found, err := getRemnantTargetMounts(ctx, stagingPath, fs)
+	if !found || err != nil {
+		return "", fmt.Errorf("could not reliably determine remnant mounts for path %s: %s", stagingPath, err.Error())
+	}
+
+	log.WithFields(logFields).Infof("%d active remnant mount exist", len(mounts))
+	for _, mount := range mounts {
+		err = fs.GetUtil().Unmount(ctx, mount.Path)
+		if err != nil {
+			return "", fmt.Errorf("could not unmount dev %s: %s", mount.Path, err.Error())
+		}
+		log.WithFields(logFields).Infof("unmount %s without error", mount.Path)
+	}
+	return mounts[0].Device, nil
 }
 
 // NodePublishVolume publishes volume to the node by mounting it to the target path
