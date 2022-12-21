@@ -214,7 +214,6 @@ func getRemnantTargetMounts(ctx context.Context, target string, fs fs.Interface)
 			targetMounts = append(targetMounts, mount)
 			log.WithFields(logFields).Infof("matching remnantTargetMount %s target %s", target, mount.Path)
 			found = true
-			break
 		}
 	}
 	return targetMounts, found, nil

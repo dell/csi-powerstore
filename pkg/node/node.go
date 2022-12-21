@@ -379,7 +379,7 @@ func unstageVolume(ctx context.Context, stagingPath, id string, logFields log.Fi
 
 	err = fs.Remove(stagingPath)
 	if err != nil && fs.IsDeviceOrResourceBusy(err) {
-		log.Warnf("failed to delete mount path %s: %s", stagingPath, err)
+		log.Warnf("failed to delete mount path : %s", err)
 		remnantDevice, e := removeRemnantMounts(ctx, stagingPath, fs, logFields)
 		if e != nil {
 			log.Errorf("%s", e)
@@ -388,8 +388,7 @@ func unstageVolume(ctx context.Context, stagingPath, id string, logFields log.Fi
 		if device == "" {
 			device = remnantDevice
 		}
-	}
-	if err != nil && !fs.IsNotExist(err) {
+	} else if err != nil && !fs.IsNotExist(err) {
 		return "", status.Errorf(codes.Internal, "failed to delete mount path %s: %s", stagingPath, err.Error())
 	}
 
@@ -406,12 +405,14 @@ func removeRemnantMounts(ctx context.Context, stagingPath string, fs fs.Interfac
 
 	log.WithFields(logFields).Infof("%d active remnant mount exist", len(mounts))
 	for _, mount := range mounts {
+		logFields["RemnantPath"] = mount.Path
 		err = fs.GetUtil().Unmount(ctx, mount.Path)
 		if err != nil {
 			return "", fmt.Errorf("could not unmount dev %s: %s", mount.Path, err.Error())
 		}
-		log.WithFields(logFields).Infof("unmount %s without error", mount.Path)
+		log.WithFields(logFields).Infof("unmount without error")
 	}
+	delete(logFields, "RemnantPath")
 	return mounts[0].Device, nil
 }
 
