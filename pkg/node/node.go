@@ -397,14 +397,15 @@ func unstageVolume(ctx context.Context, stagingPath, id string, logFields log.Fi
 }
 
 func removeRemnantMounts(ctx context.Context, stagingPath string, fs fs.Interface, logFields log.Fields) (string, error) {
-	log.WithFields(logFields).Infof("getting active remnant mount")
+	log.WithFields(logFields).Infof("getting remnant mount")
 	mounts, found, err := getRemnantTargetMounts(ctx, stagingPath, fs)
 	if !found || err != nil {
 		return "", fmt.Errorf("could not reliably determine remnant mounts for path %s: %s", stagingPath, err.Error())
 	}
 
-	log.WithFields(logFields).Infof("%d active remnant mount exist", len(mounts))
+	log.WithFields(logFields).Infof("%d remnant mount exist", len(mounts))
 	for _, mount := range mounts {
+		delete(logFields, "StagingPath")
 		logFields["RemnantPath"] = mount.Path
 		err = fs.GetUtil().Unmount(ctx, mount.Path)
 		if err != nil {
@@ -413,6 +414,7 @@ func removeRemnantMounts(ctx context.Context, stagingPath string, fs fs.Interfac
 		log.WithFields(logFields).Infof("unmount without error")
 	}
 	delete(logFields, "RemnantPath")
+	logFields["StagingPath"] = stagingPath
 	return mounts[0].Device, nil
 }
 
