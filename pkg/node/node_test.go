@@ -1377,10 +1377,11 @@ var _ = Describe("CSINodeService", func() {
 
 				utilMock.On("Unmount", mock.Anything, stagingPath).Return(nil)
 
-				fsMock.On("Remove", stagingPath).Return(errors.New("remove " + stagingPath + ": device or resource busy"))
+				fsMock.On("Remove", stagingPath).Return(errors.New("remove " + stagingPath + ": device or resource busy")).Once()
 				fsMock.On("IsDeviceOrResourceBusy", mock.Anything).Return(true)
-				fsMock.On("IsNotExist", mock.Anything).Return(false)
 				utilMock.On("Unmount", mock.Anything, remnantStagingPath).Return(nil)
+				fsMock.On("Remove", stagingPath).Return(nil).Once()
+				fsMock.On("IsNotExist", mock.Anything).Return(false)
 
 				fsMock.On("WriteFile", path.Join(nodeSvc.opts.TmpDir, validBaseVolumeID), []byte(validDevName), os.FileMode(0640)).Return(nil)
 
