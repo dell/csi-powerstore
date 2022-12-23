@@ -1005,6 +1005,7 @@ var _ = Describe("CSINodeService", func() {
 					e := errors.New("os-error")
 					fsMock.On("Remove", stagingPath).Return(e).Once()
 					fsMock.On("IsNotExist", e).Return(false)
+					fsMock.On("IsDeviceOrResourceBusy", e).Return(false)
 
 					res, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
 						VolumeId:          validBlockVolumeID,
@@ -1350,6 +1351,42 @@ var _ = Describe("CSINodeService", func() {
 
 				fsMock.On("Remove", path.Join(nodeSvc.opts.TmpDir, validBaseVolumeID)).Return(nil)
 				fsMock.On("IsNotExist", mock.Anything).Return(false)
+
+				res, err := nodeSvc.NodeUnstageVolume(context.Background(), &csi.NodeUnstageVolumeRequest{
+					VolumeId:          validBlockVolumeID,
+					StagingTargetPath: nodeStagePrivateDir,
+				})
+				Expect(err).To(BeNil())
+				Expect(res).To(Equal(&csi.NodeUnstageVolumeResponse{}))
+			})
+			It("should succeed, on device or resource busy error", func() {
+				remnantStagingPath := "/noderoot/" + stagingPath
+				mountInfo := []gofsutil.Info{
+					{
+						Device: validDevName,
+						Path:   stagingPath,
+					}, {
+						Device: validDevName,
+						Path:   remnantStagingPath,
+					},
+				}
+
+				fsMock.On("GetUtil").Return(utilMock)
+				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(4)
+				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return(mountInfo, nil)
+
+				utilMock.On("Unmount", mock.Anything, stagingPath).Return(nil)
+
+				fsMock.On("Remove", stagingPath).Return(errors.New("remove " + stagingPath + ": device or resource busy"))
+				fsMock.On("IsDeviceOrResourceBusy", mock.Anything).Return(true)
+				fsMock.On("IsNotExist", mock.Anything).Return(false)
+				utilMock.On("Unmount", mock.Anything, remnantStagingPath).Return(nil)
+
+				fsMock.On("WriteFile", path.Join(nodeSvc.opts.TmpDir, validBaseVolumeID), []byte(validDevName), os.FileMode(0640)).Return(nil)
+
+				iscsiConnectorMock.On("DisconnectVolumeByDeviceName", mock.Anything, validDevName).Return(nil)
+
+				fsMock.On("Remove", path.Join(nodeSvc.opts.TmpDir, validBaseVolumeID)).Return(nil)
 
 				res, err := nodeSvc.NodeUnstageVolume(context.Background(), &csi.NodeUnstageVolumeRequest{
 					VolumeId:          validBlockVolumeID,
