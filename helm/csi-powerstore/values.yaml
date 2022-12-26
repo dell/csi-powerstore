@@ -275,6 +275,32 @@ storageCapacity:
   # Default value: 5m
   pollInterval: 5m
 
+# Enable this feature only after contact support for additional information
+podmon:
+  enabled: false
+  image: dellemc/podmon:v1.4.0
+  #controller:
+  #  args:
+  #    - "--csisock=unix:/var/run/csi/csi.sock"
+  #    - "--labelvalue=csi-powerstore"
+  #    - "--driverPath=csi-powerstore.dellemc.com"
+  #    - "--mode=controller"
+  #    - "--skipArrayConnectionValidation=false"
+  #    - "--driver-config-params=/csi-powerstore-config-params/driver-config-params.yaml"
+  #    - "--driverPodLabelValue=dell-storage"
+  #    - "--ignoreVolumelessPods=false"
+
+  #node:
+  #  args:
+  #    - "--csisock=unix:/var/lib/kubelet/plugins/csi-powerstore/csi_sock"
+  #    - "--labelvalue=csi-powerstore"
+  #    - "--driverPath=csi-powerstore.dellemc.com"
+  #    - "--mode=node"
+  #    - "--leaderelection=false"
+  #    - "--driver-config-params=/csi-powerstore-config-params/driver-config-params.yaml"
+  #    - "--driverPodLabelValue=dell-storage"
+  #    - "--ignoreVolumelessPods=false"
+
 images:
   # "driver" defines the container image, used for the driver container.
   driverRepository: dellemc
