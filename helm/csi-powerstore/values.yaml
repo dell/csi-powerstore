@@ -68,6 +68,12 @@ imagePullPolicy: IfNotPresent
 # Default value: "0777"
 nfsAcls: "0777"
 
+# podmonAPIPort: Defines the port to be used within the kubernetes cluster
+# Allowed values:
+#   Any valid and free port.
+# Default value: 8083
+podmonAPIPort: 8083
+
 # controller: configure controller specific parameters
 controller:
   # controllerCount: defines the number of csi-powerstore controller pods to deploy to
