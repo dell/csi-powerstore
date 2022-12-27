@@ -119,6 +119,15 @@ const (
 	WWNPrefix = "naa."
 
 	contextLogFieldsKey key = iota
+
+	// DefaultPodmonAPIPortNumber is the port number in default to expose internal health APIs
+	DefaultPodmonAPIPortNumber = "8083"
+
+	// DefaultPodmonPollRate is the default polling frequency to check for array connectivity
+	DefaultPodmonPollRate = 60
+
+	// Timeout for making http requests
+	Timeout = time.Second * 5
 )
 
 // TransportType differentiates different SCSI transport protocols (FC, iSCSI, Auto, None)
@@ -374,4 +383,17 @@ func ExternalAccessAlreadyAdded(export gopowerstore.NFSExport, externalAccess st
 	}
 	log.Debug("Going to add externalAccess into Host Access list on array: ", externalAccess)
 	return false
+}
+
+// SetPollingFrequency reads the pollingFrequency from Env, sets default vale if ENV not found
+func SetPollingFrequency(ctx context.Context) int64 {
+	var pollingFrequency int64
+	if pollRateEnv, ok := csictx.LookupEnv(ctx, EnvPodmonArrayConnectivityPollRate); ok {
+		if pollingFrequency, _ = strconv.ParseInt(pollRateEnv, 10, 32); pollingFrequency != 0 {
+			log.Debugf("use pollingFrequency as %d seconds", pollingFrequency)
+			return pollingFrequency
+		}
+	}
+	log.Debugf("use default pollingFrequency as %d seconds", DefaultPodmonPollRate)
+	return DefaultPodmonPollRate
 }

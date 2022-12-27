@@ -79,9 +79,11 @@ type Service struct {
 
 	useFC                  bool
 	useNVME                bool
+	useNFS                 bool
 	initialized            bool
 	reusedHost             bool
 	isHealthMonitorEnabled bool
+	isPodmonEnabled        bool
 
 	array.Locker
 }
@@ -105,6 +107,7 @@ func (s *Service) Init() error {
 	}
 
 	if len(iscsiInitiators) == 0 && len(fcInitiators) == 0 && len(nvmeInitiators) == 0 {
+		s.useNFS = true
 		return nil
 	}
 
@@ -170,6 +173,11 @@ func (s *Service) Init() error {
 		s.isHealthMonitorEnabled, _ = strconv.ParseBool(isHealthMonitorEnabled)
 	}
 
+	if isPodmonEnabled, ok := csictx.LookupEnv(ctx, common.EnvPodmonEnabled); ok {
+		// in case of any error in reading/parsing the env variable default value will be false
+		s.isPodmonEnabled, _ = strconv.ParseBool(isPodmonEnabled)
+	}
+	go s.startAPIService(ctx)
 	return nil
 }
 
