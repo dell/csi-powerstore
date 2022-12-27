@@ -27,6 +27,7 @@ import (
 	"path"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-powerstore/pkg/common"
@@ -197,6 +198,25 @@ func getStagingPath(ctx context.Context, sp string, volID string) string {
 	stagingPath := path.Join(sp, volID)
 	log.WithFields(logFields).Infof("staging path is: %s", stagingPath)
 	return path.Join(sp, volID)
+}
+
+func getRemnantTargetMounts(ctx context.Context, target string, fs fs.Interface) ([]gofsutil.Info, bool, error) {
+	logFields := common.GetLogFields(ctx)
+	var targetMounts []gofsutil.Info
+	var found bool
+	mounts, err := getMounts(ctx, fs)
+	if err != nil {
+		log.Error("could not reliably determine existing mount status")
+		return targetMounts, false, status.Error(codes.Internal, "could not reliably determine existing mount status")
+	}
+	for _, mount := range mounts {
+		if strings.Contains(mount.Path, target) {
+			targetMounts = append(targetMounts, mount)
+			log.WithFields(logFields).Infof("matching remnantTargetMount %s target %s", target, mount.Path)
+			found = true
+		}
+	}
+	return targetMounts, found, nil
 }
 
 func getTargetMount(ctx context.Context, target string, fs fs.Interface) (gofsutil.Info, bool, error) {
