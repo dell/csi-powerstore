@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2021 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2021-2022 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -98,4 +98,13 @@ const (
 
 	// EnvAllowAutoRoundOffFilesystemSize specifies if auto round off minimum filesystem size is enabled
 	EnvAllowAutoRoundOffFilesystemSize = "CSI_AUTO_ROUND_OFF_FILESYSTEM_SIZE"
+
+	//EnvPodmonEnabled indicates that podmon is enabled
+	EnvPodmonEnabled = "X_CSI_PODMON_ENABLED"
+
+	//EnvPodmonAPIPORT indicates the port to be used for exposing podmon API health, TO-DO - Is it okay to rename this var that makes more sense. Ex: EnvPodmonArrayConnectivityAPIPORT
+	EnvPodmonAPIPORT = "X_CSI_PODMON_API_PORT"
+
+	//EnvPodmonArrayConnectivityPollRate indicates the polling frequency to check array connectivity
+	EnvPodmonArrayConnectivityPollRate = "X_CSI_PODMON_ARRAY_CONNECTIVITY_POLL_RATE"
 )

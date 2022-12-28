@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2021 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2021-2022 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,8 +28,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/dell/gonvme"
-
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-powerstore/mocks"
 	"github.com/dell/csi-powerstore/pkg/array"
@@ -39,6 +37,7 @@ import (
 	csictx "github.com/dell/gocsi/context"
 	"github.com/dell/gofsutil"
 	"github.com/dell/goiscsi"
+	"github.com/dell/gonvme"
 	"github.com/dell/gopowerstore"
 	"github.com/dell/gopowerstore/api"
 	gopowerstoremock "github.com/dell/gopowerstore/mocks"
@@ -161,6 +160,7 @@ func getTestArrays() map[string]*array.PowerStoreArray {
 		BlockProtocol: common.ISCSITransport,
 		Insecure:      true,
 		IsDefault:     true,
+		GlobalID:      "unique",
 		Client:        clientMock,
 		IP:            firstValidIP,
 	}
@@ -171,6 +171,7 @@ func getTestArrays() map[string]*array.PowerStoreArray {
 		NasName:       validNasName,
 		BlockProtocol: common.NoneTransport,
 		Insecure:      true,
+		GlobalID:      "unique2",
 		Client:        clientMock,
 		IP:            secondValidIP,
 	}
@@ -194,17 +195,18 @@ func setVariables() {
 	arrays := getTestArrays()
 
 	nodeSvc = &Service{
-		Fs:             fsMock,
-		ctrlSvc:        ctrlMock,
-		iscsiConnector: iscsiConnectorMock,
-		nvmeConnector:  nvmeConnectorMock,
-		fcConnector:    fcConnectorMock,
-		iscsiLib:       iscsiLibMock,
-		nvmeLib:        nvmeLibMock,
-		nodeID:         validNodeID,
-		useFC:          false,
-		useNVME:        false,
-		initialized:    true,
+		Fs:              fsMock,
+		ctrlSvc:         ctrlMock,
+		iscsiConnector:  iscsiConnectorMock,
+		nvmeConnector:   nvmeConnectorMock,
+		fcConnector:     fcConnectorMock,
+		iscsiLib:        iscsiLibMock,
+		nvmeLib:         nvmeLibMock,
+		nodeID:          validNodeID,
+		useFC:           false,
+		useNVME:         false,
+		initialized:     true,
+		isPodmonEnabled: false,
 	}
 
 	nodeSvc.SetArrays(arrays)
@@ -259,6 +261,120 @@ var _ = Describe("CSINodeService", func() {
 				Expect(err).To(BeNil())
 			})
 		})
+
+		When("failed to get host on array", func() {
+			It("should fail", func() {
+				nodeSvc.nodeID = "some-random-text"
+
+				clientMock.On("GetHostByName", mock.Anything, mock.AnythingOfType("string")).
+					Return(gopowerstore.Host{}, gopowerstore.APIError{
+						ErrorMsg: &api.ErrorMsg{
+							StatusCode: http.StatusNotFound,
+							Message:    "not found",
+						},
+					})
+				arrays := getTestArrays()
+				err := nodeSvc.nodeProbe(context.Background(), arrays["gid1"])
+				Expect(err.Error()).To(ContainSubstring("not found"))
+			})
+		})
+
+		When("failed to get host on array but it's NFS only", func() {
+			It("should not fail", func() {
+				nodeSvc.nodeID = "some-random-text"
+
+				clientMock.On("GetHostByName", mock.Anything, mock.AnythingOfType("string")).
+					Return(gopowerstore.Host{}, gopowerstore.APIError{
+						ErrorMsg: &api.ErrorMsg{
+							StatusCode: http.StatusNotFound,
+							Message:    "not found",
+						},
+					})
+				nodeSvc.useNFS = true
+				arrays := getTestArrays()
+				err := nodeSvc.nodeProbe(context.Background(), arrays["gid1"])
+				Expect(err).To(BeNil())
+				nodeSvc.useNFS = false
+			})
+		})
+
+		When("got host on array but initiators are not present", func() {
+			It("should fail", func() {
+				nodeSvc.nodeID = "some-random-text"
+
+				clientMock.On("GetHostByName", mock.Anything, mock.AnythingOfType("string")).Return(
+					gopowerstore.Host{
+						ID:         "host-id",
+						Initiators: []gopowerstore.InitiatorInstance{},
+						Name:       "host-name",
+					}, nil)
+
+				arrays := getTestArrays()
+				err := nodeSvc.nodeProbe(context.Background(), arrays["gid1"])
+
+				Expect(err.Error()).To(ContainSubstring("initiators for the host is not present"))
+			})
+		})
+
+		When("host as well as initiators are present but active sessions are not present on array", func() {
+			It("should fail", func() {
+				nodeSvc.nodeID = "some-random-text"
+
+				clientMock.On("GetHostByName", mock.Anything, mock.AnythingOfType("string")).Return(
+					gopowerstore.Host{
+						ID: "host-id",
+						Initiators: []gopowerstore.InitiatorInstance{{
+							PortName: validISCSIInitiators[0],
+							PortType: gopowerstore.InitiatorProtocolTypeEnumISCSI,
+						},
+							{
+								PortName: validISCSIInitiators[1],
+								PortType: gopowerstore.InitiatorProtocolTypeEnumISCSI,
+							}},
+						Name: "host-name",
+					}, nil)
+
+				arrays := getTestArrays()
+				err := nodeSvc.nodeProbe(context.Background(), arrays["gid1"])
+				Expect(err.Error()).To(ContainSubstring("initiators for the host is not present"))
+			})
+		})
+
+		When("host as well as initiators are present on array", func() {
+			It("should not fail", func() {
+				nodeSvc.nodeID = "some-random-text"
+
+				clientMock.On("GetHostByName", mock.Anything, mock.AnythingOfType("string")).Return(
+					gopowerstore.Host{
+						ID: "host-id",
+						Initiators: []gopowerstore.InitiatorInstance{
+							{
+								ActiveSessions: []gopowerstore.ActiveSessionInstance{
+									{
+										PortName: validFCTargetsWWPN[0],
+									},
+								},
+								PortName: validFCTargetsWWPN[0],
+								PortType: gopowerstore.InitiatorProtocolTypeEnumFC,
+							},
+							{
+								ActiveSessions: []gopowerstore.ActiveSessionInstance{
+									{
+										PortName: validFCTargetsWWPN[1],
+									},
+								},
+								PortName: validFCTargetsWWPN[1],
+								PortType: gopowerstore.InitiatorProtocolTypeEnumFC,
+							}},
+						Name: "host-name",
+					}, nil)
+
+				arrays := getTestArrays()
+				err := nodeSvc.nodeProbe(context.Background(), arrays["gid1"])
+				Expect(err).To(BeNil())
+			})
+		})
+
 		When("failed to read nodeID file", func() {
 			It("should fail", func() {
 				nodeSvc.nodeID = ""
@@ -891,6 +1007,7 @@ var _ = Describe("CSINodeService", func() {
 					e := errors.New("os-error")
 					fsMock.On("Remove", stagingPath).Return(e).Once()
 					fsMock.On("IsNotExist", e).Return(false)
+					fsMock.On("IsDeviceOrResourceBusy", e).Return(false)
 
 					res, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
 						VolumeId:          validBlockVolumeID,
@@ -1239,6 +1356,43 @@ var _ = Describe("CSINodeService", func() {
 
 				fsMock.On("Remove", path.Join(nodeSvc.opts.TmpDir, validBaseVolumeID)).Return(nil)
 				fsMock.On("IsNotExist", mock.Anything).Return(false)
+
+				res, err := nodeSvc.NodeUnstageVolume(context.Background(), &csi.NodeUnstageVolumeRequest{
+					VolumeId:          validBlockVolumeID,
+					StagingTargetPath: nodeStagePrivateDir,
+				})
+				Expect(err).To(BeNil())
+				Expect(res).To(Equal(&csi.NodeUnstageVolumeResponse{}))
+			})
+			It("should succeed, on device or resource busy error", func() {
+				remnantStagingPath := "/noderoot/" + stagingPath
+				mountInfo := []gofsutil.Info{
+					{
+						Device: validDevName,
+						Path:   stagingPath,
+					}, {
+						Device: validDevName,
+						Path:   remnantStagingPath,
+					},
+				}
+
+				fsMock.On("GetUtil").Return(utilMock)
+				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(4)
+				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return(mountInfo, nil)
+
+				utilMock.On("Unmount", mock.Anything, stagingPath).Return(nil)
+
+				fsMock.On("Remove", stagingPath).Return(errors.New("remove " + stagingPath + ": device or resource busy")).Once()
+				fsMock.On("IsDeviceOrResourceBusy", mock.Anything).Return(true)
+				utilMock.On("Unmount", mock.Anything, remnantStagingPath).Return(nil)
+				fsMock.On("Remove", stagingPath).Return(nil).Once()
+				fsMock.On("IsNotExist", mock.Anything).Return(false)
+
+				fsMock.On("WriteFile", path.Join(nodeSvc.opts.TmpDir, validBaseVolumeID), []byte(validDevName), os.FileMode(0640)).Return(nil)
+
+				iscsiConnectorMock.On("DisconnectVolumeByDeviceName", mock.Anything, validDevName).Return(nil)
+
+				fsMock.On("Remove", path.Join(nodeSvc.opts.TmpDir, validBaseVolumeID)).Return(nil)
 
 				res, err := nodeSvc.NodeUnstageVolume(context.Background(), &csi.NodeUnstageVolumeRequest{
 					VolumeId:          validBlockVolumeID,

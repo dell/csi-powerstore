@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2021 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2021-2022 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -272,6 +272,33 @@ func TestParseCIDR(t *testing.T) {
 			if got != tt.want {
 				t.Errorf("ParseCIDR() = %v, want %v", got, tt.want)
 			}
+		})
+	}
+}
+
+func TestSetPollingFrequency(t *testing.T) {
+	type args struct {
+		ctx context.Context
+	}
+	tests := []struct {
+		name string
+		args args
+		want int64
+	}{
+		{"Setting environament variable", args{ctx: context.TODO()}, 100},
+		{"Expecting default value to be set", args{ctx: context.TODO()}, 60},
+	}
+	for i, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if i == 0 {
+				os.Setenv("X_CSI_PODMON_ARRAY_CONNECTIVITY_POLL_RATE", "100")
+			}
+			// need to import this function because the package name in this file is not common
+			// @TO-DO Is it okay to rename package to common ?
+			if got := common.SetPollingFrequency(tt.args.ctx); got != tt.want {
+				t.Errorf("SetPollingFrequency() = %v, want %v", got, tt.want)
+			}
+			os.Unsetenv("X_CSI_PODMON_ARRAY_CONNECTIVITY_POLL_RATE")
 		})
 	}
 }

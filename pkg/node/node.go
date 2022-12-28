@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2021 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2021-2022 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -84,9 +84,11 @@ type Service struct {
 	useDPU                 bool
 	useFC                  bool
 	useNVME                bool
+	useNFS                 bool
 	initialized            bool
 	reusedHost             bool
 	isHealthMonitorEnabled bool
+	isPodmonEnabled        bool
 
 	array.Locker
 }
@@ -124,6 +126,7 @@ func (s *Service) Init() error {
 	*/
 
 	if len(iscsiInitiators) == 0 && len(fcInitiators) == 0 && len(nvmeInitiators) == 0 {
+		s.useNFS = true
 		return nil
 	}
 
@@ -209,6 +212,11 @@ func (s *Service) Init() error {
 		s.isHealthMonitorEnabled, _ = strconv.ParseBool(isHealthMonitorEnabled)
 	}
 
+	if isPodmonEnabled, ok := csictx.LookupEnv(ctx, common.EnvPodmonEnabled); ok {
+		// in case of any error in reading/parsing the env variable default value will be false
+		s.isPodmonEnabled, _ = strconv.ParseBool(isPodmonEnabled)
+	}
+	go s.startAPIService(ctx)
 	return nil
 }
 
@@ -411,12 +419,46 @@ func unstageVolume(ctx context.Context, stagingPath, id string, logFields log.Fi
 	}
 
 	err = fs.Remove(stagingPath)
+	if err != nil && fs.IsDeviceOrResourceBusy(err) {
+		log.Warnf("failed to delete mount path : %s", err)
+		var remnantDevice string
+		remnantDevice, err = removeRemnantMounts(ctx, stagingPath, fs, logFields)
+		if device == "" {
+			device = remnantDevice
+		}
+	}
 	if err != nil && !fs.IsNotExist(err) {
 		return "", status.Errorf(codes.Internal, "failed to delete mount path %s: %s", stagingPath, err.Error())
 	}
 
 	log.WithFields(logFields).Infof("target mount file deleted")
 	return device, nil
+}
+
+func removeRemnantMounts(ctx context.Context, stagingPath string, fs fs.Interface, logFields log.Fields) (string, error) {
+	log.WithFields(logFields).Infof("getting remnant mount")
+	mounts, found, err := getRemnantTargetMounts(ctx, stagingPath, fs)
+	if !found || err != nil {
+		return "", fmt.Errorf("could not reliably determine remnant mounts for path %s: %s", stagingPath, err.Error())
+	}
+
+	log.WithFields(logFields).Infof("%d remnant mount exist", len(mounts))
+	for _, mount := range mounts {
+		delete(logFields, "StagingPath")
+		logFields["RemnantPath"] = mount.Path
+		err = fs.GetUtil().Unmount(ctx, mount.Path)
+		if err != nil {
+			return "", fmt.Errorf("could not unmount dev %s: %s", mount.Path, err.Error())
+		}
+		log.WithFields(logFields).Infof("unmount without error")
+	}
+
+	delete(logFields, "RemnantPath")
+	logFields["StagingPath"] = stagingPath
+
+	err = fs.Remove(stagingPath)
+
+	return mounts[0].Device, err
 }
 
 // NodePublishVolume publishes volume to the node by mounting it to the target path
@@ -1252,7 +1294,7 @@ func (s *Service) getInitiators() ([]string, []string, []string, error) {
 	} else if len(fcInitiators) == 0 {
 		log.Error("FC was not found or filtered with FCPortsFilterFile")
 	} else {
-		log.Error("FC initiators found on node")
+		log.Debug("FC initiators found on node")
 		fcAvailable = true
 	}
 

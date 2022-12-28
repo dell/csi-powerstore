@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2021 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2021-2022 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ package fs
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -28,6 +29,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"syscall"
 	"time"
 
 	"github.com/dell/gofsutil"
@@ -53,6 +55,7 @@ type Interface interface {
 	ReadFile(name string) ([]byte, error)
 	WriteFile(filename string, data []byte, perm os.FileMode) error
 	IsNotExist(err error) bool
+	IsDeviceOrResourceBusy(err error) bool
 	Mkdir(name string, perm os.FileMode) error
 	MkdirAll(name string, perm os.FileMode) error
 	Chmod(name string, perm os.FileMode) error
@@ -146,6 +149,11 @@ func (fs *Fs) Stat(name string) (FileInfo, error) {
 // IsNotExist is a wrapper of os.IsNotExist
 func (fs *Fs) IsNotExist(err error) bool {
 	return os.IsNotExist(err)
+}
+
+// IsDeviceOrResourceBusy checks for device or resource busy error
+func (fs *Fs) IsDeviceOrResourceBusy(err error) bool {
+	return errors.Unwrap(err) == syscall.EBUSY
 }
 
 // Mkdir is a wrapper of os.Mkdir
