@@ -93,6 +93,9 @@ spec:
     metadata:
       labels:
         app: {{ .Release.Name }}-node
+      {{- if .Values.podmon.enabled }}
+        driver.dellemc.com: dell-storage
+      {{- end }}
     spec:
       {{ if .Values.node.nodeSelector }}
       nodeSelector:
@@ -151,7 +154,6 @@ spec:
               mountPropagation: "Bidirectional"
             - name: dev
               mountPath: /dev
-              mountPropagation: "Bidirectional"
             - name: usr-bin
               mountPath: /usr-bin
             - name: var-run

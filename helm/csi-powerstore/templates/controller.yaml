@@ -409,7 +409,7 @@ spec:
             - name: X_CSI_PODMON_ENABLED
               value: "{{ .Values.podmon.enabled }}"
             {{- if eq .Values.podmon.enabled true }}
-              {{- range $key, $value := .Values.controller.node.args }}
+              {{- range $key, $value := .Values.podmon.controller.args }}
                 {{- if contains "--arrayConnectivityPollRate" $value }}
             - name: X_CSI_PODMON_ARRAY_CONNECTIVITY_POLL_RATE
               value: "{{ (split "=" $value)._1 }}"
