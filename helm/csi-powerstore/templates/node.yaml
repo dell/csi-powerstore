@@ -129,7 +129,7 @@ spec:
                   apiVersion: v1
                   fieldPath: spec.nodeName
             - name: X_CSI_PRIVATE_MOUNT_DIR
-              value: "{{ .Values.kubeletConfigDir }}/plugins/csi-powerstore/disks"
+              value: {{ .Values.kubeletConfigDir }}
             - name: MY_NODE_NAME
               valueFrom:
                 fieldRef:
