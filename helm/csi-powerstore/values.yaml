@@ -238,6 +238,33 @@ node:
   #   operator: "Exists"
   #   effect: "NoSchedule"
 
+  # Uncomment if CSM for Resiliency and CSI Driver pods monitor are enabled
+  #tolerations:
+  #  - key: "offline.vxflexos.storage.dell.com"
+  #    operator: "Exists"
+  #    effect: "NoSchedule"
+  #  - key: "vxflexos.podmon.storage.dell.com"
+  #    operator: "Exists"
+  #    effect: "NoSchedule"
+  #  - key: "offline.unity.storage.dell.com"
+  #    operator: "Exists"
+  #    effect: "NoSchedule"
+  #  - key: "unity.podmon.storage.dell.com"
+  #    operator: "Exists"
+  #    effect: "NoSchedule"
+  #  - key: "offline.isilon.storage.dell.com"
+  #    operator: "Exists"
+  #    effect: "NoSchedule"
+  #  - key: "isilon.podmon.storage.dell.com"
+  #    operator: "Exists"
+  #    effect: "NoSchedule"
+  #  - key: "offline.pstore.storage.dell.com"
+  #    operator: "Exists"
+  #    effect: "NoSchedule"
+  #  - key: "pstore.podmon.storage.dell.com"
+  #    operator: "Exists"
+  #    effect: "NoSchedule"
+
 ## PLATFORM ATTRIBUTES
 ######################
 
@@ -289,10 +316,11 @@ podmon:
   #  args:
   #    - "--csisock=unix:/var/run/csi/csi.sock"
   #    - "--labelvalue=csi-powerstore"
+  #    - "--arrayConnectivityPollRate=60"
   #    - "--driverPath=csi-powerstore.dellemc.com"
   #    - "--mode=controller"
   #    - "--skipArrayConnectionValidation=false"
-  #    - "--driver-config-params=/csi-powerstore-config-params/driver-config-params.yaml"
+  #    - "--driver-config-params=/powerstore-config-params/driver-config-params.yaml"
   #    - "--driverPodLabelValue=dell-storage"
   #    - "--ignoreVolumelessPods=false"
 
@@ -300,10 +328,11 @@ podmon:
   #  args:
   #    - "--csisock=unix:/var/lib/kubelet/plugins/csi-powerstore/csi_sock"
   #    - "--labelvalue=csi-powerstore"
+  #    - "--arrayConnectivityPollRate=60"
   #    - "--driverPath=csi-powerstore.dellemc.com"
   #    - "--mode=node"
   #    - "--leaderelection=false"
-  #    - "--driver-config-params=/csi-powerstore-config-params/driver-config-params.yaml"
+  #    - "--driver-config-params=/powerstore-config-params/driver-config-params.yaml"
   #    - "--driverPodLabelValue=dell-storage"
   #    - "--ignoreVolumelessPods=false"
 
