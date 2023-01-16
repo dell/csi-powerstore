@@ -1093,7 +1093,7 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 						log.Info("Logging to NVMe target ", target)
 						err = s.nvmeLib.NVMeTCPConnect(target, false)
 						if err != nil {
-							log.Errorf("couldn't connect to the iscsi target")
+							log.Errorf("couldn't connect to the nvme target")
 							continue
 						}
 						loginToAtleastOneTarget = true
