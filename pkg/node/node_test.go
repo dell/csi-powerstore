@@ -2891,6 +2891,10 @@ var _ = Describe("CSINodeService", func() {
 							Address: "192.168.1.1",
 							IPPort:  gopowerstore.IPPortInstance{TargetIqn: "iqn"},
 						},
+						{
+							Address: "192.168.1.2",
+							IPPort:  gopowerstore.IPPortInstance{TargetIqn: "iqn2"},
+						},
 					}, nil)
 				conn, _ := net.Dial("udp", "127.0.0.1:80")
 				fsMock.On("NetDial", mock.Anything).Return(
@@ -3310,6 +3314,39 @@ var _ = Describe("CSINodeService", func() {
 						},
 					},
 				}))
+			})
+
+			When("target can not be discovered", func() {
+				It("should not return nvme topology key", func() {
+					goiscsi.GOISCSIMock.InduceDiscoveryError = true
+					gonvme.GONVMEMock.InduceDiscoveryError = true
+					nodeSvc.useNVME = true
+					nodeSvc.useFC = false
+					clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
+						Return([]gopowerstore.IPPoolAddress{
+							{
+								Address: "192.168.1.1",
+								IPPort:  gopowerstore.IPPortInstance{TargetIqn: "iqn"},
+							},
+						}, nil)
+					conn, _ := net.Dial("udp", "127.0.0.1:80")
+					fsMock.On("NetDial", mock.Anything).Return(
+						conn,
+						nil,
+					)
+					res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
+					Expect(err).To(BeNil())
+					Expect(res).To(Equal(&csi.NodeGetInfoResponse{
+						NodeId: nodeSvc.nodeID,
+						AccessibleTopology: &csi.Topology{
+							Segments: map[string]string{
+								common.Name + "/" + firstValidIP + "-nfs":  "true",
+								common.Name + "/" + secondValidIP + "-nfs": "true",
+							},
+						},
+					}))
+					gonvme.GONVMEMock.InduceDiscoveryError = false
+				})
 			})
 
 			When("we cannot get NVMeTCP targets from the array", func() {
