@@ -1077,9 +1077,9 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 						continue
 					}
 					var nvmeTargets []gonvme.NVMeTarget
-					for _, addresses := range infoList {
+					for _, address := range infoList {
 						// doesn't matter how many portals are present, discovering from any one will list out all targets
-						nvmeIP := strings.Split(addresses.Portal, ":")
+						nvmeIP := strings.Split(address.Portal, ":")
 						log.Info("Trying to discover NVMe target from portal ", nvmeIP[0])
 						nvmeTargets, err = s.nvmeLib.DiscoverNVMeTCPTargets(nvmeIP[0], false)
 						if err != nil {
@@ -1147,10 +1147,10 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 				}
 
 				var iscsiTargets []goiscsi.ISCSITarget
-				for _, addresses := range infoList {
+				for _, address := range infoList {
 					// doesn't matter how many portals are present, discovering from any one will list out all targets
-					log.Info("Trying to discover iSCSI target from portal ", addresses.Portal)
-					iscsiTargets, err = s.iscsiLib.DiscoverTargets(addresses.Portal, false)
+					log.Info("Trying to discover iSCSI target from portal ", address.Portal)
+					iscsiTargets, err = s.iscsiLib.DiscoverTargets(address.Portal, false)
 					if err != nil {
 						log.Error("couldn't discover targets")
 						continue
