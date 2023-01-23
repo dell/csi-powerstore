@@ -18,9 +18,13 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
+	"github.com/dell/csi-powerstore/pkg/array"
+	"github.com/dell/csi-powerstore/pkg/common"
+	podmon "github.com/dell/dell-csi-extensions/podmon"
 	vgsext "github.com/dell/dell-csi-extensions/volumeGroupSnapshot"
 	"github.com/dell/gopowerstore"
 	log "github.com/sirupsen/logrus"
@@ -147,7 +151,7 @@ func (s *Service) CreateVolumeGroupSnapshot(ctx context.Context, request *vgsext
 	}, nil
 }
 
-//validate if request has VGS name, and VGS name must be less than 28 chars
+// validate if request has VGS name, and VGS name must be less than 28 chars
 func validateCreateVGSreq(request *vgsext.CreateVolumeGroupSnapshotRequest) error {
 	if request.Name == "" {
 		err := status.Error(codes.InvalidArgument, "CreateVolumeGroupSnapshotRequest needs Name to be set")
@@ -169,4 +173,139 @@ func validateCreateVGSreq(request *vgsext.CreateVolumeGroupSnapshotRequest) erro
 	}
 
 	return nil
+}
+
+// ValidateVolumeHostConnectivity menthod will be called by podmon sidecars to check host connectivity with array
+func (s *Service) ValidateVolumeHostConnectivity(ctx context.Context, req *podmon.ValidateVolumeHostConnectivityRequest) (*podmon.ValidateVolumeHostConnectivityResponse, error) {
+	// ctx, log, _ := GetRunIDLog(ctx)
+	log.Infof("ValidateVolumeHostConnectivity called %+v", req)
+	rep := &podmon.ValidateVolumeHostConnectivityResponse{
+		Messages: make([]string, 0),
+	}
+
+	if (len(req.GetVolumeIds()) == 0 || len(req.GetArrayId()) == 0) && len(req.GetNodeId()) == 0 {
+		// This is a nop call just testing the interface is present
+		rep.Messages = append(rep.Messages, "ValidateVolumeHostConnectivity is implemented")
+		return rep, nil
+	}
+
+	if req.GetNodeId() == "" {
+		return nil, fmt.Errorf("the NodeID is a required field")
+	}
+	// create the map of all the array with array's GloabalID as key
+	globalIDs := make(map[string]bool)
+	globalID := req.GetArrayId()
+	if globalID == "" {
+		// for loop req.GetVolumeIds()
+		for _, volID := range req.GetVolumeIds() {
+			_, globalID, _, _ = array.ParseVolumeID(ctx, volID, s.DefaultArray(), nil)
+			globalIDs[globalID] = true
+		}
+	} else {
+		globalIDs[globalID] = true
+	}
+
+	// Go through each of the globalIDs
+	for globalID := range globalIDs {
+		// First - check if the array is visible from the node
+		err := s.checkIfNodeIsConnected(ctx, globalID, req.GetNodeId(), rep)
+		if err != nil {
+			return rep, err
+		}
+
+		// Check for IOinProgress only when volumes IDs are present in the request as the field is required only in the latter case also to reduce number of calls to the API making it efficient
+		if len(req.GetVolumeIds()) > 0 {
+			// Get array config
+			for _, volID := range req.GetVolumeIds() {
+				id, globalIDForVol, protocol, _ := array.ParseVolumeID(ctx, volID, s.DefaultArray(), nil)
+				if globalIDForVol != globalID {
+					log.Errorf("Recived globalId from podman is %s and retrieved from array is %s ", globalID, globalIDForVol)
+					return nil, fmt.Errorf("invalid globalId %s is provided", globalID)
+				}
+				arraysConfig, err := s.GetOneArray(globalID)
+				if err != nil || arraysConfig == nil {
+					log.Error("Failed to get array config with error ", err.Error())
+					return nil, err
+				}
+				// check if any IO is inProgress for the current globalID/array
+				err = s.IsIOInProgress(ctx, id, arraysConfig, protocol)
+				if err == nil {
+					rep.IosInProgress = true
+					return rep, nil
+				}
+			}
+		}
+	}
+	log.Infof("ValidateVolumeHostConnectivity reply %+v", rep)
+	return rep, nil
+}
+
+// checkIfNodeIsConnected looks at the 'nodeId' to determine if there is connectivity to the 'arrayId' array.
+// The 'rep' object will be filled with the results of the check.
+func (s *Service) checkIfNodeIsConnected(ctx context.Context, arrayID string, nodeID string, rep *podmon.ValidateVolumeHostConnectivityResponse) error {
+
+	log.Infof("Checking if array %s is connected to node %s", arrayID, nodeID)
+	var message string
+	rep.Connected = false
+
+	nodeIP := common.GetIPListFromString(nodeID)
+	if len(nodeIP) == 0 {
+		log.Errorf("failed to parse node ID '%s'", nodeID)
+		return fmt.Errorf("failed to parse node ID")
+	}
+	ip := nodeIP[len(nodeIP)-1]
+	// form url to call array on node
+	url := "http://" + ip + common.APIPort + common.ArrayStatus + "/" + arrayID
+	connected, err := s.QueryArrayStatus(ctx, url)
+	if err != nil {
+		message = fmt.Sprintf("connectivity unknown for array %s to node %s due to %s", arrayID, nodeID, err)
+		log.Error(message)
+		rep.Messages = append(rep.Messages, message)
+		log.Errorf(err.Error())
+	}
+
+	if connected {
+		rep.Connected = true
+		message = fmt.Sprintf("array %s is connected to node %s", arrayID, nodeID)
+	} else {
+		message = fmt.Sprintf("array %s is not connected to node %s", arrayID, nodeID)
+		/* log.Info(message)
+		rep.Messages = append(rep.Messages, message)
+		return fmt.Errorf("not connected with array") */
+	}
+	log.Info(message)
+	rep.Messages = append(rep.Messages, message)
+	return nil
+}
+
+// IsIOInProgress function check the IO operation status on array
+func (s *Service) IsIOInProgress(ctx context.Context, volID string, arrayConfig *array.PowerStoreArray, protocol string) (err error) {
+	// Call PerformanceMetricsByVolume  or  PerformanceMetricsByFileSystem in gopowerstore based on the volume type
+	if protocol == "scsi" {
+		resp, err := arrayConfig.Client.PerformanceMetricsByVolume(ctx, volID, gopowerstore.TwentySec)
+		if err != nil {
+			log.Errorf("Error %v while checking IsIOInProgress for array having globalId %s for volumeId %s", err.Error(), arrayConfig.GlobalID, volID)
+			return fmt.Errorf("error %v while while checking IsIOInProgress", err.Error())
+		}
+		// check last four entries status recieved in the response
+		for i := len(resp) - 1; i >= (len(resp)-4) && i >= 0; i-- {
+			if resp[i].TotalIops != 0.0 {
+				return nil
+			}
+		}
+		return fmt.Errorf("no IOInProgress")
+	}
+	// nfs volume type logic
+	resp, err := arrayConfig.Client.PerformanceMetricsByFileSystem(ctx, volID, gopowerstore.TwentySec)
+	if err != nil {
+		log.Errorf("Error %v while checking IsIOInProgress for array having globalId %s for volumeId %s", err.Error(), arrayConfig.GlobalID, volID)
+		return fmt.Errorf("error %v while while checking IsIOInProgress", err.Error())
+	}
+	// check last four entries status recieved in the response
+	for i := len(resp) - 1; i >= len(resp)-4 && i >= 0; i-- {
+		if resp[i].TotalIops != 0.0 {
+			return nil
+		}
+	}
+	return fmt.Errorf("no IOInProgress")
 }

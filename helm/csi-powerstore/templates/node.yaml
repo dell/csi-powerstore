@@ -222,7 +222,7 @@ spec:
               value: "{{ .Values.controller.healthMonitor.enabled }}"
             {{- end }}
             {{- end }}
-            {{- if hasKey .Values.node "podmon" }}
+            {{- if hasKey .Values "podmon" }}
             - name: X_CSI_PODMON_ENABLED
               value: "{{ .Values.podmon.enabled }}"
             {{- if eq .Values.podmon.enabled true }}

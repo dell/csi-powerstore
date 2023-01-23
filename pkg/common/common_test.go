@@ -294,11 +294,41 @@ func TestSetPollingFrequency(t *testing.T) {
 				os.Setenv("X_CSI_PODMON_ARRAY_CONNECTIVITY_POLL_RATE", "100")
 			}
 			// need to import this function because the package name in this file is not common
-			// @TO-DO Is it okay to rename package to common ?
+			// @TO-DO rename package name to common
 			if got := common.SetPollingFrequency(tt.args.ctx); got != tt.want {
 				t.Errorf("SetPollingFrequency() = %v, want %v", got, tt.want)
 			}
 			os.Unsetenv("X_CSI_PODMON_ARRAY_CONNECTIVITY_POLL_RATE")
+		})
+	}
+}
+
+func Test_setAPIPort(t *testing.T) {
+	type args struct {
+		ctx context.Context
+	}
+	tests := []struct {
+		name string
+		args args
+	}{
+		{"Fetching port number from Environment variable", args{ctx: context.TODO()}},
+		{"Fetching & setting default port number", args{ctx: context.TODO()}},
+	}
+
+	for i, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if i == 0 {
+				os.Setenv("X_CSI_PODMON_API_PORT", "8090")
+				common.SetAPIPort(tt.args.ctx)
+				if common.APIPort != ":8090" {
+					t.Errorf("setAPIPort() error, want 8090 port found %v", common.APIPort)
+				}
+				os.Unsetenv("X_CSI_PODMON_API_PORT")
+			}
+			common.SetAPIPort(tt.args.ctx)
+			if common.APIPort != ":8083" {
+				t.Errorf("setAPIPort() error, want 8083 port found %v", common.APIPort)
+			}
 		})
 	}
 }
