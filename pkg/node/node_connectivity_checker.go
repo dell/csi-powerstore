@@ -23,38 +23,21 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/dell/csi-powerstore/pkg/array"
 	"github.com/dell/csi-powerstore/pkg/common"
-	csictx "github.com/dell/gocsi/context"
 	"github.com/dell/gopowerstore"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
 )
 
-// end points
-const (
-	nodeStatus  = "/node-status"
-	arrayStatus = "/array-status"
-)
-
 // pollingFrequency in seconds
 var pollingFrequencyInSeconds int64
 
-// port for API calls
-var apiPort string
-
 // probeStatus map[string]ArrayConnectivityStatus
 var probeStatus *sync.Map
-
-// ArrayConnectivityStatus Status of the array probe
-type ArrayConnectivityStatus struct {
-	LastSuccess int64 `json:"lastSuccess"` // connectivity status
-	LastAttempt int64 `json:"lastAttempt"` // last timestamp attempted to check connectivity
-}
 
 // startAPIService reads nodes to array status periodically
 func (s *Service) startAPIService(ctx context.Context) {
@@ -63,36 +46,23 @@ func (s *Service) startAPIService(ctx context.Context) {
 		return
 	}
 	pollingFrequencyInSeconds = common.SetPollingFrequency(ctx)
-	setAPIPort(ctx)
+	common.SetAPIPort(ctx)
 	s.startNodeToArrayConnectivityCheck(ctx)
 	s.apiRouter(ctx)
 }
 
-// setAPIPort set the port for running server
-func setAPIPort(ctx context.Context) {
-	if port, ok := csictx.LookupEnv(ctx, common.EnvPodmonAPIPORT); ok && strings.TrimSpace(port) != "" {
-		apiPort = fmt.Sprintf(":%s", port)
-		log.Debugf("set podmon API port to %s", apiPort)
-		return
-	}
-	// If the port number cannot be fetched, set it to default
-	apiPort = ":" + common.DefaultPodmonAPIPortNumber
-	log.Debugf("set podmon API port to default %s", apiPort)
-}
-
 // apiRouter serves http requests
 func (s *Service) apiRouter(ctx context.Context) {
-	log.Infof("starting http server on port %s", apiPort)
+	log.Infof("starting http server on port %s", common.APIPort)
 	// create a new mux router
 	router := mux.NewRouter()
 	// route to connectivity status
-	// nodeHealth & connectivityStatus are the handlers
-	router.HandleFunc(nodeStatus, nodeHealth).Methods("GET")
-	router.HandleFunc(arrayStatus, connectivityStatus).Methods("GET")
-	router.HandleFunc(arrayStatus+"/"+"{arrayId}", getArrayConnectivityStatus).Methods("GET")
+	// connectivityStatus is the handlers
+	router.HandleFunc(common.ArrayStatus, connectivityStatus).Methods("GET")
+	router.HandleFunc(common.ArrayStatus+"/"+"{arrayId}", getArrayConnectivityStatus).Methods("GET")
 	// start http server to serve requests
 	server := &http.Server{
-		Addr:         apiPort,
+		Addr:         common.APIPort,
 		Handler:      router,
 		ReadTimeout:  common.Timeout,
 		WriteTimeout: common.Timeout,
@@ -101,13 +71,6 @@ func (s *Service) apiRouter(ctx context.Context) {
 	if err != nil {
 		log.Errorf("unable to start http server to serve status requests due to %s", err)
 	}
-}
-
-// nodeHealth handler states if the node is up
-func nodeHealth(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusOK)
-	w.Header().Set("Content-Type", "application/json")
-	fmt.Fprintf(w, "node is up and running \n")
 }
 
 // connectivityStatus handler returns array connectivity status
@@ -134,20 +97,18 @@ func connectivityStatus(w http.ResponseWriter, r *http.Request) {
 	log.Info("sending connectivityStatus for all arrays ")
 	_, err = w.Write(jsonResponse)
 	if err != nil {
-		w.WriteHeader(http.StatusOK)
-		w.Header().Set("Content-Type", "application/json")
 		log.Errorf("unable to write response %s", err)
 	}
 }
 
 // MarshalSyncMapToJSON marshal the sync Map to Json
 func MarshalSyncMapToJSON(m *sync.Map) ([]byte, error) {
-	tmpMap := make(map[string]ArrayConnectivityStatus)
+	tmpMap := make(map[string]common.ArrayConnectivityStatus)
 	m.Range(func(k, value interface{}) bool {
 		// this check is not necessary but just in case is someone in future play around this
 		switch value.(type) {
-		case ArrayConnectivityStatus:
-			tmpMap[k.(string)] = value.(ArrayConnectivityStatus)
+		case common.ArrayConnectivityStatus:
+			tmpMap[k.(string)] = value.(common.ArrayConnectivityStatus)
 			return true
 		default:
 			log.Errorf("invalid data is stored in cache")
@@ -196,7 +157,6 @@ func (s *Service) startNodeToArrayConnectivityCheck(ctx context.Context) {
 	log.Debug("startNodeToArrayConnectivityCheck called")
 	probeStatus = new(sync.Map)
 	// in case if we want to store the status of default array, uncomment below line
-	// this could be an improvement ...?
 	// powerStoreArray := s.DefaultArray()
 	powerStoreArray := s.Arrays()
 	for _, array := range powerStoreArray {
@@ -212,12 +172,12 @@ func (s *Service) startNodeToArrayConnectivityCheck(ctx context.Context) {
 func (s *Service) testConnectivityAndUpdateStatus(ctx context.Context, array *array.PowerStoreArray, timeout time.Duration) {
 	defer func() {
 		if err := recover(); err != nil {
-			log.Errorf("panic occurred in testConnectivityAndUpdateStatus:%s for clsuter %v", err, array)
+			log.Errorf("panic occurred in testConnectivityAndUpdateStatus: %s for array having %s", err, array.GlobalID)
 		}
 		// if panic occurs restart new goroutine
 		go s.testConnectivityAndUpdateStatus(ctx, array, timeout)
 	}()
-	var status ArrayConnectivityStatus
+	var status common.ArrayConnectivityStatus
 	for {
 		// add timeout to context
 		timeOutCtx, cancel := context.WithTimeout(ctx, timeout)
@@ -225,7 +185,7 @@ func (s *Service) testConnectivityAndUpdateStatus(ctx context.Context, array *ar
 		if existingStatus, ok := probeStatus.Load(array.GlobalID); !ok {
 			log.Debugf("%s not in probeStatus ", array.GlobalID)
 		} else {
-			if status, ok = existingStatus.(ArrayConnectivityStatus); !ok {
+			if status, ok = existingStatus.(common.ArrayConnectivityStatus); !ok {
 				log.Errorf("failed to extract ArrayConnectivityStatus for array '%s'", array.GlobalID)
 			}
 		}
@@ -266,7 +226,6 @@ func (s *Service) nodeProbe(timeOutCtx context.Context, array *array.PowerStoreA
 
 	for _, initiator := range host.Initiators {
 		if len(initiator.ActiveSessions) > 0 {
-			// iscsiConnection = true
 			return nil
 		}
 	}

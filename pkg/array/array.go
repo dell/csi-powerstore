@@ -71,6 +71,17 @@ func (s *Locker) Arrays() map[string]*PowerStoreArray {
 	return s.arrays
 }
 
+// GetOneArray is a getter for an arrays based on globalID
+func (s *Locker) GetOneArray(globalID string) (*PowerStoreArray, error) {
+	s.arraysLock.Lock()
+	defer s.arraysLock.Unlock()
+	if arrayConfig, ok := s.arrays[globalID]; ok {
+		return arrayConfig, nil
+	}
+	log.Errorf("array having globalID %s is not found in cache", globalID)
+	return nil, fmt.Errorf("array not found")
+}
+
 // SetArrays adds an array
 func (s *Locker) SetArrays(arrays map[string]*PowerStoreArray) {
 	s.arraysLock.Lock()
@@ -237,10 +248,12 @@ func GetPowerStoreArrays(fs fs.Interface, filePath string) (map[string]*PowerSto
 // "/" is used as a delimiter.
 //
 // Example:
-// 		ParseVolumeID("1cd254s/192.168.0.1/scsi") will return
-//			id = "1cd254s"
-//			ip = "192.168.0.1"
-//			protocol = "scsi"
+//
+//	ParseVolumeID("1cd254s/192.168.0.1/scsi") will return
+//		id = "1cd254s"
+//		ip = "192.168.0.1"
+//		protocol = "scsi"
+//
 // This function is backwards compatible and will try to understand volume protocol even if there is no such information in volume id.
 // It will do that by querying default powerstore array passed as one of the arguments
 func ParseVolumeID(ctx context.Context, volumeID string, defaultArray *PowerStoreArray /*optional*/, cap *csi.VolumeCapability) (id string, arrayID string, protocol string, e error) {

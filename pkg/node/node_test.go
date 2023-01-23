@@ -261,119 +261,6 @@ var _ = Describe("CSINodeService", func() {
 			})
 		})
 
-		When("failed to get host on array", func() {
-			It("should fail", func() {
-				nodeSvc.nodeID = "some-random-text"
-
-				clientMock.On("GetHostByName", mock.Anything, mock.AnythingOfType("string")).
-					Return(gopowerstore.Host{}, gopowerstore.APIError{
-						ErrorMsg: &api.ErrorMsg{
-							StatusCode: http.StatusNotFound,
-							Message:    "not found",
-						},
-					})
-				arrays := getTestArrays()
-				err := nodeSvc.nodeProbe(context.Background(), arrays["gid1"])
-				Expect(err.Error()).To(ContainSubstring("not found"))
-			})
-		})
-
-		When("failed to get host on array but it's NFS only", func() {
-			It("should not fail", func() {
-				nodeSvc.nodeID = "some-random-text"
-
-				clientMock.On("GetHostByName", mock.Anything, mock.AnythingOfType("string")).
-					Return(gopowerstore.Host{}, gopowerstore.APIError{
-						ErrorMsg: &api.ErrorMsg{
-							StatusCode: http.StatusNotFound,
-							Message:    "not found",
-						},
-					})
-				nodeSvc.useNFS = true
-				arrays := getTestArrays()
-				err := nodeSvc.nodeProbe(context.Background(), arrays["gid1"])
-				Expect(err).To(BeNil())
-				nodeSvc.useNFS = false
-			})
-		})
-
-		When("got host on array but initiators are not present", func() {
-			It("should fail", func() {
-				nodeSvc.nodeID = "some-random-text"
-
-				clientMock.On("GetHostByName", mock.Anything, mock.AnythingOfType("string")).Return(
-					gopowerstore.Host{
-						ID:         "host-id",
-						Initiators: []gopowerstore.InitiatorInstance{},
-						Name:       "host-name",
-					}, nil)
-
-				arrays := getTestArrays()
-				err := nodeSvc.nodeProbe(context.Background(), arrays["gid1"])
-
-				Expect(err.Error()).To(ContainSubstring("initiators for the host is not present"))
-			})
-		})
-
-		When("host as well as initiators are present but active sessions are not present on array", func() {
-			It("should fail", func() {
-				nodeSvc.nodeID = "some-random-text"
-
-				clientMock.On("GetHostByName", mock.Anything, mock.AnythingOfType("string")).Return(
-					gopowerstore.Host{
-						ID: "host-id",
-						Initiators: []gopowerstore.InitiatorInstance{{
-							PortName: validISCSIInitiators[0],
-							PortType: gopowerstore.InitiatorProtocolTypeEnumISCSI,
-						},
-							{
-								PortName: validISCSIInitiators[1],
-								PortType: gopowerstore.InitiatorProtocolTypeEnumISCSI,
-							}},
-						Name: "host-name",
-					}, nil)
-
-				arrays := getTestArrays()
-				err := nodeSvc.nodeProbe(context.Background(), arrays["gid1"])
-				Expect(err.Error()).To(ContainSubstring("initiators for the host is not present"))
-			})
-		})
-
-		When("host as well as initiators are present on array", func() {
-			It("should not fail", func() {
-				nodeSvc.nodeID = "some-random-text"
-
-				clientMock.On("GetHostByName", mock.Anything, mock.AnythingOfType("string")).Return(
-					gopowerstore.Host{
-						ID: "host-id",
-						Initiators: []gopowerstore.InitiatorInstance{
-							{
-								ActiveSessions: []gopowerstore.ActiveSessionInstance{
-									{
-										PortName: validFCTargetsWWPN[0],
-									},
-								},
-								PortName: validFCTargetsWWPN[0],
-								PortType: gopowerstore.InitiatorProtocolTypeEnumFC,
-							},
-							{
-								ActiveSessions: []gopowerstore.ActiveSessionInstance{
-									{
-										PortName: validFCTargetsWWPN[1],
-									},
-								},
-								PortName: validFCTargetsWWPN[1],
-								PortType: gopowerstore.InitiatorProtocolTypeEnumFC,
-							}},
-						Name: "host-name",
-					}, nil)
-
-				arrays := getTestArrays()
-				err := nodeSvc.nodeProbe(context.Background(), arrays["gid1"])
-				Expect(err).To(BeNil())
-			})
-		})
-
 		When("failed to read nodeID file", func() {
 			It("should fail", func() {
 				nodeSvc.nodeID = ""
@@ -683,6 +570,123 @@ var _ = Describe("CSINodeService", func() {
 					Return(gopowerstore.CreateResponse{ID: validHostID}, nil)
 
 				err := nodeSvc.Init()
+				Expect(err).To(BeNil())
+			})
+		})
+	})
+
+	Describe("calling nodeProbe", func() {
+
+		When("failed to get host on array", func() {
+			It("should fail", func() {
+				nodeSvc.nodeID = "some-random-text"
+
+				clientMock.On("GetHostByName", mock.Anything, mock.AnythingOfType("string")).
+					Return(gopowerstore.Host{}, gopowerstore.APIError{
+						ErrorMsg: &api.ErrorMsg{
+							StatusCode: http.StatusNotFound,
+							Message:    "not found",
+						},
+					})
+				arrays := getTestArrays()
+				err := nodeSvc.nodeProbe(context.Background(), arrays["gid1"])
+				Expect(err.Error()).To(ContainSubstring("not found"))
+			})
+		})
+
+		When("failed to get host on array but it's NFS only", func() {
+			It("should not fail", func() {
+				nodeSvc.nodeID = "some-random-text"
+
+				clientMock.On("GetHostByName", mock.Anything, mock.AnythingOfType("string")).
+					Return(gopowerstore.Host{}, gopowerstore.APIError{
+						ErrorMsg: &api.ErrorMsg{
+							StatusCode: http.StatusNotFound,
+							Message:    "not found",
+						},
+					})
+				nodeSvc.useNFS = true
+				arrays := getTestArrays()
+				err := nodeSvc.nodeProbe(context.Background(), arrays["gid1"])
+				Expect(err).To(BeNil())
+				nodeSvc.useNFS = false
+			})
+		})
+
+		When("got host on array but initiators are not present", func() {
+			It("should fail", func() {
+				nodeSvc.nodeID = "some-random-text"
+
+				clientMock.On("GetHostByName", mock.Anything, mock.AnythingOfType("string")).Return(
+					gopowerstore.Host{
+						ID:         "host-id",
+						Initiators: []gopowerstore.InitiatorInstance{},
+						Name:       "host-name",
+					}, nil)
+
+				arrays := getTestArrays()
+				err := nodeSvc.nodeProbe(context.Background(), arrays["gid1"])
+
+				Expect(err.Error()).To(ContainSubstring("initiators for the host is not present"))
+			})
+		})
+
+		When("host as well as initiators are present but active sessions are not present on array", func() {
+			It("should fail", func() {
+				nodeSvc.nodeID = "some-random-text"
+
+				clientMock.On("GetHostByName", mock.Anything, mock.AnythingOfType("string")).Return(
+					gopowerstore.Host{
+						ID: "host-id",
+						Initiators: []gopowerstore.InitiatorInstance{{
+							PortName: validISCSIInitiators[0],
+							PortType: gopowerstore.InitiatorProtocolTypeEnumISCSI,
+						},
+							{
+								PortName: validISCSIInitiators[1],
+								PortType: gopowerstore.InitiatorProtocolTypeEnumISCSI,
+							}},
+						Name: "host-name",
+					}, nil)
+
+				arrays := getTestArrays()
+				err := nodeSvc.nodeProbe(context.Background(), arrays["gid1"])
+				Expect(err.Error()).To(ContainSubstring("initiators for the host is not present"))
+			})
+		})
+
+		When("host as well as initiators are present on array", func() {
+			It("should not fail", func() {
+				nodeSvc.nodeID = "some-random-text"
+
+				clientMock.On("GetHostByName", mock.Anything, mock.AnythingOfType("string")).Return(
+					gopowerstore.Host{
+						ID: "host-id",
+						Initiators: []gopowerstore.InitiatorInstance{
+							{
+								ActiveSessions: []gopowerstore.ActiveSessionInstance{
+									{
+										PortName: validFCTargetsWWPN[0],
+									},
+								},
+								PortName: validFCTargetsWWPN[0],
+								PortType: gopowerstore.InitiatorProtocolTypeEnumFC,
+							},
+							{
+								ActiveSessions: []gopowerstore.ActiveSessionInstance{
+									{
+										PortName: validFCTargetsWWPN[1],
+									},
+								},
+								PortName: validFCTargetsWWPN[1],
+								PortType: gopowerstore.InitiatorProtocolTypeEnumFC,
+							}},
+						Name: "host-name",
+					}, nil)
+
+				arrays := getTestArrays()
+				nodeSvc.startNodeToArrayConnectivityCheck(context.Background())
+				err := nodeSvc.nodeProbe(context.Background(), arrays["gid1"])
 				Expect(err).To(BeNil())
 			})
 		})

@@ -104,7 +104,7 @@ func main() {
 	if name, ok := csictx.LookupEnv(context.Background(), common.EnvDriverName); ok {
 		common.Name = name
 	}
-
+	common.SetAPIPort(context.Background())
 	if strings.EqualFold(mode, "controller") {
 		cs := &controller.Service{
 			Fs: f,
