@@ -46,7 +46,6 @@ func (s *Service) startAPIService(ctx context.Context) {
 		return
 	}
 	pollingFrequencyInSeconds = common.SetPollingFrequency(ctx)
-	// common.SetAPIPort(ctx)
 	s.startNodeToArrayConnectivityCheck(ctx)
 	s.apiRouter(ctx)
 }
@@ -222,7 +221,7 @@ func (s *Service) nodeProbe(timeOutCtx context.Context, array *array.PowerStoreA
 		log.Infof("Error %s, while probing %s", err.Error(), array.GlobalID)
 		return err
 	} else if s.useNFS {
-		log.Infof("Host Entry found but failed to login to nvme/iscsi target", array.GlobalID)
+		log.Infof("Host Entry found but failed to login to nvme/iscsi target")
 		return nil
 	}
 

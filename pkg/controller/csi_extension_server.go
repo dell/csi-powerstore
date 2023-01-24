@@ -296,7 +296,7 @@ func (s *Service) IsIOInProgress(ctx context.Context, volID string, arrayConfig 
 		}
 		// check last four entries status recieved in the response
 		for i := len(resp) - 1; i >= (len(resp)-4) && i >= 0; i-- {
-			if resp[i].TotalIops > 0.0 && CheckIfEntryIsLatest(resp[i].CommonMetricsFields.Timestamp) {
+			if resp[i].TotalIops > 0.0 && checkIfEntryIsLatest(resp[i].CommonMetricsFields.Timestamp) {
 				return nil
 			}
 		}
@@ -310,19 +310,19 @@ func (s *Service) IsIOInProgress(ctx context.Context, volID string, arrayConfig 
 	}
 	// check last four entries status recieved in the response
 	for i := len(resp) - 1; i >= len(resp)-4 && i >= 0; i-- {
-		if resp[i].TotalIops > 0.0 && CheckIfEntryIsLatest(resp[i].CommonMetricsFields.Timestamp) {
+		if resp[i].TotalIops > 0.0 && checkIfEntryIsLatest(resp[i].CommonMetricsFields.Timestamp) {
 			return nil
 		}
 	}
 	return fmt.Errorf("no IOInProgress")
 }
 
-func CheckIfEntryIsLatest(timestamp strfmt.DateTime) bool {
+func checkIfEntryIsLatest(timestamp strfmt.DateTime) bool {
 	RFC3339MillisNoColon := "2006-01-02T15:04:05Z"
 	stringTime := timestamp.String()
 	timeFromResponse, err := time.Parse(RFC3339MillisNoColon, stringTime)
 	if err != nil {
-		log.Errorf("error in parsing the time recieved in the response", err)
+		log.Errorf("error in parsing the time recieved in the response %v", err)
 		return false
 	}
 	log.Debugf("timestamp recieved from the response body is %v", timeFromResponse)
