@@ -1076,25 +1076,29 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 						log.Errorf("couldn't get targets from array: %s", err.Error())
 						continue
 					}
-
-					log.Infof("Discovering NVMeTCP targets")
-					nvmetcpConnectCount := 0
-					nvmeIP := strings.Split(infoList[0].Portal, ":")
-					nvmeTargets, err := s.nvmeLib.DiscoverNVMeTCPTargets(nvmeIP[0], false)
-					if err != nil {
-						log.Error("couldn't discover NVMe targets")
-						continue
-					} else {
-						for _, target := range nvmeTargets {
-							err = s.nvmeLib.NVMeTCPConnect(target, false)
-							if err != nil {
-								log.Infof("couldn't connect to NVMeTCP targets")
-							} else {
-								nvmetcpConnectCount = nvmetcpConnectCount + 1
-							}
+					var nvmeTargets []gonvme.NVMeTarget
+					for _, address := range infoList {
+						// doesn't matter how many portals are present, discovering from any one will list out all targets
+						nvmeIP := strings.Split(address.Portal, ":")
+						log.Info("Trying to discover NVMe target from portal ", nvmeIP[0])
+						nvmeTargets, err = s.nvmeLib.DiscoverNVMeTCPTargets(nvmeIP[0], false)
+						if err != nil {
+							log.Error("couldn't discover targets")
+							continue
 						}
+						break
 					}
-					if nvmetcpConnectCount != 0 {
+					loginToAtleastOneTarget := false
+					for _, target := range nvmeTargets {
+						log.Info("Logging to NVMe target ", target)
+						err = s.nvmeLib.NVMeTCPConnect(target, false)
+						if err != nil {
+							log.Errorf("couldn't connect to the nvme target")
+							continue
+						}
+						loginToAtleastOneTarget = true
+					}
+					if loginToAtleastOneTarget {
 						resp.AccessibleTopology.Segments[common.Name+"/"+arr.GetIP()+"-nvmetcp"] = "true"
 					}
 				}
@@ -1136,27 +1140,37 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 					continue
 				}
 			} else {
-
 				infoList, err := common.GetISCSITargetsInfoFromStorage(arr.GetClient(), "")
 				if err != nil {
 					log.Errorf("couldn't get targets from array: %s", err.Error())
 					continue
 				}
 
-				iscsiTargets, err := s.iscsiLib.DiscoverTargets(infoList[0].Portal, false)
-				if err != nil {
-					log.Error("couldn't discover targets")
-					continue
-				} else {
-					for _, target := range iscsiTargets {
-						log.Info("Iscsi target", target)
-						err = s.iscsiLib.PerformLogin(target)
-						if err != nil {
-							log.Errorf("couldn't connect to the iscsi target")
-						}
+				var iscsiTargets []goiscsi.ISCSITarget
+				for _, address := range infoList {
+					// doesn't matter how many portals are present, discovering from any one will list out all targets
+					log.Info("Trying to discover iSCSI target from portal ", address.Portal)
+					iscsiTargets, err = s.iscsiLib.DiscoverTargets(address.Portal, false)
+					if err != nil {
+						log.Error("couldn't discover targets")
+						continue
 					}
+					break
 				}
-				resp.AccessibleTopology.Segments[common.Name+"/"+arr.GetIP()+"-iscsi"] = "true"
+				loginToAtleastOneTarget := false
+				for _, target := range iscsiTargets {
+					log.Info("Logging to Iscsi target ", target)
+					err = s.iscsiLib.PerformLogin(target)
+					if err != nil {
+						log.Errorf("couldn't connect to the iscsi target")
+						continue
+					}
+					loginToAtleastOneTarget = true
+				}
+
+				if loginToAtleastOneTarget {
+					resp.AccessibleTopology.Segments[common.Name+"/"+arr.GetIP()+"-iscsi"] = "true"
+				}
 			}
 		}
 	}

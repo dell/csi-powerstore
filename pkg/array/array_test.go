@@ -467,3 +467,17 @@ users:
 
 	assert.Equal(t, lck.RegisterK8sCluster(fsMock), nil)
 }
+
+func TestLocker_GetOneArray(t *testing.T) {
+	lck := array.Locker{}
+	arrayMap := make(map[string]*array.PowerStoreArray)
+	array := &array.PowerStoreArray{GlobalID: "globalId1"}
+	arrayMap["globalId1"] = array
+	lck.SetArrays(arrayMap)
+	fetched, err := lck.GetOneArray("globalId1")
+	assert.NoError(t, err)
+	assert.Equal(t, fetched, array)
+	fetched, err = lck.GetOneArray("globalId2")
+	assert.Error(t, err)
+	assert.NotEqual(t, fetched, array)
+}

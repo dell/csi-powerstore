@@ -22,6 +22,7 @@ package controller
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"time"
@@ -31,35 +32,18 @@ import (
 	"github.com/dell/csi-powerstore/pkg/common"
 )
 
-// ArrayConnectivityStatus Status of the array probe
-type ArrayConnectivityStatus struct {
-	LastSuccess int64 `json:"lastSuccess"` // connectivity status
-	LastAttempt int64 `json:"lastAttempt"` // last timestamp attempted to check connectivity
-}
-
-// queryStatus make API call to the specified url to retrieve connection status
-func (s *Service) queryArrayStatus(ctx context.Context, url string) (bool, error) {
-	// ctx, log, _ := GetRunIDLog(ctx)
+// QueryArrayStatus make API call to the specified url to retrieve connection status
+func (s *Service) QueryArrayStatus(ctx context.Context, url string) (bool, error) {
 	defer func() {
 		if err := recover(); err != nil {
 			log.Println("panic occurred in queryStatus:", err)
 		}
 	}()
-	log.Infof("Calling API %s with timeout %v", url, common.Timeout)
-	timeOutCtx, cancel := context.WithTimeout(ctx, common.Timeout)
-	defer cancel()
-
-	req, err := http.NewRequestWithContext(timeOutCtx, "GET", url, nil)
-	if err != nil {
-		log.Errorf("failed to create request for API %s due to %s ", url, err.Error())
-		return false, err
+	client := http.Client{
+		Timeout: common.Timeout,
 	}
-	req.Header.Add("Accept", "application/json")
-	req.Header.Add("Content-Type", "application/json")
-	log.Debugf("Making %s url request %+v", url, req)
+	resp, err := client.Get(url)
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
 	log.Debugf("Received response %+v for url %s", resp, url)
 	if err != nil {
 		log.Errorf("failed to call API %s due to %s ", url, err.Error())
@@ -71,7 +55,11 @@ func (s *Service) queryArrayStatus(ctx context.Context, url string) (bool, error
 		log.Errorf("failed to read API response due to %s ", err.Error())
 		return false, err
 	}
-	var statusResponse ArrayConnectivityStatus
+	if resp.StatusCode != 200 {
+		log.Errorf("Found unexpected response from the server while fetching array status %d ", resp.StatusCode)
+		return false, fmt.Errorf("unexpected response from the server")
+	}
+	var statusResponse common.ArrayConnectivityStatus
 	err = json.Unmarshal(bodyBytes, &statusResponse)
 	if err != nil {
 		log.Errorf("unable to unmarshal and determine connectivity due to %s ", err)

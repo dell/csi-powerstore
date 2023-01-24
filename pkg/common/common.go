@@ -48,6 +48,9 @@ import (
 // Name contains default name of the driver, can be overridden
 var Name = "csi-powerstore.dellemc.com"
 
+// APIPort port for API calls
+var APIPort string
+
 // Manifest contains additional information about the driver
 var Manifest = map[string]string{
 	"url":    "https://github.com/dell/csi-powerstore",
@@ -57,6 +60,12 @@ var Manifest = map[string]string{
 }
 
 type key int
+
+// ArrayConnectivityStatus Status of the array probe
+type ArrayConnectivityStatus struct {
+	LastSuccess int64 `json:"lastSuccess"` // connectivity status
+	LastAttempt int64 `json:"lastAttempt"` // last timestamp attempted to check connectivity
+}
 
 const (
 	// KeyAllowRoot key value to check if driver should enable root squashing for nfs volumes
@@ -128,6 +137,9 @@ const (
 
 	// Timeout for making http requests
 	Timeout = time.Second * 5
+
+	// ArrayStatus is the endPoint for polling to check array status
+	ArrayStatus = "/array-status"
 )
 
 // TransportType differentiates different SCSI transport protocols (FC, iSCSI, Auto, None)
@@ -396,4 +408,16 @@ func SetPollingFrequency(ctx context.Context) int64 {
 	}
 	log.Debugf("use default pollingFrequency as %d seconds", DefaultPodmonPollRate)
 	return DefaultPodmonPollRate
+}
+
+// SetAPIPort set the port for running server
+func SetAPIPort(ctx context.Context) {
+	if port, ok := csictx.LookupEnv(ctx, EnvPodmonAPIPORT); ok && strings.TrimSpace(port) != "" {
+		APIPort = fmt.Sprintf(":%s", port)
+		log.Debugf("set podmon API port to %s", APIPort)
+		return
+	}
+	// If the port number cannot be fetched, set it to default
+	APIPort = ":" + DefaultPodmonAPIPortNumber
+	log.Debugf("set podmon API port to default %s", APIPort)
 }
