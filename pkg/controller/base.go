@@ -130,7 +130,7 @@ func detachVolumeFromHost(ctx context.Context, hostID string, volumeID string, c
 		if !ok {
 			return status.Errorf(codes.Unknown, "failed to detach volume '%s' from host: %s", volumeID, err.Error())
 		}
-		// @TO-DO comments needs to be added
+		// In case of resiliency we can have multiple calls simultaneously (from podmon and k8) so to keep it idempotent
 		if strings.Contains(apiError.Message, "Host is not attached to volume") {
 			return nil
 		}
