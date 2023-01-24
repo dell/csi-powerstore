@@ -20,6 +20,7 @@ package controller
 
 import (
 	"context"
+	"strings"
 	"unicode/utf8"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
@@ -129,7 +130,10 @@ func detachVolumeFromHost(ctx context.Context, hostID string, volumeID string, c
 		if !ok {
 			return status.Errorf(codes.Unknown, "failed to detach volume '%s' from host: %s", volumeID, err.Error())
 		}
-
+		// @TO-DO comments needs to be added
+		if strings.Contains(apiError.Message, "Host is not attached to volume") {
+			return nil
+		}
 		if apiError.HostIsNotExist() {
 			return status.Errorf(codes.NotFound, "host with ID '%s' not found", hostID)
 		}

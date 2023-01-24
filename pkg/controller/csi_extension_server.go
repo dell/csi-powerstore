@@ -27,6 +27,7 @@ import (
 	podmon "github.com/dell/dell-csi-extensions/podmon"
 	vgsext "github.com/dell/dell-csi-extensions/volumeGroupSnapshot"
 	"github.com/dell/gopowerstore"
+	"github.com/go-openapi/strfmt"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -196,10 +197,19 @@ func (s *Service) ValidateVolumeHostConnectivity(ctx context.Context, req *podmo
 	globalIDs := make(map[string]bool)
 	globalID := req.GetArrayId()
 	if globalID == "" {
+		if len(req.GetVolumeIds()) == 0 {
+			log.Info("neither globalId nor volumeID is present in request")
+			globalIDs[s.DefaultArray().GlobalID] = true
+		}
 		// for loop req.GetVolumeIds()
 		for _, volID := range req.GetVolumeIds() {
-			_, globalID, _, _ = array.ParseVolumeID(ctx, volID, s.DefaultArray(), nil)
-			globalIDs[globalID] = true
+			_, globalID, _, err := array.ParseVolumeID(ctx, volID, s.DefaultArray(), nil)
+			if err != nil || globalID == "" {
+				log.Errorf("unable to retrieve array's globalID after parsing volumeID")
+				globalIDs[s.DefaultArray().GlobalID] = true
+			} else {
+				globalIDs[globalID] = true
+			}
 		}
 	} else {
 		globalIDs[globalID] = true
@@ -269,9 +279,6 @@ func (s *Service) checkIfNodeIsConnected(ctx context.Context, arrayID string, no
 		message = fmt.Sprintf("array %s is connected to node %s", arrayID, nodeID)
 	} else {
 		message = fmt.Sprintf("array %s is not connected to node %s", arrayID, nodeID)
-		/* log.Info(message)
-		rep.Messages = append(rep.Messages, message)
-		return fmt.Errorf("not connected with array") */
 	}
 	log.Info(message)
 	rep.Messages = append(rep.Messages, message)
@@ -289,7 +296,7 @@ func (s *Service) IsIOInProgress(ctx context.Context, volID string, arrayConfig 
 		}
 		// check last four entries status recieved in the response
 		for i := len(resp) - 1; i >= (len(resp)-4) && i >= 0; i-- {
-			if resp[i].TotalIops != 0.0 {
+			if resp[i].TotalIops > 0.0 && CheckIfEntryIsLatest(resp[i].CommonMetricsFields.Timestamp) {
 				return nil
 			}
 		}
@@ -303,9 +310,27 @@ func (s *Service) IsIOInProgress(ctx context.Context, volID string, arrayConfig 
 	}
 	// check last four entries status recieved in the response
 	for i := len(resp) - 1; i >= len(resp)-4 && i >= 0; i-- {
-		if resp[i].TotalIops != 0.0 {
+		if resp[i].TotalIops > 0.0 && CheckIfEntryIsLatest(resp[i].CommonMetricsFields.Timestamp) {
 			return nil
 		}
 	}
 	return fmt.Errorf("no IOInProgress")
+}
+
+func CheckIfEntryIsLatest(timestamp strfmt.DateTime) bool {
+	RFC3339MillisNoColon := "2006-01-02T15:04:05Z"
+	stringTime := timestamp.String()
+	timeFromResponse, err := time.Parse(RFC3339MillisNoColon, stringTime)
+	if err != nil {
+		log.Errorf("error in parsing the time recieved in the response", err)
+		return false
+	}
+	log.Debugf("timestamp recieved from the response body is %v", timeFromResponse)
+	currentTime := time.Now().UTC()
+	log.Debugf("current time %v", currentTime)
+	if currentTime.Sub(timeFromResponse).Seconds() < 60 {
+		log.Debug("found a fresh metric")
+		return true
+	}
+	return false
 }
