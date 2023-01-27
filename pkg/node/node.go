@@ -1100,6 +1100,8 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 					}
 					if loginToAtleastOneTarget {
 						resp.AccessibleTopology.Segments[common.Name+"/"+arr.GetIP()+"-nvmetcp"] = "true"
+					} else {
+						s.useNFS = true
 					}
 				}
 
@@ -1170,6 +1172,8 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 
 				if loginToAtleastOneTarget {
 					resp.AccessibleTopology.Segments[common.Name+"/"+arr.GetIP()+"-iscsi"] = "true"
+				} else {
+					s.useNFS = true
 				}
 			}
 		}

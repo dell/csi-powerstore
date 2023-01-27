@@ -46,7 +46,6 @@ func (s *Service) startAPIService(ctx context.Context) {
 		return
 	}
 	pollingFrequencyInSeconds = common.SetPollingFrequency(ctx)
-	common.SetAPIPort(ctx)
 	s.startNodeToArrayConnectivityCheck(ctx)
 	s.apiRouter(ctx)
 }
@@ -95,6 +94,7 @@ func connectivityStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	log.Info("sending connectivityStatus for all arrays ")
+	w.Header().Set("Content-Type", "application/json")
 	_, err = w.Write(jsonResponse)
 	if err != nil {
 		log.Errorf("unable to write response %s", err)
@@ -145,7 +145,6 @@ func getArrayConnectivityStatus(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Infof("sending response %+v for array %s \n", status, arrayID)
 	//update response
-	w.WriteHeader(http.StatusOK)
 	_, err = w.Write(jsonResponse)
 	if err != nil {
 		log.Errorf("unable to write response %s", err)
@@ -221,7 +220,11 @@ func (s *Service) nodeProbe(timeOutCtx context.Context, array *array.PowerStoreA
 		// nodeId is not right or it's not NFS and still host is not preset
 		log.Infof("Error %s, while probing %s", err.Error(), array.GlobalID)
 		return err
+	} else if s.useNFS {
+		log.Infof("Host Entry found but failed to login to nvme/iscsi target")
+		return nil
 	}
+
 	log.Debugf("Successfully got Host for %s", array.GlobalID)
 
 	for _, initiator := range host.Initiators {

@@ -30,6 +30,7 @@ import (
 	vgsext "github.com/dell/dell-csi-extensions/volumeGroupSnapshot"
 	"github.com/dell/gopowerstore"
 	"github.com/dell/gopowerstore/api"
+	"github.com/go-openapi/strfmt"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/stretchr/testify/mock"
@@ -78,6 +79,30 @@ var _ = Describe("csi-extension-server", func() {
 			})
 		})
 
+		When("neither arrayId nor volId is present in the request body ", func() {
+			It("should not return error", func() {
+
+				req := &podmon.ValidateVolumeHostConnectivityRequest{
+					NodeId: "csi-node-003c684ccb0c4ca0a9c99423563dfd2c-127.0.0.1",
+				}
+				clientMock.On("GetVolume", context.Background(), mock.Anything).Return(gopowerstore.Volume{ApplianceID: validApplianceID}, nil)
+				_, err := ctrlSvc.ValidateVolumeHostConnectivity(context.Background(), req)
+				Expect(err).To(BeNil())
+			})
+		})
+
+		When("Invalid nodeID is sent in the request body ", func() {
+			It("should return error", func() {
+
+				req := &podmon.ValidateVolumeHostConnectivityRequest{
+					NodeId: "csi-node-003c684ccb0c4ca0a9c99423563dfd2c-@@@",
+				}
+				clientMock.On("GetVolume", context.Background(), mock.Anything).Return(gopowerstore.Volume{ApplianceID: validApplianceID}, nil)
+				_, err := ctrlSvc.ValidateVolumeHostConnectivity(context.Background(), req)
+				Expect(err).ToNot(BeNil())
+			})
+		})
+
 		When("not sending arrayId in request body ", func() {
 			It("should not return error but IO in response should be false", func() {
 				clientMock.On("GetVolume", context.Background(), mock.Anything).Return(gopowerstore.Volume{ApplianceID: validApplianceID}, nil)
@@ -116,6 +141,7 @@ var _ = Describe("csi-extension-server", func() {
 			It("should not return error", func() {
 				clientMock.On("GetVolume", context.Background(), mock.Anything).Return(gopowerstore.Volume{ApplianceID: validApplianceID}, nil)
 				resp2 := make([]gopowerstore.PerformanceMetricsByVolumeResponse, 6)
+				freshTime, _ := strfmt.ParseDateTime(fmt.Sprint(time.Now().UTC().Format("2006-01-02T15:04:05Z")))
 				resp2[0].TotalIops = 0.0
 				resp2[0].WriteIops = 0.0
 				resp2[0].ReadIops = 0.0
@@ -124,9 +150,12 @@ var _ = Describe("csi-extension-server", func() {
 				resp2[1].ReadIops = 0.0
 				resp2[2].TotalIops = 4.9
 				resp2[2].WriteIops = 2.6
+				resp2[2].CommonMetricsFields.Timestamp = freshTime
 				resp2[2].ReadIops = 2.3
 				resp2[3].TotalIops = 0.0
+				resp2[3].CommonMetricsFields.Timestamp = freshTime
 				resp2[4].TotalIops = 4.6
+				resp2[4].CommonMetricsFields.Timestamp = freshTime
 				resp2[5].TotalIops = 0.0
 				clientMock.On("PerformanceMetricsByVolume", context.Background(), mock.Anything, mock.Anything).
 					Return(resp2, nil)
@@ -191,16 +220,39 @@ var _ = Describe("csi-extension-server", func() {
 		When("IOConnectivity for scsi type volume on array when IO operation is there", func() {
 			It("should not fail", func() {
 				resp := make([]gopowerstore.PerformanceMetricsByVolumeResponse, 6)
+				freshTime, _ := strfmt.ParseDateTime(fmt.Sprint(time.Now().UTC().Format("2006-01-02T15:04:05Z")))
 				resp[0].TotalIops = 0.0
 				resp[1].TotalIops = 0.0
 				resp[2].TotalIops = 4.9
+				resp[2].CommonMetricsFields.Timestamp = freshTime
 				resp[3].TotalIops = 0.0
+				resp[4].CommonMetricsFields.Timestamp = freshTime
 				resp[4].TotalIops = 4.6
 				resp[5].TotalIops = 0.0
 				clientMock.On("PerformanceMetricsByVolume", context.Background(), mock.Anything, mock.Anything).
 					Return(resp, nil)
 				err := ctrlSvc.IsIOInProgress(context.Background(), validBlockVolumeID, ctrlSvc.DefaultArray(), "scsi")
 				Expect(err).To(BeNil())
+			})
+		})
+
+		When("IOConnectivity for scsi type volume on array when IO operation is there but entry is not fresh", func() {
+			It("should fail", func() {
+				resp := make([]gopowerstore.PerformanceMetricsByVolumeResponse, 6)
+				// this time is not in UTC timezone so not fresh as per the logic
+				freshTime, _ := strfmt.ParseDateTime(fmt.Sprint(time.Now().Format("2006-01-02T15:04:05Z")))
+				resp[0].TotalIops = 0.0
+				resp[1].TotalIops = 0.0
+				resp[2].TotalIops = 4.9
+				resp[2].CommonMetricsFields.Timestamp = freshTime
+				resp[3].TotalIops = 0.0
+				resp[4].CommonMetricsFields.Timestamp = freshTime
+				resp[4].TotalIops = 4.6
+				resp[5].TotalIops = 0.0
+				clientMock.On("PerformanceMetricsByVolume", context.Background(), mock.Anything, mock.Anything).
+					Return(resp, nil)
+				err := ctrlSvc.IsIOInProgress(context.Background(), validBlockVolumeID, ctrlSvc.DefaultArray(), "scsi")
+				Expect(err).ToNot(BeNil())
 			})
 		})
 
@@ -223,11 +275,14 @@ var _ = Describe("csi-extension-server", func() {
 		When("IOConnectivity for nfs type volume on array when IO operation is there", func() {
 			It("should not fail", func() {
 				resp := make([]gopowerstore.PerformanceMetricsByFileSystemResponse, 6)
+				freshTime, _ := strfmt.ParseDateTime(fmt.Sprint(time.Now().UTC().Format("2006-01-02T15:04:05Z")))
 				resp[0].TotalIops = 0.0
 				resp[1].TotalIops = 0.0
+				resp[2].CommonMetricsFields.Timestamp = freshTime
 				resp[2].TotalIops = 4.9
 				resp[3].TotalIops = 0.0
 				resp[4].TotalIops = 4.6
+				resp[4].CommonMetricsFields.Timestamp = freshTime
 				resp[5].TotalIops = 0.0
 				clientMock.On("PerformanceMetricsByFileSystem", context.Background(), mock.Anything, mock.Anything).
 					Return(resp, nil)

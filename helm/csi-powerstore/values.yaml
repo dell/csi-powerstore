@@ -258,10 +258,10 @@ node:
   #  - key: "isilon.podmon.storage.dell.com"
   #    operator: "Exists"
   #    effect: "NoSchedule"
-  #  - key: "offline.pstore.storage.dell.com"
+  #  - key: "offline.powerstore.storage.dell.com"
   #    operator: "Exists"
   #    effect: "NoSchedule"
-  #  - key: "pstore.podmon.storage.dell.com"
+  #  - key: "powerstore.podmon.storage.dell.com"
   #    operator: "Exists"
   #    effect: "NoSchedule"
 

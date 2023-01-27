@@ -631,6 +631,25 @@ var _ = Describe("CSINodeService", func() {
 			})
 		})
 
+		When("got host on array but it's NFS type since none of the targets were reachable", func() {
+			It("should not fail", func() {
+				nodeSvc.nodeID = "some-random-text"
+
+				clientMock.On("GetHostByName", mock.Anything, mock.AnythingOfType("string")).Return(
+					gopowerstore.Host{
+						ID:         "host-id",
+						Initiators: []gopowerstore.InitiatorInstance{},
+						Name:       "host-name",
+					}, nil)
+
+				arrays := getTestArrays()
+				nodeSvc.useNFS = true
+				err := nodeSvc.nodeProbe(context.Background(), arrays["gid1"])
+
+				Expect(err).To(BeNil())
+				nodeSvc.useNFS = false
+			})
+		})
 		When("host as well as initiators are present but active sessions are not present on array", func() {
 			It("should fail", func() {
 				nodeSvc.nodeID = "some-random-text"
