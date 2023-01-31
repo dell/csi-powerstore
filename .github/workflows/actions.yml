@@ -22,7 +22,7 @@ jobs:
       - name: Checkout the code
         uses: actions/checkout@v2
       - name: Run gosec to check for security vulnerabilities
-        uses: dell/common-github-actions/gosec-runner@main
+        uses: dell/common-github-actions/gosec-runner@fix-gosec-curl-command
         with:
           exclude-dir: "tests/e2e"
           directories: "./..."
