@@ -1162,6 +1162,13 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 				loginToAtleastOneTarget := false
 				for _, target := range iscsiTargets {
 					log.Info("Logging to Iscsi target ", target)
+					if s.opts.EnableCHAP {
+						log.Info("Updating CHAP credentials for node before logging to Iscsi target ", target)
+						err = s.iscsiLib.SetCHAPCredentials(target, s.opts.CHAPUsername, s.opts.CHAPPassword)
+						if err != nil {
+							log.Errorf("Unable to update the CHAP credentials on node")
+						}
+					}
 					err = s.iscsiLib.PerformLogin(target)
 					if err != nil {
 						log.Errorf("couldn't connect to the iscsi target")
