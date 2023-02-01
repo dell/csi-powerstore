@@ -26,6 +26,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"regexp"
@@ -1164,7 +1165,8 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 					log.Info("Logging to Iscsi target ", target)
 					if s.opts.EnableCHAP {
 						log.Info("Updating CHAP credentials for node before logging to Iscsi target ", target)
-						err = s.iscsiLib.SetCHAPCredentials(target, s.opts.CHAPUsername, s.opts.CHAPPassword)
+						// err = s.iscsiLib.SetCHAPCredentials(target, s.opts.CHAPUsername, s.opts.CHAPPassword)
+						err = iscsiLogin(target, s)
 						if err != nil {
 							log.Errorf("Unable to update the CHAP credentials on node")
 						}
@@ -1188,6 +1190,14 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 	return resp, nil
 }
 
+func iscsiLogin(target goiscsi.ISCSITarget, s *Service) error {
+	cmd := exec.Command("iscsiadm", "-m", "node", "--targetname", target.Target, "--portal", target.Portal, "--login", "--username", s.opts.CHAPUsername, "--password", s.opts.CHAPPassword)
+	err := cmd.Run()
+	if err != nil {
+		return fmt.Errorf("failed to run iSCSI login command: %v", err)
+	}
+	return nil
+}
 func (s *Service) updateNodeID() error {
 	if s.nodeID == "" {
 		hostID, err := s.Fs.ReadFile(s.opts.NodeIDFilePath)
