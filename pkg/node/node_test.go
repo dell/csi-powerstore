@@ -631,15 +631,55 @@ var _ = Describe("CSINodeService", func() {
 			})
 		})
 
-		When("got host on array but it's NFS type since none of the targets were reachable", func() {
+		When("got host on array but initiators are not present and UseNFS is true at the beginning", func() {
 			It("should not fail", func() {
 				nodeSvc.nodeID = "some-random-text"
 
 				clientMock.On("GetHostByName", mock.Anything, mock.AnythingOfType("string")).Return(
 					gopowerstore.Host{
-						ID:         "host-id",
-						Initiators: []gopowerstore.InitiatorInstance{},
-						Name:       "host-name",
+						ID: "host-id",
+						Initiators: []gopowerstore.InitiatorInstance{
+							{
+								PortName: validISCSIPortals[0],
+								PortType: gopowerstore.InitiatorProtocolTypeEnumISCSI,
+							}},
+						Name: "host-name",
+					}, nil)
+				nodeSvc.useNFS = true
+				arrays := getTestArrays()
+				err := nodeSvc.nodeProbe(context.Background(), arrays["gid1"])
+				nodeSvc.useNFS = false
+				Expect(err).To(BeNil())
+			})
+		})
+
+		When("got host on array but it's NFS type at the beginning but later found active sessions", func() {
+			It("should not fail", func() {
+				nodeSvc.nodeID = "some-random-text"
+
+				clientMock.On("GetHostByName", mock.Anything, mock.AnythingOfType("string")).Return(
+					gopowerstore.Host{
+						ID: "host-id",
+						Initiators: []gopowerstore.InitiatorInstance{
+							{
+								ActiveSessions: []gopowerstore.ActiveSessionInstance{
+									{
+										PortName: validISCSITargets[0],
+									},
+								},
+								PortName: validISCSIPortals[0],
+								PortType: gopowerstore.InitiatorProtocolTypeEnumISCSI,
+							},
+							{
+								ActiveSessions: []gopowerstore.ActiveSessionInstance{
+									{
+										PortName: validISCSITargets[1],
+									},
+								},
+								PortName: validISCSIPortals[1],
+								PortType: gopowerstore.InitiatorProtocolTypeEnumISCSI,
+							}},
+						Name: "host-name",
 					}, nil)
 
 				arrays := getTestArrays()
@@ -647,9 +687,10 @@ var _ = Describe("CSINodeService", func() {
 				err := nodeSvc.nodeProbe(context.Background(), arrays["gid1"])
 
 				Expect(err).To(BeNil())
-				nodeSvc.useNFS = false
+				Expect(nodeSvc.useNFS).To(BeFalse())
 			})
 		})
+
 		When("host as well as initiators are present but active sessions are not present on array", func() {
 			It("should fail", func() {
 				nodeSvc.nodeID = "some-random-text"
