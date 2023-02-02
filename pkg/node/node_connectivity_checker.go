@@ -226,7 +226,7 @@ func (s *Service) nodeProbe(timeOutCtx context.Context, array *array.PowerStoreA
 
 	for _, initiator := range host.Initiators {
 		if len(initiator.ActiveSessions) > 0 {
-			// just in case if we have set useNFS as true earlier when iscsi session were not established
+			// In case we had set useNFS as true when no ISCSI session was established in NodeGetInfo
 			if s.useNFS {
 				s.useNFS = false
 			}
