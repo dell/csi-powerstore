@@ -1159,6 +1159,10 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 					}
 					break
 				}
+				// login is also performed as a part of ConnectVolume by using dynamically created chap credentials, InCase if it fails here
+				if len(iscsiTargets) > 0 {
+					resp.AccessibleTopology.Segments[common.Name+"/"+arr.GetIP()+"-iscsi"] = "true"
+				}
 				loginToAtleastOneTarget := false
 				for _, target := range iscsiTargets {
 					log.Info("Logging to Iscsi target ", target)
@@ -1170,9 +1174,7 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 					loginToAtleastOneTarget = true
 				}
 
-				if loginToAtleastOneTarget {
-					resp.AccessibleTopology.Segments[common.Name+"/"+arr.GetIP()+"-iscsi"] = "true"
-				} else {
+				if !loginToAtleastOneTarget {
 					s.useNFS = true
 				}
 			}

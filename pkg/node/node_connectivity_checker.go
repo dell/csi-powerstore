@@ -220,15 +220,19 @@ func (s *Service) nodeProbe(timeOutCtx context.Context, array *array.PowerStoreA
 		// nodeId is not right or it's not NFS and still host is not preset
 		log.Infof("Error %s, while probing %s", err.Error(), array.GlobalID)
 		return err
-	} else if s.useNFS {
-		log.Infof("Host Entry found but failed to login to nvme/iscsi target")
-		return nil
 	}
 
 	log.Debugf("Successfully got Host for %s", array.GlobalID)
 
 	for _, initiator := range host.Initiators {
 		if len(initiator.ActiveSessions) > 0 {
+			// just in case if we have set useNFS as true earlier when iscsi session were not established
+			if s.useNFS {
+				s.useNFS = false
+			}
+			return nil
+		} else if s.useNFS {
+			log.Infof("Host Entry found but failed to login to nvme/iscsi target, seems to be this worker has only NFS")
 			return nil
 		}
 	}
