@@ -13,7 +13,7 @@ require (
 	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.2.2-0.20220823070737-c80a2164070b
 	github.com/dell/gobrick v1.6.0
 	github.com/dell/gocsi v1.6.0
-	github.com/dell/gofsutil v1.11.0
+	github.com/dell/gofsutil v1.11.1-0.20230124081154-d3ea573aa8aa
 	github.com/dell/goiscsi v1.6.1-0.20230120052643-7d7bb9515e01
 	github.com/dell/gonvme v1.3.0
 	github.com/dell/gopowerstore v1.10.0
@@ -36,8 +36,6 @@ require (
 	google.golang.org/grpc v1.47.0
 	gopkg.in/yaml.v3 v3.0.1
 )
-
-replace github.com/dell/gofsutil v1.11.0 => ../gofsutil
 
 require (
 	github.com/HdrHistogram/hdrhistogram-go v1.1.2 // indirect
