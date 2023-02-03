@@ -18,8 +18,8 @@ package controller_test
 
 import (
 	"context"
-	"github.com/dell/csi-powerstore/pkg/array"
-	"github.com/dell/csi-powerstore/pkg/controller"
+	"github.com/dell/csi-powerstore/v2/pkg/array"
+	"github.com/dell/csi-powerstore/v2/pkg/controller"
 	csiext "github.com/dell/dell-csi-extensions/replication"
 	"github.com/dell/gopowerstore"
 	"github.com/dell/gopowerstore/api"

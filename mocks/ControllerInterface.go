@@ -21,11 +21,11 @@ package mocks
 import (
 	context "context"
 
-	array "github.com/dell/csi-powerstore/pkg/array"
+	array "github.com/dell/csi-powerstore/v2/pkg/array"
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 
-	fs "github.com/dell/csi-powerstore/pkg/common/fs"
+	fs "github.com/dell/csi-powerstore/v2/pkg/common/fs"
 
 	mock "github.com/stretchr/testify/mock"
 )

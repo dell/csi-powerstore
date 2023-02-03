@@ -19,7 +19,7 @@
 package mocks
 
 import (
-	controller "github.com/dell/csi-powerstore/pkg/controller"
+	controller "github.com/dell/csi-powerstore/v2/pkg/controller"
 	mock "github.com/stretchr/testify/mock"
 )
 

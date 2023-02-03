@@ -26,8 +26,8 @@ import (
 	"testing"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/dell/csi-powerstore/mocks"
-	"github.com/dell/csi-powerstore/pkg/common"
+	"github.com/dell/csi-powerstore/v2/mocks"
+	"github.com/dell/csi-powerstore/v2/pkg/common"
 	csictx "github.com/dell/gocsi/context"
 	"github.com/dell/gocsi/utils"
 	"github.com/dell/gopowerstore"

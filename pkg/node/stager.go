@@ -29,9 +29,9 @@ import (
 	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/dell/csi-powerstore/pkg/array"
-	"github.com/dell/csi-powerstore/pkg/common"
-	"github.com/dell/csi-powerstore/pkg/common/fs"
+	"github.com/dell/csi-powerstore/v2/pkg/array"
+	"github.com/dell/csi-powerstore/v2/pkg/common"
+	"github.com/dell/csi-powerstore/v2/pkg/common/fs"
 	"github.com/dell/gobrick"
 	"github.com/dell/gopowerstore"
 	log "github.com/sirupsen/logrus"

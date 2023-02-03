@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/dell/csi-powerstore/mocks"
+	"github.com/dell/csi-powerstore/v2/mocks"
 	"github.com/dell/gopowerstore"
 	gopowerstoremock "github.com/dell/gopowerstore/mocks"
 	"github.com/stretchr/testify/mock"

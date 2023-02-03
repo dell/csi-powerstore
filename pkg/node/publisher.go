@@ -22,7 +22,7 @@ import (
 	"context"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/dell/csi-powerstore/pkg/common/fs"
+	"github.com/dell/csi-powerstore/v2/pkg/common/fs"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

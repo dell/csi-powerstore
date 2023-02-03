@@ -24,7 +24,7 @@ import (
 	"testing"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/dell/csi-powerstore/pkg/controller"
+	"github.com/dell/csi-powerstore/v2/pkg/controller"
 	"github.com/dell/gopowerstore"
 	"github.com/dell/gopowerstore/mocks"
 	"github.com/stretchr/testify/assert"

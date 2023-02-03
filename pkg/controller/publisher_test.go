@@ -24,7 +24,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/dell/csi-powerstore/pkg/controller"
+	"github.com/dell/csi-powerstore/v2/pkg/controller"
 	"github.com/dell/gopowerstore"
 	"github.com/dell/gopowerstore/api"
 	"github.com/dell/gopowerstore/mocks"

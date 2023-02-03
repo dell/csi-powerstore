@@ -25,7 +25,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dell/csi-powerstore/pkg/common"
+	"github.com/dell/csi-powerstore/v2/pkg/common"
 )
 
 func TestApiRouter2(t *testing.T) {
