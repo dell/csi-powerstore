@@ -288,8 +288,11 @@ func readISCSITargetsFromPublishContext(pc map[string]string) []gobrick.ISCSITar
 			target.Target = t
 		}
 		p, pfound := pc[fmt.Sprintf("%s%d", common.PublishContextISCSIPortalsPrefix, i)]
-		if pfound {
+		if pfound && common.ReachableIscsiEndPoint(p) {
 			target.Portal = p
+		} else {
+			// if the portals from the context (set in ControllerPublishVolume) is not reachable from the nodes
+			pfound = false
 		}
 		if !tfound || !pfound {
 			break
