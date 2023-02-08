@@ -1161,7 +1161,7 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 						}
 						break
 					} else {
-						log.Debug("Portal is not rechable from the node", address.Portal)
+						log.Debug("Portal is not rechable from the node ", address.Portal)
 					}
 				}
 				// login is also performed as a part of ConnectVolume by using dynamically created chap credentials, In case if it fails here
@@ -1172,6 +1172,13 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 				for _, target := range iscsiTargets {
 					if common.ReachableIscsiEndPoint(target.Portal) {
 						log.Info("Logging to Iscsi target ", target)
+						if s.opts.EnableCHAP {
+							log.Info("Setting CHAP credentials for  ", target)
+							err = s.iscsiLib.SetCHAPCredentials(target, s.opts.CHAPUsername, s.opts.CHAPPassword)
+							if err != nil {
+								log.Errorf("couldn't connect to the iscsi target")
+							}
+						}
 						err = s.iscsiLib.PerformLogin(target)
 						if err != nil {
 							log.Errorf("couldn't connect to the iscsi target")
@@ -1179,7 +1186,7 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 						}
 						loginToAtleastOneTarget = true
 					} else {
-						log.Debug("Target is not rechable from the node", target.Portal)
+						log.Debug("Target is not rechable from the node ", target.Portal)
 					}
 				}
 
