@@ -1173,6 +1173,7 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 					if ReachableEndPoint(target.Portal) {
 						log.Info("Logging to Iscsi target ", target)
 						if s.opts.EnableCHAP {
+							log.Debug("Setting CHAP Credentials before login")
 							err = s.iscsiLib.SetCHAPCredentials(target, s.opts.CHAPUsername, s.opts.CHAPPassword)
 							if err != nil {
 								log.Errorf("couldn't connect to the iscsi target")
@@ -1374,6 +1375,7 @@ func (s *Service) setupHost(initiators []string, client gopowerstore.Client, arr
 			return err
 		}
 		if s.opts.EnableCHAP && len(h.Initiators) > 0 && (h.Initiators[0].ChapSingleUsername == "" || h.Initiators[0].ChapSingleUsername == "admin") {
+			log.Debug("CHAP was enabled earlier, modifying credentials")
 			err := s.modifyHostInitiators(context.Background(), h.ID, client, nil, nil, initiators)
 			if err != nil {
 				return fmt.Errorf("can't modify initiators CHAP credentials %s", err.Error())
