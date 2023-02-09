@@ -1151,7 +1151,7 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 				var iscsiTargets []goiscsi.ISCSITarget
 				for _, address := range infoList {
 					// first check if this portal is reachable from this machine or not
-					if common.ReachableIscsiEndPoint(address.Portal) {
+					if ReachableEndPoint(address.Portal) {
 						// doesn't matter how many portals are present, discovering from any one will list out all targets
 						log.Info("Trying to discover iSCSI target from portal ", address.Portal)
 						iscsiTargets, err = s.iscsiLib.DiscoverTargets(address.Portal, false)
@@ -1161,7 +1161,7 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 						}
 						break
 					} else {
-						log.Debug("Portal is not rechable from the node ", address.Portal)
+						log.Debugf("Portal %s is not rechable from the node", address.Portal)
 					}
 				}
 				// login is also performed as a part of ConnectVolume by using dynamically created chap credentials, In case if it fails here
@@ -1170,10 +1170,9 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 				}
 				loginToAtleastOneTarget := false
 				for _, target := range iscsiTargets {
-					if common.ReachableIscsiEndPoint(target.Portal) {
+					if ReachableEndPoint(target.Portal) {
 						log.Info("Logging to Iscsi target ", target)
 						if s.opts.EnableCHAP {
-							log.Info("Setting CHAP credentials for  ", target)
 							err = s.iscsiLib.SetCHAPCredentials(target, s.opts.CHAPUsername, s.opts.CHAPPassword)
 							if err != nil {
 								log.Errorf("couldn't connect to the iscsi target")
@@ -1186,7 +1185,7 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 						}
 						loginToAtleastOneTarget = true
 					} else {
-						log.Debug("Target is not rechable from the node ", target.Portal)
+						log.Debugf("Target's Portal %s is not rechable from the node ", target.Portal)
 					}
 				}
 
@@ -1374,8 +1373,7 @@ func (s *Service) setupHost(initiators []string, client gopowerstore.Client, arr
 		if err != nil {
 			return err
 		}
-
-		if s.opts.EnableCHAP && len(h.Initiators) > 0 && h.Initiators[0].ChapSingleUsername == "" {
+		if s.opts.EnableCHAP && len(h.Initiators) > 0 && (h.Initiators[0].ChapSingleUsername == "" || h.Initiators[0].ChapSingleUsername == "admin") {
 			err := s.modifyHostInitiators(context.Background(), h.ID, client, nil, nil, initiators)
 			if err != nil {
 				return fmt.Errorf("can't modify initiators CHAP credentials %s", err.Error())
@@ -1398,7 +1396,7 @@ func (s *Service) setupHost(initiators []string, client gopowerstore.Client, arr
 			for _, rI := range reqInitiators {
 				if hI.PortName == *rI.PortName && hI.PortType == *rI.PortType {
 					log.Info("Found existing host ", h.Name, hI.PortName, hI.PortType)
-					updateCHAP = s.opts.EnableCHAP && hI.ChapSingleUsername == ""
+					updateCHAP = s.opts.EnableCHAP && (hI.ChapSingleUsername == "" || hI.ChapSingleUsername == "admin")
 					found = true
 					break
 				}

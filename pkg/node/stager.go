@@ -49,6 +49,9 @@ type VolumeStager interface {
 	Stage(ctx context.Context, req *csi.NodeStageVolumeRequest, logFields log.Fields, fs fs.Interface, id string) (*csi.NodeStageVolumeResponse, error)
 }
 
+// ReachableEndPoint checks if the endpoint is reachable or not
+var ReachableEndPoint = common.ReachableEndPoint
+
 // SCSIStager implementation of NodeVolumeStager for SCSI based (FC, iSCSI) volumes
 type SCSIStager struct {
 	useFC          bool
@@ -288,16 +291,17 @@ func readISCSITargetsFromPublishContext(pc map[string]string) []gobrick.ISCSITar
 			target.Target = t
 		}
 		p, pfound := pc[fmt.Sprintf("%s%d", common.PublishContextISCSIPortalsPrefix, i)]
-		if pfound && common.ReachableIscsiEndPoint(p) {
+		if pfound {
 			target.Portal = p
-		} else {
-			// if the portals from the context (set in ControllerPublishVolume) is not reachable from the nodes
-			pfound = false
 		}
 		if !tfound || !pfound {
 			break
 		}
-		targets = append(targets, target)
+
+		if ReachableEndPoint(p) {
+			// if the portals from the context (set in ControllerPublishVolume) is not reachable from the nodes
+			targets = append(targets, target)
+		}
 	}
 	log.Infof("iSCSI iscsiTargets from context: %v", targets)
 	return targets
