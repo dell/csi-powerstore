@@ -240,13 +240,13 @@ var _ = Describe("csi-extension-server", func() {
 			It("should fail", func() {
 				resp := make([]gopowerstore.PerformanceMetricsByVolumeResponse, 6)
 				// this time is not in UTC timezone so not fresh as per the logic
-				freshTime, _ := strfmt.ParseDateTime(fmt.Sprint(time.Now().Format("2006-01-02T15:04:05Z")))
+				staleTime, _ := strfmt.ParseDateTime(fmt.Sprint(time.Now().Add(time.Duration(-600) * time.Minute).Format("2006-01-02T15:04:05Z")))
 				resp[0].TotalIops = 0.0
 				resp[1].TotalIops = 0.0
 				resp[2].TotalIops = 4.9
-				resp[2].CommonMetricsFields.Timestamp = freshTime
+				resp[2].CommonMetricsFields.Timestamp = staleTime
 				resp[3].TotalIops = 0.0
-				resp[4].CommonMetricsFields.Timestamp = freshTime
+				resp[4].CommonMetricsFields.Timestamp = staleTime
 				resp[4].TotalIops = 4.6
 				resp[5].TotalIops = 0.0
 				clientMock.On("PerformanceMetricsByVolume", context.Background(), mock.Anything, mock.Anything).
@@ -303,10 +303,22 @@ var _ = Describe("csi-extension-server", func() {
 					w.Write(input)
 				})
 
-				fmt.Printf("Starting server at port 8089\n")
-				go http.ListenAndServe(":8089", nil)
+				server := &http.Server{Addr: ":49154"}
+				fmt.Printf("Starting server at port 49154 \n")
+				go func() {
+					err := server.ListenAndServe()
+					if err != nil {
+						fmt.Println(err)
+					}
+				}()
+				defer func() {
+					err := server.Close()
+					if err != nil {
+						fmt.Println(err)
+					}
+				}()
 				// c, _ := context.WithTimeout(context.Background(), 10*time.Second)
-				check, err := ctrlSvc.QueryArrayStatus(context.Background(), "http://localhost:8089/array/id1")
+				check, err := ctrlSvc.QueryArrayStatus(context.Background(), "http://localhost:49154/array/id1")
 				Expect(err).To(BeNil())
 				Expect(check).ToNot(BeFalse())
 			})
@@ -324,10 +336,21 @@ var _ = Describe("csi-extension-server", func() {
 					w.Write(input)
 				})
 
-				fmt.Printf("Starting server at port 9098\n")
-				go http.ListenAndServe(":9098", nil)
-				// c, _ := context.WithTimeout(context.Background(), 10*time.Second)
-				check, err := ctrlSvc.QueryArrayStatus(context.Background(), "http://localhost:9098/array/id2")
+				server := &http.Server{Addr: ":49153"}
+				fmt.Printf("Starting server at port 49153 \n")
+				go func() {
+					err := server.ListenAndServe()
+					if err != nil {
+						fmt.Println(err)
+					}
+				}()
+				defer func() {
+					err := server.Close()
+					if err != nil {
+						fmt.Println(err)
+					}
+				}()
+				check, err := ctrlSvc.QueryArrayStatus(context.Background(), "http://localhost:49153/array/id2")
 				Expect(err).To(BeNil())
 				Expect(check).ToNot(BeTrue())
 			})
@@ -340,7 +363,7 @@ var _ = Describe("csi-extension-server", func() {
 				status.LastAttempt = time.Now().Unix() - 200
 				status.LastSuccess = time.Now().Unix() - 200
 				input, _ := json.Marshal(status)
-				// responding with some dummy response that is for the case when array check was just done quite back
+				// Responding with a dummy response for the case when the array check was done a while ago
 				http.HandleFunc("/array/id3", func(w http.ResponseWriter, r *http.Request) {
 					w.Write(input)
 				})
@@ -348,19 +371,29 @@ var _ = Describe("csi-extension-server", func() {
 				http.HandleFunc("/array/id4", func(w http.ResponseWriter, r *http.Request) {
 					w.Write([]byte("invalid type response"))
 				})
-
-				fmt.Printf("Starting server at port 9099\n")
-				go http.ListenAndServe(":9099", nil)
-
-				check, err := ctrlSvc.QueryArrayStatus(context.Background(), "http://localhost:9099/array/id3")
+				server := &http.Server{Addr: ":49152"}
+				fmt.Printf("Starting server at port 49152 \n")
+				go func() {
+					err := server.ListenAndServe()
+					if err != nil {
+						fmt.Println(err)
+					}
+				}()
+				defer func() {
+					err := server.Close()
+					if err != nil {
+						fmt.Println(err)
+					}
+				}()
+				check, err := ctrlSvc.QueryArrayStatus(context.Background(), "http://localhost:49152/array/id3")
 				Expect(err).To(BeNil())
 				Expect(check).ToNot(BeTrue())
 
-				check, err = ctrlSvc.QueryArrayStatus(context.Background(), "http://localhost:9099/array/id4")
+				check, err = ctrlSvc.QueryArrayStatus(context.Background(), "http://localhost:49152/array/id4")
 				Expect(err).ToNot(BeNil())
 				Expect(check).ToNot(BeTrue())
 
-				check, err = ctrlSvc.QueryArrayStatus(context.Background(), "http://localhost:9099/array/id5")
+				check, err = ctrlSvc.QueryArrayStatus(context.Background(), "http://localhost:49152/array/id5")
 				Expect(err).ToNot(BeNil())
 				Expect(check).ToNot(BeTrue())
 			})
