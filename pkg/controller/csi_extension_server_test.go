@@ -239,7 +239,7 @@ var _ = Describe("csi-extension-server", func() {
 		When("IOConnectivity for scsi type volume on array when IO operation is there but entry is not fresh", func() {
 			It("should fail", func() {
 				resp := make([]gopowerstore.PerformanceMetricsByVolumeResponse, 6)
-				// this time is not in UTC timezone so not fresh as per the logic
+				// stale time
 				staleTime, _ := strfmt.ParseDateTime(fmt.Sprint(time.Now().Add(time.Duration(-600) * time.Minute).Format("2006-01-02T15:04:05Z")))
 				resp[0].TotalIops = 0.0
 				resp[1].TotalIops = 0.0
@@ -311,16 +311,10 @@ var _ = Describe("csi-extension-server", func() {
 						fmt.Println(err)
 					}
 				}()
-				defer func() {
-					err := server.Close()
-					if err != nil {
-						fmt.Println(err)
-					}
-				}()
-				// c, _ := context.WithTimeout(context.Background(), 10*time.Second)
 				check, err := ctrlSvc.QueryArrayStatus(context.Background(), "http://localhost:49154/array/id1")
 				Expect(err).To(BeNil())
 				Expect(check).ToNot(BeFalse())
+				server.Shutdown(context.Background())
 			})
 		})
 
@@ -344,15 +338,10 @@ var _ = Describe("csi-extension-server", func() {
 						fmt.Println(err)
 					}
 				}()
-				defer func() {
-					err := server.Close()
-					if err != nil {
-						fmt.Println(err)
-					}
-				}()
 				check, err := ctrlSvc.QueryArrayStatus(context.Background(), "http://localhost:49153/array/id2")
 				Expect(err).To(BeNil())
 				Expect(check).ToNot(BeTrue())
+				server.Shutdown(context.Background())
 			})
 		})
 
@@ -379,12 +368,6 @@ var _ = Describe("csi-extension-server", func() {
 						fmt.Println(err)
 					}
 				}()
-				defer func() {
-					err := server.Close()
-					if err != nil {
-						fmt.Println(err)
-					}
-				}()
 				check, err := ctrlSvc.QueryArrayStatus(context.Background(), "http://localhost:49152/array/id3")
 				Expect(err).To(BeNil())
 				Expect(check).ToNot(BeTrue())
@@ -396,6 +379,7 @@ var _ = Describe("csi-extension-server", func() {
 				check, err = ctrlSvc.QueryArrayStatus(context.Background(), "http://localhost:49152/array/id5")
 				Expect(err).ToNot(BeNil())
 				Expect(check).ToNot(BeTrue())
+				server.Shutdown(context.Background())
 			})
 		})
 	})
