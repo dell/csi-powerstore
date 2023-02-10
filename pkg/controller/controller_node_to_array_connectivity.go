@@ -49,7 +49,11 @@ func (s *Service) QueryArrayStatus(ctx context.Context, url string) (bool, error
 		log.Errorf("failed to call API %s due to %s ", url, err.Error())
 		return false, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Printf("error closing response body: %v", err)
+		}
+	}()
 	bodyBytes, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		log.Errorf("failed to read API response due to %s ", err.Error())

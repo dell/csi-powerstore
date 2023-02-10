@@ -173,8 +173,14 @@ func (i *interceptor) nodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		return nil, err
 	}
 
+	var once sync.Once
+
 	if closer, ok := lock.(io.Closer); ok {
-		defer closer.Close()
+		defer func() {
+			once.Do(func() {
+				closer.Close()
+			})
+		}()
 	}
 
 	if !lock.TryLock(i.opts.timeout) {
@@ -192,14 +198,18 @@ func (i *interceptor) nodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 		return nil, err
 	}
 
-	if closer, ok := lock.(io.Closer); ok {
-		defer closer.Close()
-	}
-
 	if !lock.TryLock(i.opts.timeout) {
 		return nil, status.Error(codes.Aborted, pending)
 	}
 	defer lock.Unlock()
+
+	if closer, ok := lock.(io.Closer); ok {
+		defer func() {
+			if resErr == nil {
+				closer.Close()
+			}
+		}()
+	}
 
 	return handler(ctx, req)
 }
@@ -212,9 +222,13 @@ func (i *interceptor) createVolume(ctx context.Context, req *csi.CreateVolumeReq
 		return nil, err
 	}
 
-	if closer, ok := lock.(io.Closer); ok {
-		defer closer.Close()
-	}
+	defer func() {
+		if closer, ok := lock.(io.Closer); ok {
+			if err := closer.Close(); err != nil {
+				log.Errorf("Failed to close lock: %v", err)
+			}
+		}
+	}()
 
 	if !lock.TryLock(i.opts.timeout) {
 		return nil, status.Error(codes.Aborted, pending)
