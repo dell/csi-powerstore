@@ -178,7 +178,9 @@ func (i *interceptor) nodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	if closer, ok := lock.(io.Closer); ok {
 		defer func() {
 			once.Do(func() {
-				closer.Close()
+				if err := closer.Close(); err != nil {
+					log.Errorf("Failed to close lock: %v", err)
+				}
 			})
 		}()
 	}
@@ -205,8 +207,8 @@ func (i *interceptor) nodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 
 	if closer, ok := lock.(io.Closer); ok {
 		defer func() {
-			if resErr == nil {
-				closer.Close()
+			if err := closer.Close(); err != nil {
+				log.Errorf("Failed to close lock: %v", err)
 			}
 		}()
 	}

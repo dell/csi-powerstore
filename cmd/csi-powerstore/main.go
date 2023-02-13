@@ -185,7 +185,9 @@ func main() {
 		var once sync.Once
 		defer func() {
 			once.Do(func() {
-				closer.Close()
+				if err := closer.Close(); err != nil {
+					log.Errorf("Failed to close lock: %v", err)
+				}
 			})
 		}()
 		opentracing.SetGlobalTracer(t)
