@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/dell/csi-powerstore/core"
@@ -182,14 +181,7 @@ func main() {
 		if err != nil {
 			log.Fatalf("couldn't create tracer for Jaeger: %s", err.Error())
 		}
-		var once sync.Once
-		defer func() {
-			once.Do(func() {
-				if err := closer.Close(); err != nil {
-					log.Errorf("Failed to close lock: %v", err)
-				}
-			})
-		}()
+		defer closer.Close() // #nosec G307
 		opentracing.SetGlobalTracer(t)
 		interList = append(interList, grpc_opentracing.UnaryServerInterceptor(grpc_opentracing.WithTracer(t)))
 	}

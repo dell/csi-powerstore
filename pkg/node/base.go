@@ -166,11 +166,7 @@ func getOutboundIP(endpoint string, fs fs.Interface) (net.IP, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer func() {
-		if cerr := conn.Close(); cerr != nil {
-			log.Println("error while closing connection:", cerr)
-		}
-	}()
+	defer conn.Close() // #nosec G307
 
 	localAddr := conn.LocalAddr().(*net.UDPAddr)
 
