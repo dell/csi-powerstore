@@ -181,7 +181,7 @@ func main() {
 		if err != nil {
 			log.Fatalf("couldn't create tracer for Jaeger: %s", err.Error())
 		}
-		defer closer.Close()
+		defer closer.Close() // #nosec G307
 		opentracing.SetGlobalTracer(t)
 		interList = append(interList, grpc_opentracing.UnaryServerInterceptor(grpc_opentracing.WithTracer(t)))
 	}
