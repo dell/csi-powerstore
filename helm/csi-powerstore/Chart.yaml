@@ -16,8 +16,8 @@
 
 name: csi-powerstore
 apiVersion: v2
-version: 2.5.0
-appVersion: "2.5.0"
+version: 2.6.0
+appVersion: "2.6.0"
 kubeVersion: ">= 1.23.0 < 1.27.0"
 #If you are using a complex K8s version like "v1.23.3-mirantis-1", use this kubeVersion check instead
 #WARNING: this version of the check will allow the use of alpha and beta versions, which is NOT SUPPORTED
