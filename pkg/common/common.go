@@ -421,3 +421,13 @@ func SetAPIPort(ctx context.Context) {
 	APIPort = ":" + DefaultPodmonAPIPortNumber
 	log.Debugf("set podmon API port to default %s", APIPort)
 }
+
+// ReachableEndPoint checks if this endpoint is reachable or not
+func ReachableEndPoint(endpoint string) bool {
+	// this endpoint has IP:PORT
+	_, err := net.DialTimeout("tcp", endpoint, 2*time.Second)
+	if err != nil {
+		return false
+	}
+	return true
+}
