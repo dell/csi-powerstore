@@ -1,6 +1,6 @@
 module github.com/dell/csi-powerstore/tests/e2e
 
-go 1.19
+go 1.20
 
 require (
 	github.com/onsi/ginkgo v1.16.5

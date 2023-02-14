@@ -174,7 +174,7 @@ func (i *interceptor) nodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	}
 
 	if closer, ok := lock.(io.Closer); ok {
-		defer closer.Close()
+		defer closer.Close() // #nosec G307
 	}
 
 	if !lock.TryLock(i.opts.timeout) {
@@ -191,11 +191,9 @@ func (i *interceptor) nodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 	if err != nil {
 		return nil, err
 	}
-
 	if closer, ok := lock.(io.Closer); ok {
-		defer closer.Close()
+		defer closer.Close() // #nosec G307
 	}
-
 	if !lock.TryLock(i.opts.timeout) {
 		return nil, status.Error(codes.Aborted, pending)
 	}
@@ -213,7 +211,7 @@ func (i *interceptor) createVolume(ctx context.Context, req *csi.CreateVolumeReq
 	}
 
 	if closer, ok := lock.(io.Closer); ok {
-		defer closer.Close()
+		defer closer.Close() // #nosec G307
 	}
 
 	if !lock.TryLock(i.opts.timeout) {

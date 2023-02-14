@@ -1,6 +1,6 @@
 module github.com/dell/csi-powerstore
 
-go 1.19
+go 1.20
 
 require (
 	github.com/akutz/gosync v0.1.0

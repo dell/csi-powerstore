@@ -207,7 +207,14 @@ func setVariables() {
 		initialized:     true,
 		isPodmonEnabled: false,
 	}
-
+	old := ReachableEndPoint
+	func() { ReachableEndPoint = old }()
+	ReachableEndPoint = func(ip string) bool {
+		if ip == "192.168.1.1:3260" || ip == "192.168.1.2:3260" {
+			return true
+		}
+		return false
+	}
 	nodeSvc.SetArrays(arrays)
 	nodeSvc.SetDefaultArray(arrays[firstValidIP])
 }
@@ -2974,6 +2981,38 @@ var _ = Describe("CSINodeService", func() {
 							common.Name + "/" + firstValidIP + "-nfs":   "true",
 							common.Name + "/" + firstValidIP + "-iscsi": "true",
 							common.Name + "/" + secondValidIP + "-nfs":  "true",
+						},
+					},
+				}))
+			})
+		})
+
+		When("Portals are not discoverable", func() {
+			It("should return correct topology segments", func() {
+				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
+					Return([]gopowerstore.IPPoolAddress{
+						{
+							Address: "192.168.1.3",
+							IPPort:  gopowerstore.IPPortInstance{TargetIqn: "iqn"},
+						},
+						{
+							Address: "192.168.1.4",
+							IPPort:  gopowerstore.IPPortInstance{TargetIqn: "iqn2"},
+						},
+					}, nil)
+				conn, _ := net.Dial("udp", "127.0.0.1:80")
+				fsMock.On("NetDial", mock.Anything).Return(
+					conn,
+					nil,
+				)
+				res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
+				Expect(err).To(BeNil())
+				Expect(res).To(Equal(&csi.NodeGetInfoResponse{
+					NodeId: nodeSvc.nodeID,
+					AccessibleTopology: &csi.Topology{
+						Segments: map[string]string{
+							common.Name + "/" + firstValidIP + "-nfs":  "true",
+							common.Name + "/" + secondValidIP + "-nfs": "true",
 						},
 					},
 				}))
