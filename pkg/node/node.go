@@ -1150,14 +1150,19 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 
 				var iscsiTargets []goiscsi.ISCSITarget
 				for _, address := range infoList {
-					// doesn't matter how many portals are present, discovering from any one will list out all targets
-					log.Info("Trying to discover iSCSI target from portal ", address.Portal)
-					iscsiTargets, err = s.iscsiLib.DiscoverTargets(address.Portal, false)
-					if err != nil {
-						log.Error("couldn't discover targets")
-						continue
+					// first check if this portal is reachable from this machine or not
+					if ReachableEndPoint(address.Portal) {
+						// doesn't matter how many portals are present, discovering from any one will list out all targets
+						log.Info("Trying to discover iSCSI target from portal ", address.Portal)
+						iscsiTargets, err = s.iscsiLib.DiscoverTargets(address.Portal, false)
+						if err != nil {
+							log.Error("couldn't discover targets")
+							continue
+						}
+						break
+					} else {
+						log.Debugf("Portal %s is not rechable from the node", address.Portal)
 					}
-					break
 				}
 				// login is also performed as a part of ConnectVolume by using dynamically created chap credentials, In case if it fails here
 				if len(iscsiTargets) > 0 {
@@ -1165,13 +1170,24 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 				}
 				loginToAtleastOneTarget := false
 				for _, target := range iscsiTargets {
-					log.Info("Logging to Iscsi target ", target)
-					err = s.iscsiLib.PerformLogin(target)
-					if err != nil {
-						log.Errorf("couldn't connect to the iscsi target")
-						continue
+					if ReachableEndPoint(target.Portal) {
+						log.Info("Logging to Iscsi target ", target)
+						if s.opts.EnableCHAP {
+							log.Debug("Setting CHAP Credentials before login")
+							err = s.iscsiLib.SetCHAPCredentials(target, s.opts.CHAPUsername, s.opts.CHAPPassword)
+							if err != nil {
+								log.Errorf("couldn't connect to the iscsi target")
+							}
+						}
+						err = s.iscsiLib.PerformLogin(target)
+						if err != nil {
+							log.Errorf("couldn't connect to the iscsi target")
+							continue
+						}
+						loginToAtleastOneTarget = true
+					} else {
+						log.Debugf("Target's Portal %s is not rechable from the node ", target.Portal)
 					}
-					loginToAtleastOneTarget = true
 				}
 
 				if !loginToAtleastOneTarget {
@@ -1358,8 +1374,8 @@ func (s *Service) setupHost(initiators []string, client gopowerstore.Client, arr
 		if err != nil {
 			return err
 		}
-
-		if s.opts.EnableCHAP && len(h.Initiators) > 0 && h.Initiators[0].ChapSingleUsername == "" {
+		if s.opts.EnableCHAP && len(h.Initiators) > 0 && (h.Initiators[0].ChapSingleUsername == "" || h.Initiators[0].ChapSingleUsername == "admin") {
+			log.Debug("CHAP was enabled earlier, modifying credentials")
 			err := s.modifyHostInitiators(context.Background(), h.ID, client, nil, nil, initiators)
 			if err != nil {
 				return fmt.Errorf("can't modify initiators CHAP credentials %s", err.Error())
@@ -1382,7 +1398,7 @@ func (s *Service) setupHost(initiators []string, client gopowerstore.Client, arr
 			for _, rI := range reqInitiators {
 				if hI.PortName == *rI.PortName && hI.PortType == *rI.PortType {
 					log.Info("Found existing host ", h.Name, hI.PortName, hI.PortType)
-					updateCHAP = s.opts.EnableCHAP && hI.ChapSingleUsername == ""
+					updateCHAP = s.opts.EnableCHAP && (hI.ChapSingleUsername == "" || hI.ChapSingleUsername == "admin")
 					found = true
 					break
 				}
