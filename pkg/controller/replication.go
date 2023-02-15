@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/dell/csi-powerstore/pkg/array"
+	"github.com/dell/csi-powerstore/v2/pkg/array"
 	csiext "github.com/dell/dell-csi-extensions/replication"
 	"github.com/dell/gopowerstore"
 	log "github.com/sirupsen/logrus"

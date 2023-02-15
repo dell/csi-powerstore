@@ -29,7 +29,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/dell/csi-powerstore/pkg/common"
+	"github.com/dell/csi-powerstore/v2/pkg/common"
 )
 
 // QueryArrayStatus make API call to the specified url to retrieve connection status

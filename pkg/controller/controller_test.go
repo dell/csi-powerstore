@@ -28,13 +28,13 @@ import (
 
 	csiext "github.com/dell/dell-csi-extensions/replication"
 
-	"github.com/dell/csi-powerstore/mocks"
-	"github.com/dell/csi-powerstore/pkg/controller"
+	"github.com/dell/csi-powerstore/v2/mocks"
+	"github.com/dell/csi-powerstore/v2/pkg/controller"
 	csictx "github.com/dell/gocsi/context"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/dell/csi-powerstore/pkg/array"
-	"github.com/dell/csi-powerstore/pkg/common"
+	"github.com/dell/csi-powerstore/v2/pkg/array"
+	"github.com/dell/csi-powerstore/v2/pkg/common"
 	"github.com/dell/gopowerstore"
 	"github.com/dell/gopowerstore/api"
 	gopowerstoremock "github.com/dell/gopowerstore/mocks"

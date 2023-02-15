@@ -21,7 +21,7 @@ package identity
 import (
 	"context"
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/dell/csi-powerstore/pkg/common"
+	"github.com/dell/csi-powerstore/v2/pkg/common"
 	"github.com/golang/protobuf/ptypes/wrappers"
 	. "github.com/onsi/ginkgo"
 	"github.com/onsi/ginkgo/reporters"

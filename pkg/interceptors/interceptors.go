@@ -28,8 +28,8 @@ import (
 
 	"github.com/akutz/gosync"
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/dell/csi-powerstore/pkg/common"
-	controller "github.com/dell/csi-powerstore/pkg/controller"
+	"github.com/dell/csi-powerstore/v2/pkg/common"
+	controller "github.com/dell/csi-powerstore/v2/pkg/controller"
 	"github.com/dell/gocsi/middleware/serialvolume"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"

@@ -1,4 +1,4 @@
-module github.com/dell/csi-powerstore
+module github.com/dell/csi-powerstore/v2
 
 go 1.20
 

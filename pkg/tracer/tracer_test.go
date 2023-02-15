@@ -20,7 +20,7 @@ package tracer
 
 import (
 	"errors"
-	"github.com/dell/csi-powerstore/mocks"
+	"github.com/dell/csi-powerstore/v2/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/uber/jaeger-client-go/config"
 	"testing"

@@ -26,8 +26,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dell/csi-powerstore/pkg/array"
-	"github.com/dell/csi-powerstore/pkg/common"
+	"github.com/dell/csi-powerstore/v2/pkg/array"
+	"github.com/dell/csi-powerstore/v2/pkg/common"
 	"github.com/dell/gopowerstore"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
