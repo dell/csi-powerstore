@@ -9,7 +9,7 @@ require (
 	github.com/dell/csi-metadata-retriever v1.2.1-0.20230214081422-e2f677fae86d
 	github.com/dell/dell-csi-extensions/common v1.1.0
 	github.com/dell/dell-csi-extensions/podmon v1.1.1
-	github.com/dell/dell-csi-extensions/replication v1.2.0
+	github.com/dell/dell-csi-extensions/replication v1.2.2-0.20230112204455-8f3445ef5483
 	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.2.2-0.20220823070737-c80a2164070b
 	github.com/dell/gobrick v1.6.1-0.20230214105503-1d11125e5822
 	github.com/dell/gocsi v1.6.0
