@@ -100,7 +100,7 @@ func setVolumeCreateAttributes(reqParams map[string]string, createParams *gopowe
 		createParams.PerformancePolicyID = performancePolicyID
 	}
 	if appType, ok := reqParams["app_type"]; ok {
-		createParams.AppType = appType
+		createParams.AppType = gopowerstore.AppTypeEnum(appType)
 		if appTypeOther, ok := reqParams["app_type_other"]; ok {
 			createParams.AppTypeOther = appTypeOther
 		}

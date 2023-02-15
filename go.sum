@@ -124,6 +124,8 @@ github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/dell/csi-metadata-retriever v1.2.0 h1:A7fmlREheZyKOTQSyfOlx7itKLsNRnx0lAm0avlAneA=
 github.com/dell/csi-metadata-retriever v1.2.0/go.mod h1:k5Jgaja0avn8EvaWS5pK31+cwPoFWwI3H9R3kugI0IE=
+github.com/dell/csi-metadata-retriever v1.2.1-0.20230214081422-e2f677fae86d h1:PnA36P/CiHNA6tZULsTQkJX6UXqRXIPurXtHxzXkLmQ=
+github.com/dell/csi-metadata-retriever v1.2.1-0.20230214081422-e2f677fae86d/go.mod h1:rr6XKY6PFP4XCAGbntwCHgMkY/BQlDFSiPFISLmMTmI=
 github.com/dell/dell-csi-extensions/common v1.1.0 h1:BFWoXdAennOs+fFiYqsGo02AU27YEYT4jT7YKjWghnw=
 github.com/dell/dell-csi-extensions/common v1.1.0/go.mod h1:x68COjv2yqphSmGWZDPV9WcBENA9+e8v21aGFO5i3PQ=
 github.com/dell/dell-csi-extensions/podmon v1.1.1 h1:AIFHmVscJInpADaJyXMuvpHZKAhLpQhD+7dFHjHKdjI=
@@ -132,8 +134,8 @@ github.com/dell/dell-csi-extensions/replication v1.2.2-0.20230112204455-8f3445ef
 github.com/dell/dell-csi-extensions/replication v1.2.2-0.20230112204455-8f3445ef5483/go.mod h1:FU2kzS8/29GlK9iCdS+E70cyeWun63eNP44aHwg7jW8=
 github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.2.2-0.20220823070737-c80a2164070b h1:PIKiU3qwTIUb4vSLUghB3hsgbuRUA84jaePt/Ds8r5c=
 github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.2.2-0.20220823070737-c80a2164070b/go.mod h1:etLWwS1G2IqHDuArHqB0OWQvpdcztuBxopWrRE+mpk0=
-github.com/dell/gobrick v1.6.0 h1:U0bfvCVaSCAm3LCoMULY4LOoG9ovrLj8dorwejU/wig=
-github.com/dell/gobrick v1.6.0/go.mod h1:xufugWfQbeLmHP16HKV1mkluR2DTYgeQD9V8KLG28oo=
+github.com/dell/gobrick v1.6.1-0.20230214105503-1d11125e5822 h1:6Uri9/0qnOgTl9gxamD0EilGKe3nZJ7YfUI2XKfX0j4=
+github.com/dell/gobrick v1.6.1-0.20230214105503-1d11125e5822/go.mod h1:1eVfrMCKAjPApv4jQG4RLl8FP+rkw8mx9icwb+ovuEg=
 github.com/dell/gocsi v1.6.0 h1:ZmoMi17v1jK0RE0OGEivu52/RqHbOhP5cqs9SHExqa0=
 github.com/dell/gocsi v1.6.0/go.mod h1:+ihwgNYeFTv69Ym2X2Ij1idK72JYoNR8CeiWYJrrbho=
 github.com/dell/gofsutil v1.11.1-0.20230203082314-2f3fce6920eb h1:HgZ92sK/McbpMvDq0HrUo64JVBBIw0ejY4Ep6DtS5Nk=
@@ -142,8 +144,8 @@ github.com/dell/goiscsi v1.6.1-0.20230120052643-7d7bb9515e01 h1:ckHXgbSn8QeWDtTf
 github.com/dell/goiscsi v1.6.1-0.20230120052643-7d7bb9515e01/go.mod h1:hNS7UZhjblSykVRHPv8slHNL2RdbR/1rtfKOckld598=
 github.com/dell/gonvme v1.3.0 h1:IkcZLesdBWKomawZkO2sI1H41xG7lLxHQtanx/Wyku4=
 github.com/dell/gonvme v1.3.0/go.mod h1:qVUW4Z4ijkD5xXyn1Fl3h8pMcMBH+GjrvZy4OsQNRYs=
-github.com/dell/gopowerstore v1.10.0 h1:okxWFIsAo5FHlJCJ6Hrmi2+h1wJLiiwq6hgwbzl4XW0=
-github.com/dell/gopowerstore v1.10.0/go.mod h1:lRtAas+0ZNx97T8nC8b5uPrxrIc1qYIzX6ORjb7J8mQ=
+github.com/dell/gopowerstore v1.10.1-0.20230215101224-20f0d2bcc20b h1:9MQd+f8GrJUJPi1rToUGr1RO9cYbrC9X37cBVmY95NM=
+github.com/dell/gopowerstore v1.10.1-0.20230215101224-20f0d2bcc20b/go.mod h1:d5OP8ZaRcZ65GTkUuZHLGa0IFgRdA3vF4i6JccfHBYE=
 github.com/dgrijalva/jwt-go v3.2.0+incompatible/go.mod h1:E3ru+11k8xSBh+hMPgOLZmtrrCbhqsmaPHjLKYnJCaQ=
 github.com/dgryski/go-sip13 v0.0.0-20181026042036-e10d5fee7954/go.mod h1:vAd38F8PWV+bWy6jNmig1y/TA+kYO4g3RSRF0IAv0no=
 github.com/docopt/docopt-go v0.0.0-20180111231733-ee0de3bc6815/go.mod h1:WwZ+bS3ebgob9U8Nd0kOddGdZWjyMGR8Wziv+TBNwSE=
@@ -557,8 +559,9 @@ go.etcd.io/etcd/client/pkg/v3 v3.5.4 h1:lrneYvz923dvC14R54XcA7FXoZ3mlGZAgmwhfm7H
 go.etcd.io/etcd/client/pkg/v3 v3.5.4/go.mod h1:IJHfcCEKxYu1Os13ZdwCwIUTUVGYTSAM3YSwc9/Ac1g=
 go.etcd.io/etcd/client/v3 v3.5.4 h1:p83BUL3tAYS0OT/r0qglgc3M1JjhM0diV8DSWAhVXv4=
 go.etcd.io/etcd/client/v3 v3.5.4/go.mod h1:ZaRkVgBZC+L+dLCjTcF1hRXpgZXQPOvnA/Ak/gq3kiY=
-go.mongodb.org/mongo-driver v1.10.0 h1:UtV6N5k14upNp4LTduX0QCufG124fSu25Wz9tu94GLg=
 go.mongodb.org/mongo-driver v1.10.0/go.mod h1:wsihk0Kdgv8Kqu1Anit4sfK+22vSFbUrAVEYRhCXrA8=
+go.mongodb.org/mongo-driver v1.11.2 h1:+1v2rDQUWNcGW7/7E0Jvdz51V38XXxJfhzbV17aNHCw=
+go.mongodb.org/mongo-driver v1.11.2/go.mod h1:s7p5vEtfbeR1gYi6pnj3c3/urpbLv2T5Sfd6Rp2HBB8=
 go.opencensus.io v0.21.0/go.mod h1:mSImk1erAIZhrmZN+AvHh14ztQfjbGwt4TtuofqLduU=
 go.opencensus.io v0.22.0/go.mod h1:+kGneAE2xo2IficOXnaByMWTGM9T73dGwxeWcUqIpI8=
 go.opencensus.io v0.22.2/go.mod h1:yxeiOL68Rb0Xd1ddK5vPZ/oVn4vY4Ynel7k9FzqtOIw=
