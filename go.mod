@@ -6,17 +6,17 @@ require (
 	github.com/akutz/gosync v0.1.0
 	github.com/apparentlymart/go-cidr v1.1.0
 	github.com/container-storage-interface/spec v1.5.0
-	github.com/dell/csi-metadata-retriever v1.2.0
+	github.com/dell/csi-metadata-retriever v1.2.1-0.20230214081422-e2f677fae86d
 	github.com/dell/dell-csi-extensions/common v1.1.0
 	github.com/dell/dell-csi-extensions/podmon v1.1.1
-	github.com/dell/dell-csi-extensions/replication v1.2.0
+	github.com/dell/dell-csi-extensions/replication v1.2.2-0.20230112204455-8f3445ef5483
 	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.2.2-0.20220823070737-c80a2164070b
-	github.com/dell/gobrick v1.6.0
+	github.com/dell/gobrick v1.6.1-0.20230214105503-1d11125e5822
 	github.com/dell/gocsi v1.6.0
 	github.com/dell/gofsutil v1.11.1-0.20230203082314-2f3fce6920eb
 	github.com/dell/goiscsi v1.6.1-0.20230120052643-7d7bb9515e01
 	github.com/dell/gonvme v1.3.0
-	github.com/dell/gopowerstore v1.10.0
+	github.com/dell/gopowerstore v1.10.1-0.20230215101224-20f0d2bcc20b
 	github.com/fsnotify/fsnotify v1.5.4
 	github.com/go-openapi/strfmt v0.21.3
 	github.com/golang/mock v1.6.0
@@ -86,7 +86,7 @@ require (
 	go.etcd.io/etcd/api/v3 v3.5.4 // indirect
 	go.etcd.io/etcd/client/pkg/v3 v3.5.4 // indirect
 	go.etcd.io/etcd/client/v3 v3.5.4 // indirect
-	go.mongodb.org/mongo-driver v1.10.0 // indirect
+	go.mongodb.org/mongo-driver v1.11.2 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/multierr v1.8.0 // indirect
 	go.uber.org/zap v1.21.0 // indirect
