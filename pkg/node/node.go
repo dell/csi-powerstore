@@ -73,9 +73,10 @@ type Service struct {
 	nvmeConnector  NVMEConnector
 	iscsiLib       goiscsi.ISCSIinterface
 	nvmeLib        gonvme.NVMEinterface
-
-	opts   Opts
-	nodeID string
+	iscsiTargets   map[string][]string
+	nvmeTargets    map[string][]string
+	opts           Opts
+	nodeID         string
 
 	useFC                  bool
 	useNVME                bool
@@ -100,7 +101,8 @@ func (s *Service) Init() error {
 	if err != nil {
 		return fmt.Errorf("can't update node id: %s", err.Error())
 	}
-
+	s.iscsiTargets = make(map[string][]string)
+	s.nvmeTargets = make(map[string][]string)
 	iscsiInitiators, fcInitiators, nvmeInitiators, err := s.getInitiators()
 	if err != nil {
 		return fmt.Errorf("can't get initiators of the node: %s", err.Error())
@@ -1063,6 +1065,8 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 									log.Errorf("couldn't connect to NVMeFC target")
 								} else {
 									nvmefcConnectCount = nvmefcConnectCount + 1
+									otherTargets := s.nvmeTargets[arr.GlobalID]
+									s.nvmeTargets[arr.GlobalID] = append(otherTargets, target.TargetNqn)
 								}
 							}
 						}
@@ -1096,6 +1100,8 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 							log.Errorf("couldn't connect to the nvme target")
 							continue
 						}
+						otherTargets := s.nvmeTargets[arr.GlobalID]
+						s.nvmeTargets[arr.GlobalID] = append(otherTargets, target.TargetNqn)
 						loginToAtleastOneTarget = true
 					}
 					if loginToAtleastOneTarget {
@@ -1184,6 +1190,8 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 							log.Errorf("couldn't connect to the iscsi target")
 							continue
 						}
+						otherTargets := s.iscsiTargets[arr.GlobalID]
+						s.iscsiTargets[arr.GlobalID] = append(otherTargets, target.Target)
 						loginToAtleastOneTarget = true
 					} else {
 						log.Debugf("Target's Portal %s is not rechable from the node ", target.Portal)
