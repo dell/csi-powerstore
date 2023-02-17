@@ -17,7 +17,7 @@
 # Dockerfile to build PowerStore CSI Driver
 # based on UBI-minimal image
 # Requires: RHEL host with subscription
-# UBI Image: ubi8/ubi-minimal:8.6-994
+# UBI Image: ubi8/ubi-minimal:8.7-1049.1675784874
 FROM registry.access.redhat.com/ubi8/ubi-minimal@sha256:0214a28336e387c66493c61bb394e86a18f3bea8dbc46de74a26f173ff553c89
 
 LABEL vendor="Dell Inc." \
