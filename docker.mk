@@ -34,7 +34,7 @@ ifndef DOCKER_IMAGE_NAME
 endif
 
 ifndef BASEIMAGE
-	BASEIMAGE=ubi-minimal:8.6-994
+	BASEIMAGE=ubi-minimal:8.7-1049.1675784874
 endif
 
 # figure out if podman or docker should be used (use podman if found)
