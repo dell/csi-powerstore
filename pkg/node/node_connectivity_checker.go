@@ -28,6 +28,8 @@ import (
 
 	"github.com/dell/csi-powerstore/v2/pkg/array"
 	"github.com/dell/csi-powerstore/v2/pkg/common"
+	"github.com/dell/goiscsi"
+	"github.com/dell/gonvme"
 	"github.com/dell/gopowerstore"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
@@ -222,20 +224,55 @@ func (s *Service) nodeProbe(timeOutCtx context.Context, array *array.PowerStoreA
 		return err
 	}
 
-	log.Debugf("Successfully got Host for %s", array.GlobalID)
-
-	for _, initiator := range host.Initiators {
-		if len(initiator.ActiveSessions) > 0 {
-			// In case we had set useNFS as true when no ISCSI session was established in NodeGetInfo
-			if s.useNFS {
-				s.useNFS = false
+	log.Debugf("Successfully got Host on %s", array.GlobalID)
+	// check if nvme sessions are active
+	if s.useNVME {
+		log.Debugf("Checking if nvme sessions are active on node or not")
+		sessions, _ := s.nvmeLib.GetSessions()
+		for _, target := range s.nvmeTargets[array.GlobalID] {
+			for _, session := range sessions {
+				log.Debugf("matching %v with %v", target, session)
+				if session.Target == target && session.NVMESessionState == gonvme.NVMESessionStateLive {
+					if s.useNFS {
+						s.useNFS = false
+					}
+					return nil
+				}
 			}
-			return nil
-		} else if s.useNFS {
-			log.Infof("Host Entry found but failed to login to nvme/iscsi target, seems to be this worker has only NFS")
+		}
+		if s.useNFS {
+			log.Infof("Host Entry found but failed to login to nvme target, seems to be this worker has only NFS")
 			return nil
 		}
+		return fmt.Errorf("no active nvme sessions")
+	} else if s.useFC {
+		log.Debugf("Checking if FC sessions are active on node or not")
+		for _, initiator := range host.Initiators {
+			if len(initiator.ActiveSessions) > 0 {
+				return nil
+			}
+		}
+		return fmt.Errorf("no active fc sessions")
+	} else {
+		// check if iscsi sessions are active
+		// if !s.useNVME && !s.useFC {
+		log.Debugf("Checking if iscsi sessions are active on node or not")
+		sessions, _ := s.iscsiLib.GetSessions()
+		for _, target := range s.iscsiTargets[array.GlobalID] {
+			for _, session := range sessions {
+				log.Debugf("matching %v with %v", target, session)
+				if session.Target == target && session.ISCSISessionState == goiscsi.ISCSISessionStateLOGGEDIN {
+					if s.useNFS {
+						s.useNFS = false
+					}
+					return nil
+				}
+			}
+		}
+		if s.useNFS {
+			log.Infof("Host Entry found but failed to login to iscsi target, seems to be this worker has only NFS")
+			return nil
+		}
+		return fmt.Errorf("no active iscsi sessions")
 	}
-	log.Errorf("initiators for the host is not present")
-	return fmt.Errorf("initiators for the host is not present")
 }
