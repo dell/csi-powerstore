@@ -107,12 +107,12 @@ func (s *Service) Init() error {
 	if err != nil {
 		return fmt.Errorf("can't get initiators of the node: %s", err.Error())
 	}
-	
+
 	if isPodmonEnabled, ok := csictx.LookupEnv(ctx, common.EnvPodmonEnabled); ok {
 		// in case of any error in reading/parsing the env variable default value will be false
 		s.isPodmonEnabled, _ = strconv.ParseBool(isPodmonEnabled)
 	}
-	
+
 	if len(iscsiInitiators) == 0 && len(fcInitiators) == 0 && len(nvmeInitiators) == 0 {
 		s.useNFS = true
 		go s.startAPIService(ctx)
