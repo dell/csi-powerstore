@@ -110,6 +110,10 @@ func (s *Service) Init() error {
 
 	if len(iscsiInitiators) == 0 && len(fcInitiators) == 0 && len(nvmeInitiators) == 0 {
 		s.useNFS = true
+		if isPodmonEnabled, ok := csictx.LookupEnv(ctx, common.EnvPodmonEnabled); ok {
+			// in case of any error in reading/parsing the env variable default value will be false
+			s.isPodmonEnabled, _ = strconv.ParseBool(isPodmonEnabled)
+		}
 		go s.startAPIService(ctx)
 		return nil
 	}
