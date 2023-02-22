@@ -110,6 +110,7 @@ func (s *Service) Init() error {
 
 	if len(iscsiInitiators) == 0 && len(fcInitiators) == 0 && len(nvmeInitiators) == 0 {
 		s.useNFS = true
+		go s.startAPIService(ctx)
 		return nil
 	}
 
