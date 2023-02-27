@@ -206,7 +206,7 @@ func GetIPListWithMaskFromString(input string) (string, error) {
 	// Split the IP address and subnet mask if present
 	parts := strings.Split(input, "/")
 	ip := parts[0]
-	result := net.ParseIP(parts[0])
+	result := net.ParseIP(ip)
 	if result == nil {
 		return "", errors.New("doesn't seem to be a valid IP")
 	}
