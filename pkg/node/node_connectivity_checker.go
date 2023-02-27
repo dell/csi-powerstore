@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -225,6 +226,7 @@ func (s *Service) nodeProbe(timeOutCtx context.Context, array *array.PowerStoreA
 	}
 
 	log.Debugf("Successfully got Host on %s", array.GlobalID)
+	s.populateTargetsInCache(array)
 	// check if nvme sessions are active
 	if s.useNVME {
 		log.Debugf("Checking if nvme sessions are active on node or not")
@@ -274,5 +276,82 @@ func (s *Service) nodeProbe(timeOutCtx context.Context, array *array.PowerStoreA
 			return nil
 		}
 		return fmt.Errorf("no active iscsi sessions")
+	}
+}
+
+// populateTargetsInCache checks if nvmeTargets or iscsiTargets in cache is empty, try to fetch the targets from array and populate the cache
+func (s *Service) populateTargetsInCache(array *array.PowerStoreArray) {
+	// if nvmeTargets in cache is empty
+	if s.useNVME {
+		if len(s.nvmeTargets[array.GlobalID]) == 0 {
+			// for NVMeFC
+			if s.useFC {
+				nvmefcInfo, err := common.GetNVMEFCTargetInfoFromStorage(array.GetClient(), "")
+				if err != nil {
+					log.Errorf("couldn't get targets from the array: %s", err.Error())
+					return
+				}
+				for _, info := range nvmefcInfo {
+					NVMeFCTargets, err := s.nvmeLib.DiscoverNVMeFCTargets(info.Portal, false)
+					if err != nil {
+						log.Errorf("couldn't discover NVMeFC targets")
+						continue
+					} else {
+						for _, target := range NVMeFCTargets {
+							otherTargets := s.nvmeTargets[array.GlobalID]
+							s.nvmeTargets[array.GlobalID] = append(otherTargets, target.TargetNqn)
+						}
+					}
+				}
+			} else {
+				infoList, err := common.GetISCSITargetsInfoFromStorage(array.GetClient(), "")
+				if err != nil {
+					log.Errorf("couldn't get targets from array: %s", err.Error())
+					return
+				}
+				var nvmeTargets []gonvme.NVMeTarget
+				for _, address := range infoList {
+					nvmeIP := strings.Split(address.Portal, ":")
+					log.Info("Trying to discover NVMe target from portal ", nvmeIP[0])
+					nvmeTargets, err = s.nvmeLib.DiscoverNVMeTCPTargets(nvmeIP[0], false)
+					if err != nil {
+						log.Error("couldn't discover targets")
+						continue
+					}
+					break
+				}
+				for _, target := range nvmeTargets {
+					otherTargets := s.nvmeTargets[array.GlobalID]
+					s.nvmeTargets[array.GlobalID] = append(otherTargets, target.TargetNqn)
+				}
+			}
+		}
+	} else if !s.useNVME && !s.useFC {
+		infoList, err := common.GetISCSITargetsInfoFromStorage(array.GetClient(), "")
+		if err != nil {
+			log.Errorf("couldn't get targets from array: %s", err.Error())
+			return
+		}
+
+		var iscsiTargets []goiscsi.ISCSITarget
+		for _, address := range infoList {
+			// first check if this portal is reachable from this machine or not
+			if ReachableEndPoint(address.Portal) {
+				// doesn't matter how many portals are present, discovering from any one will list out all targets
+				log.Info("Trying to discover iSCSI target from portal ", address.Portal)
+				iscsiTargets, err = s.iscsiLib.DiscoverTargets(address.Portal, false)
+				if err != nil {
+					log.Error("couldn't discover targets")
+					continue
+				}
+				break
+			} else {
+				log.Debugf("Portal %s is not rechable from the node", address.Portal)
+			}
+		}
+		for _, target := range iscsiTargets {
+			otherTargets := s.iscsiTargets[array.GlobalID]
+			s.iscsiTargets[array.GlobalID] = append(otherTargets, target.Target)
+		}
 	}
 }
