@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2021-2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -203,18 +203,35 @@ func parseMask(ipaddr string) (mask string, err error) {
 // GetIPListWithMaskFromString returns ip and mask in string form found in input string
 // A return value of nil indicates no match
 func GetIPListWithMaskFromString(input string) (string, error) {
-	re := regexp.MustCompile(`^([01]?\d\d?|2[0-4]\d|25[0-5])(?:\.(?:[01]?\d\d?|2[0-4]\d|25[0-5])){3}(?:/[0-2]\d|/3[0-2])?$`)
-	validated := re.FindAllString(input, 1)
-	if validated != nil {
-		mask, err := parseMask(validated[0])
-		if err != nil {
-			return validated[0], nil
-		}
-		if i := strings.Index(input, "/"); i != -1 {
-			return validated[0][:i+1] + mask, nil
-		}
+	// Split the IP address and subnet mask if present
+	parts := strings.Split(input, "/")
+	ip := parts[0]
+	result := net.ParseIP(parts[0])
+	if result == nil {
+		return "", errors.New("doesn't seem to be a valid IP")
 	}
-	return "", errors.New("doesn't seem to be a valid IP")
+	if len(parts) > 1 {
+		mask := "32" // Default subnet mask
+		// Check if subnet mask is present
+		mask = parts[1]
+		// ideally there will be only 2 substrings for a valid IP/SubnetMask
+		if len(parts) > 2 {
+			return "", errors.New("doesn't seem to be a valid IP")
+		}
+
+		// Convert subnet mask to integer
+		maskInt, err := strconv.Atoi(mask)
+		if err != nil {
+			return "", errors.New("Invalid subnet mask")
+		}
+		// Check if subnet mask is valid
+		if maskInt < 0 || maskInt > 32 {
+			return "", errors.New("Invalid subnet mask")
+		}
+		mask, _ = parseMask(input)
+		ip = ip + "/" + mask
+	}
+	return ip, nil
 }
 
 // SetLogFields returns modified context with fields inserted as values by using contextLogFieldsKey key
