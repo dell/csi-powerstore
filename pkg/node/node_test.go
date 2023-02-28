@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2021-2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -634,6 +634,8 @@ var _ = Describe("CSINodeService", func() {
 					}, nil)
 
 				arrays := getTestArrays()
+				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
+					Return([]gopowerstore.IPPoolAddress{}, nil)
 				err := nodeSvc.nodeProbe(context.Background(), arrays["gid1"])
 
 				Expect(err.Error()).To(ContainSubstring("no active iscsi sessions"))
@@ -653,6 +655,8 @@ var _ = Describe("CSINodeService", func() {
 
 				arrays := getTestArrays()
 				nodeSvc.useNVME = true
+				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
+					Return([]gopowerstore.IPPoolAddress{}, nil)
 				err := nodeSvc.nodeProbe(context.Background(), arrays["gid1"])
 				nodeSvc.useNVME = false
 				Expect(err.Error()).To(ContainSubstring("no active nvme sessions"))
@@ -673,6 +677,8 @@ var _ = Describe("CSINodeService", func() {
 							}},
 						Name: "host-name",
 					}, nil)
+				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
+					Return([]gopowerstore.IPPoolAddress{}, nil)
 				nodeSvc.useNFS = true
 				arrays := getTestArrays()
 				err := nodeSvc.nodeProbe(context.Background(), arrays["gid1"])
@@ -695,6 +701,8 @@ var _ = Describe("CSINodeService", func() {
 							}},
 						Name: "host-name",
 					}, nil)
+				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
+					Return([]gopowerstore.IPPoolAddress{}, nil)
 				nodeSvc.useNFS = true
 				nodeSvc.useNVME = true
 				arrays := getTestArrays()
@@ -733,7 +741,8 @@ var _ = Describe("CSINodeService", func() {
 							}},
 						Name: "host-name",
 					}, nil)
-
+				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
+					Return([]gopowerstore.IPPoolAddress{}, nil)
 				arrays := getTestArrays()
 				nodeSvc.useNFS = true
 				nodeSvc.iscsiTargets["unique"] = []string{"iqn.2015-10.com.dell:dellemc-foobar-123-a-7ceb34a0"}
@@ -772,7 +781,8 @@ var _ = Describe("CSINodeService", func() {
 							}},
 						Name: "host-name",
 					}, nil)
-
+				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
+					Return([]gopowerstore.IPPoolAddress{}, nil)
 				arrays := getTestArrays()
 				nodeSvc.useNFS = true
 				nodeSvc.useNVME = true
@@ -801,7 +811,8 @@ var _ = Describe("CSINodeService", func() {
 							}},
 						Name: "host-name",
 					}, nil)
-
+				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
+					Return([]gopowerstore.IPPoolAddress{}, nil)
 				arrays := getTestArrays()
 				err := nodeSvc.nodeProbe(context.Background(), arrays["gid1"])
 				Expect(err.Error()).To(ContainSubstring("no active iscsi sessions"))
