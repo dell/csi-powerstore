@@ -203,7 +203,7 @@ func parseMask(ipaddr string) (mask string, err error) {
 // GetIPListWithMaskFromString returns ip and mask in string form found in input string
 // A return value of nil indicates no match
 func GetIPListWithMaskFromString(input string) (string, error) {
-	// Split the IP address and subnet mask if present
+	//Split the IP address and subnet mask if present
 	parts := strings.Split(input, "/")
 	ip := parts[0]
 	result := net.ParseIP(ip)
@@ -211,24 +211,14 @@ func GetIPListWithMaskFromString(input string) (string, error) {
 		return "", errors.New("doesn't seem to be a valid IP")
 	}
 	if len(parts) > 1 {
-		mask := "32" // Default subnet mask
-		// Check if subnet mask is present
-		mask = parts[1]
 		// ideally there will be only 2 substrings for a valid IP/SubnetMask
 		if len(parts) > 2 {
 			return "", errors.New("doesn't seem to be a valid IP")
 		}
-
-		// Convert subnet mask to integer
-		maskInt, err := strconv.Atoi(mask)
+		mask, err := parseMask(input)
 		if err != nil {
-			return "", errors.New("Invalid subnet mask")
+			return "", errors.New("doesn't seem to be a valid IP")
 		}
-		// Check if subnet mask is valid
-		if maskInt < 0 || maskInt > 32 {
-			return "", errors.New("Invalid subnet mask")
-		}
-		mask, _ = parseMask(input)
 		ip = ip + "/" + mask
 	}
 	return ip, nil
