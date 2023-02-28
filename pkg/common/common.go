@@ -184,6 +184,9 @@ func parseMask(ipaddr string) (mask string, err error) {
 	if err != nil {
 		return "", errors.New("Parse Mask: Error parsing mask")
 	}
+	if subnet < 0 || subnet > 32 {
+		return "", errors.New("Invalid subnet mask")
+	}
 	var buff bytes.Buffer
 	for i := 0; i < int(subnet); i++ {
 		buff.WriteString("1")
@@ -203,7 +206,7 @@ func parseMask(ipaddr string) (mask string, err error) {
 // GetIPListWithMaskFromString returns ip and mask in string form found in input string
 // A return value of nil indicates no match
 func GetIPListWithMaskFromString(input string) (string, error) {
-	//Split the IP address and subnet mask if present
+	// Split the IP address and subnet mask if present
 	parts := strings.Split(input, "/")
 	ip := parts[0]
 	result := net.ParseIP(ip)
