@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2021-2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"reflect"
 	"testing"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
@@ -328,6 +329,102 @@ func Test_setAPIPort(t *testing.T) {
 			common.SetAPIPort(tt.args.ctx)
 			if common.APIPort != ":8083" {
 				t.Errorf("setAPIPort() error, want 8083 port found %v", common.APIPort)
+			}
+		})
+	}
+}
+
+func TestRandomString(t *testing.T) {
+	type args struct {
+		len int
+	}
+	tests := []struct {
+		name string
+		args args
+	}{
+		{"Generating some random string", args{len: 5}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Since each byte in the slice is represented by two hex characters in the resulting string, the length of the string returned by the function will be len * 2.
+			if got := common.RandomString(tt.args.len); len(got) != 5*2 {
+				t.Errorf("RandomString() = %v, have len %d and want 5*2", got, len(got))
+			}
+		})
+	}
+}
+
+func TestGetIPListWithMaskFromString(t *testing.T) {
+	type args struct {
+		input string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    string
+		wantErr bool
+	}{
+		{"Valid IP without subnet mask, Test 1", args{input: "10.1.1.2"}, "10.1.1.2", false},
+		{"Invalid IP without subnet maskTest 2", args{input: "10.256.1.2"}, "", true},
+		{"Invalid IP with subnet mask, Test 3", args{input: "10.256.1.2/24"}, "", true},
+		{"Valid IP with subnet mask, Test 4", args{input: "10.1.1.2/24"}, "10.1.1.2/255.255.255.0", false},
+		{"Invalid IP with subnet maskTest 5", args{input: "10.256.1.2/24/25"}, "", true},
+		{"Invalid IP with Invalid subnet mask, Test 6", args{input: "10.255.1.2/24/25"}, "", true},
+		{"Invalid IP with Invalid subnet mask, Test 7", args{input: "10.255.1.2/38"}, "", true},
+		{"Invalid IP with Invalid subnet mask, Test 8", args{input: "10.255.1.2/x"}, "", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := common.GetIPListWithMaskFromString(tt.args.input)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetIPListWithMaskFromString() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("GetIPListWithMaskFromString() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGetIPListFromString(t *testing.T) {
+	type args struct {
+		input string
+	}
+	x := []string{}
+	x = nil
+	tests := []struct {
+		name string
+		args args
+		want []string
+	}{
+		{"Valid IP, Test 1", args{input: "10.255.1.2"}, []string{"10.255.1.2"}},
+		{"InValid IP, Test 2", args{input: "10.256.1.2"}, x},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := common.GetIPListFromString(tt.args.input); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("GetIPListFromString() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestReachableEndPoint(t *testing.T) {
+	type args struct {
+		endpoint string
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		{"Unreachable IP, ", args{endpoint: "10.255.1.2:100"}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := common.ReachableEndPoint(tt.args.endpoint); got != tt.want {
+				t.Errorf("ReachableEndPoint() = %v, want %v", got, tt.want)
 			}
 		})
 	}
