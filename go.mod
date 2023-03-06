@@ -7,10 +7,10 @@ require (
 	github.com/apparentlymart/go-cidr v1.1.0
 	github.com/container-storage-interface/spec v1.5.0
 	github.com/dell/csi-metadata-retriever v1.2.1-0.20230214081422-e2f677fae86d
-	github.com/dell/dell-csi-extensions/common v1.1.1-0.20230223220121-65f0c737bc34
-	github.com/dell/dell-csi-extensions/podmon v1.1.2-0.20230223220121-65f0c737bc34
-	github.com/dell/dell-csi-extensions/replication v1.2.2-0.20230223220121-65f0c737bc34
-	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.2.2-0.20230223220121-65f0c737bc34
+	github.com/dell/dell-csi-extensions/common v1.1.1
+	github.com/dell/dell-csi-extensions/podmon v1.1.2
+	github.com/dell/dell-csi-extensions/replication v1.3.0
+	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.2.2
 	github.com/dell/gobrick v1.6.1-0.20230214105503-1d11125e5822
 	github.com/dell/gocsi v1.6.0
 	github.com/dell/gofsutil v1.11.1-0.20230203082314-2f3fce6920eb
