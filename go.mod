@@ -6,17 +6,17 @@ require (
 	github.com/akutz/gosync v0.1.0
 	github.com/apparentlymart/go-cidr v1.1.0
 	github.com/container-storage-interface/spec v1.5.0
-	github.com/dell/csi-metadata-retriever v1.2.1-0.20230214081422-e2f677fae86d
-	github.com/dell/dell-csi-extensions/common v1.1.1-0.20230223220121-65f0c737bc34
-	github.com/dell/dell-csi-extensions/podmon v1.1.2-0.20230223220121-65f0c737bc34
-	github.com/dell/dell-csi-extensions/replication v1.2.2-0.20230223220121-65f0c737bc34
-	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.2.2-0.20230223220121-65f0c737bc34
-	github.com/dell/gobrick v1.6.1-0.20230214105503-1d11125e5822
-	github.com/dell/gocsi v1.6.0
-	github.com/dell/gofsutil v1.11.1-0.20230203082314-2f3fce6920eb
-	github.com/dell/goiscsi v1.6.1-0.20230303112542-aa7beac159e1
-	github.com/dell/gonvme v1.3.1-0.20230303114629-e0e7e44e0f49
-	github.com/dell/gopowerstore v1.10.1-0.20230215101224-20f0d2bcc20b
+	github.com/dell/csi-metadata-retriever v1.3.0
+	github.com/dell/dell-csi-extensions/common v1.1.1
+	github.com/dell/dell-csi-extensions/podmon v1.1.2
+	github.com/dell/dell-csi-extensions/replication v1.3.0
+	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.2.2
+	github.com/dell/gobrick v1.7.0
+	github.com/dell/gocsi v1.7.0
+	github.com/dell/gofsutil v1.12.0
+	github.com/dell/goiscsi v1.7.0
+	github.com/dell/gonvme v1.4.0
+	github.com/dell/gopowerstore v1.11.0
 	github.com/fsnotify/fsnotify v1.5.4
 	github.com/go-openapi/strfmt v0.21.3
 	github.com/golang/mock v1.6.0
@@ -27,12 +27,12 @@ require (
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.23.0
 	github.com/opentracing/opentracing-go v1.2.0
-	github.com/sirupsen/logrus v1.8.1
+	github.com/sirupsen/logrus v1.9.0
 	github.com/spf13/viper v1.12.0
 	github.com/stretchr/testify v1.8.0
 	github.com/uber/jaeger-client-go v2.30.0+incompatible
 	github.com/uber/jaeger-lib v2.4.1+incompatible
-	golang.org/x/net v0.5.0
+	golang.org/x/net v0.7.0
 	google.golang.org/grpc v1.47.0
 	gopkg.in/yaml.v3 v3.0.1
 )
@@ -92,9 +92,9 @@ require (
 	go.uber.org/zap v1.21.0 // indirect
 	golang.org/x/oauth2 v0.0.0-20220524215830-622c5d57e401 // indirect
 	golang.org/x/sync v0.0.0-20220601150217-0de741cfad7f // indirect
-	golang.org/x/sys v0.4.0 // indirect
-	golang.org/x/term v0.4.0 // indirect
-	golang.org/x/text v0.6.0 // indirect
+	golang.org/x/sys v0.6.0 // indirect
+	golang.org/x/term v0.5.0 // indirect
+	golang.org/x/text v0.7.0 // indirect
 	golang.org/x/time v0.0.0-20220411224347-583f2d630306 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20220601144221-27df5f98adab // indirect

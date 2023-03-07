@@ -164,7 +164,7 @@ controller:
     replicationPrefix: "replication.storage.dell.com"
 
   # Image for csi-metadata-retriever
-  metadataretriever: dellemc/csi-metadata-retriever:v1.2.0
+  metadataretriever: dellemc/csi-metadata-retriever:v1.3.0
 
   # nodeSelector: Define node selection constraints for controller pods.
   # For the pod to be eligible to run on a node, the node must have each
