@@ -508,12 +508,12 @@ func (s *Service) DeleteStorageProtectionGroup(ctx context.Context,
 }
 
 // TODO: implement
-func (s *Service) DeleteRemoteVolume(ctx context.Context,
-	req *csiext.DeleteRemoteVolumeRequest) (*csiext.DeleteRemoteVolumeResponse, error) {
+func (s *Service) DeleteLocalVolume(ctx context.Context,
+	req *csiext.DeleteLocalVolumeRequest) (*csiext.DeleteLocalVolumeResponse, error) {
 
-	log.Info("!!! Deleting Remote Volume !!!")
+	log.Info("!!! Deleting Local Volume !!!")
 
-	return &csiext.DeleteRemoteVolumeResponse{}, nil
+	return &csiext.DeleteLocalVolumeResponse{}, nil
 }
 
 // GetStorageProtectionGroupStatus gets storage protection group status
