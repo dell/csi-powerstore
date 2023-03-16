@@ -507,11 +507,12 @@ func (s *Service) DeleteStorageProtectionGroup(ctx context.Context,
 	return &csiext.DeleteStorageProtectionGroupResponse{}, nil
 }
 
-// TODO: implement
+// DeleteLocalVolume deletes a volume on the local storage array upon request from a remote replication controller.
 func (s *Service) DeleteLocalVolume(ctx context.Context,
 	req *csiext.DeleteLocalVolumeRequest) (*csiext.DeleteLocalVolumeResponse, error) {
+	// TODO: Implement this at the driver level.
 
-	log.Info("!!! Deleting Local Volume !!!")
+	log.Info("Deleting Local Volume " + req.VolumeHandle)
 
 	return &csiext.DeleteLocalVolumeResponse{}, nil
 }
