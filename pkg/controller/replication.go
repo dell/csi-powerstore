@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/dell/csi-powerstore/v2/pkg/array"
 	csiext "github.com/dell/dell-csi-extensions/replication"
@@ -87,10 +88,11 @@ func (s *Service) CreateRemoteVolume(ctx context.Context,
 	}
 
 	remoteParams := map[string]string{
-		"remoteSystem": localSystem.Name,
+		"remoteSystem":                                   localSystem.Name,
+		s.replicationContextPrefix + "arrayID":           remoteSystem.ID,
 		s.replicationContextPrefix + "managementAddress": remoteSystem.ManagementAddress,
 	}
-	remoteVolume := getRemoteCSIVolume(remoteVolumeID+"/"+remoteParams[s.replicationContextPrefix+"managementAddress"]+"/"+protocol, vol.Size)
+	remoteVolume := getRemoteCSIVolume(remoteVolumeID+"/"+remoteParams[s.replicationContextPrefix+"arrayID"]+"/"+protocol, vol.Size)
 	remoteVolume.VolumeContext = remoteParams
 	return &csiext.CreateRemoteVolumeResponse{
 		RemoteVolume: remoteVolume,
@@ -510,9 +512,30 @@ func (s *Service) DeleteStorageProtectionGroup(ctx context.Context,
 // DeleteLocalVolume deletes a volume on the local storage array upon request from a remote replication controller.
 func (s *Service) DeleteLocalVolume(ctx context.Context,
 	req *csiext.DeleteLocalVolumeRequest) (*csiext.DeleteLocalVolumeResponse, error) {
-	// TODO: Implement this at the driver level.
+	localParams := req.GetVolumeAttributes()
+	log.Info(" !!!!!! Local params !!!!!!")
+	log.Info(localParams)
+
+	globalID, ok := localParams["arrayID"]
+
+	if !ok {
+		return nil, status.Error(codes.InvalidArgument, "missing arrayID in volume attributes")
+	}
+
+	arr, ok := s.Arrays()[globalID]
+	if !ok {
+		return nil, status.Errorf(codes.InvalidArgument, "can't find array with global id %s", globalID)
+	}
 
 	log.Info("Deleting Local Volume " + req.VolumeHandle)
+
+	// req.VolumeHandle is of format <volumeid>/<ip address>/<protocol>. We only need the ID.
+	splitHandle := strings.Split(req.VolumeHandle, `/`)
+	volumeID := splitHandle[0]
+	_, err := arr.GetClient().DeleteVolume(ctx, nil, volumeID)
+	if apiErr, ok := err.(gopowerstore.APIError); ok && !apiErr.NotFound() {
+		return nil, status.Errorf(codes.Internal, "Error: Unable to delete volume")
+	}
 
 	return &csiext.DeleteLocalVolumeResponse{}, nil
 }

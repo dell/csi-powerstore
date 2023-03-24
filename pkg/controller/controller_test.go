@@ -3653,7 +3653,7 @@ var _ = Describe("CSIControllerService", func() {
 					Return(gopowerstore.Cluster{Name: validClusterName}, nil)
 
 				clientMock.On("GetRemoteSystem", mock.Anything, validRemoteSystemID).
-					Return(gopowerstore.RemoteSystem{Name: validRemoteSystemName, ManagementAddress: secondValidID}, nil)
+					Return(gopowerstore.RemoteSystem{Name: validRemoteSystemName, ManagementAddress: secondValidID, ID: validRemoteSystemID}, nil)
 
 				req := &csiext.CreateRemoteVolumeRequest{
 					VolumeHandle: validBaseVolID + "/" + firstValidID + "/" + "iscsi",
@@ -3665,10 +3665,11 @@ var _ = Describe("CSIControllerService", func() {
 				Expect(res).To(Equal(
 					&csiext.CreateRemoteVolumeResponse{RemoteVolume: &csiext.Volume{
 						CapacityBytes: validVolSize,
-						VolumeId:      validRemoteVolId + "/" + secondValidID + "/" + "iscsi",
+						VolumeId:      validRemoteVolId + "/" + validRemoteSystemID + "/" + "iscsi",
 						VolumeContext: map[string]string{
 							"remoteSystem":      validClusterName,
 							"managementAddress": secondValidID,
+							"arrayID":           validRemoteSystemID,
 						},
 					}}))
 
