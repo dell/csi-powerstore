@@ -89,7 +89,7 @@ func (s *Service) CreateRemoteVolume(ctx context.Context,
 
 	remoteParams := map[string]string{
 		"remoteSystem":                                   localSystem.Name,
-		s.replicationContextPrefix + "arrayID":           remoteSystem.ID,
+		s.replicationContextPrefix + "arrayID":           remoteSystem.SerialNumber,
 		s.replicationContextPrefix + "managementAddress": remoteSystem.ManagementAddress,
 	}
 	remoteVolume := getRemoteCSIVolume(remoteVolumeID+"/"+remoteParams[s.replicationContextPrefix+"arrayID"]+"/"+protocol, vol.Size)
@@ -512,31 +512,58 @@ func (s *Service) DeleteStorageProtectionGroup(ctx context.Context,
 // DeleteLocalVolume deletes a volume on the local storage array upon request from a remote replication controller.
 func (s *Service) DeleteLocalVolume(ctx context.Context,
 	req *csiext.DeleteLocalVolumeRequest) (*csiext.DeleteLocalVolumeResponse, error) {
-	localParams := req.GetVolumeAttributes()
-	log.Info(" !!!!!! Local params !!!!!!")
-	log.Info(localParams)
+	log.Info("Deleting local volume " + req.VolumeHandle + " per request from remote replication controller")
 
-	globalID, ok := localParams["arrayID"]
-
-	if !ok {
-		return nil, status.Error(codes.InvalidArgument, "missing arrayID in volume attributes")
+	// req.VolumeHandle is of format <volumeid>/<array ID>/<protocol>. We only need the IDs.
+	splitHandle := strings.Split(req.VolumeHandle, `/`)
+	if len(splitHandle) != 3 {
+		return nil, status.Errorf(codes.InvalidArgument, "can't delete volume of improper handle format")
 	}
+	volumeID := splitHandle[0]
+	globalID := splitHandle[1]
 
 	arr, ok := s.Arrays()[globalID]
 	if !ok {
 		return nil, status.Errorf(codes.InvalidArgument, "can't find array with global id %s", globalID)
 	}
 
-	log.Info("Deleting Local Volume " + req.VolumeHandle)
+	vol, err := arr.GetClient().GetVolume(ctx, volumeID)
+	if err != nil {
+		if apiError, ok := err.(gopowerstore.APIError); ok {
+			if apiError.NotFound() {
+				// volume doesn't exist, return success
+				log.Info(("Volume does not exist. It may have already been deleted."))
+				return &csiext.DeleteLocalVolumeResponse{}, nil
+			}
+		}
+		// any other error means the volume to be deleted couldn't be retrieved, return error
+		return nil, status.Errorf(codes.Internal, "Error: Unable to get volume for deletion")
+	}
 
-	// req.VolumeHandle is of format <volumeid>/<ip address>/<protocol>. We only need the ID.
-	splitHandle := strings.Split(req.VolumeHandle, `/`)
-	volumeID := splitHandle[0]
-	_, err := arr.GetClient().DeleteVolume(ctx, nil, volumeID)
-	if apiErr, ok := err.(gopowerstore.APIError); ok && !apiErr.NotFound() {
+	vgs, err := arr.GetClient().GetVolumeGroupsByVolumeID(ctx, volumeID)
+	if err != nil {
+		if apiError, ok := err.(gopowerstore.APIError); !ok || !apiError.NotFound() {
+			return nil, err
+		}
+	}
+
+	// Do not proceed to DeleteVolume if there is a volume group or protection policy.
+	// DeleteVolume would remove those, and source-side deletion is the responsible party for that operation.
+	if len(vgs.VolumeGroup) != 0 {
+		log.Info("Cannot delete local volume " + volumeID + ", volume is part of a Volume Group and needs to be removed first.")
+		return nil, status.Errorf(codes.Internal, "Error: Unable to delete volume")
+	} else if vol.ProtectionPolicyID != "" {
+		log.Info("Cannot delete local volume " + volumeID + ", volume is under a protection policy that must be removed first.")
 		return nil, status.Errorf(codes.Internal, "Error: Unable to delete volume")
 	}
 
+	_, err = arr.GetClient().DeleteVolume(ctx, nil, volumeID)
+	if apiErr, ok := err.(gopowerstore.APIError); ok && !apiErr.NotFound() {
+		log.Info("Unable to delete local volume. Something went wrong.")
+		return nil, status.Errorf(codes.Internal, "Error: Unable to delete volume")
+	}
+
+	log.Info("Local volume deleted successfully.")
 	return &csiext.DeleteLocalVolumeResponse{}, nil
 }
 
