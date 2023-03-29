@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2021-2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -524,7 +524,7 @@ func (s *Service) DeleteLocalVolume(ctx context.Context,
 
 	arr, ok := s.Arrays()[globalID]
 	if !ok {
-		return nil, status.Errorf(codes.InvalidArgument, "can't find array with global id %s", globalID)
+		return nil, status.Errorf(codes.InvalidArgument, "can't find array with global ID %s", globalID)
 	}
 
 	vol, err := arr.GetClient().GetVolume(ctx, volumeID)
@@ -558,9 +558,11 @@ func (s *Service) DeleteLocalVolume(ctx context.Context,
 	}
 
 	_, err = arr.GetClient().DeleteVolume(ctx, nil, volumeID)
-	if apiErr, ok := err.(gopowerstore.APIError); ok && !apiErr.NotFound() {
-		log.Info("Unable to delete local volume. Something went wrong.")
-		return nil, status.Errorf(codes.Internal, "Error: Unable to delete volume")
+	if err != nil {
+		if apiErr, ok := err.(gopowerstore.APIError); ok && !apiErr.NotFound() {
+			log.Info("Cannot delete local volume " + volumeID + ", deletion returned a non-404 error code.")
+			return nil, status.Errorf(codes.Internal, "Error: Unable to delete volume")
+		}
 	}
 
 	log.Info("Local volume deleted successfully.")
