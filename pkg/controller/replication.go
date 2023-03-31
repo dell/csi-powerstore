@@ -559,7 +559,7 @@ func (s *Service) DeleteLocalVolume(ctx context.Context,
 
 	_, err = arr.GetClient().DeleteVolume(ctx, nil, volumeID)
 	if err != nil {
-		if apiErr, ok := err.(gopowerstore.APIError); ok && !apiErr.NotFound() {
+		if apiErr, ok := err.(gopowerstore.APIError); !ok || !apiErr.NotFound() {
 			log.Info("Cannot delete local volume " + volumeID + ", deletion returned a non-404 error code.")
 			return nil, status.Errorf(codes.Internal, "Error: Unable to delete volume")
 		}
