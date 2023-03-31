@@ -532,7 +532,7 @@ func (s *Service) DeleteLocalVolume(ctx context.Context,
 		if apiError, ok := err.(gopowerstore.APIError); ok {
 			if apiError.NotFound() {
 				// volume doesn't exist, return success
-				log.Info(("Volume does not exist. It may have already been deleted."))
+				log.Info("Volume does not exist. It may have already been deleted.")
 				return &csiext.DeleteLocalVolumeResponse{}, nil
 			}
 		}
