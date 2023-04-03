@@ -18,6 +18,8 @@ package controller_test
 
 import (
 	"context"
+	"net/http"
+
 	"github.com/dell/csi-powerstore/v2/pkg/array"
 	"github.com/dell/csi-powerstore/v2/pkg/controller"
 	csiext "github.com/dell/dell-csi-extensions/replication"
@@ -28,7 +30,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"net/http"
 )
 
 var _ = Describe("Replication", func() {
@@ -395,6 +396,34 @@ var _ = Describe("Replication", func() {
 
 			})
 
+		})
+
+		Describe("calling DeleteLocalVolume()", func() {
+			When("Volume ID is missing", func() {
+				It("should fail", func() {
+					req := new(csiext.DeleteLocalVolumeRequest)
+					res, err := ctrlSvc.DeleteLocalVolume(context.Background(), req)
+
+					Expect(res).To(BeNil())
+					Expect(err).ToNot(BeNil())
+					Expect(err.Error()).To(
+						ContainSubstring("can't delete volume of improper handle format"))
+				})
+			})
+			When("Array with specified globalID couldn't be found", func() {
+				It("should fail", func() {
+
+					req := new(csiext.DeleteLocalVolumeRequest)
+					handle := "valid-id/SOMETHING-WRONG/iscsi"
+					req.VolumeHandle = handle
+					res, err := ctrlSvc.DeleteLocalVolume(context.Background(), req)
+
+					Expect(res).To(BeNil())
+					Expect(err).ToNot(BeNil())
+					Expect(err.Error()).To(
+						ContainSubstring("can't find array with global ID"))
+				})
+			})
 		})
 		Describe("calling DeleteStorageProtectionGroup()", func() {
 			When("GlobalID is missing", func() {

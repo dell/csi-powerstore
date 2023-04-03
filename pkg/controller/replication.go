@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2021-2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/dell/csi-powerstore/v2/pkg/array"
 	csiext "github.com/dell/dell-csi-extensions/replication"
@@ -87,10 +88,11 @@ func (s *Service) CreateRemoteVolume(ctx context.Context,
 	}
 
 	remoteParams := map[string]string{
-		"remoteSystem": localSystem.Name,
+		"remoteSystem":                                   localSystem.Name,
+		s.replicationContextPrefix + "arrayID":           remoteSystem.SerialNumber,
 		s.replicationContextPrefix + "managementAddress": remoteSystem.ManagementAddress,
 	}
-	remoteVolume := getRemoteCSIVolume(remoteVolumeID+"/"+remoteParams[s.replicationContextPrefix+"managementAddress"]+"/"+protocol, vol.Size)
+	remoteVolume := getRemoteCSIVolume(remoteVolumeID+"/"+remoteParams[s.replicationContextPrefix+"arrayID"]+"/"+protocol, vol.Size)
 	remoteVolume.VolumeContext = remoteParams
 	return &csiext.CreateRemoteVolumeResponse{
 		RemoteVolume: remoteVolume,
@@ -505,6 +507,66 @@ func (s *Service) DeleteStorageProtectionGroup(ctx context.Context,
 	}
 
 	return &csiext.DeleteStorageProtectionGroupResponse{}, nil
+}
+
+// DeleteLocalVolume deletes a volume on the local storage array upon request from a remote replication controller.
+func (s *Service) DeleteLocalVolume(ctx context.Context,
+	req *csiext.DeleteLocalVolumeRequest) (*csiext.DeleteLocalVolumeResponse, error) {
+	log.Info("Deleting local volume " + req.VolumeHandle + " per request from remote replication controller")
+
+	// req.VolumeHandle is of format <volumeid>/<array ID>/<protocol>. We only need the IDs.
+	splitHandle := strings.Split(req.VolumeHandle, `/`)
+	if len(splitHandle) != 3 {
+		return nil, status.Errorf(codes.InvalidArgument, "can't delete volume of improper handle format")
+	}
+	volumeID := splitHandle[0]
+	globalID := splitHandle[1]
+
+	arr, ok := s.Arrays()[globalID]
+	if !ok {
+		return nil, status.Errorf(codes.InvalidArgument, "can't find array with global ID %s", globalID)
+	}
+
+	vol, err := arr.GetClient().GetVolume(ctx, volumeID)
+	if err != nil {
+		if apiError, ok := err.(gopowerstore.APIError); ok {
+			if apiError.NotFound() {
+				// volume doesn't exist, return success
+				log.Info("Volume does not exist. It may have already been deleted.")
+				return &csiext.DeleteLocalVolumeResponse{}, nil
+			}
+		}
+		// any other error means the volume to be deleted couldn't be retrieved, return error
+		return nil, status.Errorf(codes.Internal, "Error: Unable to get volume for deletion")
+	}
+
+	vgs, err := arr.GetClient().GetVolumeGroupsByVolumeID(ctx, volumeID)
+	if err != nil {
+		if apiError, ok := err.(gopowerstore.APIError); !ok || !apiError.NotFound() {
+			return nil, err
+		}
+	}
+
+	// Do not proceed to DeleteVolume if there is a volume group or protection policy.
+	// DeleteVolume would remove those, and source-side deletion is the responsible party for that operation.
+	if len(vgs.VolumeGroup) != 0 {
+		log.Info("Cannot delete local volume " + volumeID + ", volume is part of a Volume Group and needs to be removed first.")
+		return nil, status.Errorf(codes.Internal, "Error: Unable to delete volume")
+	} else if vol.ProtectionPolicyID != "" {
+		log.Info("Cannot delete local volume " + volumeID + ", volume is under a protection policy that must be removed first.")
+		return nil, status.Errorf(codes.Internal, "Error: Unable to delete volume")
+	}
+
+	_, err = arr.GetClient().DeleteVolume(ctx, nil, volumeID)
+	if err != nil {
+		if apiErr, ok := err.(gopowerstore.APIError); !ok || !apiErr.NotFound() {
+			log.Info("Cannot delete local volume " + volumeID + ", deletion returned a non-404 error code.")
+			return nil, status.Errorf(codes.Internal, "Error: Unable to delete volume")
+		}
+	}
+
+	log.Info("Local volume deleted successfully.")
+	return &csiext.DeleteLocalVolumeResponse{}, nil
 }
 
 // GetStorageProtectionGroupStatus gets storage protection group status
