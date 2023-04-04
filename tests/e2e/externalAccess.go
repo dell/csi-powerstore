@@ -24,9 +24,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/dell/csi-powerstore/pkg/common"
+	"github.com/dell/csi-powerstore/v2/pkg/common"
 	"github.com/dell/gopowerstore"
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/apps/v1"
@@ -83,7 +83,7 @@ var _ = ginkgo.Describe("External Access Test", func() {
 	f := framework.NewDefaultFramework("external-access")
 	// prevent annoying psp warning
 
-	f.SkipPrivilegedPSPBinding = true
+	//f.SkipPrivilegedPSPBinding = true
 	defer ginkgo.GinkgoRecover()
 	framework.Logf("run e2e test default timeouts  %#v ", f.Timeouts)
 	ginkgo.BeforeEach(func() {

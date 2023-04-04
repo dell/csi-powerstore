@@ -40,7 +40,7 @@ import (
 
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 // getNamespaceToRunTests returns the namespace in which the tests are expected

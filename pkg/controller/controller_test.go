@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2021-2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -3653,7 +3653,7 @@ var _ = Describe("CSIControllerService", func() {
 					Return(gopowerstore.Cluster{Name: validClusterName}, nil)
 
 				clientMock.On("GetRemoteSystem", mock.Anything, validRemoteSystemID).
-					Return(gopowerstore.RemoteSystem{Name: validRemoteSystemName, ManagementAddress: secondValidID}, nil)
+					Return(gopowerstore.RemoteSystem{Name: validRemoteSystemName, ManagementAddress: secondValidID, ID: validRemoteSystemID, SerialNumber: validRemoteSystemGlobalID}, nil)
 
 				req := &csiext.CreateRemoteVolumeRequest{
 					VolumeHandle: validBaseVolID + "/" + firstValidID + "/" + "iscsi",
@@ -3665,10 +3665,11 @@ var _ = Describe("CSIControllerService", func() {
 				Expect(res).To(Equal(
 					&csiext.CreateRemoteVolumeResponse{RemoteVolume: &csiext.Volume{
 						CapacityBytes: validVolSize,
-						VolumeId:      validRemoteVolId + "/" + secondValidID + "/" + "iscsi",
+						VolumeId:      validRemoteVolId + "/" + validRemoteSystemGlobalID + "/" + "iscsi",
 						VolumeContext: map[string]string{
 							"remoteSystem":      validClusterName,
 							"managementAddress": secondValidID,
+							"arrayID":           validRemoteSystemGlobalID,
 						},
 					}}))
 
