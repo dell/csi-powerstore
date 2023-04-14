@@ -277,30 +277,30 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 			}
 		}
 
-		vgName := vgPrefix + "-" + namespace + remoteSystemName + "-" + rpo
+		rgName := vgPrefix + "-" + namespace + remoteSystemName + "-" + rpo
 		if useNFS {
-			vgName = vgPrefix + "-nfs-" + namespace + remoteSystemName + "-" + rpo // Append NFS to NFS-typed 'VG', it'll be used in PP/RR.
+			rgName = vgPrefix + "-nfs-" + namespace + remoteSystemName + "-" + rpo // Append NFS to NFS-typed 'VG', it'll be used in PP/RR.
 		} else {
-			vgName = vgPrefix + "-" + namespace + remoteSystemName + "-" + rpo
+			rgName = vgPrefix + "-" + namespace + remoteSystemName + "-" + rpo
 		}
-		if len(vgName) > 128 { // keep only the first 128 characters
-			vgName = vgName[:128]
+		if len(rgName) > 128 { // keep only the first 128 characters
+			rgName = rgName[:128]
 		}
 
 		if !useNFS { // Non-NFS replication uses volume groups with protection policies as the RG analog
-			vg, err = arr.Client.GetVolumeGroupByName(ctx, vgName)
+			vg, err = arr.Client.GetVolumeGroupByName(ctx, rgName)
 			if err != nil {
 				if apiError, ok := err.(gopowerstore.APIError); ok && apiError.NotFound() {
-					log.Infof("Volume group with name %s not found, creating it", vgName)
+					log.Infof("Volume group with name %s not found, creating it", rgName)
 
 					// ensure protection policy exists
-					pp, err := EnsureProtectionPolicyExists(ctx, arr, vgName, remoteSystemName, rpoEnum)
+					pp, err := EnsureProtectionPolicyExists(ctx, arr, rgName, remoteSystemName, rpoEnum)
 					if err != nil {
 						return nil, status.Errorf(codes.Internal, "can't ensure protection policy exists %s", err.Error())
 					}
 
 					group, err := arr.Client.CreateVolumeGroup(ctx, &gopowerstore.VolumeGroupCreate{
-						Name:               vgName,
+						Name:               rgName,
 						ProtectionPolicyID: pp,
 					})
 					if err != nil {
@@ -313,12 +313,12 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 					}
 
 				} else {
-					return nil, status.Errorf(codes.Internal, "can't query volume group by name %s : %s", vgName, err.Error())
+					return nil, status.Errorf(codes.Internal, "can't query volume group by name %s : %s", rgName, err.Error())
 				}
 			} else {
 				// group exists, check that protection policy applied
 				if vg.ProtectionPolicyID == "" {
-					pp, err := EnsureProtectionPolicyExists(ctx, arr, vgName, remoteSystemName, rpoEnum)
+					pp, err := EnsureProtectionPolicyExists(ctx, arr, rgName, remoteSystemName, rpoEnum)
 					if err != nil {
 						return nil, status.Errorf(codes.Internal, "can't ensure protection policy exists %s", err.Error())
 					}
@@ -336,7 +336,7 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 		} else { // NFS volumes use protected NAS servers instead of protected VGs for replication.
 
 			// Create the protection policy if it does not already exist
-			pp, err := EnsureProtectionPolicyExists(ctx, arr, vgName, remoteSystemName, rpoEnum)
+			pp, err := EnsureProtectionPolicyExists(ctx, arr, rgName, remoteSystemName, rpoEnum)
 			if err != nil {
 				return nil, status.Errorf(codes.Internal, "can't ensure protection policy exists %s", err.Error())
 			}

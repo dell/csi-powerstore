@@ -88,14 +88,3 @@ parameters:
   # Optional: false
   # Default value: None
   arrayID: "Unique"
-  # FsType: file system type for mounted volumes
-  # Allowed values:
-  #   ext3: ext3 filesystem type
-  #   ext4: ext4 filesystem type
-  #   xfs: XFS filesystem type
-  #   nfs: NFS filesystem
-  # Optional: true
-  # Default value: None if defaultFsType is not mentioned in values.yaml
-  # Else defaultFsType value mentioned in values.yaml
-  # will be used as default value
-  csi.storage.k8s.io/fstype: "ext4"
