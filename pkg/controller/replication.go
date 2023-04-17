@@ -451,6 +451,7 @@ func (s *Service) DeleteStorageProtectionGroup(ctx context.Context,
 	localParams := req.GetProtectionGroupAttributes()
 	groupID := req.GetProtectionGroupId()
 	globalID, ok := localParams[s.replicationContextPrefix+"globalID"]
+	// TODO: We must obtain protocol from localParams in some fashion. NFS will be handled differently, it does not have volume group concept.
 
 	if !ok {
 		return nil, status.Error(codes.InvalidArgument, "missing globalID in protection group attributes")
@@ -568,18 +569,20 @@ func (s *Service) DeleteLocalVolume(ctx context.Context,
 			log.Info("Cannot delete local volume " + volumeID + ", volume is under a protection policy that must be removed first.")
 			return nil, status.Errorf(codes.Internal, "Error: Unable to delete volume")
 		}
-	} // TODO: There may be similar requirements necessary for unprotecting File Systems before they can be deleted.
 
-	_, err = arr.GetClient().DeleteVolume(ctx, nil, volumeID)
-	if err != nil {
-		if apiErr, ok := err.(gopowerstore.APIError); !ok || !apiErr.NotFound() {
-			log.Info("Cannot delete local volume " + volumeID + ", deletion returned a non-404 error code.")
-			return nil, status.Errorf(codes.Internal, "Error: Unable to delete volume")
+		_, err = arr.GetClient().DeleteVolume(ctx, nil, volumeID)
+		if err != nil {
+			if apiErr, ok := err.(gopowerstore.APIError); !ok || !apiErr.NotFound() {
+				log.Info("Cannot delete local volume " + volumeID + ", deletion returned a non-404 error code.")
+				return nil, status.Errorf(codes.Internal, "Error: Unable to delete volume")
+			}
 		}
-	}
+		log.Info("Local volume deleted successfully.")
+		return &csiext.DeleteLocalVolumeResponse{}, nil
+	} // TODO: There may be similar requirements necessary for unprotecting File Systems before they can be deleted.
+	// TODO: Use Filesystem API to delete filesystem in the NFS case.
+	return nil, status.Errorf(codes.Internal, "Error: NFS file replication is not currently supported.")
 
-	log.Info("Local volume deleted successfully.")
-	return &csiext.DeleteLocalVolumeResponse{}, nil
 }
 
 // GetStorageProtectionGroupStatus gets storage protection group status

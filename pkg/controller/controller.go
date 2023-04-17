@@ -280,8 +280,6 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 		rgName := vgPrefix + "-" + namespace + remoteSystemName + "-" + rpo
 		if useNFS {
 			rgName = vgPrefix + "-nfs-" + namespace + remoteSystemName + "-" + rpo // Append NFS to NFS-typed 'VG', it'll be used in PP/RR.
-		} else {
-			rgName = vgPrefix + "-" + namespace + remoteSystemName + "-" + rpo
 		}
 		if len(rgName) > 128 { // keep only the first 128 characters
 			rgName = rgName[:128]
