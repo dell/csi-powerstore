@@ -1,6 +1,6 @@
 #
 #
-# Copyright © 2021-2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+# Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,11 +17,37 @@
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: "powerstore-replication"
+  name: "powerstore-file-replication"
 provisioner: "csi-powerstore.dellemc.com"
 reclaimPolicy: Retain
 volumeBindingMode: Immediate
 parameters:
+  # FsType: file system type for mounted volumes
+  # Allowed values:
+  #   ext3: ext3 filesystem type
+  #   ext4: ext4 filesystem type
+  #   xfs: XFS filesystem type
+  #   nfs: NFS filesystem
+  # Optional: true
+  # Default value: None if defaultFsType is not mentioned in values.yaml
+  # Else defaultFsType value mentioned in values.yaml
+  # will be used as default value
+  csi.storage.k8s.io/fstype: "nfs"
+
+  # nasName: NAS server's name. If not specified, value from secret.yaml will be used
+  # Allowed values: string
+  # Optional: true
+  # Default value: None
+  replication.storage.dell.com/nasName: "nas-server"
+
+  # allowRoot: enables or disables root squashing (valid only for NFS)
+  # Allowed values:
+  #   true: will allow root users to use their privileges
+  #   false: will prevent root users on NFS clients from exercising root privileges on the NFS server
+  # Optional: true
+  # Default value: false
+  replication.storage.dell.com/allowRoot: "false"
+
   # replicationPrefix paramater in values.yaml must be used as prefix for all replication parameters in storage class
   # for e.g., all replication parameters have prefix: replication.storage.dell.com here
 
@@ -37,7 +63,7 @@ parameters:
   # Allowed values: string
   # Optional: true
   # Default value: None
-  replication.storage.dell.com/remoteStorageClassName: "powerstore-replication"
+  replication.storage.dell.com/remoteStorageClassName: "powerstore-file-replication"
 
   # replication.storage.dell.com/remoteClusterID: point to correct remote cluster id
   # Allowed values: string 
@@ -76,14 +102,3 @@ parameters:
   # Optional: false
   # Default value: None
   arrayID: "Unique"
-  # FsType: file system type for mounted volumes
-  # Allowed values:
-  #   ext3: ext3 filesystem type
-  #   ext4: ext4 filesystem type
-  #   xfs: XFS filesystem type
-  #   nfs: NFS filesystem
-  # Optional: true
-  # Default value: None if defaultFsType is not mentioned in values.yaml
-  # Else defaultFsType value mentioned in values.yaml
-  # will be used as default value
-  csi.storage.k8s.io/fstype: "ext4"

@@ -37,7 +37,7 @@ func (s *Service) CreateRemoteVolume(ctx context.Context,
 		return nil, status.Error(codes.InvalidArgument, "volume ID is required")
 	}
 
-	id, arrayID, protocol, err := array.ParseVolumeID(ctx, volID, s.DefaultArray(), nil)
+	id, arrayID, protocol, err := array.ParseVolumeID(ctx, volID, s.DefaultArray(), nil) // TODO: This seems wrong. What if the replication setup isn't being done on the default array? Why aren't we pulling the array from the SC and only using default if it's undefined there?
 	if err != nil {
 		log.Error(err)
 		return nil, err
@@ -49,53 +49,59 @@ func (s *Service) CreateRemoteVolume(ctx context.Context,
 		return nil, status.Error(codes.InvalidArgument, "failed to find array with given IP")
 	}
 
-	vgs, err := arr.GetClient().GetVolumeGroupsByVolumeID(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-	if len(vgs.VolumeGroup) == 0 {
-		return nil, status.Error(codes.Unimplemented, "replication of volumes that aren't assigned to group is not implemented yet")
-	}
-	vg := vgs.VolumeGroup[0]
-
-	rs, err := arr.Client.GetReplicationSessionByLocalResourceID(ctx, vg.ID)
-	if err != nil {
-		return nil, err
-	}
-
-	var remoteVolumeID string
-	for _, sp := range rs.StorageElementPairs {
-		if sp.LocalStorageElementId == id {
-			remoteVolumeID = sp.RemoteStorageElementId
+	if protocol != "nfs" {
+		vgs, err := arr.GetClient().GetVolumeGroupsByVolumeID(ctx, id)
+		if err != nil {
+			return nil, err
 		}
-	}
+		if len(vgs.VolumeGroup) == 0 {
+			return nil, status.Error(codes.Unimplemented, "replication of volumes that aren't assigned to group is not implemented yet")
+		}
+		vg := vgs.VolumeGroup[0]
 
-	if remoteVolumeID == "" {
-		return nil, status.Errorf(codes.Internal, "couldn't find volume id %s in storage element pairs of replication session", id)
-	}
+		rs, err := arr.Client.GetReplicationSessionByLocalResourceID(ctx, vg.ID)
+		if err != nil {
+			return nil, err
+		}
 
-	vol, err := arr.Client.GetVolume(ctx, id)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "can't query volume: %s", err.Error())
-	}
-	localSystem, err := arr.Client.GetCluster(ctx)
-	if err != nil {
-		return nil, err
-	}
-	remoteSystem, err := arr.Client.GetRemoteSystem(ctx, rs.RemoteSystemId)
-	if err != nil {
-		return nil, err
-	}
+		var remoteVolumeID string
+		for _, sp := range rs.StorageElementPairs {
+			if sp.LocalStorageElementId == id {
+				remoteVolumeID = sp.RemoteStorageElementId
+			}
+		}
 
-	remoteParams := map[string]string{
-		"remoteSystem":                                   localSystem.Name,
-		s.replicationContextPrefix + "arrayID":           remoteSystem.SerialNumber,
-		s.replicationContextPrefix + "managementAddress": remoteSystem.ManagementAddress,
+		if remoteVolumeID == "" {
+			return nil, status.Errorf(codes.Internal, "couldn't find volume id %s in storage element pairs of replication session", id)
+		}
+
+		vol, err := arr.Client.GetVolume(ctx, id)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "can't query volume: %s", err.Error())
+		}
+		localSystem, err := arr.Client.GetCluster(ctx)
+		if err != nil {
+			return nil, err
+		}
+		remoteSystem, err := arr.Client.GetRemoteSystem(ctx, rs.RemoteSystemId)
+		if err != nil {
+			return nil, err
+		}
+
+		remoteParams := map[string]string{
+			"remoteSystem":                                   localSystem.Name,
+			s.replicationContextPrefix + "arrayID":           remoteSystem.SerialNumber,
+			s.replicationContextPrefix + "managementAddress": remoteSystem.ManagementAddress,
+		}
+		remoteVolume := getRemoteCSIVolume(remoteVolumeID+"/"+remoteParams[s.replicationContextPrefix+"arrayID"]+"/"+protocol, vol.Size)
+		remoteVolume.VolumeContext = remoteParams
+		return &csiext.CreateRemoteVolumeResponse{
+			RemoteVolume: remoteVolume,
+		}, nil
 	}
-	remoteVolume := getRemoteCSIVolume(remoteVolumeID+"/"+remoteParams[s.replicationContextPrefix+"arrayID"]+"/"+protocol, vol.Size)
-	remoteVolume.VolumeContext = remoteParams
+	// TODO: Handling for NFS-type replication. Cannot use VG for replication session. NAS server instead?
 	return &csiext.CreateRemoteVolumeResponse{
-		RemoteVolume: remoteVolume,
+		RemoteVolume: nil,
 	}, nil
 }
 
@@ -119,10 +125,14 @@ func (s *Service) CreateStorageProtectionGroup(ctx context.Context,
 		return nil, status.Error(codes.InvalidArgument, "failed to find array with given ID")
 	}
 
-	if protocol == "nfs" {
+	if protocol == "nfs" { // NFS protocol indicates a FileSystem on the storage array and requires different handling from block Volumes.
 		return nil, status.Error(codes.InvalidArgument, "replication is not supported for NFS volumes")
+
+		// TODO: Implement nfs replication.
+
 	}
 
+	// Non-NFS protocol indicates a Volume on the storage array.
 	vgs, err := arr.GetClient().GetVolumeGroupsByVolumeID(ctx, id)
 	if err != nil {
 		return nil, err
@@ -441,6 +451,7 @@ func (s *Service) DeleteStorageProtectionGroup(ctx context.Context,
 	localParams := req.GetProtectionGroupAttributes()
 	groupID := req.GetProtectionGroupId()
 	globalID, ok := localParams[s.replicationContextPrefix+"globalID"]
+	// TODO: We must obtain protocol from localParams in some fashion. NFS will be handled differently, it does not have volume group concept.
 
 	if !ok {
 		return nil, status.Error(codes.InvalidArgument, "missing globalID in protection group attributes")
@@ -521,6 +532,7 @@ func (s *Service) DeleteLocalVolume(ctx context.Context,
 	}
 	volumeID := splitHandle[0]
 	globalID := splitHandle[1]
+	protocol := splitHandle[2]
 
 	arr, ok := s.Arrays()[globalID]
 	if !ok {
@@ -540,33 +552,37 @@ func (s *Service) DeleteLocalVolume(ctx context.Context,
 		return nil, status.Errorf(codes.Internal, "Error: Unable to get volume for deletion")
 	}
 
-	vgs, err := arr.GetClient().GetVolumeGroupsByVolumeID(ctx, volumeID)
-	if err != nil {
-		if apiError, ok := err.(gopowerstore.APIError); !ok || !apiError.NotFound() {
-			return nil, err
+	if protocol != "nfs" {
+		vgs, err := arr.GetClient().GetVolumeGroupsByVolumeID(ctx, volumeID)
+		if err != nil {
+			if apiError, ok := err.(gopowerstore.APIError); !ok || !apiError.NotFound() {
+				return nil, err
+			}
 		}
-	}
 
-	// Do not proceed to DeleteVolume if there is a volume group or protection policy.
-	// DeleteVolume would remove those, and source-side deletion is the responsible party for that operation.
-	if len(vgs.VolumeGroup) != 0 {
-		log.Info("Cannot delete local volume " + volumeID + ", volume is part of a Volume Group and needs to be removed first.")
-		return nil, status.Errorf(codes.Internal, "Error: Unable to delete volume")
-	} else if vol.ProtectionPolicyID != "" {
-		log.Info("Cannot delete local volume " + volumeID + ", volume is under a protection policy that must be removed first.")
-		return nil, status.Errorf(codes.Internal, "Error: Unable to delete volume")
-	}
-
-	_, err = arr.GetClient().DeleteVolume(ctx, nil, volumeID)
-	if err != nil {
-		if apiErr, ok := err.(gopowerstore.APIError); !ok || !apiErr.NotFound() {
-			log.Info("Cannot delete local volume " + volumeID + ", deletion returned a non-404 error code.")
+		// Do not proceed to DeleteVolume if there is a volume group or protection policy.
+		// DeleteVolume would remove those, and source-side deletion is the responsible party for that operation.
+		if len(vgs.VolumeGroup) != 0 {
+			log.Info("Cannot delete local volume " + volumeID + ", volume is part of a Volume Group and needs to be removed first.")
+			return nil, status.Errorf(codes.Internal, "Error: Unable to delete volume")
+		} else if vol.ProtectionPolicyID != "" {
+			log.Info("Cannot delete local volume " + volumeID + ", volume is under a protection policy that must be removed first.")
 			return nil, status.Errorf(codes.Internal, "Error: Unable to delete volume")
 		}
-	}
 
-	log.Info("Local volume deleted successfully.")
-	return &csiext.DeleteLocalVolumeResponse{}, nil
+		_, err = arr.GetClient().DeleteVolume(ctx, nil, volumeID)
+		if err != nil {
+			if apiErr, ok := err.(gopowerstore.APIError); !ok || !apiErr.NotFound() {
+				log.Info("Cannot delete local volume " + volumeID + ", deletion returned a non-404 error code.")
+				return nil, status.Errorf(codes.Internal, "Error: Unable to delete volume")
+			}
+		}
+		log.Info("Local volume deleted successfully.")
+		return &csiext.DeleteLocalVolumeResponse{}, nil
+	} // TODO: There may be similar requirements necessary for unprotecting File Systems before they can be deleted.
+	// TODO: Use Filesystem API to delete filesystem in the NFS case.
+	return nil, status.Errorf(codes.Internal, "Error: NFS file replication is not currently supported.")
+
 }
 
 // GetStorageProtectionGroupStatus gets storage protection group status
