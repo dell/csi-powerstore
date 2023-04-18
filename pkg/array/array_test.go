@@ -140,6 +140,13 @@ func TestGetPowerStoreArrays(t *testing.T) {
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "can't get ips from endpoint")
 	})
+
+	t.Run("invalid endpoint", func(t *testing.T) {
+		f := &fs.Fs{Util: &gofsutil.FS{}}
+		_, _, _, err := array.GetPowerStoreArrays(f, "./testdata/invalid-endpoint.yaml")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "can't get ips from endpoint")
+	})
 	t.Run("no global ID", func(t *testing.T) {
 		f := &fs.Fs{Util: &gofsutil.FS{}}
 		_, _, _, err := array.GetPowerStoreArrays(f, "./testdata/no-globalID.yaml")

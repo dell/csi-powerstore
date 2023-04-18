@@ -105,7 +105,7 @@ spec:
       tolerations:
       {{- toYaml .Values.node.tolerations | nindent 6 }}
       {{ end }}
-      serviceAccount: {{ .Release.Name }}-node
+      serviceAccountName: {{ .Release.Name }}-node
       dnsPolicy: ClusterFirstWithHostNet
       hostNetwork: true
       hostIPC: true
