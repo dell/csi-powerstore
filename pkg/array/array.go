@@ -234,9 +234,7 @@ func GetPowerStoreArrays(fs fs.Interface, filePath string) (map[string]*PowerSto
 			if len(sub) > 2 {
 				ip = sub[2]
 				if regexp.MustCompile(`^[0-9.]*$`).MatchString(sub[2]) {
-					if net.ParseIP(sub[2]) == nil {
 						return nil, nil, nil, fmt.Errorf("can't get ips from endpoint: %s", array.Endpoint)
-					}
 				}
 			} else {
 				return nil, nil, nil, fmt.Errorf("can't get ips from endpoint: %s", array.Endpoint)
