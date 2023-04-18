@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2021-2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"net/http"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -224,15 +225,24 @@ func GetPowerStoreArrays(fs fs.Interface, filePath string) (map[string]*PowerSto
 			array.BlockProtocol = common.AutoDetectTransport
 		}
 		array.BlockProtocol = common.TransportType(strings.ToUpper(string(array.BlockProtocol)))
-
+		var ip string
 		ips := common.GetIPListFromString(array.Endpoint)
 		if ips == nil {
-			return nil, nil, nil, fmt.Errorf("can't get ips from endpoint: %s", array.Endpoint)
+			log.Warnf("didn't found an IP from the provided endPoint, it could be a FQDN. Please make sure to enter a valid FQDN in https://abc.com/api/rest format")
+			sub := strings.Split(array.Endpoint, "/")
+			if len(sub) > 2 {
+				ip = sub[2]
+				if regexp.MustCompile(`^[0-9.]*$`).MatchString(sub[2]) {
+					return nil, nil, nil, fmt.Errorf("can't get ips from endpoint: %s", array.Endpoint)
+				}
+			} else {
+				return nil, nil, nil, fmt.Errorf("can't get ips from endpoint: %s", array.Endpoint)
+			}
+		} else {
+			ip = ips[0]
 		}
-
-		ip := ips[0]
 		array.IP = ip
-		log.Infof("%s,%s,%s,%s,%t,%t,%s", array.Endpoint, array.GlobalID, array.Username, array.NasName, array.Insecure, array.IsDefault, array.BlockProtocol)
+		log.Infof("%s,%s,%s,%s,%t,%t,%s,%s", array.Endpoint, array.GlobalID, array.Username, array.NasName, array.Insecure, array.IsDefault, array.BlockProtocol, ip)
 		arrayMap[array.GlobalID] = array
 		mapper[ip] = array.GlobalID
 		if array.IsDefault && !foundDefault {

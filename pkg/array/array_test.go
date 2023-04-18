@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2021-2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -137,6 +137,13 @@ func TestGetPowerStoreArrays(t *testing.T) {
 	t.Run("incorrect endpoint", func(t *testing.T) {
 		f := &fs.Fs{Util: &gofsutil.FS{}}
 		_, _, _, err := array.GetPowerStoreArrays(f, "./testdata/incorrect-endpoint.yaml")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "can't get ips from endpoint")
+	})
+
+	t.Run("invalid endpoint", func(t *testing.T) {
+		f := &fs.Fs{Util: &gofsutil.FS{}}
+		_, _, _, err := array.GetPowerStoreArrays(f, "./testdata/invalid-endpoint.yaml")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "can't get ips from endpoint")
 	})
