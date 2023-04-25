@@ -162,16 +162,19 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 	var protocol string
 
 	nfsAcls := s.nfsAcls
+	nasName := ""
 	if useNFS {
 		protocol = "nfs"
 		nasParamsName, ok := params[KeyNasName]
 		if ok {
+			nasName = nasParamsName
 			creator = &NfsCreator{
-				nasName: nasParamsName,
+				nasName: nasName,
 			}
 		} else {
+			nasName = arr.GetNasName()
 			creator = &NfsCreator{
-				nasName: arr.GetNasName(),
+				nasName: nasName,
 			}
 		}
 
@@ -343,6 +346,16 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 			// TODO: Verify that the protection policy is NOT applied to any NAS servers besides the one we intend to use
 
 			// TODO: Instead of getting/creating VG, ensure NAS server exists, then update it with the protection policy.
+			nas, err := arr.Client.GetNASByName(ctx, nasName)
+			if err != nil {
+				return nil, status.Errorf(codes.Internal, "can't obtain NAS server to apply protection policy %s", err.Error())
+			}
+
+			policyUpdate := gopowerstore.NASChangePolicy{ProtectionPolicyID: pp}
+			_, err = arr.Client.UpdateNASProtectionPolicy(ctx, nas.ID, &policyUpdate)
+			if err != nil {
+				return nil, status.Errorf(codes.Internal, "can't update volume group policy %s", err.Error())
+			}
 
 		}
 	}
