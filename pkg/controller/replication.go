@@ -145,7 +145,7 @@ func (s *Service) CreateStorageProtectionGroup(ctx context.Context,
 		if err != nil {
 			return nil, err
 		}
-		log.Infof("Replication session: " + rs.ID) // crashing here -- rs is null
+		log.Infof("Replication session: " + rs.ID)
 
 		localSystem, err := arr.Client.GetCluster(ctx)
 		if err != nil {
@@ -662,6 +662,7 @@ func (s *Service) GetStorageProtectionGroupStatus(ctx context.Context,
 	if err != nil {
 		return nil, err
 	}
+	// TODO: If NFS type RGs require editing for getting their state, it'll be in this method.
 
 	var state csiext.StorageProtectionGroupStatus_State
 	switch rs.State {

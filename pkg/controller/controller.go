@@ -343,14 +343,25 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 			}
 			log.Info("Protection policy " + pp + " verified as existant.")
 
-			// TODO: Verify that the protection policy is NOT applied to any NAS servers besides the one we intend to use
+			// Verify that the protection policy is NOT applied to any NAS servers besides the one we intend to use
+			ppObj, err := arr.Client.GetProtectionPolicy(ctx, pp)
+			if err != nil {
+				return nil, status.Errorf(codes.Internal, "can't get protection policy %s", err.Error())
+			}
+			if len(ppObj.NasServers) > 1 || len(ppObj.VolumeGroups) > 0 || (len(ppObj.NasServers) == 1 && ppObj.NasServers[0].Name != nasName) {
+				return nil, status.Errorf(codes.Internal, "can't use protection policy for NFS replication - already in use %s", err.Error())
+			}
 
-			// TODO: Instead of getting/creating VG, ensure NAS server exists, then update it with the protection policy.
+			// ensure NAS server exists and meets appropriate requirements, then update it with the protection policy.
 			nas, err := arr.Client.GetNASByName(ctx, nasName)
 			if err != nil {
 				return nil, status.Errorf(codes.Internal, "can't obtain NAS server to apply protection policy %s", err.Error())
 			}
-
+			if nas.ProtectionPolicyID != "" && nas.ProtectionPolicyID != pp { // NAS may only be unprotected or under this PP to be valid
+				return nil, status.Errorf(codes.Internal, "can't use NAS server for NFS replication - already under a protection policy")
+			} else if nas.ProtectionPolicyID == "" && len(nas.FileSystems) > 0 { // if it is unprotected but has filesystems already, we can't use it
+				return nil, status.Errorf(codes.Internal, "can't use NAS server for NFS replication - already has file systems")
+			}
 			policyUpdate := gopowerstore.NASChangePolicy{ProtectionPolicyID: pp}
 			_, err = arr.Client.UpdateNASProtectionPolicy(ctx, nas.ID, &policyUpdate)
 			if err != nil {
