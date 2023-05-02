@@ -14,20 +14,20 @@ type NVMEConnector struct {
 	mock.Mock
 }
 
-// ConnectVolume provides a mock function with given fields: ctx, info, useFC, useDPU, subsystemID
-func (_m *NVMEConnector) ConnectVolume(ctx context.Context, info gobrick.NVMeVolumeInfo, useFC bool, useDPU bool, subsystemID string) (gobrick.Device, error) {
-	ret := _m.Called(ctx, info, useFC, useDPU, subsystemID)
+// ConnectVolume provides a mock function with given fields: ctx, info, useFC, useDPU, subsystemID, hostID
+func (_m *NVMEConnector) ConnectVolume(ctx context.Context, info gobrick.NVMeVolumeInfo, useFC bool, useDPU bool, subsystemID string, hostID int32) (gobrick.Device, error) {
+	ret := _m.Called(ctx, info, useFC, useDPU, subsystemID, hostID)
 
 	var r0 gobrick.Device
-	if rf, ok := ret.Get(0).(func(context.Context, gobrick.NVMeVolumeInfo, bool, bool, string) gobrick.Device); ok {
-		r0 = rf(ctx, info, useFC, useDPU, subsystemID)
+	if rf, ok := ret.Get(0).(func(context.Context, gobrick.NVMeVolumeInfo, bool, bool, string, int32) gobrick.Device); ok {
+		r0 = rf(ctx, info, useFC, useDPU, subsystemID, hostID)
 	} else {
 		r0 = ret.Get(0).(gobrick.Device)
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, gobrick.NVMeVolumeInfo, bool, bool, string) error); ok {
-		r1 = rf(ctx, info, useFC, useDPU, subsystemID)
+	if rf, ok := ret.Get(1).(func(context.Context, gobrick.NVMeVolumeInfo, bool, bool, string, int32) error); ok {
+		r1 = rf(ctx, info, useFC, useDPU, subsystemID, hostID)
 	} else {
 		r1 = ret.Error(1)
 	}

@@ -57,6 +57,7 @@ type SCSIStager struct {
 	iscsiConnector ISCSIConnector
 	nvmeConnector  NVMEConnector
 	fcConnector    FcConnector
+	dpuHostID      int32
 }
 
 // Stage stages volume by connecting it through either FC or iSCSI and creating bind mount to staging path
@@ -437,7 +438,7 @@ func (s *SCSIStager) connectNVMEDevice(ctx context.Context,
 		Targets: targets,
 		WWN:     wwn,
 		NGUID:   nguid,
-	}, s.useFC, s.useDPU, data.dpuSubsystemID)
+	}, s.useFC, s.useDPU, data.dpuSubsystemID, s.dpuHostID)
 }
 
 func (s *SCSIStager) connectFCDevice(ctx context.Context,

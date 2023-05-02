@@ -31,6 +31,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync/atomic"
 
 	"github.com/dell/gonvme"
 
@@ -80,6 +81,7 @@ type Service struct {
 	nodeID         string
 	dpuHostNQN     string
 	dpuSubsystemID string
+	dpuHostID      int32
 
 	useDPU                 bool
 	useFC                  bool
@@ -289,6 +291,7 @@ func (s *Service) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeR
 		req.PublishContext[fmt.Sprintf("%s%d", common.PublishContextNVMETCPPortalsPrefix, i)] = t.Portal + ":4420"
 	}
 	req.PublishContext[common.DPUSubsystemID] = s.dpuSubsystemID
+	atomic.AddInt32(&s.dpuHostID, 1)
 
 	id, arrayID, protocol, _ := array.ParseVolumeID(ctx, id, s.DefaultArray(), req.VolumeCapability)
 
@@ -311,6 +314,7 @@ func (s *Service) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeR
 			iscsiConnector: s.iscsiConnector,
 			nvmeConnector:  s.nvmeConnector,
 			fcConnector:    s.fcConnector,
+			dpuHostID:      s.dpuHostID,
 		}
 	}
 
@@ -1093,8 +1097,9 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 				if err != nil {
 					log.Errorf("could not discover NVMe targets: %s", err.Error())
 				}
-				for i, target := range nvmeTargets {
-					err := goopicsi.NVMeControllerConnect(int64(i), target.Portal, target.TargetNqn, 4420, s.dpuHostNQN)
+				for _, target := range nvmeTargets {
+					Id := strings.ReplaceAll(target.Portal, ".", "")
+					err := goopicsi.NVMeControllerConnect(Id, target.Portal, target.TargetNqn, 4420, s.dpuHostNQN)
 					if err != nil {
 						log.Errorf("could not connect DPU to the backend array")
 					}
@@ -1103,6 +1108,8 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 				s.dpuSubsystemID, _, err = goopicsi.ExposeRemoteNVMe(s.dpuHostNQN, 100)
 				if err != nil {
 					log.Errorf("could not create NVMe subsystem and controller %v", err.Error())
+				} else {
+					s.dpuHostID = 0
 				}
 				resp.AccessibleTopology.Segments[common.Name+"/"+arr.GetIP()+"-dpu"] = "true"
 
@@ -1142,7 +1149,6 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 						log.Errorf("couldn't get targets from array: %s", err.Error())
 						continue
 					}
-
 					log.Infof("Discovering NVMeTCP targets")
 					nvmetcpConnectCount := 0
 					nvmeIP := strings.Split(infoList[0].Portal, ":")
