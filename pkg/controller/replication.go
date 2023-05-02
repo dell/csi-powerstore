@@ -132,20 +132,16 @@ func (s *Service) CreateStorageProtectionGroup(ctx context.Context,
 			return nil, err
 		}
 		nasId := fs.NasServerID
-		log.Infof("!!!!!!!!!")
-		log.Infof("NAS ID: " + nasId)
 		nas, err := arr.GetClient().GetNAS(ctx, nasId)
 		if err != nil {
 			return nil, err
 		}
-		log.Infof("NAS name: " + nas.Name)
 
 		// get the local and remote systems
 		rs, err := arr.Client.GetReplicationSessionByLocalResourceID(ctx, nasId)
 		if err != nil {
 			return nil, err
 		}
-		log.Infof("Replication session: " + rs.ID)
 
 		localSystem, err := arr.Client.GetCluster(ctx)
 		if err != nil {
@@ -155,8 +151,6 @@ func (s *Service) CreateStorageProtectionGroup(ctx context.Context,
 		if err != nil {
 			return nil, err
 		}
-		log.Infof("Local system: " + localSystem.Name)
-		log.Infof("Remote system: " + remoteSystem.Name)
 
 		// define params
 		localParams := map[string]string{
