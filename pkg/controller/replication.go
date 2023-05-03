@@ -126,10 +126,56 @@ func (s *Service) CreateStorageProtectionGroup(ctx context.Context,
 	}
 
 	if protocol == "nfs" { // NFS protocol indicates a FileSystem on the storage array and requires different handling from block Volumes.
-		return nil, status.Error(codes.InvalidArgument, "replication is not supported for NFS volumes")
+		// get the NAS server from the filesystem
+		fs, err := arr.GetClient().GetFS(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		nasId := fs.NasServerID
+		nas, err := arr.GetClient().GetNAS(ctx, nasId)
+		if err != nil {
+			return nil, err
+		}
 
-		// TODO: Implement nfs replication.
+		// get the local and remote systems
+		rs, err := arr.Client.GetReplicationSessionByLocalResourceID(ctx, nasId)
+		if err != nil {
+			return nil, err
+		}
 
+		localSystem, err := arr.Client.GetCluster(ctx)
+		if err != nil {
+			return nil, err
+		}
+		remoteSystem, err := arr.Client.GetRemoteSystem(ctx, rs.RemoteSystemId)
+		if err != nil {
+			return nil, err
+		}
+
+		// define params
+		localParams := map[string]string{
+			s.replicationContextPrefix + "systemName":              localSystem.Name,
+			s.replicationContextPrefix + "managementAddress":       localSystem.ManagementAddress,
+			s.replicationContextPrefix + "remoteSystemName":        remoteSystem.Name,
+			s.replicationContextPrefix + "remoteManagementAddress": remoteSystem.ManagementAddress,
+			s.replicationContextPrefix + "globalID":                arrayID,
+			s.replicationContextPrefix + "remoteGlobalID":          remoteSystem.SerialNumber,
+			s.replicationContextPrefix + "nasName":                 nas.Name,
+		}
+		remoteParams := map[string]string{
+			s.replicationContextPrefix + "systemName":              remoteSystem.Name,
+			s.replicationContextPrefix + "managementAddress":       remoteSystem.ManagementAddress,
+			s.replicationContextPrefix + "remoteSystemName":        localSystem.Name,
+			s.replicationContextPrefix + "remoteManagementAddress": localSystem.ManagementAddress,
+			s.replicationContextPrefix + "globalID":                remoteSystem.SerialNumber,
+			s.replicationContextPrefix + "nasName":                 nas.Name,
+		}
+		return &csiext.CreateStorageProtectionGroupResponse{
+			LocalProtectionGroupId:          rs.LocalResourceId,
+			RemoteProtectionGroupId:         rs.RemoteResourceId,
+			LocalProtectionGroupAttributes:  localParams,
+			RemoteProtectionGroupAttributes: remoteParams,
+		}, nil
 	}
 
 	// Non-NFS protocol indicates a Volume on the storage array.
@@ -610,6 +656,7 @@ func (s *Service) GetStorageProtectionGroupStatus(ctx context.Context,
 	if err != nil {
 		return nil, err
 	}
+	// TODO: If NFS type RGs require editing for getting their state, it'll be in this method.
 
 	var state csiext.StorageProtectionGroupStatus_State
 	switch rs.State {
