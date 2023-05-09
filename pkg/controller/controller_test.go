@@ -3627,8 +3627,8 @@ var _ = Describe("CSIControllerService", func() {
 		})
 	})
 
-	Describe("calling DiscoverRemoteVolume", func() {
-		When("discover remote volume", func() {
+	Describe("calling CreateRemoteVolume", func() {
+		When("creating remote volume", func() {
 			It("should return info if everything is ok", func() {
 				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).
 					Return(gopowerstore.VolumeGroups{VolumeGroup: []gopowerstore.VolumeGroup{{ID: validGroupID}}}, nil)
@@ -3738,6 +3738,39 @@ var _ = Describe("CSIControllerService", func() {
 				Expect(err.Error()).To(ContainSubstring(
 					fmt.Sprintf("couldn't find volume id %s in storage element pairs of replication session", validBaseVolID)))
 			})
+
+			It("should fail if the array id is nil", func() {
+
+				// create volume handle with nil array ID
+				req := &csiext.CreateRemoteVolumeRequest{
+					VolumeHandle: validBaseVolID + "/" + "/" + "iscsi",
+				}
+				res, err := ctrlSvc.CreateRemoteVolume(context.Background(), req)
+
+				Expect(res).To(BeNil())
+				Expect(err).NotTo(BeNil())
+				Expect(err.Error()).To(ContainSubstring(
+					"failed to find array with given IP",
+				))
+			})
+
+			It("should fail if a volume group does not exist for the volume", func() {
+
+				// return an empty volume group
+				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).Return(gopowerstore.VolumeGroups{}, nil)
+
+				req := &csiext.CreateRemoteVolumeRequest{
+					VolumeHandle: validBaseVolID + "/" + firstValidID + "/" + "iscsi",
+				}
+				res, err := ctrlSvc.CreateRemoteVolume(context.Background(), req)
+
+				Expect(res).To(BeNil())
+				Expect(err).ToNot(BeNil())
+				Expect(err.Error()).To(ContainSubstring(
+					"replication of volumes that aren't assigned to group is not implemented yet",
+				))
+			})
+
 		})
 	})
 
