@@ -3854,6 +3854,33 @@ var _ = Describe("CSIControllerService", func() {
 				Expect(err).To(BeNil())
 				Expect(res).To(Equal(validRuleID))
 			})
+
+			It("should fail to create a replication rule", func() {
+
+				clientMock.On("GetReplicationRuleByName", mock.Anything, validRuleName).Return(
+					gopowerstore.ReplicationRule{ID: validRuleID},
+					gopowerstore.NewNotFoundError(),
+				)
+
+				// generic error
+				apiErr := gopowerstore.NewAPIError()
+				apiErr.Message = "injected api error"
+
+				clientMock.On("CreateReplicationRule", mock.Anything,
+					&gopowerstore.ReplicationRuleCreate{
+						Name:           validRuleName,
+						Rpo:            validRPO,
+						RemoteSystemID: validRemoteSystemID,
+					},
+				).Return(gopowerstore.CreateResponse{}, gopowerstore.WrapErr(apiErr))
+
+				res, err := controller.EnsureReplicationRuleExists(context.Background(), ctrlSvc.DefaultArray(),
+					validGroupName, validRemoteSystemID, validRPO)
+
+				Expect(res).To(BeEmpty())
+				Expect(err).ToNot(BeNil())
+				Expect(err.Error()).To(ContainSubstring("can't create replication rule"))
+			})
 		})
 
 	})
