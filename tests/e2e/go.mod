@@ -47,7 +47,7 @@ require (
 	github.com/dell/gofsutil v1.12.0 // indirect
 	github.com/dell/goiscsi v1.7.0 // indirect
 	github.com/dell/gonvme v1.4.0 // indirect
-	github.com/docker/distribution v2.8.1+incompatible // indirect
+	github.com/docker/distribution v2.8.2+incompatible // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/emicklei/go-restful/v3 v3.10.0 // indirect
 	github.com/euank/go-kmsg-parser v2.0.0+incompatible // indirect
