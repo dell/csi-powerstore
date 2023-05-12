@@ -10,7 +10,7 @@
 
 # verify-csi-powerstore method
 function verify-csi-powerstore() {
-  verify_k8s_versions "1.23" "1.27"
+  verify_k8s_versions "1.22" "1.27"
   verify_openshift_versions "4.11" "4.12"
   verify_namespace "${NS}"
   verify_required_secrets "${RELEASE}-config"

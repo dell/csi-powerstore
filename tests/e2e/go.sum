@@ -157,7 +157,7 @@ github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/dell/dell-csi-extensions/common v1.1.1 h1:PXdqCm6lL1g02KuR9SrsrZeoTk6jZoyPp56s3ve+8DE=
 github.com/dell/dell-csi-extensions/podmon v1.1.2 h1:U0p2IS3PA/GPXYwtmY3bM+xfhj7hPY6nPkRAyFh0slw=
-github.com/dell/dell-csi-extensions/replication v1.3.0 h1:Z2w+jwoyBM4ESKhABLeRjIcWxJMd4Bnt3phEPeQhljw=
+github.com/dell/dell-csi-extensions/replication v1.3.1-0.20230316192210-d1b46db0cbe0 h1:8puwDAHQI+SI9KoKigJARxmwRE1tk40zRFekt6WQQ/o=
 github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.2.2 h1:g3HZyuXgCiHpCkkVuCNKXFRETjvOkO6/16vrAH5ls90=
 github.com/dell/gobrick v1.7.0 h1:XM72GhtyIKpBuj/yjTr3N04uWLFNMyDjXjDGjgCmtno=
 github.com/dell/gobrick v1.7.0/go.mod h1:fUM/uqSvswD3368dEs+iz2wtp/pwlylN4oVQMcJm3jA=
@@ -173,8 +173,9 @@ github.com/dell/gopowerstore v1.11.0 h1:h4Opj5zDho3RnhqS/kgyeFOS+Y8+mE1OutnTDybg
 github.com/dell/gopowerstore v1.11.0/go.mod h1:d5OP8ZaRcZ65GTkUuZHLGa0IFgRdA3vF4i6JccfHBYE=
 github.com/dgrijalva/jwt-go v3.2.0+incompatible/go.mod h1:E3ru+11k8xSBh+hMPgOLZmtrrCbhqsmaPHjLKYnJCaQ=
 github.com/dgryski/go-sip13 v0.0.0-20181026042036-e10d5fee7954/go.mod h1:vAd38F8PWV+bWy6jNmig1y/TA+kYO4g3RSRF0IAv0no=
-github.com/docker/distribution v2.8.1+incompatible h1:Q50tZOPR6T/hjNsyc9g8/syEs6bk8XXApsHjKukMl68=
 github.com/docker/distribution v2.8.1+incompatible/go.mod h1:J2gT2udsDAN96Uj4KfcMRqY0/ypR+oyYUYmja8H+y+w=
+github.com/docker/distribution v2.8.2+incompatible h1:T3de5rq0dB1j30rp0sA2rER+m322EBzniBPB6ZIzuh8=
+github.com/docker/distribution v2.8.2+incompatible/go.mod h1:J2gT2udsDAN96Uj4KfcMRqY0/ypR+oyYUYmja8H+y+w=
 github.com/docker/docker v20.10.18+incompatible h1:SN84VYXTBNGn92T/QwIRPlum9zfemfitN7pbsp26WSc=
 github.com/docker/docker v20.10.18+incompatible/go.mod h1:eEKB0N0r5NX/I1kEveEz05bcu8tLC/8azJZsviup8Sk=
 github.com/docker/go-connections v0.4.0 h1:El9xVISelRB7BuFusrZozjnkIM5YnzCViNKohAFqRJQ=
