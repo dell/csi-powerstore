@@ -424,6 +424,42 @@ var _ = Describe("Replication", func() {
 						ContainSubstring("can't find array with global ID"))
 				})
 			})
+			When("the volume cannot be found on the powerstore array", func() {
+				It("should fail with 'not found'", func() {
+
+					// GetVolume should return a NotFound error.
+					clientMock.On("GetVolume", mock.Anything, validBaseVolID).Return(
+						gopowerstore.Volume{}, gopowerstore.WrapErr(gopowerstore.NewNotFoundError()),
+					)
+
+					req := &csiext.DeleteLocalVolumeRequest{
+						VolumeHandle: validBaseVolID + "/" + firstValidID + "/" + "iscsi",
+					}
+					res, err := ctrlSvc.DeleteLocalVolume(context.Background(), req)
+
+					Expect(res).To(Equal(
+						&csiext.DeleteLocalVolumeResponse{},
+					))
+					Expect(err).To(BeNil())
+				})
+				It("should fail to get the volume", func() {
+					// GetVolume should return a non-nil error, and not be a NotFoundError
+					clientMock.On("GetVolume", mock.Anything, validBaseVolID).Return(
+						gopowerstore.Volume{}, gopowerstore.WrapErr(gopowerstore.NewAPIError()),
+					)
+
+					req := &csiext.DeleteLocalVolumeRequest{
+						VolumeHandle: validBaseVolID + "/" + firstValidID + "/" + "iscsi",
+					}
+					res, err := ctrlSvc.DeleteLocalVolume(context.Background(), req)
+
+					Expect(res).To(BeNil())
+					Expect(err).ToNot(BeNil())
+					Expect(err.Error()).To(ContainSubstring(
+						"Unable to get volume for deletion",
+					))
+				})
+			})
 		})
 		Describe("calling DeleteStorageProtectionGroup()", func() {
 			When("GlobalID is missing", func() {
