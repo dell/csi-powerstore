@@ -3578,6 +3578,59 @@ var _ = Describe("CSIControllerService", func() {
 					LocalProtectionGroupAttributes:  localParams,
 					RemoteProtectionGroupAttributes: remoteParams,
 				}))
+
+			})
+
+			// NFS Replication Support
+			It("should successfully discover protection group if everything is ok - NFS", func() {
+				clientMock.On("GetFS", mock.Anything, validBaseVolID).
+					Return(gopowerstore.FileSystem{ID: validBaseVolID, SizeTotal: validVolSize, NasServerID: validGroupID}, nil)
+
+				clientMock.On("GetNAS", mock.Anything, validGroupID).
+					Return(gopowerstore.NAS{ID: validGroupID, Name: validGroupName}, nil)
+
+				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, validGroupID).
+					Return(gopowerstore.ReplicationSession{
+						RemoteSystemId:   validRemoteSystemID,
+						LocalResourceId:  validGroupID,
+						RemoteResourceId: validRemoteGroupID,
+						StorageElementPairs: []gopowerstore.StorageElementPair{{
+							LocalStorageElementId:  validBaseVolID,
+							RemoteStorageElementId: validRemoteVolId,
+						}}}, nil)
+
+				clientMock.On("GetCluster", mock.Anything).
+					Return(gopowerstore.Cluster{Name: validClusterName, ManagementAddress: firstValidID}, nil)
+
+				clientMock.On("GetRemoteSystem", mock.Anything, validRemoteSystemID).
+					Return(gopowerstore.RemoteSystem{
+						Name:              validRemoteSystemName,
+						ManagementAddress: secondValidID,
+						SerialNumber:      validRemoteSystemGlobalID}, nil)
+
+				req := &csiext.CreateStorageProtectionGroupRequest{
+					VolumeHandle: validBaseVolID + "/" + firstValidID + "/" + "nfs",
+				}
+
+				res, err := ctrlSvc.CreateStorageProtectionGroup(context.Background(), req)
+
+				localParams, remoteParams := getLocalAndRemoteParams(validClusterName, firstValidID,
+					validRemoteSystemName, secondValidID, validRemoteSystemGlobalID, validVolumeGroupName)
+				// replace VolumeGroupName with nasName for NFS volume
+				localParams["nasName"] = validGroupName
+				remoteParams["nasName"] = validGroupName
+				delete(localParams, "VolumeGroupName")
+				delete(remoteParams, "VolumeGroupName")
+
+				Expect(err).To(BeNil())
+				Expect(res).To(Equal(&csiext.CreateStorageProtectionGroupResponse{
+
+					LocalProtectionGroupId:          validGroupID,
+					RemoteProtectionGroupId:         validRemoteGroupID,
+					LocalProtectionGroupAttributes:  localParams,
+					RemoteProtectionGroupAttributes: remoteParams,
+				}))
+
 			})
 
 			It("should fail if volume doesn't exists", func() {
@@ -3738,6 +3791,49 @@ var _ = Describe("CSIControllerService", func() {
 				Expect(err.Error()).To(ContainSubstring(
 					fmt.Sprintf("couldn't find volume id %s in storage element pairs of replication session", validBaseVolID)))
 			})
+		})
+		// NFS Replication Support
+		It("should return info if everything is ok - NFS", func() {
+			clientMock.On("GetFS", mock.Anything, validBaseVolID).
+				Return(gopowerstore.FileSystem{ID: validBaseVolID, SizeTotal: validVolSize, NasServerID: validGroupID}, nil)
+
+			clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, validGroupID).
+				Return(gopowerstore.ReplicationSession{
+					LocalResourceId:  validGroupID,
+					RemoteResourceId: validRemoteGroupID,
+					RemoteSystemId:   validRemoteSystemID,
+					StorageElementPairs: []gopowerstore.StorageElementPair{
+						{
+							LocalStorageElementId:  validBaseVolID,
+							RemoteStorageElementId: validRemoteVolId,
+						},
+					},
+				}, nil)
+
+			clientMock.On("GetCluster", mock.Anything).
+				Return(gopowerstore.Cluster{Name: validClusterName}, nil)
+
+			clientMock.On("GetRemoteSystem", mock.Anything, validRemoteSystemID).
+				Return(gopowerstore.RemoteSystem{Name: validRemoteSystemName, ManagementAddress: secondValidID, ID: validRemoteSystemID, SerialNumber: validRemoteSystemGlobalID}, nil)
+
+			req := &csiext.CreateRemoteVolumeRequest{
+				VolumeHandle: validBaseVolID + "/" + firstValidID + "/" + "nfs",
+			}
+
+			res, err := ctrlSvc.CreateRemoteVolume(context.Background(), req)
+
+			Expect(err).To(BeNil())
+			Expect(res).To(Equal(
+				&csiext.CreateRemoteVolumeResponse{RemoteVolume: &csiext.Volume{
+					CapacityBytes: validVolSize,
+					VolumeId:      validRemoteVolId + "/" + validRemoteSystemGlobalID + "/" + "nfs",
+					VolumeContext: map[string]string{
+						"remoteSystem":      validClusterName,
+						"managementAddress": secondValidID,
+						"arrayID":           validRemoteSystemGlobalID,
+					},
+				}}))
+
 		})
 	})
 

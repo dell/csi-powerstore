@@ -399,6 +399,29 @@ var _ = Describe("Replication", func() {
 		})
 
 		Describe("calling DeleteLocalVolume()", func() {
+			When("passing in valid data", func() {
+				It("should return a valid DeleteLocalVolumeResponse", func() {
+					clientMock.On("GetVolume", mock.Anything, validBaseVolID).
+						Return(gopowerstore.Volume{ID: validBaseVolID, Size: validVolSize}, nil)
+
+					clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).
+						Return(gopowerstore.VolumeGroups{}, nil) // empty, should not be any VGs
+
+					clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).
+						Return(nil, nil)
+
+					clientMock.On("DeleteVolume", mock.Anything, mock.Anything, validBaseVolID).
+						Return(gopowerstore.EmptyResponse(""), nil)
+
+					req := &csiext.DeleteLocalVolumeRequest{
+						VolumeHandle: validBaseVolID + "/" + firstValidID + "/" + "iscsi",
+					}
+					res, err := ctrlSvc.DeleteLocalVolume(context.Background(), req)
+
+					Expect(res).To(Equal(new(csiext.DeleteLocalVolumeResponse)))
+					Expect(err).To(BeNil())
+				})
+			})
 			When("Volume ID is missing", func() {
 				It("should fail", func() {
 					req := new(csiext.DeleteLocalVolumeRequest)

@@ -99,9 +99,49 @@ func (s *Service) CreateRemoteVolume(ctx context.Context,
 			RemoteVolume: remoteVolume,
 		}, nil
 	}
-	// TODO: Handling for NFS-type replication. Cannot use VG for replication session. NAS server instead?
+	// Handling for NFS-type replication
+	fs, err := arr.GetClient().GetFS(ctx, id)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "Unable to retrieve FS with ID %s", id)
+	}
+
+	rs, err := arr.Client.GetReplicationSessionByLocalResourceID(ctx, fs.NasServerID)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "Unable to retrieve replication session for NAS server with ID %s", fs.NasServerID)
+	}
+
+	var remoteFileSystemId string
+	for _, sp := range rs.StorageElementPairs {
+		if sp.LocalStorageElementId == id {
+			remoteFileSystemId = sp.RemoteStorageElementId
+		}
+	}
+
+	if remoteFileSystemId == "" {
+		return nil, status.Errorf(codes.Internal, "couldn't find file system id %s in storage element pairs of replication session", id)
+	}
+
+	localSystem, err := arr.Client.GetCluster(ctx)
+	if err != nil {
+		return nil, err
+	}
+	remoteSystem, err := arr.Client.GetRemoteSystem(ctx, rs.RemoteSystemId)
+	if err != nil {
+		return nil, err
+	}
+
+	remoteParams := map[string]string{
+		"remoteSystem":                                   localSystem.Name,
+		s.replicationContextPrefix + "arrayID":           remoteSystem.SerialNumber,
+		s.replicationContextPrefix + "managementAddress": remoteSystem.ManagementAddress,
+	}
+
+	remoteVolume := getRemoteCSIVolume(remoteFileSystemId+"/"+remoteParams[s.replicationContextPrefix+"arrayID"]+"/"+protocol, fs.SizeTotal)
+	remoteVolume.VolumeContext = remoteParams
+	log.Info("Remote params successfully defined")
+
 	return &csiext.CreateRemoteVolumeResponse{
-		RemoteVolume: nil,
+		RemoteVolume: remoteVolume,
 	}, nil
 }
 
