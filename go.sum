@@ -121,6 +121,8 @@ github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/dell/csi-metadata-retriever v1.3.0 h1:S+DaiW19FHxNyOtWCAZ2cQAiDSOpW4lhTT4yEJEpDl0=
 github.com/dell/csi-metadata-retriever v1.3.0/go.mod h1:rr6XKY6PFP4XCAGbntwCHgMkY/BQlDFSiPFISLmMTmI=
+github.com/dell/csi-metadata-retriever v1.3.1-0.20230418071627-3c1ed2482436 h1:7wOdtXrTpUewYzsdIlhRj6Fje8vrUI7F71T8G0A2xOs=
+github.com/dell/csi-metadata-retriever v1.3.1-0.20230418071627-3c1ed2482436/go.mod h1:cPGxyyOoHkpIKjMOtQwqrle49/Q7o63eZ+bUq/6+nzY=
 github.com/dell/dell-csi-extensions/common v1.1.2-0.20230517135918-9920e636bff1 h1:oviKJqvut+RTs5kjAq0W3BkCUcrfmGlp4iizcLKk5eI=
 github.com/dell/dell-csi-extensions/common v1.1.2-0.20230517135918-9920e636bff1/go.mod h1:gN1UI4Wag3JXtqHQwkM4O6p0V+2WvesangManDOH9a8=
 github.com/dell/dell-csi-extensions/podmon v1.1.3-0.20230517135918-9920e636bff1 h1:Nd0MI5lVGK6Zt+j3mr+JbEDZXsuCvWPcnpmqS2D2MrE=
@@ -131,6 +133,8 @@ github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.2.3-0.20230517135918-
 github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.2.3-0.20230517135918-9920e636bff1/go.mod h1:e+mpeEK5tc2n2indRbG27V00QoNoZBCzqcloOXx75lA=
 github.com/dell/gobrick v1.7.0 h1:XM72GhtyIKpBuj/yjTr3N04uWLFNMyDjXjDGjgCmtno=
 github.com/dell/gobrick v1.7.0/go.mod h1:fUM/uqSvswD3368dEs+iz2wtp/pwlylN4oVQMcJm3jA=
+github.com/dell/gobrick v1.7.1-0.20230509091132-fb6b80aa79f1 h1:2aoGUTD3Vi/nFvYJlmFWnJ5NzBLNBnvew6BjHMWx0+U=
+github.com/dell/gobrick v1.7.1-0.20230509091132-fb6b80aa79f1/go.mod h1:VDRop+1h088TrUadCj1hxhGtl9enLI8Im7UoTniKz3M=
 github.com/dell/gocsi v1.7.0 h1:fMQO2zwAXCaIsUoPCcnnuPMwfQMoaI1/0aqkQVndlxU=
 github.com/dell/gocsi v1.7.0/go.mod h1:X/8Ll8qqKAKCenmd1gPJMUvUmgY8cK0LiS8Pck12UaU=
 github.com/dell/gofsutil v1.12.0 h1:oo2YHfGFKHvHS1urtqjOIKpaHwcdyqacwKHLXzUg33M=
@@ -141,6 +145,8 @@ github.com/dell/gonvme v1.4.0 h1:SK94ETt0pYZbaKkRJOcq81TbrzC38ufBX+w4uKwJnks=
 github.com/dell/gonvme v1.4.0/go.mod h1:fIu54BDTyIu8JOTXo6Q0BqMF1tOjpO+wKXVXjLReR2o=
 github.com/dell/gopowerstore v1.11.0 h1:h4Opj5zDho3RnhqS/kgyeFOS+Y8+mE1OutnTDybgEhQ=
 github.com/dell/gopowerstore v1.11.0/go.mod h1:d5OP8ZaRcZ65GTkUuZHLGa0IFgRdA3vF4i6JccfHBYE=
+github.com/dell/gopowerstore v1.11.1-0.20230516154101-dc92813b4f58 h1:9VBD0OI1lGM7AKA9N2nWOtuAZS1ZDIpCuDKBE6SIgBw=
+github.com/dell/gopowerstore v1.11.1-0.20230516154101-dc92813b4f58/go.mod h1:d5OP8ZaRcZ65GTkUuZHLGa0IFgRdA3vF4i6JccfHBYE=
 github.com/dgrijalva/jwt-go v3.2.0+incompatible/go.mod h1:E3ru+11k8xSBh+hMPgOLZmtrrCbhqsmaPHjLKYnJCaQ=
 github.com/dgryski/go-sip13 v0.0.0-20181026042036-e10d5fee7954/go.mod h1:vAd38F8PWV+bWy6jNmig1y/TA+kYO4g3RSRF0IAv0no=
 github.com/docopt/docopt-go v0.0.0-20180111231733-ee0de3bc6815/go.mod h1:WwZ+bS3ebgob9U8Nd0kOddGdZWjyMGR8Wziv+TBNwSE=
