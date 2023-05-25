@@ -23,7 +23,7 @@
 driverName: "csi-powerstore.dellemc.com"
 
 # Driver version required to pull the latest driver image
-version: "v2.6.0"
+version: "v2.7.0"
 
 # Specify kubelet config dir path.
 # Ensure that the config.yaml file is present at this path.
@@ -301,8 +301,8 @@ storageCapacity:
   # Allowed values:
   #   true: enable storage capacity tracking
   #   false: disable storage capacity tracking
-  # Default value: true
-  enabled: true
+  # Default value: false
+  enabled: false
   # pollInterval : Configure how often external-provisioner polls the driver to detect changed capacity
   # Allowed values: 1m,2m,3m,...,10m,...,60m etc
   # Default value: 5m
