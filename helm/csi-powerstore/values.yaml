@@ -301,8 +301,8 @@ storageCapacity:
   # Allowed values:
   #   true: enable storage capacity tracking
   #   false: disable storage capacity tracking
-  # Default value: true
-  enabled: true
+  # Default value: false
+  enabled: false
   # pollInterval : Configure how often external-provisioner polls the driver to detect changed capacity
   # Allowed values: 1m,2m,3m,...,10m,...,60m etc
   # Default value: 5m
