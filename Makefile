@@ -1,6 +1,6 @@
 #
 #
-# Copyright © 2020-2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+# Copyright © 2020-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ all: clean build
 # Dockerfile defines which base image to use [Dockerfile.centos, Dockerfile.ubi, Dockerfile.ubi.min, Dockerfile.ubi.alt]
 # e.g.:$ make docker DOCKER_FILE=Dockerfile.ubi.alt
 ifndef DOCKER_FILE
-    DOCKER_FILE = Dockerfile.ubi.min
+    DOCKER_FILE = Dockerfile.ubi.micro
 endif
 
 # Tag parameters
@@ -71,7 +71,6 @@ docker-no-cache:
 	go generate ./cmd/csi-powerstore
 	go run core/semver/semver.go -f mk >semver.mk
 	make -f docker.mk DOCKER_FILE=docker-files/$(DOCKER_FILE) docker-no-cache
-
 
 # Pushes container to the repository
 push:	docker

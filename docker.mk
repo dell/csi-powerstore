@@ -1,6 +1,6 @@
 #
 #
-# Copyright © 2020-2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+# Copyright © 2020-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -34,7 +34,13 @@ ifndef DOCKER_IMAGE_NAME
 endif
 
 ifndef BASEIMAGE
-	BASEIMAGE=ubi-minimal:8.7-1085
+	BASEIMAGE=registry.access.redhat.com/ubi8/ubi-micro:8.7-8
+endif
+
+# Add 'build-base-image' as a dependency if UBI Micro is used as the base image.
+# This is required to load all the depedent packages into UBI Miro image.
+ifeq ($(DOCKER_FILE), docker-files/Dockerfile.ubi.micro)
+	DEPENDENCIES=build-base-image
 endif
 
 # figure out if podman or docker should be used (use podman if found)
@@ -44,17 +50,23 @@ else
 	BUILDER=docker
 endif
 
-docker:
-	echo "MAJOR $(MAJOR) MINOR $(MINOR) PATCH $(PATCH) RELNOTE $(RELNOTE) SEMVER $(SEMVER)"
-	echo "$(DOCKER_FILE)"
+docker: $(DEPENDENCIES)
+	@echo "MAJOR $(MAJOR) MINOR $(MINOR) PATCH $(PATCH) RELNOTE $(RELNOTE) SEMVER $(SEMVER)"
+	@echo "$(DOCKER_FILE)"
 	$(BUILDER) build -f $(DOCKER_FILE) -t "$(DOCKER_REGISTRY)/$(DOCKER_IMAGE_NAME):v$(MAJOR).$(MINOR).$(PATCH)$(RELNOTE)" --build-arg BASEIMAGE=$(BASEIMAGE) .
 
-docker-no-cache:
-	echo "MAJOR $(MAJOR) MINOR $(MINOR) PATCH $(PATCH) RELNOTE $(RELNOTE) SEMVER $(SEMVER)"
-	echo "$(DOCKER_FILE) --no-cache"
-	$(BUILDER) build --no-cache --pull -f $(DOCKER_FILE) -t "$(DOCKER_REGISTRY)/$(DOCKER_IMAGE_NAME):v$(MAJOR).$(MINOR).$(PATCH)$(RELNOTE)" --build-arg BASEIMAGE=$(BASEIMAGE) .
 
+docker-no-cache: $(DEPENDENCIES)
+	@echo "MAJOR $(MAJOR) MINOR $(MINOR) PATCH $(PATCH) RELNOTE $(RELNOTE) SEMVER $(SEMVER)"
+	@echo "$(DOCKER_FILE) --no-cache"
+	$(BUILDER) build --no-cache -f $(DOCKER_FILE) -t "$(DOCKER_REGISTRY)/$(DOCKER_IMAGE_NAME):v$(MAJOR).$(MINOR).$(PATCH)$(RELNOTE)" --build-arg BASEIMAGE=$(BASEIMAGE) .
 
 push:   
 	echo "MAJOR $(MAJOR) MINOR $(MINOR) PATCH $(PATCH) RELNOTE $(RELNOTE) SEMVER $(SEMVER)"
 	$(BUILDER) push "$(DOCKER_REGISTRY)/$(DOCKER_IMAGE_NAME):v$(MAJOR).$(MINOR).$(PATCH)$(RELNOTE)"
+
+build-base-image:
+	@echo "Building base image from $(BASEIMAGE) and loading dependencies..."
+	./buildubimicro.sh $(BASEIMAGE)
+	@echo "Base image build: SUCCESS"
+	$(eval BASEIMAGE=localhost/csipowerstore-ubimicro:latest)
