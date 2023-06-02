@@ -30,7 +30,7 @@ ifndef MAJOR
     MAJOR=2
 endif
 ifndef MINOR
-    MINOR=0
+    MINOR=7
 endif
 ifndef PATCH
     PATCH=0
