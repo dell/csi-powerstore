@@ -90,7 +90,7 @@ func setVolumeCreateAttributes(reqParams map[string]string, createParams *gopowe
 	if applianceID, ok := reqParams["appliance_id"]; ok {
 		createParams.ApplianceID = applianceID
 	}
-	if description, ok := reqParams["description"]; ok {
+	if description, ok := reqParams[common.KeyVolumeDescription]; ok {
 		createParams.Description = description
 	}
 	if protectionPolicyID, ok := reqParams["protection_policy_id"]; ok {
@@ -148,7 +148,7 @@ func setFLRAttributes(reqParams map[string]string, createParams *gopowerstore.Fs
 }
 
 func setNFSCreateAttributes(reqParams map[string]string, createParams *gopowerstore.FsCreate) {
-	if description, ok := reqParams["description"]; ok {
+	if description, ok := reqParams[common.KeyVolumeDescription]; ok {
 		createParams.Description = description
 	}
 	if configType, ok := reqParams["config_type"]; ok {

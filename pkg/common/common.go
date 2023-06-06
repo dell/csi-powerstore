@@ -89,7 +89,7 @@ const (
 	// KeyNasName key value to specify NAS server name
 	KeyNasName = "nasName"
 	// KeyVolumeDescription key value to specify volume description
-	KeyVolumeDescription = "description"
+	KeyVolumeDescription = "csi.dell.com/description"
 	// KeyServiceTag has the service tag associated to an Appliance
 	KeyServiceTag = "serviceTag"
 	// VerboseName longer description of the driver
