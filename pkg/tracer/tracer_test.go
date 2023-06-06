@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2021 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2021 -2023 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,10 +20,11 @@ package tracer
 
 import (
 	"errors"
+	"testing"
+
 	"github.com/dell/csi-powerstore/v2/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/uber/jaeger-client-go/config"
-	"testing"
 )
 
 func TestNewTracer(t *testing.T) {
