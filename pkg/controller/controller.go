@@ -329,6 +329,8 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 		}
 	}
 
+	params[common.KeyVolumeDescription] = getDescription(req.GetParameters())
+
 	var volumeResponse *csi.Volume
 	resp, err := creator.Create(ctx, req, sizeInBytes, arr.GetClient())
 	if err != nil {
@@ -352,6 +354,7 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 	volumeResponse.VolumeContext[common.KeyArrayVolumeName] = req.Name
 	volumeResponse.VolumeContext[common.KeyProtocol] = protocol
 	volumeResponse.VolumeContext[common.KeyServiceTag] = serviceTag
+	// volumeResponse.VolumeContext[common.KeyVolumeDescription] = getDescription(req.GetParameters())
 
 	if useNFS {
 		volumeResponse.VolumeContext[common.KeyNfsACL] = nfsAcls
