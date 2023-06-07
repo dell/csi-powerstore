@@ -124,7 +124,7 @@ func setFLRAttributes(reqParams map[string]string, createParams *gopowerstore.Fs
 	flrMode, flrModeFound := reqParams[common.KeyFlrCreateMode]
 	flrDefaultRetention, flrDefaultRetentionFound := reqParams[common.KeyFlrDefaultRetention]
 	flrMinimumRetention, flrMinimumRetentionFound := reqParams[common.KeyFlrMinRetention]
-	flrMaximumRetention, flrMaximumRetentionFound := reqParams[common.KeyFlrMinRetention]
+	flrMaximumRetention, flrMaximumRetentionFound := reqParams[common.KeyFlrMaxRetention]
 
 	if flrModeFound ||
 		flrDefaultRetentionFound ||
