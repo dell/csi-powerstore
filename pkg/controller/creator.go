@@ -87,21 +87,21 @@ func setMetaData(reqParams map[string]string, createParams interface{}) {
 }
 
 func setVolumeCreateAttributes(reqParams map[string]string, createParams *gopowerstore.VolumeCreate) {
-	if applianceID, ok := reqParams["appliance_id"]; ok {
+	if applianceID, ok := reqParams[common.KeyApplianceId]; ok {
 		createParams.ApplianceID = applianceID
 	}
 	if description, ok := reqParams[common.KeyVolumeDescription]; ok {
 		createParams.Description = description
 	}
-	if protectionPolicyID, ok := reqParams["protection_policy_id"]; ok {
+	if protectionPolicyID, ok := reqParams[common.KeyProtectionPolicyId]; ok {
 		createParams.ProtectionPolicyID = protectionPolicyID
 	}
-	if performancePolicyID, ok := reqParams["performance_policy_id"]; ok {
+	if performancePolicyID, ok := reqParams[common.KeyPerformancePolicyId]; ok {
 		createParams.PerformancePolicyID = performancePolicyID
 	}
-	if appType, ok := reqParams["app_type"]; ok {
+	if appType, ok := reqParams[common.KeyAppType]; ok {
 		createParams.AppType = gopowerstore.AppTypeEnum(appType)
-		if appTypeOther, ok := reqParams["app_type_other"]; ok {
+		if appTypeOther, ok := reqParams[common.KeyAppTypeOther]; ok {
 			createParams.AppTypeOther = appTypeOther
 		}
 	}
@@ -121,10 +121,10 @@ func validateHostIOSize(hostIOSize string) string {
 }
 
 func setFLRAttributes(reqParams map[string]string, createParams *gopowerstore.FsCreate) {
-	flrMode, flrModeFound := reqParams["flr_attributes.flr_create.mode"]
-	flrDefaultRetention, flrDefaultRetentionFound := reqParams["flr_attributes.flr_create.default_retention"]
-	flrMinimumRetention, flrMinimumRetentionFound := reqParams["flr_attributes.flr_create.minimum_retention"]
-	flrMaximumRetention, flrMaximumRetentionFound := reqParams["flr_attributes.flr_create.maximum_retention"]
+	flrMode, flrModeFound := reqParams[common.KeyFlrCreateMode]
+	flrDefaultRetention, flrDefaultRetentionFound := reqParams[common.KeyFlrDefaultRetention]
+	flrMinimumRetention, flrMinimumRetentionFound := reqParams[common.KeyFlrMinRetention]
+	flrMaximumRetention, flrMaximumRetentionFound := reqParams[common.KeyFlrMinRetention]
 
 	if flrModeFound ||
 		flrDefaultRetentionFound ||
@@ -151,30 +151,30 @@ func setNFSCreateAttributes(reqParams map[string]string, createParams *gopowerst
 	if description, ok := reqParams[common.KeyVolumeDescription]; ok {
 		createParams.Description = description
 	}
-	if configType, ok := reqParams["config_type"]; ok {
+	if configType, ok := reqParams[common.KeyConfigType]; ok {
 		createParams.ConfigType = configType
 	}
-	if accessPolicy, ok := reqParams["access_policy"]; ok {
+	if accessPolicy, ok := reqParams[common.KeyAccessPolicy]; ok {
 		createParams.AccessPolicy = accessPolicy
 	}
-	if lockingPolicy, ok := reqParams["locking_policy"]; ok {
+	if lockingPolicy, ok := reqParams[common.KeyLockingPolicy]; ok {
 		createParams.LockingPolicy = lockingPolicy
 	}
-	if folderRenamePolicy, ok := reqParams["folder_rename_policy"]; ok {
+	if folderRenamePolicy, ok := reqParams[common.KeyFolderRenamePolicy]; ok {
 		createParams.FolderRenamePolicy = folderRenamePolicy
 	}
-	if isAsyncMTimeEnabled, ok := reqParams["is_async_mtime_enabled"]; ok {
+	if isAsyncMTimeEnabled, ok := reqParams[common.KeyIsAsyncMtimeEnabled]; ok {
 		if val, err := strconv.ParseBool(isAsyncMTimeEnabled); err == nil {
 			createParams.IsAsyncMTimeEnabled = val
 		}
 	}
-	if protectionPolicyID, ok := reqParams["protection_policy_id"]; ok {
+	if protectionPolicyID, ok := reqParams[common.KeyProtectionPolicyId]; ok {
 		createParams.ProtectionPolicyId = protectionPolicyID
 	}
-	if fileEventsPublishingMode, ok := reqParams["file_events_publishing_mode"]; ok {
+	if fileEventsPublishingMode, ok := reqParams[common.KeyFileEventsPublishingMode]; ok {
 		createParams.FileEventsPublishingMode = fileEventsPublishingMode
 	}
-	if hostIOSize, ok := reqParams["host_io_size"]; ok {
+	if hostIOSize, ok := reqParams[common.KeyHostIoSize]; ok {
 		createParams.HostIOSize = validateHostIOSize(hostIOSize)
 	}
 	setFLRAttributes(reqParams, createParams)
@@ -252,7 +252,7 @@ func (sc *SCSICreator) Create(ctx context.Context, req *csi.CreateVolumeRequest,
 	}
 	if sc.vg != nil {
 		reqParams.VolumeGroupID = sc.vg.ID
-	} else if vgID, ok := req.Parameters["volume_group_id"]; ok {
+	} else if vgID, ok := req.Parameters[common.KeyVolumeGroupId]; ok {
 		reqParams.VolumeGroupID = vgID
 	}
 	setMetaData(req.Parameters, reqParams)

@@ -90,6 +90,40 @@ const (
 	KeyNasName = "nasName"
 	// KeyVolumeDescription key value to specify volume description
 	KeyVolumeDescription = "csi.dell.com/description"
+	// KeyApplianceId key value to specify appliance_id
+	KeyApplianceId = "csi.dell.com/appliance_id"
+	// KeyProtectionPolicyId key value to specify protection_policy_id
+	KeyProtectionPolicyId = "csi.dell.com/protection_policy_id"
+	// KeyPerformancePolicyId key value to specify performance_policy_id
+	KeyPerformancePolicyId = "csi.dell.com/performance_policy_id"
+	// KeyAppType key value to specify app_type
+	KeyAppType = "csi.dell.com/app_type"
+	// KeyAppTypeOther key value to specify app_type_other
+	KeyAppTypeOther = "csi.dell.com/app_type_other"
+	// KeyConfigType key value to specify volume config_type
+	KeyConfigType = "csi.dell.com/config_type"
+	// KeyAccessPolicy key value to specify volume access_policy
+	KeyAccessPolicy = "csi.dell.com/access_policy"
+	// KeyLockingPolicy key value to specify volume locking_policy
+	KeyLockingPolicy = "csi.dell.com/locking_policy"
+	// KeyFolderRenamePolicy key value to specify volume folder_rename_policy
+	KeyFolderRenamePolicy = "csi.dell.com/folder_rename_policy"
+	// KeyIsAsyncMtimeEnabled key value to specify volume is_async_mtime_enabled
+	KeyIsAsyncMtimeEnabled = "csi.dell.com/is_async_mtime_enabled"
+	// KeyFileEventsPublishingMode key value to specify volume file_events_publishing_mode
+	KeyFileEventsPublishingMode = "csi.dell.com/file_events_publishing_mode"
+	// KeyHostIoSize key value to specify volume host_io_size
+	KeyHostIoSize = "csi.dell.com/host_io_size"
+	// KeyVolumeGroupId key value to specify volume_group_id
+	KeyVolumeGroupId = "csi.dell.com/volume_group_id"
+	// KeyFlrCreateMode key value to specify flr_attributes.flr_create.mode
+	KeyFlrCreateMode = "csi.dell.com/flr_attributes.flr_create.mode"
+	// KeyFlrDefaultRetention key value to specify flr_attributes.flr_create.default_retention
+	KeyFlrDefaultRetention = "csi.dell.com/flr_attributes.flr_create.default_retention"
+	// KeyFlrMinRetention key value to specify flr_attributes.flr_create.minimum_retention
+	KeyFlrMinRetention = "csi.dell.com/flr_attributes.flr_create.minimum_retention"
+	// KeyFlrMaxRetention key value to specify flr_attributes.flr_create.maximum_retention
+	KeyFlrMaxRetention = "csi.dell.com/flr_attributes.flr_create.maximum_retention"
 	// KeyServiceTag has the service tag associated to an Appliance
 	KeyServiceTag = "serviceTag"
 	// VerboseName longer description of the driver
