@@ -90,12 +90,12 @@ const (
 	KeyNasName = "nasName"
 	// KeyVolumeDescription key value to specify volume description
 	KeyVolumeDescription = "csi.dell.com/description"
-	// KeyApplianceId key value to specify appliance_id
-	KeyApplianceId = "csi.dell.com/appliance_id"
-	// KeyProtectionPolicyId key value to specify protection_policy_id
-	KeyProtectionPolicyId = "csi.dell.com/protection_policy_id"
-	// KeyPerformancePolicyId key value to specify performance_policy_id
-	KeyPerformancePolicyId = "csi.dell.com/performance_policy_id"
+	// KeyApplianceID key value to specify appliance_id
+	KeyApplianceID = "csi.dell.com/appliance_id"
+	// KeyProtectionPolicyID key value to specify protection_policy_id
+	KeyProtectionPolicyID = "csi.dell.com/protection_policy_id"
+	// KeyPerformancePolicyID key value to specify performance_policy_id
+	KeyPerformancePolicyID = "csi.dell.com/performance_policy_id"
 	// KeyAppType key value to specify app_type
 	KeyAppType = "csi.dell.com/app_type"
 	// KeyAppTypeOther key value to specify app_type_other
@@ -114,8 +114,8 @@ const (
 	KeyFileEventsPublishingMode = "csi.dell.com/file_events_publishing_mode"
 	// KeyHostIoSize key value to specify volume host_io_size
 	KeyHostIoSize = "csi.dell.com/host_io_size"
-	// KeyVolumeGroupId key value to specify volume_group_id
-	KeyVolumeGroupId = "csi.dell.com/volume_group_id"
+	// KeyVolumeGroupID key value to specify volume_group_id
+	KeyVolumeGroupID = "csi.dell.com/volume_group_id"
 	// KeyFlrCreateMode key value to specify flr_attributes.flr_create.mode
 	KeyFlrCreateMode = "csi.dell.com/flr_attributes.flr_create.mode"
 	// KeyFlrDefaultRetention key value to specify flr_attributes.flr_create.default_retention

@@ -200,9 +200,9 @@ var _ = Describe("CSIControllerService", func() {
 			req.Parameters[common.KeyVolumeDescription] = "Vol-description"
 			req.Parameters[common.KeyAppType] = "Other"
 			req.Parameters[common.KeyAppTypeOther] = "Android"
-			req.Parameters[common.KeyApplianceId] = "12345"
-			req.Parameters[common.KeyProtectionPolicyId] = "xyz"
-			req.Parameters[common.KeyPerformancePolicyId] = "abc"
+			req.Parameters[common.KeyApplianceID] = "12345"
+			req.Parameters[common.KeyProtectionPolicyID] = "xyz"
+			req.Parameters[common.KeyPerformancePolicyID] = "abc"
 			res, err := ctrlSvc.CreateVolume(context.Background(), req)
 
 			Expect(err).To(BeNil())
@@ -217,9 +217,9 @@ var _ = Describe("CSIControllerService", func() {
 						common.KeyVolumeDescription:   "Vol-description",
 						common.KeyAppType:             "Other",
 						common.KeyAppTypeOther:        "Android",
-						common.KeyApplianceId:         "12345",
-						common.KeyProtectionPolicyId:  "xyz",
-						common.KeyPerformancePolicyId: "abc",
+						common.KeyApplianceID:         "12345",
+						common.KeyProtectionPolicyID:  "xyz",
+						common.KeyPerformancePolicyID: "abc",
 						controller.KeyCSIPVCName:      req.Name,
 						controller.KeyCSIPVCNamespace: validNamespaceName,
 						common.KeyServiceTag:          validServiceTag,
@@ -526,7 +526,7 @@ var _ = Describe("CSIControllerService", func() {
 			req.Parameters[common.KeyLockingPolicy] = "KeyLockingPolicy_A"
 			req.Parameters[common.KeyFolderRenamePolicy] = "KeyFolderRenamePolicy"
 			req.Parameters[common.KeyIsAsyncMtimeEnabled] = "true"
-			req.Parameters[common.KeyProtectionPolicyId] = "KeyProtectionPolicyId"
+			req.Parameters[common.KeyProtectionPolicyID] = "KeyProtectionPolicyID"
 			req.Parameters[common.KeyFileEventsPublishingMode] = "KeyFileEventsPublishingMode"
 			req.Parameters[common.KeyHostIoSize] = "VMware_16K"
 			req.Parameters[common.KeyFlrCreateMode] = "KeyFlrCreateMode"
@@ -552,7 +552,7 @@ var _ = Describe("CSIControllerService", func() {
 						common.KeyLockingPolicy:            "KeyLockingPolicy_A",
 						common.KeyFolderRenamePolicy:       "KeyFolderRenamePolicy",
 						common.KeyIsAsyncMtimeEnabled:      "true",
-						common.KeyProtectionPolicyId:       "KeyProtectionPolicyId",
+						common.KeyProtectionPolicyID:       "KeyProtectionPolicyID",
 						common.KeyFileEventsPublishingMode: "KeyFileEventsPublishingMode",
 						common.KeyHostIoSize:               "VMware_16K",
 						common.KeyFlrCreateMode:            "KeyFlrCreateMode",

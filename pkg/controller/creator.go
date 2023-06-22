@@ -87,16 +87,16 @@ func setMetaData(reqParams map[string]string, createParams interface{}) {
 }
 
 func setVolumeCreateAttributes(reqParams map[string]string, createParams *gopowerstore.VolumeCreate) {
-	if applianceID, ok := reqParams[common.KeyApplianceId]; ok {
+	if applianceID, ok := reqParams[common.KeyApplianceID]; ok {
 		createParams.ApplianceID = applianceID
 	}
 	if description, ok := reqParams[common.KeyVolumeDescription]; ok {
 		createParams.Description = description
 	}
-	if protectionPolicyID, ok := reqParams[common.KeyProtectionPolicyId]; ok {
+	if protectionPolicyID, ok := reqParams[common.KeyProtectionPolicyID]; ok {
 		createParams.ProtectionPolicyID = protectionPolicyID
 	}
-	if performancePolicyID, ok := reqParams[common.KeyPerformancePolicyId]; ok {
+	if performancePolicyID, ok := reqParams[common.KeyPerformancePolicyID]; ok {
 		createParams.PerformancePolicyID = performancePolicyID
 	}
 	if appType, ok := reqParams[common.KeyAppType]; ok {
@@ -168,7 +168,7 @@ func setNFSCreateAttributes(reqParams map[string]string, createParams *gopowerst
 			createParams.IsAsyncMTimeEnabled = val
 		}
 	}
-	if protectionPolicyID, ok := reqParams[common.KeyProtectionPolicyId]; ok {
+	if protectionPolicyID, ok := reqParams[common.KeyProtectionPolicyID]; ok {
 		createParams.ProtectionPolicyId = protectionPolicyID
 	}
 	if fileEventsPublishingMode, ok := reqParams[common.KeyFileEventsPublishingMode]; ok {
@@ -252,7 +252,7 @@ func (sc *SCSICreator) Create(ctx context.Context, req *csi.CreateVolumeRequest,
 	}
 	if sc.vg != nil {
 		reqParams.VolumeGroupID = sc.vg.ID
-	} else if vgID, ok := req.Parameters[common.KeyVolumeGroupId]; ok {
+	} else if vgID, ok := req.Parameters[common.KeyVolumeGroupID]; ok {
 		reqParams.VolumeGroupID = vgID
 	}
 	setMetaData(req.Parameters, reqParams)
