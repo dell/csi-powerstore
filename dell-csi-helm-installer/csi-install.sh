@@ -9,9 +9,16 @@
 #  http://www.apache.org/licenses/LICENSE-2.0
 
 SCRIPTDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
-DRIVERDIR="${SCRIPTDIR}/../helm"
+# DRIVERDIR="${SCRIPTDIR}/../helm"
+DRIVERDIR="${SCRIPTDIR}/../"
+git clone --quiet "https://github.com/dell/helm-charts" 
+mv helm-charts $DRIVERDIR
+DRIVERDIR="${SCRIPTDIR}/../helm-charts/charts"
+DRIVER="csi-powerstore"
 VERIFYSCRIPT="${SCRIPTDIR}/verify.sh"
+
 PROG="${0}"
+
 NODE_VERIFY=1
 VERIFY=1
 MODE="install"
@@ -69,6 +76,7 @@ function warning() {
   decho
   if [ "${CONT}" != "Y" -a "${CONT}" != "y" ]; then
     decho "quitting at user request"
+    rm -rf "${SCRIPTDIR}/../helm-charts"
     exit 2
   fi
 }
@@ -104,12 +112,12 @@ function validate_params() {
     exit 1
   fi
   # make sure the driver name is valid
-  if [[ ! "${VALIDDRIVERS[@]}" =~ "${DRIVER}" ]]; then
-    decho "Driver: ${DRIVER} is invalid."
-    decho "Valid options are: ${VALIDDRIVERS[@]}"
-    usage
-    exit 1
-  fi
+  # if [[ ! "${VALIDDRIVERS[@]}" =~ "${DRIVER}" ]]; then
+  #   decho "Driver: ${DRIVER} is invalid."
+  #   decho "Valid options are: ${VALIDDRIVERS[@]}"
+  #   usage
+  #   exit 1
+  # fi
   # the namespace is required
   if [ -z "${NS}" ]; then
     decho "No namespace specified"
@@ -270,8 +278,10 @@ function verify_kubernetes() {
     if [ $NODE_VERIFY -eq 0 ]; then
       EXTRA_OPTS="$EXTRA_OPTS --skip-verify-node"
     fi
+    
     "${VERIFYSCRIPT}" --version "${VERSION}" --driver-version "${DRIVER_VERSION}" --namespace "${NS}" --release "${RELEASE}" --values "${VALUES}" --node-verify-user "${NODEUSER}" ${EXTRA_OPTS}
     VERIFYRC=$?
+
     case $VERIFYRC in
     0) ;;
 
@@ -293,11 +303,14 @@ VERIFYOPTS=""
 ASSUMEYES="false"
 
 # get the list of valid CSI Drivers, this will be the list of directories in drivers/ that contain helm charts
-get_drivers "${DRIVERDIR}"
-# if only one driver was found, set the DRIVER to that one
-if [ ${#VALIDDRIVERS[@]} -eq 1 ]; then
-  DRIVER="${VALIDDRIVERS[0]}"
-fi
+DRIVERDIR="${SCRIPTDIR}/../helm-charts/charts"
+
+# get_drivers_from_helm "$DRIVERDIR"
+# # if only one driver was found, set the DRIVER to that one
+# if [ ${#VALIDDRIVERS[@]} -eq 1 ]; then
+#   DRIVER="${VALIDDRIVERS[0]}"
+# fi
+
 
 while getopts ":h-:" optchar; do
   case "${optchar}" in
@@ -399,12 +412,11 @@ kMajorVersion=$(run_command kubectl version | grep 'Server Version' | sed -e 's/
 kMinorVersion=$(run_command kubectl version | grep 'Server Version' | sed -e 's/^.*Minor:"//' -e 's/[^0-9].*//g')
 
 # validate the parameters passed in
-validate_params "${MODE}"
 
+validate_params "${MODE}"
 header
 check_for_driver "${MODE}"
 verify_kubernetes
-
 # all good, keep processing
 install_driver "${MODE}"
 

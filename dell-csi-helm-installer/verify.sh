@@ -11,6 +11,7 @@
 SCRIPTDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 PROG="${0}"
 source "$SCRIPTDIR"/common.sh
+DRIVER="csi-powerstore"
 
 if [ -z "${DEBUGLOG}" ]; then
   export DEBUGLOG="${SCRIPTDIR}/install-debug.log"
@@ -535,18 +536,19 @@ function summary() {
 # validate_params will validate the parameters passed in
 function validate_params() {
   # make sure the driver was specified
+ 
   if [ -z "${DRIVER}" ]; then
     decho "No driver specified"
     usage
     exit 1
   fi
   # make sure the driver name is valid
-  if [[ ! "${VALIDDRIVERS[@]}" =~ "${DRIVER}" ]]; then
-    decho "Driver: ${DRIVER} is invalid."
-    decho "Valid options are: ${VALIDDRIVERS[@]}"
-    usage
-    exit 1
-  fi
+  # if [[ ! "${VALIDDRIVERS[@]}" =~ "${DRIVER}" ]]; then
+  #   decho "Driver: ${DRIVER} is invalid."
+  #   decho "Valid options are: ${VALIDDRIVERS[@]}"
+  #   usage
+  #   exit 1
+  # fi
   # the namespace is required
   if [ -z "${NS}" ]; then
     decho "No namespace specified"
@@ -627,15 +629,18 @@ kMajorVersion=$(run_command kubectl version | grep 'Server Version' | sed -e 's/
 kMinorVersion=$(run_command kubectl version | grep 'Server Version' | sed -e 's/^.*Minor:"//' -e 's/[^0-9].*//g')
 
 # get the list of valid CSI Drivers, this will be the list of directories in drivers/ that contain helm charts
-get_drivers "${SCRIPTDIR}/../helm"
-# if only one driver was found, set the DRIVER to that one
-if [ ${#VALIDDRIVERS[@]} -eq 1 ]; then
-  DRIVER="${VALIDDRIVERS[0]}"
-fi
+# get_drivers "${SCRIPTDIR}/../helm" 
+
+# get_drivers_from_helm "${SCRIPTDIR}/../helm-charts/charts"
+# # if only one driver was found, set the DRIVER to that one
+# if [ ${#VALIDDRIVERS[@]} -eq 1 ]; then
+#   DRIVER="${VALIDDRIVERS[0]}"
+# fi
 
 while getopts ":h-:" optchar; do
   case "${optchar}" in
   -)
+
     case "${OPTARG}" in
     skip-verify-node)
       NODE_VERIFY=0
@@ -711,6 +716,7 @@ RELEASE=$(get_release_name "${DRIVER}")
 NODEUSER="${NODEUSER:-root}"
 
 # validate the parameters passed in
+
 validate_params "${MODE}"
 OPENSHIFT=$(isOpenShift)
 
