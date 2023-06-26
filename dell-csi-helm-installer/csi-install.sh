@@ -11,8 +11,22 @@
 SCRIPTDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 # DRIVERDIR="${SCRIPTDIR}/../helm"
 DRIVERDIR="${SCRIPTDIR}/../"
-git clone --quiet "https://github.com/dell/helm-charts" 
-mv helm-charts $DRIVERDIR
+
+if [ ! -d "$DRIVERDIR/helm-charts" ]; then
+  
+  if  [ ! -d "$SCRIPTDIR/helm-charts" ]; then
+    git clone --quiet "https://github.com/dell/helm-charts"
+   
+  fi
+  mv helm-charts $DRIVERDIR
+else 
+  if [  -d "$SCRIPTDIR/helm-charts" ]; then
+    rm -rf $SCRIPTDIR/helm-charts
+  fi
+fi
+
+
+
 DRIVERDIR="${SCRIPTDIR}/../helm-charts/charts"
 DRIVER="csi-powerstore"
 VERIFYSCRIPT="${SCRIPTDIR}/verify.sh"
@@ -76,7 +90,7 @@ function warning() {
   decho
   if [ "${CONT}" != "Y" -a "${CONT}" != "y" ]; then
     decho "quitting at user request"
-    rm -rf "${SCRIPTDIR}/../helm-charts"
+    # rm -rf "${SCRIPTDIR}/../helm-charts"
     exit 2
   fi
 }
