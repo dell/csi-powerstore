@@ -55,6 +55,7 @@ type Opts struct {
 	NodeIDFilePath        string
 	NodeNamePrefix        string
 	NodeChrootPath        string
+	MaxVolumesPerNode     int64
 	FCPortsFilterFilePath string
 	KubeNodeName          string
 	CHAPUsername          string
@@ -1206,6 +1207,17 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 			}
 		}
 	}
+
+	var maxVolumesPerNode int64
+
+	if s.opts.MaxVolumesPerNode < 0 {
+		return nil, fmt.Errorf("maxVolumesPerNode MUST NOT be set to negative value")
+	}
+
+	maxVolumesPerNode = s.opts.MaxVolumesPerNode
+	log.Infof("alankar node label 'max-powerstore-volumes-per-node' is not available. Using default volume limit '%v'", maxVolumesPerNode)
+	resp.MaxVolumesPerNode = maxVolumesPerNode
+
 	return resp, nil
 }
 

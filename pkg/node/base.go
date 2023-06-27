@@ -103,6 +103,11 @@ func getNodeOptions() Opts {
 		opts.NodeChrootPath = nodeChrootPath
 	}
 
+	if maxVolumesPerNodeStr, ok := csictx.LookupEnv(ctx, common.EnvMaxVolumesPerNode); ok {
+		maxVolumesPerNode, _ := strconv.ParseInt(maxVolumesPerNodeStr, 10, 64)
+		opts.MaxVolumesPerNode = maxVolumesPerNode
+	}
+
 	if opts.NodeChrootPath == "" {
 		opts.NodeChrootPath = defaultNodeChrootPath
 	}

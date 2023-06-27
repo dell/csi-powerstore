@@ -34,6 +34,8 @@ const (
 	// used when registering node on PowerStore array
 	EnvNodeNamePrefix = "X_CSI_POWERSTORE_NODE_NAME_PREFIX"
 
+	EnvMaxVolumesPerNode = "X_CSI_POWERSTORE_MAX_VOLUMES_PER_NODE"
+
 	// EnvNodeChrootPath is the name of the environment variable which store path to chroot where
 	// to execute iSCSI commands
 	EnvNodeChrootPath = "X_CSI_POWERSTORE_NODE_CHROOT_PATH"

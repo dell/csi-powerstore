@@ -53,6 +53,8 @@ externalAccess:
 # Default value: None
 imagePullPolicy: IfNotPresent
 
+maxPowerstoreVolumesPerNode: 0
+
 # nfsAcls: enables setting permissions on NFS mount directory
 # This value acts as default value for NFS ACL (nfsAcls), if not specified for an array config in secret
 # Permissions can be specified in two formats:
