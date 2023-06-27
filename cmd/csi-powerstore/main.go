@@ -170,7 +170,7 @@ func main() {
 	})
 
 	interList := []grpc.UnaryServerInterceptor{
-		interceptors.NewCustomSerialLock(),
+		interceptors.NewCustomSerialLock(mode),
 		interceptors.NewRewriteRequestIDInterceptor(),
 	}
 

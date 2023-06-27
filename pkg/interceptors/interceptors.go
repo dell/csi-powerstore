@@ -115,7 +115,7 @@ type interceptor struct {
 }
 
 // NewCustomSerialLock creates new unary interceptor that locks gRPC requests
-func NewCustomSerialLock() grpc.UnaryServerInterceptor {
+func NewCustomSerialLock(mode string) grpc.UnaryServerInterceptor {
 	locker := &lockProvider{
 		volIDLocks:   map[string]gosync.TryLocker{},
 		volNameLocks: map[string]gosync.TryLocker{},
@@ -125,7 +125,7 @@ func NewCustomSerialLock() grpc.UnaryServerInterceptor {
 
 	i := &interceptor{opts{locker: locker, timeout: 0}}
 
-	i.createMetadataRetrieverClient(context.Background())
+	i.createMetadataRetrieverClient(context.Background(), mode)
 
 	handle := func(ctx xctx.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 		switch t := req.(type) {
@@ -142,25 +142,28 @@ func NewCustomSerialLock() grpc.UnaryServerInterceptor {
 	return handle
 }
 
-func (i *interceptor) createMetadataRetrieverClient(ctx context.Context) {
+func (i *interceptor) createMetadataRetrieverClient(ctx context.Context, mode string) {
 	metricsManager := metrics.NewCSIMetricsManagerWithOptions("csi-metadata-retriever",
 		metrics.WithProcessStartTime(false),
 		metrics.WithSubsystem(metrics.SubsystemSidecar))
+	// To avoid unnecessary call, we can add a conditional check to prevent this logic from being called unnecessarily in node pods.
+	if mode == "controller" {
+		if retrieverAddress, ok := csictx.LookupEnv(ctx, common.EnvMetadataRetrieverEndpoint); ok {
+			log.Info("")
+			rpcConn, err := connection.Connect(retrieverAddress, metricsManager, connection.OnConnectionLoss(connection.ExitOnConnectionLoss()))
+			if err != nil {
+				log.Error(err.Error())
+			}
 
-	if retrieverAddress, ok := csictx.LookupEnv(ctx, common.EnvMetadataRetrieverEndpoint); ok {
-		rpcConn, err := connection.Connect(retrieverAddress, metricsManager, connection.OnConnectionLoss(connection.ExitOnConnectionLoss()))
-		if err != nil {
-			log.Error(err.Error())
+			retrieverClient := retriever.NewMetadataRetrieverClient(rpcConn, 100*time.Second)
+			if retrieverClient == nil {
+				log.Error("Cannot get csi-metadata-retriever client")
+			}
+
+			i.opts.MetadataSidecarClient = retrieverClient
+		} else {
+			log.Warn("env var not found: ", common.EnvMetadataRetrieverEndpoint)
 		}
-
-		retrieverClient := retriever.NewMetadataRetrieverClient(rpcConn, 100*time.Second)
-		if retrieverClient == nil {
-			log.Error("Cannot get csi-metadata-retriever client")
-		}
-
-		i.opts.MetadataSidecarClient = retrieverClient
-	} else {
-		log.Warn("env var not found: ", common.EnvMetadataRetrieverEndpoint)
 	}
 }
 

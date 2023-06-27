@@ -21,14 +21,15 @@ package interceptors
 import (
 	"context"
 	"fmt"
+	"sync"
+	"testing"
+	"time"
+
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	csictx "github.com/dell/gocsi/context"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
-	"sync"
-	"testing"
-	"time"
 )
 
 const (
@@ -65,7 +66,7 @@ func TestRewriteRequestIDInterceptor_RequestIDExist(t *testing.T) {
 
 func TestNewCustomSerialLock(t *testing.T) {
 	ctx := context.Background()
-	serialLock := NewCustomSerialLock()
+	serialLock := NewCustomSerialLock("controller")
 
 	runTest := func(req1 interface{}, req2 interface{}) error {
 		wg := sync.WaitGroup{}
