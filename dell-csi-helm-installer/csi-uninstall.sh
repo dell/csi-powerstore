@@ -137,7 +137,6 @@ if [ $? -ne 0 ]; then
     decho "Removal of the CSI Driver was unsuccessful"
     exit 1
 fi
-# rm -rf "${SCRIPTDIR}/../helm-charts"
 decho "Removal of the CSI Driver is in progress."
 decho "It may take a few minutes for all pods to terminate."
 

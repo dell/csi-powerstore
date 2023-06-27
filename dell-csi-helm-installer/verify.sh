@@ -536,7 +536,6 @@ function summary() {
 # validate_params will validate the parameters passed in
 function validate_params() {
   # make sure the driver was specified
- 
   if [ -z "${DRIVER}" ]; then
     decho "No driver specified"
     usage
@@ -640,7 +639,6 @@ kMinorVersion=$(run_command kubectl version | grep 'Server Version' | sed -e 's/
 while getopts ":h-:" optchar; do
   case "${optchar}" in
   -)
-
     case "${OPTARG}" in
     skip-verify-node)
       NODE_VERIFY=0
@@ -716,7 +714,6 @@ RELEASE=$(get_release_name "${DRIVER}")
 NODEUSER="${NODEUSER:-root}"
 
 # validate the parameters passed in
-
 validate_params "${MODE}"
 OPENSHIFT=$(isOpenShift)
 

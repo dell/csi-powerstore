@@ -24,15 +24,10 @@ else
     rm -rf $SCRIPTDIR/helm-charts
   fi
 fi
-
-
-
 DRIVERDIR="${SCRIPTDIR}/../helm-charts/charts"
 DRIVER="csi-powerstore"
 VERIFYSCRIPT="${SCRIPTDIR}/verify.sh"
-
 PROG="${0}"
-
 NODE_VERIFY=1
 VERIFY=1
 MODE="install"
@@ -90,7 +85,6 @@ function warning() {
   decho
   if [ "${CONT}" != "Y" -a "${CONT}" != "y" ]; then
     decho "quitting at user request"
-    # rm -rf "${SCRIPTDIR}/../helm-charts"
     exit 2
   fi
 }
@@ -292,10 +286,8 @@ function verify_kubernetes() {
     if [ $NODE_VERIFY -eq 0 ]; then
       EXTRA_OPTS="$EXTRA_OPTS --skip-verify-node"
     fi
-    
     "${VERIFYSCRIPT}" --version "${VERSION}" --driver-version "${DRIVER_VERSION}" --namespace "${NS}" --release "${RELEASE}" --values "${VALUES}" --node-verify-user "${NODEUSER}" ${EXTRA_OPTS}
     VERIFYRC=$?
-
     case $VERIFYRC in
     0) ;;
 
