@@ -144,7 +144,6 @@ copy_files() {
     else
       cp -R "${f}" "${DISTDIR}"
     fi
-
     
     if [ $? -ne 0 ]; then
       echo "Unable to copy ${f} to the distribution directory"
@@ -254,6 +253,7 @@ if [ "${MODE}" == "helm" ]; then
   INSTALLERDIR="${REPODIR}/dell-csi-helm-installer"
   CHARTFILE=$(find "${HELMDIR}" -maxdepth 2 -type f -name Chart.yaml)
   VALUESFILE=$(find "${HELMDIR}" -maxdepth 2 -type f -name values.yaml)
+
    # some output files
   DRIVERNAME=$(grep -oh "^name:\s.*" "${CHARTFILE}" | awk '{print $2}')
   DRIVERNAME=${DRIVERNAME:-"dell-csi-driver"}
@@ -268,14 +268,11 @@ if [ "${MODE}" == "helm" ]; then
   IMAGEMANIFEST="${INSTALLERDIR}/images.manifest"
   IMAGEFILEDIR="${INSTALLERDIR}/images.tar"
 
-
-  
   # directories to search all files for image names
   DIRS_FOR_IMAGE_NAMES=(
     "${HELMDIR}"
   )
   # list of all files to be included
-
   REQUIRED_FILES=(
     "${HELMDIR}"
     "${INSTALLERDIR}"
