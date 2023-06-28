@@ -9,7 +9,6 @@
 #  http://www.apache.org/licenses/LICENSE-2.0
 
 SCRIPTDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
-# DRIVERDIR="${SCRIPTDIR}/../helm"
 DRIVERDIR="${SCRIPTDIR}/../"
 
 if [ ! -d "$DRIVERDIR/helm-charts" ]; then
@@ -119,13 +118,6 @@ function validate_params() {
     usage
     exit 1
   fi
-  # make sure the driver name is valid
-  # if [[ ! "${VALIDDRIVERS[@]}" =~ "${DRIVER}" ]]; then
-  #   decho "Driver: ${DRIVER} is invalid."
-  #   decho "Valid options are: ${VALIDDRIVERS[@]}"
-  #   usage
-  #   exit 1
-  # fi
   # the namespace is required
   if [ -z "${NS}" ]; then
     decho "No namespace specified"
@@ -311,13 +303,6 @@ ASSUMEYES="false"
 # get the list of valid CSI Drivers, this will be the list of directories in drivers/ that contain helm charts
 DRIVERDIR="${SCRIPTDIR}/../helm-charts/charts"
 
-# get_drivers_from_helm "$DRIVERDIR"
-# # if only one driver was found, set the DRIVER to that one
-# if [ ${#VALIDDRIVERS[@]} -eq 1 ]; then
-#   DRIVER="${VALIDDRIVERS[0]}"
-# fi
-
-
 while getopts ":h-:" optchar; do
   case "${optchar}" in
   -)
@@ -423,6 +408,7 @@ validate_params "${MODE}"
 header
 check_for_driver "${MODE}"
 verify_kubernetes
+
 # all good, keep processing
 install_driver "${MODE}"
 

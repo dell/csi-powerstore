@@ -9,7 +9,6 @@
 #  http://www.apache.org/licenses/LICENSE-2.0
 
 SCRIPTDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-# DRIVERDIR="${SCRIPTDIR}/../helm-charts/charts"
 PROG="${0}"
 DRIVER="csi-powerstore"
 
@@ -53,11 +52,6 @@ function validate_params() {
         exit 1
     fi
     # make sure the driver name is valid
-    # if [[ ! "${VALIDDRIVERS[@]}" =~ "${DRIVER}" ]]; then
-    #     decho "Driver: ${DRIVER} is invalid."
-    #     decho "Valid options are: ${VALIDDRIVERS[@]}"
-    #     exit 1
-    # fi
     # the namespace is required
     if [ -z "${NAMESPACE}" ]; then
         decho "No namespace specified"
@@ -78,14 +72,7 @@ function check_for_driver() {
 
 # get the list of valid CSI Drivers, this will be the list of directories in drivers/ that contain helm charts
 
-# get_drivers "${DRIVERDIR}"  
 DRIVERDIR="${SCRIPTDIR}/../helm-charts/charts"
-
-# get_drivers_from_helm "${DRIVERDIR}"
-# # if only one driver was found, set the DRIVER to that one
-# if [ ${#VALIDDRIVERS[@]} -eq 1 ]; then
-#   DRIVER="${VALIDDRIVERS[0]}"
-# fi
 
 while getopts ":h-:" optchar; do
   case "${optchar}" in
@@ -137,6 +124,7 @@ if [ $? -ne 0 ]; then
     decho "Removal of the CSI Driver was unsuccessful"
     exit 1
 fi
+
 decho "Removal of the CSI Driver is in progress."
 decho "It may take a few minutes for all pods to terminate."
 
