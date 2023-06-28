@@ -185,285 +185,387 @@ var _ = Describe("CSIControllerService", func() {
 			})
 		})
 
-		When("create block volume with replication properties", func() {
-			var req *csi.CreateVolumeRequest
-			BeforeEach(func() {
-				req = getTypicalCreateVolumeRequest("my-vol", validVolSize)
-				req.Parameters[common.KeyArrayID] = firstValidID
-				req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationEnabled)] = "true"
-				req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationRPO)] = validRPO
-				req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationRemoteSystem)] = validRemoteSystemName
-				req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationIgnoreNamespaces)] = "true"
-				req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationVGPrefix)] = "csi"
-				req.Parameters[controller.KeyCSIPVCName] = req.Name
-				req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
-			})
+		It("should successfully create block volume and vol attributes should be set", func() {
+			clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+			clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
+			clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
+			clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
+			clientMock.On("GetVolume", context.Background(), mock.Anything).Return(gopowerstore.Volume{ApplianceID: validApplianceID}, nil)
+			clientMock.On("GetAppliance", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
 
-			It("should create volume and volumeGroup if policy exists", func() {
-				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
-				clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
-				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
-				// all entities not exists
-				clientMock.On("GetVolumeGroupByName", mock.Anything, validGroupName).
-					Return(gopowerstore.VolumeGroup{}, gopowerstore.NewNotFoundError())
+			req := getTypicalCreateVolumeRequest("my-vol", validVolSize)
+			req.Parameters[common.KeyArrayID] = firstValidID
+			req.Parameters[controller.KeyCSIPVCName] = req.Name
+			req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
+			req.Parameters[common.KeyVolumeDescription] = "Vol-description"
+			req.Parameters[common.KeyAppType] = "Other"
+			req.Parameters[common.KeyAppTypeOther] = "Android"
+			req.Parameters[common.KeyApplianceID] = "12345"
+			req.Parameters[common.KeyProtectionPolicyID] = "xyz"
+			req.Parameters[common.KeyPerformancePolicyID] = "abc"
+			res, err := ctrlSvc.CreateVolume(context.Background(), req)
 
-				EnsureProtectionPolicyExistsMock()
-
-				createGroupRequest := &gopowerstore.VolumeGroupCreate{Name: validGroupName, ProtectionPolicyID: validPolicyID}
-				clientMock.On("CreateVolumeGroup", mock.Anything, createGroupRequest).Return(gopowerstore.CreateResponse{ID: validGroupID}, nil)
-				clientMock.On("GetVolumeGroup", mock.Anything, validGroupID).Return(gopowerstore.VolumeGroup{ID: validGroupID, ProtectionPolicyID: validPolicyID}, nil)
-
-				clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
-				clientMock.On("GetVolume", context.Background(), mock.Anything).Return(gopowerstore.Volume{ApplianceID: validApplianceID}, nil)
-				clientMock.On("GetAppliance", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
-
-				res, err := ctrlSvc.CreateVolume(context.Background(), req)
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.CreateVolumeResponse{
-					Volume: &csi.Volume{
-						CapacityBytes: validVolSize,
-						VolumeId:      filepath.Join(validBaseVolID, firstValidID, "scsi"),
-						VolumeContext: map[string]string{
-							common.KeyArrayVolumeName:                                 "my-vol",
-							common.KeyProtocol:                                        "scsi",
-							common.KeyArrayID:                                         firstValidID,
-							common.KeyVolumeDescription:                               req.Name + "-" + validNamespaceName,
-							common.KeyServiceTag:                                      validServiceTag,
-							controller.KeyCSIPVCName:                                  req.Name,
-							controller.KeyCSIPVCNamespace:                             validNamespaceName,
-							ctrlSvc.WithRP(controller.KeyReplicationEnabled):          "true",
-							ctrlSvc.WithRP(controller.KeyReplicationRPO):              validRPO,
-							ctrlSvc.WithRP(controller.KeyReplicationRemoteSystem):     validRemoteSystemName,
-							ctrlSvc.WithRP(controller.KeyReplicationIgnoreNamespaces): "true",
-							ctrlSvc.WithRP(controller.KeyReplicationVGPrefix):         "csi",
-						},
+			Expect(err).To(BeNil())
+			Expect(res).To(Equal(&csi.CreateVolumeResponse{
+				Volume: &csi.Volume{
+					CapacityBytes: validVolSize,
+					VolumeId:      filepath.Join(validBaseVolID, firstValidID, "scsi"),
+					VolumeContext: map[string]string{
+						common.KeyArrayID:             firstValidID,
+						common.KeyArrayVolumeName:     "my-vol",
+						common.KeyProtocol:            "scsi",
+						common.KeyVolumeDescription:   "Vol-description",
+						common.KeyAppType:             "Other",
+						common.KeyAppTypeOther:        "Android",
+						common.KeyApplianceID:         "12345",
+						common.KeyProtectionPolicyID:  "xyz",
+						common.KeyPerformancePolicyID: "abc",
+						controller.KeyCSIPVCName:      req.Name,
+						controller.KeyCSIPVCNamespace: validNamespaceName,
+						common.KeyServiceTag:          validServiceTag,
 					},
-				}))
-			})
-
-			It("should create vg with namespace if namespaces not ignored", func() {
-				req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationIgnoreNamespaces)] = "false"
-				req.Parameters[controller.KeyCSIPVCName] = req.Name
-				req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
-
-				defer func() {
-					req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationIgnoreNamespaces)] = "true"
-					req.Parameters[controller.KeyCSIPVCNamespace] = ""
-				}()
-
-				clientMock.On("GetVolumeGroupByName", mock.Anything, validNamespacedGroupName).
-					Return(gopowerstore.VolumeGroup{}, gopowerstore.NewNotFoundError())
-
-				clientMock.On("GetRemoteSystemByName", mock.Anything, validRemoteSystemName).Return(gopowerstore.RemoteSystem{
-					Name: validRemoteSystemName,
-					ID:   validRemoteSystemID,
-				}, nil)
-
-				clientMock.On("GetProtectionPolicyByName", mock.Anything, "pp-"+validNamespacedGroupName).
-					Return(gopowerstore.ProtectionPolicy{ID: validPolicyID}, nil)
-
-				createGroupRequest := &gopowerstore.VolumeGroupCreate{Name: validNamespacedGroupName, ProtectionPolicyID: validPolicyID}
-				clientMock.On("CreateVolumeGroup", mock.Anything, createGroupRequest).Return(gopowerstore.CreateResponse{ID: validGroupID}, nil)
-				clientMock.On("GetVolumeGroup", mock.Anything, validGroupID).Return(gopowerstore.VolumeGroup{ID: validGroupID, ProtectionPolicyID: validPolicyID}, nil)
-				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
-				clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
-				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
-				clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
-				clientMock.On("GetVolume", context.Background(), mock.Anything).Return(gopowerstore.Volume{ApplianceID: validApplianceID}, nil)
-				clientMock.On("GetAppliance", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
-
-				res, err := ctrlSvc.CreateVolume(context.Background(), req)
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.CreateVolumeResponse{
-					Volume: &csi.Volume{
-						CapacityBytes: validVolSize,
-						VolumeId:      filepath.Join(validBaseVolID, firstValidID, "scsi"),
-						VolumeContext: map[string]string{
-							common.KeyArrayVolumeName:                                 "my-vol",
-							common.KeyProtocol:                                        "scsi",
-							common.KeyArrayID:                                         firstValidID,
-							common.KeyVolumeDescription:                               req.Name + "-" + validNamespaceName,
-							common.KeyServiceTag:                                      validServiceTag,
-							controller.KeyCSIPVCName:                                  req.Name,
-							controller.KeyCSIPVCNamespace:                             validNamespaceName,
-							ctrlSvc.WithRP(controller.KeyReplicationEnabled):          "true",
-							ctrlSvc.WithRP(controller.KeyReplicationRPO):              validRPO,
-							ctrlSvc.WithRP(controller.KeyReplicationRemoteSystem):     validRemoteSystemName,
-							ctrlSvc.WithRP(controller.KeyReplicationIgnoreNamespaces): "false",
-							ctrlSvc.WithRP(controller.KeyReplicationVGPrefix):         "csi",
-						},
-					},
-				}))
-			})
-
-			It("should create new volume with existing volumeGroup with policy", func() {
-				clientMock.On("GetVolumeGroupByName", mock.Anything, validGroupName).
-					Return(gopowerstore.VolumeGroup{ID: validGroupID, ProtectionPolicyID: validPolicyID}, nil)
-
-				req.Parameters[controller.KeyCSIPVCName] = req.Name
-				req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
-				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
-				clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
-				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
-				clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
-				clientMock.On("GetVolume", context.Background(), mock.Anything).Return(gopowerstore.Volume{ApplianceID: validApplianceID}, nil)
-				clientMock.On("GetAppliance", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
-
-				res, err := ctrlSvc.CreateVolume(context.Background(), req)
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.CreateVolumeResponse{
-					Volume: &csi.Volume{
-						CapacityBytes: validVolSize,
-						VolumeId:      filepath.Join(validBaseVolID, firstValidID, "scsi"),
-						VolumeContext: map[string]string{
-							common.KeyArrayVolumeName:                                 "my-vol",
-							common.KeyProtocol:                                        "scsi",
-							common.KeyArrayID:                                         firstValidID,
-							common.KeyVolumeDescription:                               req.Name + "-" + validNamespaceName,
-							common.KeyServiceTag:                                      validServiceTag,
-							controller.KeyCSIPVCName:                                  req.Name,
-							controller.KeyCSIPVCNamespace:                             validNamespaceName,
-							ctrlSvc.WithRP(controller.KeyReplicationEnabled):          "true",
-							ctrlSvc.WithRP(controller.KeyReplicationRPO):              validRPO,
-							ctrlSvc.WithRP(controller.KeyReplicationRemoteSystem):     validRemoteSystemName,
-							ctrlSvc.WithRP(controller.KeyReplicationIgnoreNamespaces): "true",
-							ctrlSvc.WithRP(controller.KeyReplicationVGPrefix):         "csi",
-						},
-					},
-				}))
-			})
-
-			It("should create volume and update volumeGroup without policy, but policy exists", func() {
-
-				clientMock.On("GetVolumeGroupByName", mock.Anything, validGroupName).
-					Return(gopowerstore.VolumeGroup{ID: validGroupID, ProtectionPolicyID: validPolicyID}, nil)
-
-				EnsureProtectionPolicyExistsMock()
-
-				req.Parameters[controller.KeyCSIPVCName] = req.Name
-				req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
-				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
-				clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
-				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
-				clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
-				clientMock.On("GetVolume", context.Background(), mock.Anything).Return(gopowerstore.Volume{ApplianceID: validApplianceID}, nil)
-				clientMock.On("GetAppliance", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
-
-				res, err := ctrlSvc.CreateVolume(context.Background(), req)
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.CreateVolumeResponse{
-					Volume: &csi.Volume{
-						CapacityBytes: validVolSize,
-						VolumeId:      filepath.Join(validBaseVolID, firstValidID, "scsi"),
-						VolumeContext: map[string]string{
-							common.KeyArrayVolumeName:                                 "my-vol",
-							common.KeyProtocol:                                        "scsi",
-							common.KeyArrayID:                                         firstValidID,
-							common.KeyVolumeDescription:                               req.Name + "-" + validNamespaceName,
-							common.KeyServiceTag:                                      validServiceTag,
-							controller.KeyCSIPVCName:                                  req.Name,
-							controller.KeyCSIPVCNamespace:                             validNamespaceName,
-							ctrlSvc.WithRP(controller.KeyReplicationEnabled):          "true",
-							ctrlSvc.WithRP(controller.KeyReplicationRPO):              validRPO,
-							ctrlSvc.WithRP(controller.KeyReplicationRemoteSystem):     validRemoteSystemName,
-							ctrlSvc.WithRP(controller.KeyReplicationIgnoreNamespaces): "true",
-							ctrlSvc.WithRP(controller.KeyReplicationVGPrefix):         "csi",
-						},
-					},
-				}))
-			})
-
-			It("should fail create volume and update volumeGroup if we can't ensure that policy exists", func() {
-				clientMock.On("GetVolumeGroupByName", mock.Anything, validGroupName).
-					Return(gopowerstore.VolumeGroup{}, gopowerstore.NewNotFoundError())
-
-				clientMock.On("GetRemoteSystemByName", mock.Anything, validRemoteSystemName).
-					Return(gopowerstore.RemoteSystem{}, gopowerstore.NewHostIsNotExistError())
-
-				res, err := ctrlSvc.CreateVolume(context.Background(), req)
-				Expect(res).To(BeNil())
-				Expect(err).NotTo(BeNil())
-				Expect(err.Error()).To(ContainSubstring("can't ensure protection policy exists"))
-
-			})
-
-			It("should fail when rpo incorrect", func() {
-				clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
-
-				req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationRPO)] = "invalidRpo"
-
-				res, err := ctrlSvc.CreateVolume(context.Background(), req)
-				Expect(res).To(BeNil())
-				Expect(err).NotTo(BeNil())
-				Expect(err.Error()).To(ContainSubstring("invalid rpo value"))
-
-			})
-
-			It("should fail when rpo not declared in parameters", func() {
-
-				delete(req.Parameters, ctrlSvc.WithRP(controller.KeyReplicationRPO))
-
-				res, err := ctrlSvc.CreateVolume(context.Background(), req)
-				Expect(res).To(BeNil())
-				Expect(err).NotTo(BeNil())
-				Expect(err.Error()).To(ContainSubstring("replication enabled but no RPO specified in storage class"))
-
-			})
-
-			It("should fail when remote system not declared in parameters", func() {
-				delete(req.Parameters, ctrlSvc.WithRP(controller.KeyReplicationRemoteSystem))
-
-				res, err := ctrlSvc.CreateVolume(context.Background(), req)
-				Expect(res).To(BeNil())
-				Expect(err).NotTo(BeNil())
-				Expect(err.Error()).To(ContainSubstring("replication enabled but no remote system specified in storage class"))
-			})
-
-			It("should fail when volume group prefix not declared in parameters", func() {
-				delete(req.Parameters, ctrlSvc.WithRP(controller.KeyReplicationVGPrefix))
-
-				res, err := ctrlSvc.CreateVolume(context.Background(), req)
-				Expect(res).To(BeNil())
-				Expect(err).NotTo(BeNil())
-				Expect(err.Error()).To(ContainSubstring("replication enabled but no volume group prefix specified in storage class"))
-			})
+				},
+			}))
+		})
+	})
+	When("create block volume with replication properties", func() {
+		var req *csi.CreateVolumeRequest
+		BeforeEach(func() {
+			req = getTypicalCreateVolumeRequest("my-vol", validVolSize)
+			req.Parameters[common.KeyArrayID] = firstValidID
+			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationEnabled)] = "true"
+			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationRPO)] = validRPO
+			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationRemoteSystem)] = validRemoteSystemName
+			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationIgnoreNamespaces)] = "true"
+			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationVGPrefix)] = "csi"
+			req.Parameters[controller.KeyCSIPVCName] = req.Name
+			req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
 		})
 
-		When("creating nfs volume", func() {
-			It("should successfully create nfs volume", func() {
-				clientMock.On("GetNASByName", mock.Anything, validNasName).Return(gopowerstore.NAS{ID: validNasID}, nil)
-				clientMock.On("CreateFS", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
-				clientMock.On("GetFS", context.Background(), mock.Anything).Return(gopowerstore.FileSystem{NasServerID: validNasID}, nil)
-				clientMock.On("GetNAS", context.Background(), mock.Anything).Return(gopowerstore.NAS{CurrentNodeId: validNodeID}, nil)
-				clientMock.On("GetApplianceByName", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
+		It("should create volume and volumeGroup if policy exists", func() {
+			clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+			clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
+			clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
+			// all entities not exists
+			clientMock.On("GetVolumeGroupByName", mock.Anything, validGroupName).
+				Return(gopowerstore.VolumeGroup{}, gopowerstore.NewNotFoundError())
 
-				req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
-				req.Parameters[common.KeyArrayID] = secondValidID
+			EnsureProtectionPolicyExistsMock()
 
-				req.Parameters[controller.KeyCSIPVCName] = req.Name
-				req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
+			createGroupRequest := &gopowerstore.VolumeGroupCreate{Name: validGroupName, ProtectionPolicyID: validPolicyID}
+			clientMock.On("CreateVolumeGroup", mock.Anything, createGroupRequest).Return(gopowerstore.CreateResponse{ID: validGroupID}, nil)
+			clientMock.On("GetVolumeGroup", mock.Anything, validGroupID).Return(gopowerstore.VolumeGroup{ID: validGroupID, ProtectionPolicyID: validPolicyID}, nil)
 
-				res, err := ctrlSvc.CreateVolume(context.Background(), req)
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.CreateVolumeResponse{
-					Volume: &csi.Volume{
-						CapacityBytes: validVolSize,
-						VolumeId:      filepath.Join(validBaseVolID, secondValidID, "nfs"),
-						VolumeContext: map[string]string{
-							common.KeyArrayVolumeName:     "my-vol",
-							common.KeyProtocol:            "nfs",
-							common.KeyArrayID:             secondValidID,
-							common.KeyNfsACL:              "A::OWNER@:RWX",
-							common.KeyNasName:             validNasName,
-							common.KeyVolumeDescription:   req.Name + "-" + validNamespaceName,
-							common.KeyServiceTag:          validServiceTag,
-							controller.KeyCSIPVCName:      req.Name,
-							controller.KeyCSIPVCNamespace: validNamespaceName,
-						},
-						AccessibleTopology: []*csi.Topology{{Segments: map[string]string{common.Name + "/" + ctrlSvc.Arrays()[secondValidID].GetIP() + "-nfs": "true"}}},
+			clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
+			clientMock.On("GetVolume", context.Background(), mock.Anything).Return(gopowerstore.Volume{ApplianceID: validApplianceID}, nil)
+			clientMock.On("GetAppliance", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
+
+			res, err := ctrlSvc.CreateVolume(context.Background(), req)
+			Expect(err).To(BeNil())
+			Expect(res).To(Equal(&csi.CreateVolumeResponse{
+				Volume: &csi.Volume{
+					CapacityBytes: validVolSize,
+					VolumeId:      filepath.Join(validBaseVolID, firstValidID, "scsi"),
+					VolumeContext: map[string]string{
+						common.KeyArrayVolumeName:                                 "my-vol",
+						common.KeyProtocol:                                        "scsi",
+						common.KeyArrayID:                                         firstValidID,
+						common.KeyVolumeDescription:                               req.Name + "-" + validNamespaceName,
+						common.KeyServiceTag:                                      validServiceTag,
+						controller.KeyCSIPVCName:                                  req.Name,
+						controller.KeyCSIPVCNamespace:                             validNamespaceName,
+						ctrlSvc.WithRP(controller.KeyReplicationEnabled):          "true",
+						ctrlSvc.WithRP(controller.KeyReplicationRPO):              validRPO,
+						ctrlSvc.WithRP(controller.KeyReplicationRemoteSystem):     validRemoteSystemName,
+						ctrlSvc.WithRP(controller.KeyReplicationIgnoreNamespaces): "true",
+						ctrlSvc.WithRP(controller.KeyReplicationVGPrefix):         "csi",
 					},
-				}))
-			})
+				},
+			}))
+		})
+
+		It("should create vg with namespace if namespaces not ignored", func() {
+			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationIgnoreNamespaces)] = "false"
+			req.Parameters[controller.KeyCSIPVCName] = req.Name
+			req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
+
+			defer func() {
+				req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationIgnoreNamespaces)] = "true"
+				req.Parameters[controller.KeyCSIPVCNamespace] = ""
+			}()
+
+			clientMock.On("GetVolumeGroupByName", mock.Anything, validNamespacedGroupName).
+				Return(gopowerstore.VolumeGroup{}, gopowerstore.NewNotFoundError())
+
+			clientMock.On("GetRemoteSystemByName", mock.Anything, validRemoteSystemName).Return(gopowerstore.RemoteSystem{
+				Name: validRemoteSystemName,
+				ID:   validRemoteSystemID,
+			}, nil)
+
+			clientMock.On("GetProtectionPolicyByName", mock.Anything, "pp-"+validNamespacedGroupName).
+				Return(gopowerstore.ProtectionPolicy{ID: validPolicyID}, nil)
+
+			createGroupRequest := &gopowerstore.VolumeGroupCreate{Name: validNamespacedGroupName, ProtectionPolicyID: validPolicyID}
+			clientMock.On("CreateVolumeGroup", mock.Anything, createGroupRequest).Return(gopowerstore.CreateResponse{ID: validGroupID}, nil)
+			clientMock.On("GetVolumeGroup", mock.Anything, validGroupID).Return(gopowerstore.VolumeGroup{ID: validGroupID, ProtectionPolicyID: validPolicyID}, nil)
+			clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+			clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
+			clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
+			clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
+			clientMock.On("GetVolume", context.Background(), mock.Anything).Return(gopowerstore.Volume{ApplianceID: validApplianceID}, nil)
+			clientMock.On("GetAppliance", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
+
+			res, err := ctrlSvc.CreateVolume(context.Background(), req)
+			Expect(err).To(BeNil())
+			Expect(res).To(Equal(&csi.CreateVolumeResponse{
+				Volume: &csi.Volume{
+					CapacityBytes: validVolSize,
+					VolumeId:      filepath.Join(validBaseVolID, firstValidID, "scsi"),
+					VolumeContext: map[string]string{
+						common.KeyArrayVolumeName:                                 "my-vol",
+						common.KeyProtocol:                                        "scsi",
+						common.KeyArrayID:                                         firstValidID,
+						common.KeyVolumeDescription:                               req.Name + "-" + validNamespaceName,
+						common.KeyServiceTag:                                      validServiceTag,
+						controller.KeyCSIPVCName:                                  req.Name,
+						controller.KeyCSIPVCNamespace:                             validNamespaceName,
+						ctrlSvc.WithRP(controller.KeyReplicationEnabled):          "true",
+						ctrlSvc.WithRP(controller.KeyReplicationRPO):              validRPO,
+						ctrlSvc.WithRP(controller.KeyReplicationRemoteSystem):     validRemoteSystemName,
+						ctrlSvc.WithRP(controller.KeyReplicationIgnoreNamespaces): "false",
+						ctrlSvc.WithRP(controller.KeyReplicationVGPrefix):         "csi",
+					},
+				},
+			}))
+		})
+
+		It("should create new volume with existing volumeGroup with policy", func() {
+			clientMock.On("GetVolumeGroupByName", mock.Anything, validGroupName).
+				Return(gopowerstore.VolumeGroup{ID: validGroupID, ProtectionPolicyID: validPolicyID}, nil)
+
+			req.Parameters[controller.KeyCSIPVCName] = req.Name
+			req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
+			clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+			clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
+			clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
+			clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
+			clientMock.On("GetVolume", context.Background(), mock.Anything).Return(gopowerstore.Volume{ApplianceID: validApplianceID}, nil)
+			clientMock.On("GetAppliance", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
+
+			res, err := ctrlSvc.CreateVolume(context.Background(), req)
+			Expect(err).To(BeNil())
+			Expect(res).To(Equal(&csi.CreateVolumeResponse{
+				Volume: &csi.Volume{
+					CapacityBytes: validVolSize,
+					VolumeId:      filepath.Join(validBaseVolID, firstValidID, "scsi"),
+					VolumeContext: map[string]string{
+						common.KeyArrayVolumeName:                                 "my-vol",
+						common.KeyProtocol:                                        "scsi",
+						common.KeyArrayID:                                         firstValidID,
+						common.KeyVolumeDescription:                               req.Name + "-" + validNamespaceName,
+						common.KeyServiceTag:                                      validServiceTag,
+						controller.KeyCSIPVCName:                                  req.Name,
+						controller.KeyCSIPVCNamespace:                             validNamespaceName,
+						ctrlSvc.WithRP(controller.KeyReplicationEnabled):          "true",
+						ctrlSvc.WithRP(controller.KeyReplicationRPO):              validRPO,
+						ctrlSvc.WithRP(controller.KeyReplicationRemoteSystem):     validRemoteSystemName,
+						ctrlSvc.WithRP(controller.KeyReplicationIgnoreNamespaces): "true",
+						ctrlSvc.WithRP(controller.KeyReplicationVGPrefix):         "csi",
+					},
+				},
+			}))
+		})
+
+		It("should create volume and update volumeGroup without policy, but policy exists", func() {
+
+			clientMock.On("GetVolumeGroupByName", mock.Anything, validGroupName).
+				Return(gopowerstore.VolumeGroup{ID: validGroupID, ProtectionPolicyID: validPolicyID}, nil)
+
+			EnsureProtectionPolicyExistsMock()
+
+			req.Parameters[controller.KeyCSIPVCName] = req.Name
+			req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
+			clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+			clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
+			clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
+			clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
+			clientMock.On("GetVolume", context.Background(), mock.Anything).Return(gopowerstore.Volume{ApplianceID: validApplianceID}, nil)
+			clientMock.On("GetAppliance", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
+
+			res, err := ctrlSvc.CreateVolume(context.Background(), req)
+			Expect(err).To(BeNil())
+			Expect(res).To(Equal(&csi.CreateVolumeResponse{
+				Volume: &csi.Volume{
+					CapacityBytes: validVolSize,
+					VolumeId:      filepath.Join(validBaseVolID, firstValidID, "scsi"),
+					VolumeContext: map[string]string{
+						common.KeyArrayVolumeName:                                 "my-vol",
+						common.KeyProtocol:                                        "scsi",
+						common.KeyArrayID:                                         firstValidID,
+						common.KeyVolumeDescription:                               req.Name + "-" + validNamespaceName,
+						common.KeyServiceTag:                                      validServiceTag,
+						controller.KeyCSIPVCName:                                  req.Name,
+						controller.KeyCSIPVCNamespace:                             validNamespaceName,
+						ctrlSvc.WithRP(controller.KeyReplicationEnabled):          "true",
+						ctrlSvc.WithRP(controller.KeyReplicationRPO):              validRPO,
+						ctrlSvc.WithRP(controller.KeyReplicationRemoteSystem):     validRemoteSystemName,
+						ctrlSvc.WithRP(controller.KeyReplicationIgnoreNamespaces): "true",
+						ctrlSvc.WithRP(controller.KeyReplicationVGPrefix):         "csi",
+					},
+				},
+			}))
+		})
+
+		It("should fail create volume and update volumeGroup if we can't ensure that policy exists", func() {
+			clientMock.On("GetVolumeGroupByName", mock.Anything, validGroupName).
+				Return(gopowerstore.VolumeGroup{}, gopowerstore.NewNotFoundError())
+
+			clientMock.On("GetRemoteSystemByName", mock.Anything, validRemoteSystemName).
+				Return(gopowerstore.RemoteSystem{}, gopowerstore.NewHostIsNotExistError())
+
+			res, err := ctrlSvc.CreateVolume(context.Background(), req)
+			Expect(res).To(BeNil())
+			Expect(err).NotTo(BeNil())
+			Expect(err.Error()).To(ContainSubstring("can't ensure protection policy exists"))
+
+		})
+
+		It("should fail when rpo incorrect", func() {
+			clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
+
+			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationRPO)] = "invalidRpo"
+
+			res, err := ctrlSvc.CreateVolume(context.Background(), req)
+			Expect(res).To(BeNil())
+			Expect(err).NotTo(BeNil())
+			Expect(err.Error()).To(ContainSubstring("invalid rpo value"))
+
+		})
+
+		It("should fail when rpo not declared in parameters", func() {
+
+			delete(req.Parameters, ctrlSvc.WithRP(controller.KeyReplicationRPO))
+
+			res, err := ctrlSvc.CreateVolume(context.Background(), req)
+			Expect(res).To(BeNil())
+			Expect(err).NotTo(BeNil())
+			Expect(err.Error()).To(ContainSubstring("replication enabled but no RPO specified in storage class"))
+
+		})
+
+		It("should fail when remote system not declared in parameters", func() {
+			delete(req.Parameters, ctrlSvc.WithRP(controller.KeyReplicationRemoteSystem))
+
+			res, err := ctrlSvc.CreateVolume(context.Background(), req)
+			Expect(res).To(BeNil())
+			Expect(err).NotTo(BeNil())
+			Expect(err.Error()).To(ContainSubstring("replication enabled but no remote system specified in storage class"))
+		})
+
+		It("should fail when volume group prefix not declared in parameters", func() {
+			delete(req.Parameters, ctrlSvc.WithRP(controller.KeyReplicationVGPrefix))
+
+			res, err := ctrlSvc.CreateVolume(context.Background(), req)
+			Expect(res).To(BeNil())
+			Expect(err).NotTo(BeNil())
+			Expect(err.Error()).To(ContainSubstring("replication enabled but no volume group prefix specified in storage class"))
+		})
+	})
+
+	When("creating nfs volume", func() {
+		It("should successfully create nfs volume", func() {
+			clientMock.On("GetNASByName", mock.Anything, validNasName).Return(gopowerstore.NAS{ID: validNasID}, nil)
+			clientMock.On("CreateFS", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
+			clientMock.On("GetFS", context.Background(), mock.Anything).Return(gopowerstore.FileSystem{NasServerID: validNasID}, nil)
+			clientMock.On("GetNAS", context.Background(), mock.Anything).Return(gopowerstore.NAS{CurrentNodeId: validNodeID}, nil)
+			clientMock.On("GetApplianceByName", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
+
+			req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
+			req.Parameters[common.KeyArrayID] = secondValidID
+
+			req.Parameters[controller.KeyCSIPVCName] = req.Name
+			req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
+
+			res, err := ctrlSvc.CreateVolume(context.Background(), req)
+			Expect(err).To(BeNil())
+			Expect(res).To(Equal(&csi.CreateVolumeResponse{
+				Volume: &csi.Volume{
+					CapacityBytes: validVolSize,
+					VolumeId:      filepath.Join(validBaseVolID, secondValidID, "nfs"),
+					VolumeContext: map[string]string{
+						common.KeyArrayVolumeName:     "my-vol",
+						common.KeyProtocol:            "nfs",
+						common.KeyArrayID:             secondValidID,
+						common.KeyNfsACL:              "A::OWNER@:RWX",
+						common.KeyNasName:             validNasName,
+						common.KeyVolumeDescription:   req.Name + "-" + validNamespaceName,
+						common.KeyServiceTag:          validServiceTag,
+						controller.KeyCSIPVCName:      req.Name,
+						controller.KeyCSIPVCNamespace: validNamespaceName,
+					},
+					AccessibleTopology: []*csi.Topology{{Segments: map[string]string{common.Name + "/" + ctrlSvc.Arrays()[secondValidID].GetIP() + "-nfs": "true"}}},
+				},
+			}))
+		})
+
+		It("should successfully create nfs volume & all vol attribute should get set", func() {
+			clientMock.On("GetNASByName", mock.Anything, validNasName).Return(gopowerstore.NAS{ID: validNasID}, nil)
+			clientMock.On("CreateFS", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
+			clientMock.On("GetFS", context.Background(), mock.Anything).Return(gopowerstore.FileSystem{NasServerID: validNasID}, nil)
+			clientMock.On("GetNAS", context.Background(), mock.Anything).Return(gopowerstore.NAS{CurrentNodeId: validNodeID}, nil)
+			clientMock.On("GetApplianceByName", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
+
+			req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
+			req.Parameters[common.KeyArrayID] = secondValidID
+
+			req.Parameters[controller.KeyCSIPVCName] = req.Name
+			req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
+			req.Parameters[common.KeyVolumeDescription] = "Vol-description"
+			req.Parameters[common.KeyConfigType] = "ConfigType_A"
+			req.Parameters[common.KeyAccessPolicy] = "AccessPolicy_A"
+			req.Parameters[common.KeyLockingPolicy] = "KeyLockingPolicy_A"
+			req.Parameters[common.KeyFolderRenamePolicy] = "KeyFolderRenamePolicy"
+			req.Parameters[common.KeyIsAsyncMtimeEnabled] = "true"
+			req.Parameters[common.KeyProtectionPolicyID] = "KeyProtectionPolicyID"
+			req.Parameters[common.KeyFileEventsPublishingMode] = "KeyFileEventsPublishingMode"
+			req.Parameters[common.KeyHostIoSize] = "VMware_16K"
+			req.Parameters[common.KeyFlrCreateMode] = "KeyFlrCreateMode"
+			req.Parameters[common.KeyFlrDefaultRetention] = "KeyFlrDefaultRetention"
+			req.Parameters[common.KeyFlrMinRetention] = "KeyFlrMinRetention"
+			req.Parameters[common.KeyFlrMaxRetention] = "KeyFlrMaxRetention"
+
+			res, err := ctrlSvc.CreateVolume(context.Background(), req)
+			Expect(err).To(BeNil())
+			Expect(res).To(Equal(&csi.CreateVolumeResponse{
+				Volume: &csi.Volume{
+					CapacityBytes: validVolSize,
+					VolumeId:      filepath.Join(validBaseVolID, secondValidID, "nfs"),
+					VolumeContext: map[string]string{
+						common.KeyArrayVolumeName:          "my-vol",
+						common.KeyProtocol:                 "nfs",
+						common.KeyArrayID:                  secondValidID,
+						common.KeyNfsACL:                   "A::OWNER@:RWX",
+						common.KeyNasName:                  validNasName,
+						common.KeyVolumeDescription:        "Vol-description",
+						common.KeyConfigType:               "ConfigType_A",
+						common.KeyAccessPolicy:             "AccessPolicy_A",
+						common.KeyLockingPolicy:            "KeyLockingPolicy_A",
+						common.KeyFolderRenamePolicy:       "KeyFolderRenamePolicy",
+						common.KeyIsAsyncMtimeEnabled:      "true",
+						common.KeyProtectionPolicyID:       "KeyProtectionPolicyID",
+						common.KeyFileEventsPublishingMode: "KeyFileEventsPublishingMode",
+						common.KeyHostIoSize:               "VMware_16K",
+						common.KeyFlrCreateMode:            "KeyFlrCreateMode",
+						common.KeyFlrDefaultRetention:      "KeyFlrDefaultRetention",
+						common.KeyFlrMinRetention:          "KeyFlrMinRetention",
+						common.KeyFlrMaxRetention:          "KeyFlrMaxRetention",
+						common.KeyServiceTag:               validServiceTag,
+						controller.KeyCSIPVCName:           req.Name,
+						controller.KeyCSIPVCNamespace:      validNamespaceName,
+					},
+					AccessibleTopology: []*csi.Topology{{Segments: map[string]string{common.Name + "/" + ctrlSvc.Arrays()[secondValidID].GetIP() + "-nfs": "true"}}},
+				},
+			}))
 		})
 
 		When("creating nfs volume with NFS acls in array config and storage class", func() {

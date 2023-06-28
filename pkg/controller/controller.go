@@ -329,7 +329,7 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 		}
 	}
 
-	params["description"] = getDescription(req.GetParameters())
+	params[common.KeyVolumeDescription] = getDescription(req.GetParameters())
 
 	var volumeResponse *csi.Volume
 	resp, err := creator.Create(ctx, req, sizeInBytes, arr.GetClient())
