@@ -14,8 +14,7 @@ DRIVERDIR="${SCRIPTDIR}/../"
 if [ ! -d "$DRIVERDIR/helm-charts" ]; then
   
   if  [ ! -d "$SCRIPTDIR/helm-charts" ]; then
-    git clone --quiet "https://github.com/dell/helm-charts"
-   
+    git clone --quiet -c advice.detachedHead=false -b csi-powerstore-2.7.0 https://github.com/dell/helm-charts
   fi
   mv helm-charts $DRIVERDIR
 else 
