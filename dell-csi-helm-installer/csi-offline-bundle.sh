@@ -241,7 +241,6 @@ else
   fi
 fi
 
-# HELMDIR="${REPODIR}/helm"
 HELMDIR="${REPODIR}/helm-charts/charts/$DRIVER"
 HELMBACKUPDIR="${REPODIR}/helm-original"
 
