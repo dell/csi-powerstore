@@ -138,7 +138,13 @@ copy_files() {
   status "Copying necessary files"
   for f in ${REQUIRED_FILES[@]}; do
     echo " ${f}"
-    cp -R "${f}" "${DISTDIR}"
+    if [[ ${f} == *$DRIVER ]]; then
+      mkdir -p ${DISTDIR}/helm-charts/charts
+      cp -R "${f}" "${DISTDIR}/helm-charts/charts"
+    else
+      cp -R "${f}" "${DISTDIR}"
+    fi
+    
     if [ $? -ne 0 ]; then
       echo "Unable to copy ${f} to the distribution directory"
       exit 1
@@ -193,7 +199,7 @@ copy_helm_dir() {
   fi
 
   mkdir -p "${HELMBACKUPDIR}"
-  cp -R "${HELMDIR}"/* "${HELMBACKUPDIR}"
+  cp -R "${HELMDIR}/../.."/* "${HELMBACKUPDIR}"
 }
 
 # set_mode
@@ -218,11 +224,24 @@ set_mode() {
 CREATE="false"
 PREPARE="false"
 REGISTRY=""
+DRIVER="csi-powerstore"
 
 # some directories
 SCRIPTDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 REPODIR="$( dirname "${SCRIPTDIR}" )"
-HELMDIR="${REPODIR}/helm"
+if [ ! -d "$REPODIR/helm-charts" ]; then
+  
+  if  [ ! -d "$SCRIPTDIR/helm-charts" ]; then
+    git clone --quiet -c advice.detachedHead=false -b csi-powerstore-2.7.0 https://github.com/dell/helm-charts
+  fi
+  mv helm-charts $REPODIR
+else 
+  if [  -d "$SCRIPTDIR/helm-charts" ]; then
+    rm -rf $SCRIPTDIR/helm-charts
+  fi
+fi
+
+HELMDIR="${REPODIR}/helm-charts/charts/$DRIVER"
 HELMBACKUPDIR="${REPODIR}/helm-original"
 
 # mode we are using for install, "helm" or "operator"
@@ -233,7 +252,7 @@ if [ "${MODE}" == "helm" ]; then
   CHARTFILE=$(find "${HELMDIR}" -maxdepth 2 -type f -name Chart.yaml)
   VALUESFILE=$(find "${HELMDIR}" -maxdepth 2 -type f -name values.yaml)
 
-  # some output files
+   # some output files
   DRIVERNAME=$(grep -oh "^name:\s.*" "${CHARTFILE}" | awk '{print $2}')
   DRIVERNAME=${DRIVERNAME:-"dell-csi-driver"}
   DRIVERVERSION=$(grep -oh "^version:\s.*" "${CHARTFILE}" | awk '{print $2}' | sed -e 's/^"//' -e 's/"$//')
