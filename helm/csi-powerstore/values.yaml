@@ -53,6 +53,13 @@ externalAccess:
 # Default value: None
 imagePullPolicy: IfNotPresent
 
+# maxPowerstoreVolumesPerNode: Specify default value for maximum number of volumes that controller can publish to the node.
+# If value is zero CO SHALL decide how many volumes of this type can be published by the controller to the node.
+# This limit is applicable to all the nodes in the cluster for which node label 'max-powerstore-volumes-per-node' is not set.
+# Allowed values: n, where n >= 0
+# Default value: 0
+maxPowerstoreVolumesPerNode: 0
+
 # nfsAcls: enables setting permissions on NFS mount directory
 # This value acts as default value for NFS ACL (nfsAcls), if not specified for an array config in secret
 # Permissions can be specified in two formats:

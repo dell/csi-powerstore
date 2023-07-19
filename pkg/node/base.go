@@ -87,6 +87,10 @@ func getNodeOptions() Opts {
 		opts.NodeIDFilePath = path
 	}
 
+	if kubeConfigPath, ok := csictx.LookupEnv(ctx, common.EnvKubeConfigPath); ok {
+		opts.KubeConfigPath = kubeConfigPath
+	}
+
 	if prefix, ok := csictx.LookupEnv(ctx, common.EnvNodeNamePrefix); ok {
 		opts.NodeNamePrefix = prefix
 	}
@@ -105,6 +109,15 @@ func getNodeOptions() Opts {
 
 	if opts.NodeChrootPath == "" {
 		opts.NodeChrootPath = defaultNodeChrootPath
+	}
+
+	if maxVolumesPerNodeStr, ok := csictx.LookupEnv(ctx, common.EnvMaxVolumesPerNode); ok {
+		maxVolumesPerNode, err := strconv.ParseInt(maxVolumesPerNodeStr, 10, 64)
+		if err != nil {
+			opts.MaxVolumesPerNode = 0
+		} else {
+			opts.MaxVolumesPerNode = maxVolumesPerNode
+		}
 	}
 
 	if tmpDir, ok := csictx.LookupEnv(ctx, common.EnvTmpDir); ok {

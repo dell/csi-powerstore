@@ -33,11 +33,13 @@ import (
 	"strings"
 
 	"github.com/dell/gonvme"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-powerstore/v2/pkg/array"
 	"github.com/dell/csi-powerstore/v2/pkg/common"
 	"github.com/dell/csi-powerstore/v2/pkg/common/fs"
+	"github.com/dell/csi-powerstore/v2/pkg/common/k8sutils"
 	"github.com/dell/csi-powerstore/v2/pkg/controller"
 	"github.com/dell/gobrick"
 	csictx "github.com/dell/gocsi/context"
@@ -55,8 +57,10 @@ type Opts struct {
 	NodeIDFilePath        string
 	NodeNamePrefix        string
 	NodeChrootPath        string
+	MaxVolumesPerNode     int64
 	FCPortsFilterFilePath string
 	KubeNodeName          string
+	KubeConfigPath        string
 	CHAPUsername          string
 	CHAPPassword          string
 	TmpDir                string
@@ -1027,6 +1031,24 @@ func (s *Service) NodeGetCapabilities(context context.Context, request *csi.Node
 	}, nil
 }
 
+// GetNodeLabels returns labels present in the node
+func (s *Service) GetNodeLabels(ctx context.Context) (map[string]string, error) {
+	k8sclientset, err := k8sutils.CreateKubeClientSet(s.opts.KubeConfigPath)
+	if err != nil {
+		log.Errorf("init client failed: '%s'", err.Error())
+		return nil, err
+	}
+	// access the API to fetch node object
+	node, err := k8sclientset.CoreV1().Nodes().Get(ctx, s.opts.KubeNodeName, v1.GetOptions{})
+	if err != nil {
+		log.Errorf("getting node details failed: '%s'", err.Error())
+		return nil, err
+	}
+	log.Debugf("Node labels: %v\n", node.Labels)
+
+	return node.Labels, nil
+}
+
 // NodeGetInfo returns id of the node and topology constraints
 func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
 	// Create the topology keys
@@ -1206,6 +1228,35 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 			}
 		}
 	}
+
+	// Check for node label 'max-powerstore-volumes-per-node'. If present set 'maxVolumesPerNode' to this value.
+	// If node label is not present, set 'maxVolumesPerNode' to default value i.e., 0
+	var maxVolumesPerNode int64 = 0
+
+	labels, err := s.GetNodeLabels(ctx)
+	if err != nil {
+		log.Error("failed to get Node Labels with error", err.Error())
+		return nil, err
+	}
+
+	if val, ok := labels["max-powerstore-volumes-per-node"]; ok {
+		maxVols, err := strconv.ParseInt(val, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("invalid value '%s' specified for 'max-powerstore-volumes-per-node' node label", val)
+		}
+		if maxVols > 0 {
+			maxVolumesPerNode = maxVols
+		}
+		log.Infof("node label 'max-powerstore-volumes-per-node' is available and is set to value '%d'", maxVolumesPerNode)
+	} else {
+		if s.opts.MaxVolumesPerNode > 0 {
+			maxVolumesPerNode = s.opts.MaxVolumesPerNode
+		}
+		log.Infof("node label 'max-powerstore-volumes-per-node' is not available. Using default volume limit '%v'", maxVolumesPerNode)
+	}
+
+	resp.MaxVolumesPerNode = maxVolumesPerNode
+
 	return resp, nil
 }
 
