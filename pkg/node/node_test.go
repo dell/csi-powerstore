@@ -3214,7 +3214,7 @@ var _ = Describe("CSINodeService", func() {
 					nil,
 				)
 				nodeLabelsRetrieverMock.On("BuildConfigFromFlags", mock.Anything, mock.Anything).Return(nil, nil)
-				nodeLabelsRetrieverMock.On("GetNodeLabels", mock.Anything, mock.Anything, mock.Anything).Return(map[string]string{"max-powerstore-volumes-per-node": "2"}, nil)
+				nodeLabelsRetrieverMock.On("GetNodeLabels", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
 				nodeLabelsRetrieverMock.On("InClusterConfig", mock.Anything).Return(nil, errors.New("Unable to create kubeclientset"))
 				nodeLabelsRetrieverMock.On("NewForConfig", mock.Anything).Return(nil, nil)
 
