@@ -1,7 +1,5 @@
-package k8sutils
-
 /*
- Copyright (c) 2020-2022 Dell Inc, or its subsidiaries.
+ Copyright (c) 2021-2023 Dell Inc, or its subsidiaries.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -16,36 +14,92 @@ package k8sutils
  limitations under the License.
 */
 
+package k8sutils
+
 import (
+	"context"
+
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-// CreateKubeClientSet - Returns kubeclient set
+// NodeLabelsRetrieverInterface defines the methods for retrieving Kubernetes Node Labels
+type NodeLabelsRetrieverInterface interface {
+	BuildConfigFromFlags(masterUrl, kubeconfig string) (*rest.Config, error)
+	InClusterConfig() (*rest.Config, error)
+	NewForConfig(config *rest.Config) (*kubernetes.Clientset, error)
+	GetNodeLabels(k8sclientset *kubernetes.Clientset, ctx context.Context, kubeNodeName string) (map[string]string, error)
+}
+
+// NodeLabelsRetrieverImpl provided the implementation for NodeLabelsRetrieverInterface
+type NodeLabelsRetrieverImpl struct{}
+
+var NodeLabelsRetriever NodeLabelsRetrieverInterface
+
+func init() {
+	NodeLabelsRetriever = new(NodeLabelsRetrieverImpl)
+}
+
+func (svc *NodeLabelsRetrieverImpl) BuildConfigFromFlags(masterUrl, kubeconfig string) (*rest.Config, error) {
+	return clientcmd.BuildConfigFromFlags(masterUrl, kubeconfig)
+}
+
+func (svc *NodeLabelsRetrieverImpl) InClusterConfig() (*rest.Config, error) {
+	return rest.InClusterConfig()
+}
+
+func (svc *NodeLabelsRetrieverImpl) NewForConfig(config *rest.Config) (*kubernetes.Clientset, error) {
+	return kubernetes.NewForConfig(config)
+}
+
+func (svc *NodeLabelsRetrieverImpl) GetNodeLabels(k8sclientset *kubernetes.Clientset, ctx context.Context, kubeNodeName string) (map[string]string, error) {
+	if k8sclientset != nil {
+		node, err := k8sclientset.CoreV1().Nodes().Get(ctx, kubeNodeName, v1.GetOptions{})
+		if err != nil {
+			return nil, err
+		}
+
+		return node.Labels, nil
+	}
+
+	return nil, nil
+}
+
+// CreateKubeClientSet creates and returns kubeclient set
 func CreateKubeClientSet(kubeconfig string) (*kubernetes.Clientset, error) {
 	var clientset *kubernetes.Clientset
 	if kubeconfig != "" {
-		// use the current context in kubeconfig
-		config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
+		config, err := NodeLabelsRetriever.BuildConfigFromFlags("", kubeconfig)
 		if err != nil {
 			return nil, err
 		}
 		// create the clientset
-		clientset, err = kubernetes.NewForConfig(config)
+		clientset, err = NodeLabelsRetriever.NewForConfig(config)
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		config, err := rest.InClusterConfig()
+		config, err := NodeLabelsRetriever.InClusterConfig()
 		if err != nil {
 			return nil, err
 		}
 		// creates the clientset
-		clientset, err = kubernetes.NewForConfig(config)
+		clientset, err = NodeLabelsRetriever.NewForConfig(config)
 		if err != nil {
 			return nil, err
 		}
 	}
 	return clientset, nil
+}
+
+// GetNodeLabels returns labels present in the k8s node
+func GetNodeLabels(ctx context.Context, kubeConfigPath string, kubeNodeName string) (map[string]string, error) {
+	k8sclientset, err := CreateKubeClientSet(kubeConfigPath)
+	if err != nil {
+		return nil, err
+	}
+
+	return NodeLabelsRetriever.GetNodeLabels(k8sclientset, ctx, kubeNodeName)
 }
