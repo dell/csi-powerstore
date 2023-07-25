@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2021-2023 Dell Inc, or its subsidiaries.
+ Copyright (c) 2023 Dell Inc, or its subsidiaries.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -33,17 +33,17 @@ type NodeLabelsRetrieverInterface struct {
 	mock.Mock
 }
 
-// BuildConfigFromFlags provides a mock function with given fields: masterUrl, kubeconfig
-func (_m *NodeLabelsRetrieverInterface) BuildConfigFromFlags(masterUrl string, kubeconfig string) (*rest.Config, error) {
-	ret := _m.Called(masterUrl, kubeconfig)
+// BuildConfigFromFlags provides a mock function with given fields: masterURL, kubeconfig
+func (_m *NodeLabelsRetrieverInterface) BuildConfigFromFlags(masterURL string, kubeconfig string) (*rest.Config, error) {
+	ret := _m.Called(masterURL, kubeconfig)
 
 	var r0 *rest.Config
 	var r1 error
 	if rf, ok := ret.Get(0).(func(string, string) (*rest.Config, error)); ok {
-		return rf(masterUrl, kubeconfig)
+		return rf(masterURL, kubeconfig)
 	}
 	if rf, ok := ret.Get(0).(func(string, string) *rest.Config); ok {
-		r0 = rf(masterUrl, kubeconfig)
+		r0 = rf(masterURL, kubeconfig)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*rest.Config)
@@ -51,7 +51,7 @@ func (_m *NodeLabelsRetrieverInterface) BuildConfigFromFlags(masterUrl string, k
 	}
 
 	if rf, ok := ret.Get(1).(func(string, string) error); ok {
-		r1 = rf(masterUrl, kubeconfig)
+		r1 = rf(masterURL, kubeconfig)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -59,8 +59,8 @@ func (_m *NodeLabelsRetrieverInterface) BuildConfigFromFlags(masterUrl string, k
 	return r0, r1
 }
 
-// GetNodeLabels provides a mock function with given fields: k8sclientset, ctx, kubeNodeName
-func (_m *NodeLabelsRetrieverInterface) GetNodeLabels(k8sclientset *kubernetes.Clientset, ctx context.Context, kubeNodeName string) (map[string]string, error) {
+// GetNodeLabels provides a mock function with given fields: ctx, k8sclientset, kubeNodeName
+func (_m *NodeLabelsRetrieverInterface) GetNodeLabels(ctx context.Context, k8sclientset *kubernetes.Clientset, kubeNodeName string) (map[string]string, error) {
 	ret := _m.Called(k8sclientset, ctx, kubeNodeName)
 
 	var r0 map[string]string

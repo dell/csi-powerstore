@@ -1214,33 +1214,35 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 		}
 	}
 
-	// Check for node label 'max-powerstore-volumes-per-node'. If present set 'maxVolumesPerNode' to this value.
-	// If node label is not present, set 'maxVolumesPerNode' to default value i.e., 0
 	var maxVolumesPerNode int64 = 0
 
+	// Setting maxVolumesPerNode using the value of field maxPowerstoreVolumesPerNode specified in values.yaml
+	if s.opts.MaxVolumesPerNode > 0 {
+		maxVolumesPerNode = s.opts.MaxVolumesPerNode
+	}
+
+	// Check for node label 'max-powerstore-volumes-per-node'. If present set 'maxVolumesPerNode' to this value.
 	labels, err := k8sutils.GetNodeLabels(ctx, s.opts.KubeConfigPath, s.opts.KubeNodeName)
 	if err != nil {
-		log.Error("failed to get Node Labels with error", err.Error())
-		return nil, err
+		log.Warnf("failed to get Node Labels with error: %s", err.Error())
+	} else if labels != nil {
+		if val, ok := labels[maxPowerstoreVolumesPerNodeLabel]; ok {
+			maxVols, err := strconv.ParseInt(val, 10, 64)
+			if err != nil {
+				log.Warnf("invalid value '%s' specified for 'max-powerstore-volumes-per-node' node label", val)
+			} else if maxVols > 0 {
+				maxVolumesPerNode = maxVols
+				log.Infof("node label 'max-powerstore-volumes-per-node' is available and is set to value '%d'", maxVolumesPerNode)
+			}
+
+		}
 	}
 
-	if val, ok := labels[maxPowerstoreVolumesPerNodeLabel]; ok {
-		maxVols, err := strconv.ParseInt(val, 10, 64)
-		if err != nil {
-			return nil, fmt.Errorf("invalid value '%s' specified for 'max-powerstore-volumes-per-node' node label", val)
-		}
-		if maxVols > 0 {
-			maxVolumesPerNode = maxVols
-		}
-		log.Infof("node label 'max-powerstore-volumes-per-node' is available and is set to value '%d'", maxVolumesPerNode)
-	} else {
-		if s.opts.MaxVolumesPerNode > 0 {
-			maxVolumesPerNode = s.opts.MaxVolumesPerNode
-		}
-		log.Infof("node label 'max-powerstore-volumes-per-node' is not available. Using default volume limit '%v'", maxVolumesPerNode)
+	if maxVolumesPerNode >= 0 {
+		resp.MaxVolumesPerNode = maxVolumesPerNode
+		log.Infof("Setting MaxVolumesPerNode to '%d'", maxVolumesPerNode)
 	}
 
-	resp.MaxVolumesPerNode = maxVolumesPerNode
 	return resp, nil
 }
 

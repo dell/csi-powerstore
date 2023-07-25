@@ -114,6 +114,7 @@ func getNodeOptions() Opts {
 	if maxVolumesPerNodeStr, ok := csictx.LookupEnv(ctx, common.EnvMaxVolumesPerNode); ok {
 		maxVolumesPerNode, err := strconv.ParseInt(maxVolumesPerNodeStr, 10, 64)
 		if err != nil {
+			log.Warn("error while parsing the value of maxPowerstoreVolumesPerNode, using default value 0")
 			opts.MaxVolumesPerNode = 0
 		} else {
 			opts.MaxVolumesPerNode = maxVolumesPerNode

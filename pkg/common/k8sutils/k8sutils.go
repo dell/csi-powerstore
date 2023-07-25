@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2021-2023 Dell Inc, or its subsidiaries.
+ Copyright (c) 2023 Dell Inc, or its subsidiaries.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -27,34 +27,39 @@ import (
 
 // NodeLabelsRetrieverInterface defines the methods for retrieving Kubernetes Node Labels
 type NodeLabelsRetrieverInterface interface {
-	BuildConfigFromFlags(masterUrl, kubeconfig string) (*rest.Config, error)
+	BuildConfigFromFlags(masterURL, kubeconfig string) (*rest.Config, error)
 	InClusterConfig() (*rest.Config, error)
 	NewForConfig(config *rest.Config) (*kubernetes.Clientset, error)
-	GetNodeLabels(k8sclientset *kubernetes.Clientset, ctx context.Context, kubeNodeName string) (map[string]string, error)
+	GetNodeLabels(ctx context.Context, k8sclientset *kubernetes.Clientset, kubeNodeName string) (map[string]string, error)
 }
 
 // NodeLabelsRetrieverImpl provided the implementation for NodeLabelsRetrieverInterface
 type NodeLabelsRetrieverImpl struct{}
 
+// NodeLabelsRetriever is the actual instance of NodeLabelsRetrieverInterface which is used to retrieve the node labels
 var NodeLabelsRetriever NodeLabelsRetrieverInterface
 
 func init() {
 	NodeLabelsRetriever = new(NodeLabelsRetrieverImpl)
 }
 
-func (svc *NodeLabelsRetrieverImpl) BuildConfigFromFlags(masterUrl, kubeconfig string) (*rest.Config, error) {
-	return clientcmd.BuildConfigFromFlags(masterUrl, kubeconfig)
+// BuildConfigFromFlags is a method for building kubernetes client config
+func (svc *NodeLabelsRetrieverImpl) BuildConfigFromFlags(masterURL, kubeconfig string) (*rest.Config, error) {
+	return clientcmd.BuildConfigFromFlags(masterURL, kubeconfig)
 }
 
+// InClusterConfig returns a config object which uses the service account kubernetes gives to pods
 func (svc *NodeLabelsRetrieverImpl) InClusterConfig() (*rest.Config, error) {
 	return rest.InClusterConfig()
 }
 
+// NewForConfig creates a new Clientset for the given config
 func (svc *NodeLabelsRetrieverImpl) NewForConfig(config *rest.Config) (*kubernetes.Clientset, error) {
 	return kubernetes.NewForConfig(config)
 }
 
-func (svc *NodeLabelsRetrieverImpl) GetNodeLabels(k8sclientset *kubernetes.Clientset, ctx context.Context, kubeNodeName string) (map[string]string, error) {
+// GetNodeLabels retrieves the kubernetes node object and returns its labels
+func (svc *NodeLabelsRetrieverImpl) GetNodeLabels(ctx context.Context, k8sclientset *kubernetes.Clientset, kubeNodeName string) (map[string]string, error) {
 	if k8sclientset != nil {
 		node, err := k8sclientset.CoreV1().Nodes().Get(ctx, kubeNodeName, v1.GetOptions{})
 		if err != nil {
@@ -101,5 +106,5 @@ func GetNodeLabels(ctx context.Context, kubeConfigPath string, kubeNodeName stri
 		return nil, err
 	}
 
-	return NodeLabelsRetriever.GetNodeLabels(k8sclientset, ctx, kubeNodeName)
+	return NodeLabelsRetriever.GetNodeLabels(ctx, k8sclientset, kubeNodeName)
 }

@@ -3219,8 +3219,18 @@ var _ = Describe("CSINodeService", func() {
 				nodeLabelsRetrieverMock.On("NewForConfig", mock.Anything).Return(nil, nil)
 
 				res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
-				Expect(err).To(Equal(errors.New("Unable to create kubeclientset")))
-				Expect(res).To(BeNil())
+				Expect(err).To(BeNil())
+				Expect(res).To(Equal(&csi.NodeGetInfoResponse{
+					NodeId: nodeSvc.nodeID,
+					AccessibleTopology: &csi.Topology{
+						Segments: map[string]string{
+							common.Name + "/" + firstValidIP + "-nfs":   "true",
+							common.Name + "/" + firstValidIP + "-iscsi": "true",
+							common.Name + "/" + secondValidIP + "-nfs":  "true",
+						},
+					},
+					MaxVolumesPerNode: 0,
+				}))
 			})
 		})
 
