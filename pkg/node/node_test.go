@@ -32,6 +32,7 @@ import (
 	"github.com/dell/csi-powerstore/v2/mocks"
 	"github.com/dell/csi-powerstore/v2/pkg/array"
 	"github.com/dell/csi-powerstore/v2/pkg/common"
+	"github.com/dell/csi-powerstore/v2/pkg/common/k8sutils"
 	"github.com/dell/csi-powerstore/v2/pkg/controller"
 	"github.com/dell/gobrick"
 	csictx "github.com/dell/gocsi/context"
@@ -48,16 +49,17 @@ import (
 )
 
 var (
-	iscsiConnectorMock *mocks.ISCSIConnector
-	nvmeConnectorMock  *mocks.NVMEConnector
-	fcConnectorMock    *mocks.FcConnector
-	utilMock           *mocks.UtilInterface
-	fsMock             *mocks.FsInterface
-	nodeSvc            *Service
-	clientMock         *gopowerstoremock.Client
-	ctrlMock           *mocks.ControllerInterface
-	iscsiLibMock       *goiscsi.MockISCSI
-	nvmeLibMock        *gonvme.MockNVMe
+	iscsiConnectorMock      *mocks.ISCSIConnector
+	nvmeConnectorMock       *mocks.NVMEConnector
+	fcConnectorMock         *mocks.FcConnector
+	utilMock                *mocks.UtilInterface
+	fsMock                  *mocks.FsInterface
+	nodeSvc                 *Service
+	clientMock              *gopowerstoremock.Client
+	ctrlMock                *mocks.ControllerInterface
+	iscsiLibMock            *goiscsi.MockISCSI
+	nvmeLibMock             *gonvme.MockNVMe
+	nodeLabelsRetrieverMock *mocks.NodeLabelsRetrieverInterface
 )
 
 const (
@@ -190,6 +192,8 @@ func setVariables() {
 	clientMock = new(gopowerstoremock.Client)
 	iscsiLibMock = goiscsi.NewMockISCSI(nil)
 	nvmeLibMock = gonvme.NewMockNVMe(nil)
+	nodeLabelsRetrieverMock = new(mocks.NodeLabelsRetrieverInterface)
+	k8sutils.NodeLabelsRetriever = nodeLabelsRetrieverMock
 
 	arrays := getTestArrays()
 
@@ -219,6 +223,13 @@ func setVariables() {
 	}
 	nodeSvc.SetArrays(arrays)
 	nodeSvc.SetDefaultArray(arrays[firstValidIP])
+}
+
+func setDefaultNodeLabelsRetrieverMock() {
+	nodeLabelsRetrieverMock.On("BuildConfigFromFlags", mock.Anything, mock.Anything).Return(nil, nil)
+	nodeLabelsRetrieverMock.On("GetNodeLabels", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
+	nodeLabelsRetrieverMock.On("InClusterConfig", mock.Anything).Return(nil, nil)
+	nodeLabelsRetrieverMock.On("NewForConfig", mock.Anything).Return(nil, nil)
 }
 
 var _ = Describe("CSINodeService", func() {
@@ -3127,6 +3138,8 @@ var _ = Describe("CSINodeService", func() {
 					conn,
 					nil,
 				)
+				setDefaultNodeLabelsRetrieverMock()
+
 				res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
 				Expect(err).To(BeNil())
 				Expect(res).To(Equal(&csi.NodeGetInfoResponse{
@@ -3138,6 +3151,122 @@ var _ = Describe("CSINodeService", func() {
 							common.Name + "/" + secondValidIP + "-nfs":  "true",
 						},
 					},
+					MaxVolumesPerNode: 0,
+				}))
+			})
+		})
+
+		When("node label max-powerstore-volumes-per-node is set and retrieved successfully", func() {
+			It("should return correct MaxVolumesPerNode in response", func() {
+				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
+					Return([]gopowerstore.IPPoolAddress{
+						{
+							Address: "192.168.1.1",
+							IPPort:  gopowerstore.IPPortInstance{TargetIqn: "iqn"},
+						},
+						{
+							Address: "192.168.1.2",
+							IPPort:  gopowerstore.IPPortInstance{TargetIqn: "iqn2"},
+						},
+					}, nil)
+				conn, _ := net.Dial("udp", "127.0.0.1:80")
+				fsMock.On("NetDial", mock.Anything).Return(
+					conn,
+					nil,
+				)
+				nodeLabelsRetrieverMock.On("BuildConfigFromFlags", mock.Anything, mock.Anything).Return(nil, nil)
+				nodeLabelsRetrieverMock.On("GetNodeLabels", mock.Anything, mock.Anything, mock.Anything).Return(map[string]string{"max-powerstore-volumes-per-node": "2"}, nil)
+				nodeLabelsRetrieverMock.On("InClusterConfig", mock.Anything).Return(nil, nil)
+				nodeLabelsRetrieverMock.On("NewForConfig", mock.Anything).Return(nil, nil)
+
+				res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
+				Expect(err).To(BeNil())
+				Expect(res).To(Equal(&csi.NodeGetInfoResponse{
+					NodeId: nodeSvc.nodeID,
+					AccessibleTopology: &csi.Topology{
+						Segments: map[string]string{
+							common.Name + "/" + firstValidIP + "-nfs":   "true",
+							common.Name + "/" + firstValidIP + "-iscsi": "true",
+							common.Name + "/" + secondValidIP + "-nfs":  "true",
+						},
+					},
+					MaxVolumesPerNode: 2,
+				}))
+			})
+		})
+
+		When("there is some issue while retrieving node labels", func() {
+			It("should return proper error", func() {
+				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
+					Return([]gopowerstore.IPPoolAddress{
+						{
+							Address: "192.168.1.1",
+							IPPort:  gopowerstore.IPPortInstance{TargetIqn: "iqn"},
+						},
+						{
+							Address: "192.168.1.2",
+							IPPort:  gopowerstore.IPPortInstance{TargetIqn: "iqn2"},
+						},
+					}, nil)
+				conn, _ := net.Dial("udp", "127.0.0.1:80")
+				fsMock.On("NetDial", mock.Anything).Return(
+					conn,
+					nil,
+				)
+				nodeLabelsRetrieverMock.On("BuildConfigFromFlags", mock.Anything, mock.Anything).Return(nil, nil)
+				nodeLabelsRetrieverMock.On("GetNodeLabels", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
+				nodeLabelsRetrieverMock.On("InClusterConfig", mock.Anything).Return(nil, errors.New("Unable to create kubeclientset"))
+				nodeLabelsRetrieverMock.On("NewForConfig", mock.Anything).Return(nil, nil)
+
+				res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
+				Expect(err).To(BeNil())
+				Expect(res).To(Equal(&csi.NodeGetInfoResponse{
+					NodeId: nodeSvc.nodeID,
+					AccessibleTopology: &csi.Topology{
+						Segments: map[string]string{
+							common.Name + "/" + firstValidIP + "-nfs":   "true",
+							common.Name + "/" + firstValidIP + "-iscsi": "true",
+							common.Name + "/" + secondValidIP + "-nfs":  "true",
+						},
+					},
+					MaxVolumesPerNode: 0,
+				}))
+			})
+		})
+
+		When("MaxVolumesPerNode is set via environment variable at the time of installation", func() {
+			It("should return correct MaxVolumesPerNode in response", func() {
+				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
+					Return([]gopowerstore.IPPoolAddress{
+						{
+							Address: "192.168.1.1",
+							IPPort:  gopowerstore.IPPortInstance{TargetIqn: "iqn"},
+						},
+						{
+							Address: "192.168.1.2",
+							IPPort:  gopowerstore.IPPortInstance{TargetIqn: "iqn2"},
+						},
+					}, nil)
+				conn, _ := net.Dial("udp", "127.0.0.1:80")
+				fsMock.On("NetDial", mock.Anything).Return(
+					conn,
+					nil,
+				)
+				setDefaultNodeLabelsRetrieverMock()
+				nodeSvc.opts.MaxVolumesPerNode = 2
+
+				res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
+				Expect(err).To(BeNil())
+				Expect(res).To(Equal(&csi.NodeGetInfoResponse{
+					NodeId: nodeSvc.nodeID,
+					AccessibleTopology: &csi.Topology{
+						Segments: map[string]string{
+							common.Name + "/" + firstValidIP + "-nfs":   "true",
+							common.Name + "/" + firstValidIP + "-iscsi": "true",
+							common.Name + "/" + secondValidIP + "-nfs":  "true",
+						},
+					},
+					MaxVolumesPerNode: 2,
 				}))
 			})
 		})
@@ -3160,6 +3289,8 @@ var _ = Describe("CSINodeService", func() {
 					conn,
 					nil,
 				)
+				setDefaultNodeLabelsRetrieverMock()
+
 				res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
 				Expect(err).To(BeNil())
 				Expect(res).To(Equal(&csi.NodeGetInfoResponse{
@@ -3170,6 +3301,7 @@ var _ = Describe("CSINodeService", func() {
 							common.Name + "/" + secondValidIP + "-nfs": "true",
 						},
 					},
+					MaxVolumesPerNode: 0,
 				}))
 			})
 		})
@@ -3184,6 +3316,8 @@ var _ = Describe("CSINodeService", func() {
 					conn,
 					nil,
 				)
+				setDefaultNodeLabelsRetrieverMock()
+
 				res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
 
 				Expect(err).To(BeNil())
@@ -3195,6 +3329,7 @@ var _ = Describe("CSINodeService", func() {
 							common.Name + "/" + secondValidIP + "-nfs": "true",
 						},
 					},
+					MaxVolumesPerNode: 0,
 				}))
 			})
 		})
@@ -3216,6 +3351,8 @@ var _ = Describe("CSINodeService", func() {
 					conn,
 					nil,
 				)
+				setDefaultNodeLabelsRetrieverMock()
+
 				res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
 				Expect(err).To(BeNil())
 				Expect(res).To(Equal(&csi.NodeGetInfoResponse{
@@ -3226,6 +3363,7 @@ var _ = Describe("CSINodeService", func() {
 							common.Name + "/" + secondValidIP + "-nfs": "true",
 						},
 					},
+					MaxVolumesPerNode: 0,
 				}))
 				gonvme.GONVMEMock.InduceDiscoveryError = false
 			})
@@ -3263,6 +3401,7 @@ var _ = Describe("CSINodeService", func() {
 							}},
 						Name: "host-name",
 					}, nil)
+				setDefaultNodeLabelsRetrieverMock()
 
 				res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
 				Expect(err).To(BeNil())
@@ -3275,6 +3414,7 @@ var _ = Describe("CSINodeService", func() {
 							common.Name + "/" + secondValidIP + "-nfs": "true",
 						},
 					},
+					MaxVolumesPerNode: 0,
 				}))
 			})
 
@@ -3313,6 +3453,7 @@ var _ = Describe("CSINodeService", func() {
 								}},
 							Name: "host-name",
 						}, nil)
+					setDefaultNodeLabelsRetrieverMock()
 
 					res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
 					Expect(err).To(BeNil())
@@ -3325,6 +3466,7 @@ var _ = Describe("CSINodeService", func() {
 								common.Name + "/" + secondValidIP + "-nfs": "true",
 							},
 						},
+						MaxVolumesPerNode: 0,
 					}))
 				})
 
@@ -3363,6 +3505,7 @@ var _ = Describe("CSINodeService", func() {
 									}},
 								Name: "host-name",
 							}, nil)
+						setDefaultNodeLabelsRetrieverMock()
 
 						res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
 						Expect(err).To(BeNil())
@@ -3374,6 +3517,7 @@ var _ = Describe("CSINodeService", func() {
 									common.Name + "/" + secondValidIP + "-nfs": "true",
 								},
 							},
+							MaxVolumesPerNode: 0,
 						}))
 					})
 				})
@@ -3390,6 +3534,8 @@ var _ = Describe("CSINodeService", func() {
 						conn,
 						nil,
 					)
+					setDefaultNodeLabelsRetrieverMock()
+
 					res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
 					Expect(err).To(BeNil())
 					Expect(res).To(Equal(&csi.NodeGetInfoResponse{
@@ -3400,6 +3546,7 @@ var _ = Describe("CSINodeService", func() {
 								common.Name + "/" + secondValidIP + "-nfs": "true",
 							},
 						},
+						MaxVolumesPerNode: 0,
 					}))
 				})
 			})
@@ -3418,6 +3565,8 @@ var _ = Describe("CSINodeService", func() {
 						conn,
 						nil,
 					)
+					setDefaultNodeLabelsRetrieverMock()
+
 					res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
 					Expect(err).To(BeNil())
 					Expect(res).To(Equal(&csi.NodeGetInfoResponse{
@@ -3428,6 +3577,7 @@ var _ = Describe("CSINodeService", func() {
 								common.Name + "/" + secondValidIP + "-nfs": "true",
 							},
 						},
+						MaxVolumesPerNode: 0,
 					}))
 				})
 			})
@@ -3454,6 +3604,7 @@ var _ = Describe("CSINodeService", func() {
 								}},
 							Name: "host-name",
 						}, nil)
+					setDefaultNodeLabelsRetrieverMock()
 
 					res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
 					Expect(err).To(BeNil())
@@ -3465,6 +3616,7 @@ var _ = Describe("CSINodeService", func() {
 								common.Name + "/" + secondValidIP + "-nfs": "true",
 							},
 						},
+						MaxVolumesPerNode: 0,
 					}))
 				})
 			})
@@ -3492,6 +3644,7 @@ var _ = Describe("CSINodeService", func() {
 					conn,
 					nil,
 				)
+				setDefaultNodeLabelsRetrieverMock()
 
 				res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
 				Expect(err).To(BeNil())
@@ -3504,6 +3657,7 @@ var _ = Describe("CSINodeService", func() {
 							common.Name + "/" + secondValidIP + "-nfs":   "true",
 						},
 					},
+					MaxVolumesPerNode: 0,
 				}))
 			})
 
@@ -3528,6 +3682,7 @@ var _ = Describe("CSINodeService", func() {
 						conn,
 						nil,
 					)
+					setDefaultNodeLabelsRetrieverMock()
 
 					res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
 					Expect(err).To(BeNil())
@@ -3539,6 +3694,7 @@ var _ = Describe("CSINodeService", func() {
 								common.Name + "/" + secondValidIP + "-nfs": "true",
 							},
 						},
+						MaxVolumesPerNode: 0,
 					}))
 				})
 			})
@@ -3560,6 +3716,8 @@ var _ = Describe("CSINodeService", func() {
 					conn,
 					nil,
 				)
+				setDefaultNodeLabelsRetrieverMock()
+
 				res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
 				Expect(err).To(BeNil())
 				Expect(res).To(Equal(&csi.NodeGetInfoResponse{
@@ -3571,6 +3729,7 @@ var _ = Describe("CSINodeService", func() {
 							common.Name + "/" + secondValidIP + "-nfs":    "true",
 						},
 					},
+					MaxVolumesPerNode: 0,
 				}))
 			})
 
@@ -3592,6 +3751,8 @@ var _ = Describe("CSINodeService", func() {
 						conn,
 						nil,
 					)
+					setDefaultNodeLabelsRetrieverMock()
+
 					res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
 					Expect(err).To(BeNil())
 					Expect(res).To(Equal(&csi.NodeGetInfoResponse{
@@ -3602,6 +3763,7 @@ var _ = Describe("CSINodeService", func() {
 								common.Name + "/" + secondValidIP + "-nfs": "true",
 							},
 						},
+						MaxVolumesPerNode: 0,
 					}))
 					gonvme.GONVMEMock.InduceDiscoveryError = false
 				})
@@ -3619,6 +3781,8 @@ var _ = Describe("CSINodeService", func() {
 						conn,
 						nil,
 					)
+					setDefaultNodeLabelsRetrieverMock()
+
 					res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
 					Expect(err).To(BeNil())
 					Expect(res).To(Equal(&csi.NodeGetInfoResponse{
@@ -3629,6 +3793,7 @@ var _ = Describe("CSINodeService", func() {
 								common.Name + "/" + secondValidIP + "-nfs": "true",
 							},
 						},
+						MaxVolumesPerNode: 0,
 					}))
 				})
 			})

@@ -30,9 +30,15 @@ const (
 	// node name
 	EnvKubeNodeName = "X_CSI_POWERSTORE_KUBE_NODE_NAME"
 
+	//EnvKubeConfigPath indicates kubernetes configuration path that has to be used by CSI Driver
+	EnvKubeConfigPath = "KUBECONFIG"
+
 	// EnvNodeNamePrefix is the name of the environment variable which stores prefix which will be
 	// used when registering node on PowerStore array
 	EnvNodeNamePrefix = "X_CSI_POWERSTORE_NODE_NAME_PREFIX"
+
+	// EnvMaxVolumesPerNode specifies maximum number of volumes that controller can publish to the node
+	EnvMaxVolumesPerNode = "X_CSI_POWERSTORE_MAX_VOLUMES_PER_NODE"
 
 	// EnvNodeChrootPath is the name of the environment variable which store path to chroot where
 	// to execute iSCSI commands
