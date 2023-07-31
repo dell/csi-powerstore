@@ -193,6 +193,8 @@ spec:
               value: {{ .Values.node.nodeNamePrefix }}
             - name: X_CSI_POWERSTORE_NODE_ID_PATH
               value: /node-id
+            - name: X_CSI_POWERSTORE_MAX_VOLUMES_PER_NODE
+              value: "{{ .Values.maxPowerstoreVolumesPerNode }}"
             - name: X_CSI_POWERSTORE_NODE_CHROOT_PATH
               value: /noderoot
             - name: X_CSI_POWERSTORE_TMP_DIR
