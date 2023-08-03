@@ -24,7 +24,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"os"
 	"os/exec"
@@ -131,14 +130,14 @@ func (fs *Fs) Chmod(name string, perm os.FileMode) error {
 	return os.Chmod(name, perm)
 }
 
-// ReadFile is a wrapper of ioutil.ReadFile
+// ReadFile is a wrapper of os.ReadFile
 func (fs *Fs) ReadFile(name string) ([]byte, error) {
-	return ioutil.ReadFile(filepath.Clean(name))
+	return os.ReadFile(filepath.Clean(name))
 }
 
-// WriteFile is a wrapper of ioutil.WriteFile
+// WriteFile is a wrapper of os.WriteFile
 func (fs *Fs) WriteFile(filename string, data []byte, perm os.FileMode) error {
-	return ioutil.WriteFile(filepath.Clean(filename), data, perm)
+	return os.WriteFile(filepath.Clean(filename), data, perm)
 }
 
 // Stat is a wrapper of os.Stat
