@@ -126,7 +126,7 @@ func NewCustomSerialLock(mode string) grpc.UnaryServerInterceptor {
 	i := &interceptor{opts{locker: locker, timeout: 0}}
 	// To avoid unnecessary call, we can add a conditional check to prevent this logic from being called unnecessarily in node pods.
 	if mode == "controller" {
-		i.createMetadataRetrieverClient(context.Background(), mode)
+		i.createMetadataRetrieverClient(context.Background())
 	}
 	handle := func(ctx xctx.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 		switch t := req.(type) {
@@ -143,7 +143,7 @@ func NewCustomSerialLock(mode string) grpc.UnaryServerInterceptor {
 	return handle
 }
 
-func (i *interceptor) createMetadataRetrieverClient(ctx context.Context, mode string) {
+func (i *interceptor) createMetadataRetrieverClient(ctx context.Context) {
 	metricsManager := metrics.NewCSIMetricsManagerWithOptions("csi-metadata-retriever",
 		metrics.WithProcessStartTime(false),
 		metrics.WithSubsystem(metrics.SubsystemSidecar))
