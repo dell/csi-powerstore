@@ -23,7 +23,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path"
@@ -731,7 +730,7 @@ func (s *Service) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolume
 	}
 
 	// check if volume path is accessible
-	_, err = ioutil.ReadDir(volumePath)
+	_, err = os.ReadDir(volumePath)
 	if err != nil {
 		resp := &csi.NodeGetVolumeStatsResponse{
 			VolumeCondition: &csi.VolumeCondition{

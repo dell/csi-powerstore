@@ -115,7 +115,7 @@ type interceptor struct {
 }
 
 // NewCustomSerialLock creates new unary interceptor that locks gRPC requests
-func NewCustomSerialLock() grpc.UnaryServerInterceptor {
+func NewCustomSerialLock(mode string) grpc.UnaryServerInterceptor {
 	locker := &lockProvider{
 		volIDLocks:   map[string]gosync.TryLocker{},
 		volNameLocks: map[string]gosync.TryLocker{},
@@ -124,9 +124,10 @@ func NewCustomSerialLock() grpc.UnaryServerInterceptor {
 	gocsiSerializer := serialvolume.New(serialvolume.WithLockProvider(locker))
 
 	i := &interceptor{opts{locker: locker, timeout: 0}}
-
-	i.createMetadataRetrieverClient(context.Background())
-
+	// To avoid unnecessary call, we can add a conditional check to prevent this logic from being called unnecessarily in node pods.
+	if mode == "controller" {
+		i.createMetadataRetrieverClient(context.Background())
+	}
 	handle := func(ctx xctx.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 		switch t := req.(type) {
 		case *csi.CreateVolumeRequest:
@@ -146,7 +147,6 @@ func (i *interceptor) createMetadataRetrieverClient(ctx context.Context) {
 	metricsManager := metrics.NewCSIMetricsManagerWithOptions("csi-metadata-retriever",
 		metrics.WithProcessStartTime(false),
 		metrics.WithSubsystem(metrics.SubsystemSidecar))
-
 	if retrieverAddress, ok := csictx.LookupEnv(ctx, common.EnvMetadataRetrieverEndpoint); ok {
 		rpcConn, err := connection.Connect(retrieverAddress, metricsManager, connection.OnConnectionLoss(connection.ExitOnConnectionLoss()))
 		if err != nil {
