@@ -23,7 +23,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"time"
 
@@ -50,7 +50,7 @@ func (s *Service) QueryArrayStatus(ctx context.Context, url string) (bool, error
 		return false, err
 	}
 	defer resp.Body.Close() // #nosec G307
-	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		log.Errorf("failed to read API response due to %s ", err.Error())
 		return false, err

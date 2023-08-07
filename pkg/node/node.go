@@ -23,7 +23,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path"
@@ -38,6 +37,7 @@ import (
 	"github.com/dell/csi-powerstore/v2/pkg/array"
 	"github.com/dell/csi-powerstore/v2/pkg/common"
 	"github.com/dell/csi-powerstore/v2/pkg/common/fs"
+	"github.com/dell/csi-powerstore/v2/pkg/common/k8sutils"
 	"github.com/dell/csi-powerstore/v2/pkg/controller"
 	"github.com/dell/gobrick"
 	csictx "github.com/dell/gocsi/context"
@@ -55,8 +55,10 @@ type Opts struct {
 	NodeIDFilePath        string
 	NodeNamePrefix        string
 	NodeChrootPath        string
+	MaxVolumesPerNode     int64
 	FCPortsFilterFilePath string
 	KubeNodeName          string
+	KubeConfigPath        string
 	CHAPUsername          string
 	CHAPPassword          string
 	TmpDir                string
@@ -88,6 +90,10 @@ type Service struct {
 
 	array.Locker
 }
+
+const (
+	maxPowerstoreVolumesPerNodeLabel = "max-powerstore-volumes-per-node"
+)
 
 // Init initializes node service by parsing environmental variables, connecting it as a host.
 // Will init ISCSIConnector, FcConnector and ControllerService if they are nil.
@@ -724,7 +730,7 @@ func (s *Service) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolume
 	}
 
 	// check if volume path is accessible
-	_, err = ioutil.ReadDir(volumePath)
+	_, err = os.ReadDir(volumePath)
 	if err != nil {
 		resp := &csi.NodeGetVolumeStatsResponse{
 			VolumeCondition: &csi.VolumeCondition{
@@ -1206,6 +1212,36 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 			}
 		}
 	}
+
+	var maxVolumesPerNode int64 = 0
+
+	// Setting maxVolumesPerNode using the value of field maxPowerstoreVolumesPerNode specified in values.yaml
+	if s.opts.MaxVolumesPerNode > 0 {
+		maxVolumesPerNode = s.opts.MaxVolumesPerNode
+	}
+
+	// Check for node label 'max-powerstore-volumes-per-node'. If present set 'maxVolumesPerNode' to this value.
+	labels, err := k8sutils.GetNodeLabels(ctx, s.opts.KubeConfigPath, s.opts.KubeNodeName)
+	if err != nil {
+		log.Warnf("failed to get Node Labels with error: %s", err.Error())
+	} else if labels != nil {
+		if val, ok := labels[maxPowerstoreVolumesPerNodeLabel]; ok {
+			maxVols, err := strconv.ParseInt(val, 10, 64)
+			if err != nil {
+				log.Warnf("invalid value '%s' specified for 'max-powerstore-volumes-per-node' node label", val)
+			} else if maxVols > 0 {
+				maxVolumesPerNode = maxVols
+				log.Infof("node label 'max-powerstore-volumes-per-node' is available and is set to value '%d'", maxVolumesPerNode)
+			}
+
+		}
+	}
+
+	if maxVolumesPerNode >= 0 {
+		resp.MaxVolumesPerNode = maxVolumesPerNode
+		log.Infof("Setting MaxVolumesPerNode to '%d'", maxVolumesPerNode)
+	}
+
 	return resp, nil
 }
 
