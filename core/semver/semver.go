@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2020-2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2020-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,7 +24,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -76,7 +75,7 @@ func main() {
 		format = "ver"
 	} else {
 		if fileExists(format) {
-			buf, err := ioutil.ReadFile(format) // #nosec G304
+			buf, err := os.ReadFile(format) // #nosec G304
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error: read tpl failed: %v\n", err)
 				os.Exit(1)
