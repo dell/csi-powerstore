@@ -8,7 +8,7 @@
 #
 #  http://www.apache.org/licenses/LICENSE-2.0
 
-DRIVERDIR="${SCRIPTDIR}/../helm"
+
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
