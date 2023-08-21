@@ -50,7 +50,7 @@ const (
 
 	// EnvTmpDir is the name of the environment variable which store path to the folder which will be used
 	// for csi-powerstore temporary files
-	EnvTmpDir = "X_CSI_POWERSTORE_TMP_DIR"
+	EnvTmpDir = "X_CSI_POWERSTORE_TMP_DIR" // #nosec G101
 
 	// EnvFCPortsFilterFilePath is the name of the environment variable which store path to the file which
 	// provide list of WWPN which should be used by the driver for FC connection on this node
@@ -85,7 +85,7 @@ const (
 	EnvReplicationContextPrefix = "X_CSI_REPLICATION_CONTEXT_PREFIX"
 
 	// EnvReplicationPrefix is used as a prefix to find out if replication is enabled
-	EnvReplicationPrefix = "X_CSI_REPLICATION_PREFIX"
+	EnvReplicationPrefix = "X_CSI_REPLICATION_PREFIX" // #nosec G101
 
 	// EnvGOCSIDebug indicates whether to print REQUESTs and RESPONSEs of all CSI method calls(from gocsi)
 	EnvGOCSIDebug = "X_CSI_DEBUG"
