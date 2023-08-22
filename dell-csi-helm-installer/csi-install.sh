@@ -29,7 +29,7 @@ PROG="${0}"
 NODE_VERIFY=1
 VERIFY=1
 MODE="install"
-DEFAULT_DRIVER_VERSION="v2.7.0"
+DEFAULT_DRIVER_VERSION="v2.8.0"
 WATCHLIST=""
 
 # export the name of the debug log, so child processes will see it
@@ -398,8 +398,8 @@ helm --help >&/dev/null || {
 OPENSHIFT=$(isOpenShift)
 
 # Get the kubernetes major and minor version numbers.
-kMajorVersion=$(run_command kubectl version | grep 'Server Version' | sed -e 's/^.*Major:"//' -e 's/[^0-9].*//g')
-kMinorVersion=$(run_command kubectl version | grep 'Server Version' | sed -e 's/^.*Minor:"//' -e 's/[^0-9].*//g')
+kMajorVersion=$(run_command kubectl version | grep 'Server Version' | sed -E 's/.*v([0-9]+)\.[0-9]+\.[0-9]+.*/\1/')
+kMinorVersion=$(run_command kubectl version | grep 'Server Version' |  sed -E 's/.*v[0-9]+\.([0-9]+)\.[0-9]+.*/\1/')
 
 # validate the parameters passed in
 
