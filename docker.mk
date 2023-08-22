@@ -34,7 +34,7 @@ ifndef DOCKER_IMAGE_NAME
 endif
 
 ifndef BASEIMAGE
-	BASEIMAGE=registry.access.redhat.com/ubi9/ubi-micro@sha256:18a01cb5c53560ca2295e8a218454fe33b330ad6fac0d0ea43a513cd93787b7f
+	BASEIMAGE=registry.access.redhat.com/ubi9/ubi-micro@sha256:630cf7bdef807f048cadfe7180d6c27eb3aaa99323ffc3628811da230ed3322a
 endif
 
 # Add 'build-base-image' as a dependency if UBI Micro is used as the base image.
