@@ -227,7 +227,6 @@ PREPARE="false"
 REGISTRY=""
 DRIVER="csi-powerstore"
 HELMCHARTVERSION="csi-powerstore-2.8.0"
-# HELMCHARTVERSION="aaa"
 
 while getopts "cprv:h" opt; do
   case $opt in
@@ -339,8 +338,6 @@ else
     "${REPODIR}/LICENSE"
   )
 fi
-
-
 
 # make sure exatly one option for create/prepare was specified
 if [ "${CREATE}" == "${PREPARE}" ]; then
