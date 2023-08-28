@@ -10,19 +10,7 @@
 
 SCRIPTDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 DRIVERDIR="${SCRIPTDIR}/../"
-
-if [ ! -d "$DRIVERDIR/helm-charts" ]; then
-  
-  if  [ ! -d "$SCRIPTDIR/helm-charts" ]; then
-    git clone --quiet -c advice.detachedHead=false -b release-v1.8.0 https://github.com/dell/helm-charts
-  fi
-  mv helm-charts $DRIVERDIR
-else 
-  if [  -d "$SCRIPTDIR/helm-charts" ]; then
-    rm -rf $SCRIPTDIR/helm-charts
-  fi
-fi
-DRIVERDIR="${SCRIPTDIR}/../helm-charts/charts"
+HELMCHARTVERSION="csi-powerstore-2.8.0"
 DRIVER="csi-powerstore"
 VERIFYSCRIPT="${SCRIPTDIR}/verify.sh"
 PROG="${0}"
@@ -58,6 +46,7 @@ function usage() {
   decho "  --release[=]<helm release>               Name to register with helm, default value will match the driver name"
   decho "  --upgrade                                Perform an upgrade of the specified driver, default is false"
   decho "  --version                                Use this version for CSI Driver Image"
+  decho "  --helm-charts-version                    Pass the helm chart version "
   decho "  --node-verify-user[=]<username>          Username to SSH to worker nodes as, used to validate node requirements. Default is root"
   decho "  --skip-verify                            Skip the kubernetes configuration verification to use the CSI driver, default will run verification"
   decho "  --skip-verify-node                       Skip worker node verification checks"
@@ -300,7 +289,6 @@ VERIFYOPTS=""
 ASSUMEYES="false"
 
 # get the list of valid CSI Drivers, this will be the list of directories in drivers/ that contain helm charts
-DRIVERDIR="${SCRIPTDIR}/../helm-charts/charts"
 
 while getopts ":h-:" optchar; do
   case "${optchar}" in
@@ -341,6 +329,10 @@ while getopts ":h-:" optchar; do
     release=*)
       RELEASE=${OPTARG#*=}
       ;;
+    helm-charts-version)
+      HELMCHARTVERSION="${!OPTIND}"
+      OPTIND=$((OPTIND + 1))
+      ;;
       # VALUES
     values)
       VALUES="${!OPTIND}"
@@ -375,7 +367,19 @@ while getopts ":h-:" optchar; do
   esac
 done
 
-# by default the NAME of the helm release of the driver is the same as the driver name
+if [ ! -d "$DRIVERDIR/helm-charts" ]; then
+  
+  if  [ ! -d "$SCRIPTDIR/helm-charts" ]; then
+    git clone --quiet -c advice.detachedHead=false -b $HELMCHARTVERSION https://github.com/dell/helm-charts
+  fi
+  mv helm-charts $DRIVERDIR
+else 
+  if [  -d "$SCRIPTDIR/helm-charts" ]; then
+    rm -rf $SCRIPTDIR/helm-charts
+  fi
+fi
+DRIVERDIR="${SCRIPTDIR}/../helm-charts/charts"
+
 RELEASE=$(get_release_name "${DRIVER}")
 # by default, NODEUSER is root
 NODEUSER="${NODEUSER:-root}"

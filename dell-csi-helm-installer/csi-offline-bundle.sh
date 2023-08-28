@@ -24,6 +24,7 @@ usage() {
    echo "               Supply the registry name/path which will hold the images"
    echo "               For example: my.registry.com:5000/dell/csi"
    echo "-h             Displays this information"
+   echo "-v             Pass the helm chart version "
    echo
    echo "Exactly one of '-c' or '-p' needs to be specified"
    echo
@@ -225,6 +226,40 @@ CREATE="false"
 PREPARE="false"
 REGISTRY=""
 DRIVER="csi-powerstore"
+HELMCHARTVERSION="csi-powerstore-2.8.0"
+# HELMCHARTVERSION="aaa"
+
+while getopts "cprv:h" opt; do
+  case $opt in
+    
+    c)
+      CREATE="true"
+      ;;
+    p)
+      PREPARE="true"
+      ;;
+    r)
+      REGISTRY="${!OPTIND}"
+      OPTIND=$((OPTIND + 1))
+      ;;
+    v)
+      HELMCHARTVERSION="${OPTARG}"
+      ;;
+    h)
+      usage
+      exit 0
+      ;;
+    \?)
+      echo "Invalid option: -$OPTARG" >&2
+      exit 1
+      ;;
+    :)
+      echo "Option -$OPTARG requires an argument." >&2
+      exit 1
+      ;;
+  esac
+done
+
 
 # some directories
 SCRIPTDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
@@ -232,7 +267,7 @@ REPODIR="$( dirname "${SCRIPTDIR}" )"
 if [ ! -d "$REPODIR/helm-charts" ]; then
   
   if  [ ! -d "$SCRIPTDIR/helm-charts" ]; then
-    git clone --quiet -c advice.detachedHead=false -b release-v1.8.0 https://github.com/dell/helm-charts
+    git clone --quiet -c advice.detachedHead=false -b $HELMCHARTVERSION https://github.com/dell/helm-charts
   fi
   mv helm-charts $REPODIR
 else 
@@ -305,31 +340,7 @@ else
   )
 fi
 
-while getopts "cpr:h" opt; do
-  case $opt in
-    c)
-      CREATE="true"
-      ;;
-    p)
-      PREPARE="true"
-      ;;
-    r)
-      REGISTRY="${OPTARG}"
-      ;;
-    h)
-      usage
-      exit 0
-      ;;
-    \?)
-      echo "Invalid option: -$OPTARG" >&2
-      exit 1
-      ;;
-    :)
-      echo "Option -$OPTARG requires an argument." >&2
-      exit 1
-      ;;
-  esac
-done
+
 
 # make sure exatly one option for create/prepare was specified
 if [ "${CREATE}" == "${PREPARE}" ]; then
