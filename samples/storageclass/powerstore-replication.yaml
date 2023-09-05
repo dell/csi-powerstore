@@ -31,7 +31,7 @@ parameters:
   #   false: disable replication sidecar 
   # Optional: true
   # Default value: false
-  replication.storage.dell.com/isReplicationEnabled: true
+  replication.storage.dell.com/isReplicationEnabled: "true"
 
   # replication.storage.dell.com/remoteStorageClassName: 
   # Allowed values: string
@@ -63,7 +63,7 @@ parameters:
   #   false: create separate volume group per namespace
   # Optional: true
   # Default value: None
-  replication.storage.dell.com/ignoreNamespaces: false
+  replication.storage.dell.com/ignoreNamespaces: "false"
   
   # replication.storage.dell.com/volumeGroupPrefix: volume group prefix
   # Allowed values: string
