@@ -1038,12 +1038,12 @@ var _ = Describe("CSINodeService", func() {
 
 				nfsServers := []gopowerstore.NFSServerInstance{
 					{
-						Id:             validNfsServerID,
+						ID:             validNfsServerID,
 						IsNFSv4Enabled: true,
 					},
 				}
 
-				clientMock.On("GetNfsServer", mock.Anything, validNasName).Return(gopowerstore.NFSServerInstance{Id: validNfsServerID, IsNFSv4Enabled: true}, nil)
+				clientMock.On("GetNfsServer", mock.Anything, validNasName).Return(gopowerstore.NFSServerInstance{ID: validNfsServerID, IsNFSv4Enabled: true}, nil)
 				clientMock.On("GetNASByName", mock.Anything, validNasName).Return(gopowerstore.NAS{ID: validNasID, NfsServers: nfsServers}, nil)
 				nfsv4ACLsMock.On("SetNfsv4Acls", mock.Anything, mock.Anything).Return(nil)
 
@@ -1079,14 +1079,14 @@ var _ = Describe("CSINodeService", func() {
 
 				nfsServers := []gopowerstore.NFSServerInstance{
 					{
-						Id:             validNfsServerID,
+						ID:             validNfsServerID,
 						IsNFSv4Enabled: true,
 					},
 				}
 
 				nfsv4ACLsMock.On("SetNfsv4Acls", mock.Anything, mock.Anything).Return(nil)
 				clientMock.On("GetNASByName", mock.Anything, "").Return(gopowerstore.NAS{ID: validNasID, NfsServers: nfsServers}, nil)
-				clientMock.On("GetNfsServer", mock.Anything, mock.Anything).Return(gopowerstore.NFSServerInstance{Id: validNfsServerID, IsNFSv4Enabled: true}, nil)
+				clientMock.On("GetNfsServer", mock.Anything, mock.Anything).Return(gopowerstore.NFSServerInstance{ID: validNfsServerID, IsNFSv4Enabled: true}, nil)
 
 				nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
 					VolumeId:          validNfsVolumeID,

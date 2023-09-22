@@ -41,7 +41,7 @@ var _ = Describe("Replication", func() {
 		When("getting storage protection group status and state is ok", func() {
 			It("should return synchronized status", func() {
 				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, mock.Anything).Return(
-					gopowerstore.ReplicationSession{State: gopowerstore.RS_STATE_OK}, nil)
+					gopowerstore.ReplicationSession{State: gopowerstore.RsStateOk}, nil)
 
 				req := new(csiext.GetStorageProtectionGroupStatusRequest)
 				params := make(map[string]string)
@@ -59,7 +59,7 @@ var _ = Describe("Replication", func() {
 		When("getting storage protection group status and state is failed over", func() {
 			It("should return failed over status", func() {
 				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, mock.Anything).Return(
-					gopowerstore.ReplicationSession{State: gopowerstore.RS_STATE_FAILED_OVER}, nil)
+					gopowerstore.ReplicationSession{State: gopowerstore.RsStateFailedOver}, nil)
 
 				req := new(csiext.GetStorageProtectionGroupStatusRequest)
 				params := make(map[string]string)
@@ -77,7 +77,7 @@ var _ = Describe("Replication", func() {
 		When("getting storage protection group status and state is paused (for several reasons)", func() {
 			It("should return suspended status (if paused)", func() {
 				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, mock.Anything).Return(
-					gopowerstore.ReplicationSession{State: gopowerstore.RS_STATE_PAUSED}, nil)
+					gopowerstore.ReplicationSession{State: gopowerstore.RsStatePaused}, nil)
 
 				req := new(csiext.GetStorageProtectionGroupStatusRequest)
 				params := make(map[string]string)
@@ -92,7 +92,7 @@ var _ = Describe("Replication", func() {
 			})
 			It("should return suspended status (if paused for migration)", func() {
 				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, mock.Anything).Return(
-					gopowerstore.ReplicationSession{State: gopowerstore.RS_STATE_PAUSED_FOR_MIGRATION}, nil)
+					gopowerstore.ReplicationSession{State: gopowerstore.RsStatePausedForMigration}, nil)
 
 				req := new(csiext.GetStorageProtectionGroupStatusRequest)
 				params := make(map[string]string)
@@ -107,7 +107,7 @@ var _ = Describe("Replication", func() {
 			})
 			It("should return suspended status (if paused for NDU)", func() {
 				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, mock.Anything).Return(
-					gopowerstore.ReplicationSession{State: gopowerstore.RS_STATE_PAUSED_FOR_NDU}, nil)
+					gopowerstore.ReplicationSession{State: gopowerstore.RsStatePausedForNDU}, nil)
 
 				req := new(csiext.GetStorageProtectionGroupStatusRequest)
 				params := make(map[string]string)
@@ -122,7 +122,7 @@ var _ = Describe("Replication", func() {
 			})
 			It("should return suspended status (if system paused)", func() {
 				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, mock.Anything).Return(
-					gopowerstore.ReplicationSession{State: gopowerstore.RS_STATE_SYSTEM_PAUSED}, nil)
+					gopowerstore.ReplicationSession{State: gopowerstore.RsStateSystemPaused}, nil)
 
 				req := new(csiext.GetStorageProtectionGroupStatusRequest)
 				params := make(map[string]string)
@@ -140,7 +140,7 @@ var _ = Describe("Replication", func() {
 		When("getting storage protection group status and state is updating (in progress)", func() {
 			It("should return 'sync in progress' status (if failing over)", func() {
 				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, mock.Anything).Return(
-					gopowerstore.ReplicationSession{State: gopowerstore.RS_STATE_FAILING_OVER}, nil)
+					gopowerstore.ReplicationSession{State: gopowerstore.RsStateFailingOver}, nil)
 
 				req := new(csiext.GetStorageProtectionGroupStatusRequest)
 				params := make(map[string]string)
@@ -155,7 +155,7 @@ var _ = Describe("Replication", func() {
 			})
 			It("should return 'sync in progress' status (if failing over for DR)", func() {
 				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, mock.Anything).Return(
-					gopowerstore.ReplicationSession{State: gopowerstore.RS_STATE_FAILING_OVER_FOR_DR}, nil)
+					gopowerstore.ReplicationSession{State: gopowerstore.RsStateFailingOverForDR}, nil)
 
 				req := new(csiext.GetStorageProtectionGroupStatusRequest)
 				params := make(map[string]string)
@@ -170,7 +170,7 @@ var _ = Describe("Replication", func() {
 			})
 			It("should return 'sync in progress' status (if resuming)", func() {
 				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, mock.Anything).Return(
-					gopowerstore.ReplicationSession{State: gopowerstore.RS_STATE_RESUMING}, nil)
+					gopowerstore.ReplicationSession{State: gopowerstore.RsStateResuming}, nil)
 
 				req := new(csiext.GetStorageProtectionGroupStatusRequest)
 				params := make(map[string]string)
@@ -185,7 +185,7 @@ var _ = Describe("Replication", func() {
 			})
 			It("should return 'sync in progress' status (if reprotecting)", func() {
 				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, mock.Anything).Return(
-					gopowerstore.ReplicationSession{State: gopowerstore.RS_STATE_REPROTECTING}, nil)
+					gopowerstore.ReplicationSession{State: gopowerstore.RsStateReprotecting}, nil)
 
 				req := new(csiext.GetStorageProtectionGroupStatusRequest)
 				params := make(map[string]string)
@@ -200,7 +200,7 @@ var _ = Describe("Replication", func() {
 			})
 			It("should return 'sync in progress' status (if cutover for migration)", func() {
 				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, mock.Anything).Return(
-					gopowerstore.ReplicationSession{State: gopowerstore.RS_STATE_PARTIAL_CUTOVER_FOR_MIGRATION}, nil)
+					gopowerstore.ReplicationSession{State: gopowerstore.RsStatePartialCutoverForMigration}, nil)
 
 				req := new(csiext.GetStorageProtectionGroupStatusRequest)
 				params := make(map[string]string)
@@ -215,7 +215,7 @@ var _ = Describe("Replication", func() {
 			})
 			It("should return 'sync in progress' status (if synchronizing)", func() {
 				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, mock.Anything).Return(
-					gopowerstore.ReplicationSession{State: gopowerstore.RS_STATE_SYNCHRONIZING}, nil)
+					gopowerstore.ReplicationSession{State: gopowerstore.RsStateSynchronizing}, nil)
 
 				req := new(csiext.GetStorageProtectionGroupStatusRequest)
 				params := make(map[string]string)
@@ -230,7 +230,7 @@ var _ = Describe("Replication", func() {
 			})
 			It("should return 'sync in progress' status (if initializing)", func() {
 				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, mock.Anything).Return(
-					gopowerstore.ReplicationSession{State: gopowerstore.RS_STATE_INITIALIZING}, nil)
+					gopowerstore.ReplicationSession{State: gopowerstore.RsStateInitializing}, nil)
 
 				req := new(csiext.GetStorageProtectionGroupStatusRequest)
 				params := make(map[string]string)
@@ -248,7 +248,7 @@ var _ = Describe("Replication", func() {
 		When("getting storage protection group status and state is error", func() {
 			It("should return invalid status", func() {
 				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, mock.Anything).Return(
-					gopowerstore.ReplicationSession{State: gopowerstore.RS_STATE_ERROR}, nil)
+					gopowerstore.ReplicationSession{State: gopowerstore.RsStateError}, nil)
 
 				req := new(csiext.GetStorageProtectionGroupStatusRequest)
 				params := make(map[string]string)
@@ -336,7 +336,7 @@ var _ = Describe("Replication", func() {
 			It("return nil", func() {
 				clientMock.On("ExecuteActionOnReplicationSession", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
 				session := gopowerstore.ReplicationSession{ID: "test", State: "OK"}
-				action := gopowerstore.RS_ACTION_RESUME
+				action := gopowerstore.RsActionResume
 				failoverParams := gopowerstore.FailoverParams{}
 				err := controller.ExecuteAction(&session, clientMock, action, &failoverParams)
 
@@ -348,7 +348,7 @@ var _ = Describe("Replication", func() {
 			It("return nil", func() {
 				clientMock.On("ExecuteActionOnReplicationSession", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
 				session := gopowerstore.ReplicationSession{ID: "test", State: "OK"}
-				action := gopowerstore.RS_ACTION_REPROTECT
+				action := gopowerstore.RsActionReprotect
 				failoverParams := gopowerstore.FailoverParams{}
 				err := controller.ExecuteAction(&session, clientMock, action, &failoverParams)
 
@@ -361,7 +361,7 @@ var _ = Describe("Replication", func() {
 			It("return nil", func() {
 				clientMock.On("ExecuteActionOnReplicationSession", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
 				session := gopowerstore.ReplicationSession{ID: "test", State: "Paused"}
-				action := gopowerstore.RS_ACTION_PAUSE
+				action := gopowerstore.RsActionPause
 				failoverParams := gopowerstore.FailoverParams{}
 				err := controller.ExecuteAction(&session, clientMock, action, &failoverParams)
 
@@ -373,7 +373,7 @@ var _ = Describe("Replication", func() {
 			It("return nil", func() {
 				clientMock.On("ExecuteActionOnReplicationSession", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
 				session := gopowerstore.ReplicationSession{ID: "test", State: "Failing_Over"}
-				action := gopowerstore.RS_ACTION_FAILOVER
+				action := gopowerstore.RsActionFailover
 				failoverParams := gopowerstore.FailoverParams{}
 				err := controller.ExecuteAction(&session, clientMock, action, &failoverParams)
 
@@ -388,7 +388,7 @@ var _ = Describe("Replication", func() {
 			It("return nil", func() {
 				clientMock.On("ExecuteActionOnReplicationSession", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
 				session := gopowerstore.ReplicationSession{ID: "test", State: "Failed_Over"}
-				action := gopowerstore.RS_ACTION_FAILOVER
+				action := gopowerstore.RsActionFailover
 				failoverParams := gopowerstore.FailoverParams{}
 				err := controller.ExecuteAction(&session, clientMock, action, &failoverParams)
 

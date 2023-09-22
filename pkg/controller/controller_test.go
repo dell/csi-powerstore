@@ -477,7 +477,7 @@ var _ = Describe("CSIControllerService", func() {
 			clientMock.On("GetNASByName", mock.Anything, validNasName).Return(gopowerstore.NAS{ID: validNasID}, nil)
 			clientMock.On("CreateFS", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
 			clientMock.On("GetFS", context.Background(), mock.Anything).Return(gopowerstore.FileSystem{NasServerID: validNasID}, nil)
-			clientMock.On("GetNAS", context.Background(), mock.Anything).Return(gopowerstore.NAS{CurrentNodeId: validNodeID}, nil)
+			clientMock.On("GetNAS", context.Background(), mock.Anything).Return(gopowerstore.NAS{CurrentNodeID: validNodeID}, nil)
 			clientMock.On("GetApplianceByName", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
 
 			req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
@@ -512,7 +512,7 @@ var _ = Describe("CSIControllerService", func() {
 			clientMock.On("GetNASByName", mock.Anything, validNasName).Return(gopowerstore.NAS{ID: validNasID}, nil)
 			clientMock.On("CreateFS", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
 			clientMock.On("GetFS", context.Background(), mock.Anything).Return(gopowerstore.FileSystem{NasServerID: validNasID}, nil)
-			clientMock.On("GetNAS", context.Background(), mock.Anything).Return(gopowerstore.NAS{CurrentNodeId: validNodeID}, nil)
+			clientMock.On("GetNAS", context.Background(), mock.Anything).Return(gopowerstore.NAS{CurrentNodeID: validNodeID}, nil)
 			clientMock.On("GetApplianceByName", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
 
 			req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
@@ -572,9 +572,9 @@ var _ = Describe("CSIControllerService", func() {
 			It("should successfully create nfs volume with storage class NFS acls in volume response", func() {
 				clientMock.On("GetNASByName", mock.Anything, validNasName).Return(gopowerstore.NAS{ID: validNasID}, nil)
 				clientMock.On("CreateFS", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
-				clientMock.On("GetNfsServer", mock.Anything, mock.Anything).Return(gopowerstore.NFSServerInstance{Id: validNfsServerID, IsNFSv4Enabled: true}, nil)
+				clientMock.On("GetNfsServer", mock.Anything, mock.Anything).Return(gopowerstore.NFSServerInstance{ID: validNfsServerID, IsNFSv4Enabled: true}, nil)
 				clientMock.On("GetFS", context.Background(), mock.Anything).Return(gopowerstore.FileSystem{NasServerID: validNasID}, nil)
-				clientMock.On("GetNAS", context.Background(), mock.Anything).Return(gopowerstore.NAS{CurrentNodeId: validNodeID}, nil)
+				clientMock.On("GetNAS", context.Background(), mock.Anything).Return(gopowerstore.NAS{CurrentNodeID: validNodeID}, nil)
 				clientMock.On("GetApplianceByName", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
 
 				ctrlSvc.Arrays()[secondValidID].NfsAcls = "A::GROUP@:RWX"
@@ -612,9 +612,9 @@ var _ = Describe("CSIControllerService", func() {
 			It("should successfully create nfs volume with array config NFS acls in volume response", func() {
 				clientMock.On("GetNASByName", mock.Anything, validNasName).Return(gopowerstore.NAS{ID: validNasID}, nil)
 				clientMock.On("CreateFS", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
-				clientMock.On("GetNfsServer", mock.Anything, mock.Anything).Return(gopowerstore.NFSServerInstance{Id: validNfsServerID, IsNFSv4Enabled: true}, nil)
+				clientMock.On("GetNfsServer", mock.Anything, mock.Anything).Return(gopowerstore.NFSServerInstance{ID: validNfsServerID, IsNFSv4Enabled: true}, nil)
 				clientMock.On("GetFS", context.Background(), mock.Anything).Return(gopowerstore.FileSystem{NasServerID: validNasID}, nil)
-				clientMock.On("GetNAS", context.Background(), mock.Anything).Return(gopowerstore.NAS{CurrentNodeId: validNodeID}, nil)
+				clientMock.On("GetNAS", context.Background(), mock.Anything).Return(gopowerstore.NAS{CurrentNodeID: validNodeID}, nil)
 				clientMock.On("GetApplianceByName", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
 
 				ctrlSvc.Arrays()[secondValidID].NfsAcls = "A::GROUP@:RWX"
@@ -651,9 +651,9 @@ var _ = Describe("CSIControllerService", func() {
 			It("should successfully create nfs volume with default NFS acls in volume response", func() {
 				clientMock.On("GetNASByName", mock.Anything, validNasName).Return(gopowerstore.NAS{ID: validNasID}, nil)
 				clientMock.On("CreateFS", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
-				clientMock.On("GetNfsServer", mock.Anything, mock.Anything).Return(gopowerstore.NFSServerInstance{Id: validNfsServerID, IsNFSv4Enabled: true}, nil)
+				clientMock.On("GetNfsServer", mock.Anything, mock.Anything).Return(gopowerstore.NFSServerInstance{ID: validNfsServerID, IsNFSv4Enabled: true}, nil)
 				clientMock.On("GetFS", context.Background(), mock.Anything).Return(gopowerstore.FileSystem{NasServerID: validNasID}, nil)
-				clientMock.On("GetNAS", context.Background(), mock.Anything).Return(gopowerstore.NAS{CurrentNodeId: validNodeID}, nil)
+				clientMock.On("GetNAS", context.Background(), mock.Anything).Return(gopowerstore.NAS{CurrentNodeID: validNodeID}, nil)
 				clientMock.On("GetApplianceByName", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
 
 				req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
@@ -688,9 +688,9 @@ var _ = Describe("CSIControllerService", func() {
 			It("should successfully create nfs volume with empty NFS acls in volume response", func() {
 				clientMock.On("GetNASByName", mock.Anything, validNasName).Return(gopowerstore.NAS{ID: validNasID}, nil)
 				clientMock.On("CreateFS", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
-				clientMock.On("GetNfsServer", mock.Anything, mock.Anything).Return(gopowerstore.NFSServerInstance{Id: validNfsServerID, IsNFSv4Enabled: true}, nil)
+				clientMock.On("GetNfsServer", mock.Anything, mock.Anything).Return(gopowerstore.NFSServerInstance{ID: validNfsServerID, IsNFSv4Enabled: true}, nil)
 				clientMock.On("GetFS", context.Background(), mock.Anything).Return(gopowerstore.FileSystem{NasServerID: validNasID}, nil)
-				clientMock.On("GetNAS", context.Background(), mock.Anything).Return(gopowerstore.NAS{CurrentNodeId: validNodeID}, nil)
+				clientMock.On("GetNAS", context.Background(), mock.Anything).Return(gopowerstore.NAS{CurrentNodeID: validNodeID}, nil)
 				clientMock.On("GetApplianceByName", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
 
 				req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
@@ -752,7 +752,7 @@ var _ = Describe("CSIControllerService", func() {
 				clientMock.On("GetNASByName", mock.Anything, validNasName).Return(gopowerstore.NAS{ID: validNasID}, nil)
 				clientMock.On("CreateFS", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
 				clientMock.On("GetFS", context.Background(), mock.Anything).Return(gopowerstore.FileSystem{NasServerID: validNasID}, nil)
-				clientMock.On("GetNAS", context.Background(), mock.Anything).Return(gopowerstore.NAS{CurrentNodeId: validNodeID}, nil)
+				clientMock.On("GetNAS", context.Background(), mock.Anything).Return(gopowerstore.NAS{CurrentNodeID: validNodeID}, nil)
 				clientMock.On("GetApplianceByName", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
 
 				req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
@@ -848,7 +848,7 @@ var _ = Describe("CSIControllerService", func() {
 					SizeTotal: validVolSize,
 				}, nil)
 				clientMock.On("GetFS", context.Background(), mock.Anything).Return(gopowerstore.FileSystem{NasServerID: validNasID}, nil)
-				clientMock.On("GetNAS", context.Background(), mock.Anything).Return(gopowerstore.NAS{CurrentNodeId: validNodeID}, nil)
+				clientMock.On("GetNAS", context.Background(), mock.Anything).Return(gopowerstore.NAS{CurrentNodeID: validNodeID}, nil)
 				clientMock.On("GetApplianceByName", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
 
 				req := getTypicalCreateVolumeNFSRequest(volName, validVolSize)
@@ -1950,11 +1950,11 @@ var _ = Describe("CSIControllerService", func() {
 				clientMock.On("GetNAS", mock.Anything, nasID).
 					Return(gopowerstore.NAS{
 						Name:                            validNasName,
-						CurrentPreferredIPv4InterfaceId: interfaceID,
+						CurrentPreferredIPv4InterfaceID: interfaceID,
 					}, nil)
 
 				clientMock.On("GetFileInterface", mock.Anything, interfaceID).
-					Return(gopowerstore.FileInterface{IpAddress: secondValidID}, nil)
+					Return(gopowerstore.FileInterface{IPAddress: secondValidID}, nil)
 
 				req := getTypicalControllerPublishVolumeRequest("multiple-writer", validNodeID, validNfsVolumeID)
 				req.VolumeCapability = getVolumeCapabilityNFS()
@@ -2014,11 +2014,11 @@ var _ = Describe("CSIControllerService", func() {
 				clientMock.On("GetNAS", mock.Anything, nasID).
 					Return(gopowerstore.NAS{
 						Name:                            validNasName,
-						CurrentPreferredIPv4InterfaceId: interfaceID,
+						CurrentPreferredIPv4InterfaceID: interfaceID,
 					}, nil)
 
 				clientMock.On("GetFileInterface", mock.Anything, interfaceID).
-					Return(gopowerstore.FileInterface{IpAddress: secondValidID}, nil)
+					Return(gopowerstore.FileInterface{IPAddress: secondValidID}, nil)
 
 				req := getTypicalControllerPublishVolumeRequest("multiple-writer", validNodeID, validNfsVolumeID)
 				req.VolumeCapability = getVolumeCapabilityNFS()
@@ -2143,11 +2143,11 @@ var _ = Describe("CSIControllerService", func() {
 				clientMock.On("GetNAS", mock.Anything, nasID).
 					Return(gopowerstore.NAS{
 						Name:                            validNasName,
-						CurrentPreferredIPv4InterfaceId: interfaceID,
+						CurrentPreferredIPv4InterfaceID: interfaceID,
 					}, nil)
 
 				clientMock.On("GetFileInterface", mock.Anything, interfaceID).
-					Return(gopowerstore.FileInterface{IpAddress: secondValidID}, nil)
+					Return(gopowerstore.FileInterface{IPAddress: secondValidID}, nil)
 
 				req := getTypicalControllerPublishVolumeRequest("multi-writer", validNodeID, validNfsVolumeID)
 				req.VolumeCapability = getVolumeCapabilityNFS()
@@ -3646,12 +3646,12 @@ var _ = Describe("CSIControllerService", func() {
 
 				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, validGroupID).
 					Return(gopowerstore.ReplicationSession{
-						RemoteSystemId:   validRemoteSystemID,
-						LocalResourceId:  validGroupID,
-						RemoteResourceId: validRemoteGroupID,
+						RemoteSystemID:   validRemoteSystemID,
+						LocalResourceID:  validGroupID,
+						RemoteResourceID: validRemoteGroupID,
 						StorageElementPairs: []gopowerstore.StorageElementPair{{
-							LocalStorageElementId:  validBaseVolID,
-							RemoteStorageElementId: validRemoteVolId,
+							LocalStorageElementID:  validBaseVolID,
+							RemoteStorageElementID: validRemoteVolId,
 						}}}, nil)
 
 				clientMock.On("GetCluster", mock.Anything).
@@ -3737,13 +3737,13 @@ var _ = Describe("CSIControllerService", func() {
 
 				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, validGroupID).
 					Return(gopowerstore.ReplicationSession{
-						LocalResourceId:  validGroupID,
-						RemoteResourceId: validRemoteGroupID,
-						RemoteSystemId:   validRemoteSystemID,
+						LocalResourceID:  validGroupID,
+						RemoteResourceID: validRemoteGroupID,
+						RemoteSystemID:   validRemoteSystemID,
 						StorageElementPairs: []gopowerstore.StorageElementPair{
 							{
-								LocalStorageElementId:  validBaseVolID,
-								RemoteStorageElementId: validRemoteVolId,
+								LocalStorageElementID:  validBaseVolID,
+								RemoteStorageElementID: validRemoteVolId,
 							},
 						},
 					}, nil)
@@ -3824,9 +3824,9 @@ var _ = Describe("CSIControllerService", func() {
 
 				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, validGroupID).
 					Return(gopowerstore.ReplicationSession{
-						LocalResourceId:     validGroupID,
-						RemoteResourceId:    validRemoteGroupID,
-						RemoteSystemId:      validRemoteSystemID,
+						LocalResourceID:     validGroupID,
+						RemoteResourceID:    validRemoteGroupID,
+						RemoteSystemID:      validRemoteSystemID,
 						StorageElementPairs: []gopowerstore.StorageElementPair{},
 					}, nil)
 

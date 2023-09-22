@@ -65,8 +65,8 @@ func (s *Service) CreateRemoteVolume(ctx context.Context,
 
 	var remoteVolumeID string
 	for _, sp := range rs.StorageElementPairs {
-		if sp.LocalStorageElementId == id {
-			remoteVolumeID = sp.RemoteStorageElementId
+		if sp.LocalStorageElementID == id {
+			remoteVolumeID = sp.RemoteStorageElementID
 		}
 	}
 
@@ -82,7 +82,7 @@ func (s *Service) CreateRemoteVolume(ctx context.Context,
 	if err != nil {
 		return nil, err
 	}
-	remoteSystem, err := arr.Client.GetRemoteSystem(ctx, rs.RemoteSystemId)
+	remoteSystem, err := arr.Client.GetRemoteSystem(ctx, rs.RemoteSystemID)
 	if err != nil {
 		return nil, err
 	}
@@ -142,7 +142,7 @@ func (s *Service) CreateStorageProtectionGroup(ctx context.Context,
 		return nil, err
 	}
 
-	remoteSystem, err := arr.Client.GetRemoteSystem(ctx, rs.RemoteSystemId)
+	remoteSystem, err := arr.Client.GetRemoteSystem(ctx, rs.RemoteSystemID)
 	if err != nil {
 		return nil, err
 	}
@@ -165,8 +165,8 @@ func (s *Service) CreateStorageProtectionGroup(ctx context.Context,
 	}
 
 	return &csiext.CreateStorageProtectionGroupResponse{
-		LocalProtectionGroupId:          rs.LocalResourceId,
-		RemoteProtectionGroupId:         rs.RemoteResourceId,
+		LocalProtectionGroupId:          rs.LocalResourceID,
+		RemoteProtectionGroupId:         rs.RemoteResourceID,
 		LocalProtectionGroupAttributes:  localParams,
 		RemoteProtectionGroupAttributes: remoteParams,
 	}, nil
@@ -337,19 +337,19 @@ func (s *Service) ExecuteAction(ctx context.Context,
 	var params *gopowerstore.FailoverParams = nil
 	switch action {
 	case csiext.ActionTypes_FAILOVER_REMOTE.String():
-		execAction = gopowerstore.RS_ACTION_FAILOVER
+		execAction = gopowerstore.RsActionFailover
 		params = &gopowerstore.FailoverParams{IsPlanned: true, Reverse: false}
 	case csiext.ActionTypes_UNPLANNED_FAILOVER_LOCAL.String():
-		execAction = gopowerstore.RS_ACTION_FAILOVER
+		execAction = gopowerstore.RsActionFailover
 		params = &gopowerstore.FailoverParams{IsPlanned: false, Reverse: false}
 	case csiext.ActionTypes_SUSPEND.String():
-		execAction = gopowerstore.RS_ACTION_PAUSE
+		execAction = gopowerstore.RsActionPause
 	case csiext.ActionTypes_RESUME.String():
-		execAction = gopowerstore.RS_ACTION_RESUME
+		execAction = gopowerstore.RsActionResume
 	case csiext.ActionTypes_SYNC.String():
-		execAction = gopowerstore.RS_ACTION_SYNC
+		execAction = gopowerstore.RsActionSync
 	case csiext.ActionTypes_REPROTECT_LOCAL.String():
-		execAction = gopowerstore.RS_ACTION_REPROTECT
+		execAction = gopowerstore.RsActionReprotect
 	default:
 		return nil, status.Errorf(codes.Unknown, "The requested action does not match with supported actions")
 	}
@@ -408,22 +408,22 @@ func validateRSState(session *gopowerstore.ReplicationSession, action gopowersto
 	state := session.State
 	log.Infof("replication session is in %s", state)
 	switch action {
-	case gopowerstore.RS_ACTION_RESUME:
+	case gopowerstore.RsActionResume:
 		if state == "OK" {
 			log.Infof("RS (%s) is already in desired state: (%s)", session.ID, state)
 			return true, false, nil
 		}
-	case gopowerstore.RS_ACTION_REPROTECT:
+	case gopowerstore.RsActionReprotect:
 		if state == "OK" {
 			log.Infof("RS (%s) is already in desired state: (%s)", session.ID, state)
 			return true, false, nil
 		}
-	case gopowerstore.RS_ACTION_PAUSE:
+	case gopowerstore.RsActionPause:
 		if state == "Paused" || state == "Paused_For_Migration" || state == "Paused_For_NDU" {
 			log.Infof("RS (%s) is already in desired state: (%s)", session.ID, state)
 			return true, false, nil
 		}
-	case gopowerstore.RS_ACTION_FAILOVER:
+	case gopowerstore.RsActionFailover:
 		if state == "Failing_Over" {
 			return false, false, nil
 		}
@@ -464,7 +464,7 @@ func (s *Service) DeleteStorageProtectionGroup(ctx context.Context,
 	if vg.ID != "" {
 		if vg.ProtectionPolicyID != "" {
 			_, err := arr.GetClient().ModifyVolumeGroup(ctx, &gopowerstore.VolumeGroupModify{
-				ProtectionPolicyId: "",
+				ProtectionPolicyID: "",
 			}, groupID)
 			if apiErr, ok := err.(gopowerstore.APIError); ok && !apiErr.NotFound() {
 				return nil, status.Errorf(codes.Internal, "Error: Unable to un-assign PP from Volume Group")
@@ -597,21 +597,21 @@ func (s *Service) GetStorageProtectionGroupStatus(ctx context.Context,
 
 	var state csiext.StorageProtectionGroupStatus_State
 	switch rs.State {
-	case gopowerstore.RS_STATE_OK:
+	case gopowerstore.RsStateOk:
 		state = csiext.StorageProtectionGroupStatus_SYNCHRONIZED
 		break
-	case gopowerstore.RS_STATE_FAILED_OVER:
+	case gopowerstore.RsStateFailedOver:
 		state = csiext.StorageProtectionGroupStatus_FAILEDOVER
 		break
-	case gopowerstore.RS_STATE_PAUSED, gopowerstore.RS_STATE_PAUSED_FOR_MIGRATION, gopowerstore.RS_STATE_PAUSED_FOR_NDU, gopowerstore.RS_STATE_SYSTEM_PAUSED:
+	case gopowerstore.RsStatePaused, gopowerstore.RsStatePausedForMigration, gopowerstore.RsStatePausedForNDU, gopowerstore.RsStateSystemPaused:
 		state = csiext.StorageProtectionGroupStatus_SUSPENDED
 		break
-	case gopowerstore.RS_STATE_FAILING_OVER, gopowerstore.RS_STATE_FAILING_OVER_FOR_DR, gopowerstore.RS_STATE_RESUMING,
-		gopowerstore.RS_STATE_REPROTECTING, gopowerstore.RS_STATE_PARTIAL_CUTOVER_FOR_MIGRATION, gopowerstore.RS_STATE_SYNCHRONIZING,
-		gopowerstore.RS_STATE_INITIALIZING:
+	case gopowerstore.RsStateFailingOver, gopowerstore.RsStateFailingOverForDR, gopowerstore.RsStateResuming,
+		gopowerstore.RsStateReprotecting, gopowerstore.RsStatePartialCutoverForMigration, gopowerstore.RsStateSynchronizing,
+		gopowerstore.RsStateInitializing:
 		state = csiext.StorageProtectionGroupStatus_SYNC_IN_PROGRESS
 		break
-	case gopowerstore.RS_STATE_ERROR:
+	case gopowerstore.RsStateError:
 		state = csiext.StorageProtectionGroupStatus_INVALID
 		break
 	default:
