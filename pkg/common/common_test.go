@@ -37,7 +37,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestCustomLogger(t *testing.T) {
+func TestCustomLogger(_ *testing.T) {
 	log.SetLevel(log.DebugLevel)
 	lg := &common.CustomLogger{}
 	ctx := context.Background()

@@ -54,10 +54,10 @@ var _ = Describe("csi-extension-server", func() {
 
 		When("nodeId is not provided ", func() {
 			It("should return error", func() {
-				volId := []string{validBaseVolID}
+				volID := []string{validBaseVolID}
 				req := &podmon.ValidateVolumeHostConnectivityRequest{
 					ArrayId:   "default",
-					VolumeIds: volId,
+					VolumeIds: volID,
 					NodeId:    "",
 				}
 				_, err := ctrlSvc.ValidateVolumeHostConnectivity(context.Background(), req)
@@ -67,10 +67,10 @@ var _ = Describe("csi-extension-server", func() {
 
 		When("array status is not fetched so server will not respond ", func() {
 			It("should return error", func() {
-				volId := []string{validBaseVolID}
+				volID := []string{validBaseVolID}
 				req := &podmon.ValidateVolumeHostConnectivityRequest{
 					ArrayId:   "default",
-					VolumeIds: volId,
+					VolumeIds: volID,
 					NodeId:    "csi-node-003c684ccb0c4ca0a9c99423563dfd2c-127.0.0.1",
 				}
 				clientMock.On("GetVolume", context.Background(), mock.Anything).Return(gopowerstore.Volume{ApplianceID: validApplianceID}, nil)
@@ -79,7 +79,7 @@ var _ = Describe("csi-extension-server", func() {
 			})
 		})
 
-		When("neither arrayId nor volId is present in the request body ", func() {
+		When("neither arrayId nor volID is present in the request body ", func() {
 			It("should not return error", func() {
 				req := &podmon.ValidateVolumeHostConnectivityRequest{
 					NodeId: "csi-node-003c684ccb0c4ca0a9c99423563dfd2c-127.0.0.1",
@@ -111,9 +111,9 @@ var _ = Describe("csi-extension-server", func() {
 							StatusCode: http.StatusInternalServerError,
 						},
 					})
-				volId := []string{validBaseVolID}
+				volID := []string{validBaseVolID}
 				req := &podmon.ValidateVolumeHostConnectivityRequest{
-					VolumeIds: volId,
+					VolumeIds: volID,
 					NodeId:    "csi-node-003c684ccb0c4ca0a9c99423563dfd2c-127.0.0.1",
 				}
 				common.APIPort = ":9028"
@@ -157,9 +157,9 @@ var _ = Describe("csi-extension-server", func() {
 				resp2[5].TotalIops = 0.0
 				clientMock.On("PerformanceMetricsByVolume", context.Background(), mock.Anything, mock.Anything).
 					Return(resp2, nil)
-				volId2 := []string{validBaseVolID}
+				volID2 := []string{validBaseVolID}
 				req2 := &podmon.ValidateVolumeHostConnectivityRequest{
-					VolumeIds: volId2,
+					VolumeIds: volID2,
 					NodeId:    "csi-node-003c684ccb0c4ca0a9c99423563dfd2c-127.0.0.1",
 				}
 

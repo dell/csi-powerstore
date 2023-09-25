@@ -180,7 +180,7 @@ func setNFSCreateAttributes(reqParams map[string]string, createParams *gopowerst
 }
 
 // CheckSize validates that size is correct and returns size in bytes
-func (*SCSICreator) CheckSize(ctx context.Context, cr *csi.CapacityRange, isAutoRoundOffFsSizeEnabled bool) (int64, error) {
+func (*SCSICreator) CheckSize(_ context.Context, cr *csi.CapacityRange, isAutoRoundOffFsSizeEnabled bool) (int64, error) {
 	minSize := cr.GetRequiredBytes()
 	maxSize := cr.GetLimitBytes()
 

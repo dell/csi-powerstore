@@ -59,7 +59,7 @@ const (
 	validHostName             = "csi-node-1a47a1b91c444a8a90193d8066669603"
 	validHostID               = "24aefac2-a796-47dc-886a-c73ff8c1a671"
 	validClusterName          = "localSystemName"
-	validRemoteVolId          = "9f840c56-96e6-4de9-b5a3-27e7c20eaa77"
+	validRemoteVolID          = "9f840c56-96e6-4de9-b5a3-27e7c20eaa77"
 	validRemoteSystemName     = "remoteName"
 	validRemoteSystemID       = "df7f804c-6373-4659-b197-36654d17979c"
 	validRPO                  = "Five_Minutes"
@@ -3645,7 +3645,7 @@ var _ = Describe("CSIControllerService", func() {
 						RemoteResourceID: validRemoteGroupID,
 						StorageElementPairs: []gopowerstore.StorageElementPair{{
 							LocalStorageElementID:  validBaseVolID,
-							RemoteStorageElementID: validRemoteVolId,
+							RemoteStorageElementID: validRemoteVolID,
 						}},
 					}, nil)
 
@@ -3737,7 +3737,7 @@ var _ = Describe("CSIControllerService", func() {
 						StorageElementPairs: []gopowerstore.StorageElementPair{
 							{
 								LocalStorageElementID:  validBaseVolID,
-								RemoteStorageElementID: validRemoteVolId,
+								RemoteStorageElementID: validRemoteVolID,
 							},
 						},
 					}, nil)
@@ -3761,7 +3761,7 @@ var _ = Describe("CSIControllerService", func() {
 				Expect(res).To(Equal(
 					&csiext.CreateRemoteVolumeResponse{RemoteVolume: &csiext.Volume{
 						CapacityBytes: validVolSize,
-						VolumeId:      validRemoteVolId + "/" + validRemoteSystemGlobalID + "/" + "iscsi",
+						VolumeId:      validRemoteVolID + "/" + validRemoteSystemGlobalID + "/" + "iscsi",
 						VolumeContext: map[string]string{
 							"remoteSystem":      validClusterName,
 							"managementAddress": secondValidID,

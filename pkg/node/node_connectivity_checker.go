@@ -211,7 +211,7 @@ func (s *Service) testConnectivityAndUpdateStatus(ctx context.Context, array *ar
 }
 
 // nodeProbe function used to store the status of array
-func (s *Service) nodeProbe(timeOutCtx context.Context, array *array.PowerStoreArray) error {
+func (s *Service) nodeProbe(_ context.Context, array *array.PowerStoreArray) error {
 	// try to get the host
 	host, err := array.Client.GetHostByName(context.Background(), s.nodeID)
 	// possibly NFS could be there.
