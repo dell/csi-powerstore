@@ -347,7 +347,7 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 	}
 
 	// Fetch the service tag
-	var serviceTag = GetServiceTag(ctx, req, arr, resp.ID, protocol)
+	serviceTag := GetServiceTag(ctx, req, arr, resp.ID, protocol)
 
 	volumeResponse.VolumeContext = req.Parameters
 	volumeResponse.VolumeContext[common.KeyArrayID] = arr.GetGlobalID()

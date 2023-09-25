@@ -103,8 +103,7 @@ type VolumeSnapshotter interface {
 }
 
 // SCSISnapshotter is a implementation of VolumeSnapshotter for SCSI based (FC, iSCSI) volumes
-type SCSISnapshotter struct {
-}
+type SCSISnapshotter struct{}
 
 // GetExistingSnapshot queries storage array if given snapshot of the Volume already exists
 func (*SCSISnapshotter) GetExistingSnapshot(ctx context.Context, snapName string, client gopowerstore.Client) (GeneralSnapshot, error) {
@@ -126,8 +125,7 @@ func (*SCSISnapshotter) Create(ctx context.Context, snapName string, sourceID st
 }
 
 // NfsSnapshotter is a implementation of VolumeSnapshotter for NFS volumes
-type NfsSnapshotter struct {
-}
+type NfsSnapshotter struct{}
 
 // GetExistingSnapshot queries storage array if given snapshot of the FileSystem already exists
 func (*NfsSnapshotter) GetExistingSnapshot(ctx context.Context, snapName string, client gopowerstore.Client) (GeneralSnapshot, error) {

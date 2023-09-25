@@ -31,7 +31,8 @@ import (
 
 // CreateRemoteVolume creates replica of volume in remote cluster
 func (s *Service) CreateRemoteVolume(ctx context.Context,
-	req *csiext.CreateRemoteVolumeRequest) (*csiext.CreateRemoteVolumeResponse, error) {
+	req *csiext.CreateRemoteVolumeRequest,
+) (*csiext.CreateRemoteVolumeResponse, error) {
 	volID := req.GetVolumeHandle()
 	if volID == "" {
 		return nil, status.Error(codes.InvalidArgument, "volume ID is required")
@@ -101,7 +102,8 @@ func (s *Service) CreateRemoteVolume(ctx context.Context,
 
 // CreateStorageProtectionGroup creates storage protection group
 func (s *Service) CreateStorageProtectionGroup(ctx context.Context,
-	req *csiext.CreateStorageProtectionGroupRequest) (*csiext.CreateStorageProtectionGroupResponse, error) {
+	req *csiext.CreateStorageProtectionGroupRequest,
+) (*csiext.CreateStorageProtectionGroupResponse, error) {
 	volID := req.GetVolumeHandle()
 	if volID == "" {
 		return nil, status.Error(codes.InvalidArgument, "volume ID is required")
@@ -174,8 +176,8 @@ func (s *Service) CreateStorageProtectionGroup(ctx context.Context,
 
 // EnsureProtectionPolicyExists  ensures protection policy exists
 func EnsureProtectionPolicyExists(ctx context.Context, arr *array.PowerStoreArray,
-	vgName string, remoteSystemName string, rpoEnum gopowerstore.RPOEnum) (string, error) {
-
+	vgName string, remoteSystemName string, rpoEnum gopowerstore.RPOEnum,
+) (string, error) {
 	// Get id of specified remote system
 	rs, err := arr.Client.GetRemoteSystemByName(ctx, remoteSystemName)
 	if err != nil {
@@ -209,7 +211,8 @@ func EnsureProtectionPolicyExists(ctx context.Context, arr *array.PowerStoreArra
 
 // EnsureReplicationRuleExists ensures replication rule exists
 func EnsureReplicationRuleExists(ctx context.Context, arr *array.PowerStoreArray,
-	vgName string, remoteSystemID string, rpoEnum gopowerstore.RPOEnum) (string, error) {
+	vgName string, remoteSystemID string, rpoEnum gopowerstore.RPOEnum,
+) (string, error) {
 	rrName := "rr-" + vgName
 	rr, err := arr.Client.GetReplicationRuleByName(ctx, rrName)
 	if err != nil {
@@ -229,7 +232,7 @@ func EnsureReplicationRuleExists(ctx context.Context, arr *array.PowerStoreArray
 
 // GetReplicationCapabilities is a getter for replication capabilities
 func (s *Service) GetReplicationCapabilities(ctx context.Context, req *csiext.GetReplicationCapabilityRequest) (*csiext.GetReplicationCapabilityResponse, error) {
-	var rep = new(csiext.GetReplicationCapabilityResponse)
+	rep := new(csiext.GetReplicationCapabilityResponse)
 	rep.Capabilities = []*csiext.ReplicationCapability{
 		{
 			Type: &csiext.ReplicationCapability_Rpc{
@@ -304,8 +307,8 @@ func (s *Service) GetReplicationCapabilities(ctx context.Context, req *csiext.Ge
 
 // ExecuteAction is a method to execute an action request
 func (s *Service) ExecuteAction(ctx context.Context,
-	req *csiext.ExecuteActionRequest) (*csiext.ExecuteActionResponse, error) {
-
+	req *csiext.ExecuteActionRequest,
+) (*csiext.ExecuteActionResponse, error) {
 	var reqID string
 	localParams := req.GetProtectionGroupAttributes()
 	protectionGroupID := req.GetProtectionGroupId()
@@ -332,7 +335,7 @@ func (s *Service) ExecuteAction(ctx context.Context,
 	if err != nil {
 		return nil, err
 	}
-	var client = pstoreClient
+	client := pstoreClient
 	var execAction gopowerstore.ActionType
 	var params *gopowerstore.FailoverParams = nil
 	switch action {
@@ -355,7 +358,6 @@ func (s *Service) ExecuteAction(ctx context.Context,
 	}
 	resErr := ExecuteAction(&rs, client, execAction, params)
 	if resErr != nil {
-
 		return nil, resErr
 	}
 
@@ -391,7 +393,6 @@ func ExecuteAction(session *gopowerstore.ReplicationSession, pstoreClient gopowe
 
 		_, err := pstoreClient.ExecuteActionOnReplicationSession(context.Background(), session.ID, action,
 			failoverParams)
-
 		if err != nil {
 			if apiError, ok := err.(gopowerstore.APIError); ok && !apiError.UnableToFailoverFromDestination() {
 				log.Error(fmt.Sprintf("Fail over: Failed to modify RS (%s) - Error (%s)", session.ID, err.Error()))
@@ -437,7 +438,8 @@ func validateRSState(session *gopowerstore.ReplicationSession, action gopowersto
 
 // DeleteStorageProtectionGroup deletes storage protection group
 func (s *Service) DeleteStorageProtectionGroup(ctx context.Context,
-	req *csiext.DeleteStorageProtectionGroupRequest) (*csiext.DeleteStorageProtectionGroupResponse, error) {
+	req *csiext.DeleteStorageProtectionGroupRequest,
+) (*csiext.DeleteStorageProtectionGroupResponse, error) {
 	localParams := req.GetProtectionGroupAttributes()
 	groupID := req.GetProtectionGroupId()
 	globalID, ok := localParams[s.replicationContextPrefix+"globalID"]
@@ -511,7 +513,8 @@ func (s *Service) DeleteStorageProtectionGroup(ctx context.Context,
 
 // DeleteLocalVolume deletes a volume on the local storage array upon request from a remote replication controller.
 func (s *Service) DeleteLocalVolume(ctx context.Context,
-	req *csiext.DeleteLocalVolumeRequest) (*csiext.DeleteLocalVolumeResponse, error) {
+	req *csiext.DeleteLocalVolumeRequest,
+) (*csiext.DeleteLocalVolumeResponse, error) {
 	log.Info("Deleting local volume " + req.VolumeHandle + " per request from remote replication controller")
 
 	// req.VolumeHandle is of format <volumeid>/<array ID>/<protocol>. We only need the IDs.
@@ -571,7 +574,8 @@ func (s *Service) DeleteLocalVolume(ctx context.Context,
 
 // GetStorageProtectionGroupStatus gets storage protection group status
 func (s *Service) GetStorageProtectionGroupStatus(ctx context.Context,
-	req *csiext.GetStorageProtectionGroupStatusRequest) (*csiext.GetStorageProtectionGroupStatusResponse, error) {
+	req *csiext.GetStorageProtectionGroupStatusRequest,
+) (*csiext.GetStorageProtectionGroupStatusResponse, error) {
 	localParams := req.GetProtectionGroupAttributes()
 	groupID := req.GetProtectionGroupId()
 

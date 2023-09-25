@@ -108,7 +108,6 @@ func setVolumeCreateAttributes(reqParams map[string]string, createParams *gopowe
 }
 
 func validateHostIOSize(hostIOSize string) string {
-
 	switch hostIOSize {
 	case gopowerstore.VMware8K,
 		gopowerstore.VMware16K,
@@ -268,7 +267,8 @@ func (sc *SCSICreator) Create(ctx context.Context, req *csi.CreateVolumeRequest,
 // CreateVolumeFromSnapshot create a volume from an existing snapshot.
 // The snapshotSource gives the SnapshotId which is the volume to be replicated.
 func (*SCSICreator) CreateVolumeFromSnapshot(ctx context.Context, snapshotSource *csi.VolumeContentSource_SnapshotSource,
-	volumeName string, sizeInBytes int64, parameters map[string]string, client gopowerstore.Client) (*csi.Volume, error) {
+	volumeName string, sizeInBytes int64, parameters map[string]string, client gopowerstore.Client,
+) (*csi.Volume, error) {
 	var volumeResponse *csi.Volume
 	// Lookup the volume source volume.
 	sourceVol, err := client.GetVolume(ctx, snapshotSource.SnapshotId)
@@ -300,7 +300,8 @@ func (*SCSICreator) CreateVolumeFromSnapshot(ctx context.Context, snapshotSource
 
 // Clone creates a clone of a Volume
 func (*SCSICreator) Clone(ctx context.Context, volumeSource *csi.VolumeContentSource_VolumeSource,
-	volumeName string, sizeInBytes int64, parameters map[string]string, client gopowerstore.Client) (*csi.Volume, error) {
+	volumeName string, sizeInBytes int64, parameters map[string]string, client gopowerstore.Client,
+) (*csi.Volume, error) {
 	var volumeResponse *csi.Volume
 	// Lookup the volume source volume.
 	sourceVol, err := client.GetVolume(ctx, volumeSource.VolumeId)
@@ -387,7 +388,7 @@ func (*NfsCreator) CheckSize(ctx context.Context, cr *csi.CapacityRange, isAutoR
 		minSize = minSize + VolumeSizeMultiple - mod
 	}
 
-	//TODO: This roundoff logic to be removed once platform supports minimum filesystem size
+	// TODO: This roundoff logic to be removed once platform supports minimum filesystem size
 	if isAutoRoundOffFsSizeEnabled && minSize < MinFilesystemSizeBytes {
 		log.Warn("Auto round off Filesystem size has been enabled! Rounding off PVC size to 3Gi.")
 		return MinFilesystemSizeBytes, nil
@@ -440,7 +441,8 @@ func (c *NfsCreator) Create(ctx context.Context, req *csi.CreateVolumeRequest, s
 
 // CreateVolumeFromSnapshot create a FileSystem from an existing FileSystem snapshot.
 func (*NfsCreator) CreateVolumeFromSnapshot(ctx context.Context, snapshotSource *csi.VolumeContentSource_SnapshotSource,
-	volumeName string, sizeInBytes int64, parameters map[string]string, client gopowerstore.Client) (*csi.Volume, error) {
+	volumeName string, sizeInBytes int64, parameters map[string]string, client gopowerstore.Client,
+) (*csi.Volume, error) {
 	var volumeResponse *csi.Volume
 	// Lookup the volume source volume.
 
@@ -473,7 +475,8 @@ func (*NfsCreator) CreateVolumeFromSnapshot(ctx context.Context, snapshotSource 
 
 // Clone creates a clone of a FileSystem
 func (*NfsCreator) Clone(ctx context.Context, volumeSource *csi.VolumeContentSource_VolumeSource,
-	volumeName string, sizeInBytes int64, parameters map[string]string, client gopowerstore.Client) (*csi.Volume, error) {
+	volumeName string, sizeInBytes int64, parameters map[string]string, client gopowerstore.Client,
+) (*csi.Volume, error) {
 	var volumeResponse *csi.Volume
 	// Lookup the volume source volume.
 	sourceVol, err := client.GetFS(ctx, volumeSource.VolumeId)

@@ -826,7 +826,7 @@ func (s *Service) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolum
 		log.Infof("DisklLocation: %s", disklocation)
 		targetmount = fmt.Sprintf("tmp/%s/%s", vol.ID, vol.Name)
 		log.Infof("TargetMount: %s", targetmount)
-		err = s.Fs.MkdirAll(targetmount, 0750)
+		err = s.Fs.MkdirAll(targetmount, 0o750)
 		if err != nil {
 			return nil, status.Error(codes.Internal,
 				fmt.Sprintf("Failed to find mount info for (%s) with error (%s)", vol.Name, err.Error()))
@@ -1118,7 +1118,6 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 						s.useNFS = true
 					}
 				}
-
 			} else if s.useFC {
 				// Check node initiators connection to array
 				nodeID := s.nodeID
@@ -1547,18 +1546,24 @@ func (s *Service) createHost(ctx context.Context, initiators []string, client go
 
 		if s.opts.KubeNodeName == "" {
 			log.Warnf("KubeNodeName value is not set")
-			createParams = gopowerstore.HostCreate{Name: &s.nodeID, OsType: &osType, Initiators: &reqInitiators,
-				Description: &description}
+			createParams = gopowerstore.HostCreate{
+				Name: &s.nodeID, OsType: &osType, Initiators: &reqInitiators,
+				Description: &description,
+			}
 		} else {
 			metadata := map[string]string{
 				"k8s_node_name": s.opts.KubeNodeName,
 			}
-			createParams = gopowerstore.HostCreate{Name: &s.nodeID, OsType: &osType, Initiators: &reqInitiators,
-				Description: &description, Metadata: &metadata}
+			createParams = gopowerstore.HostCreate{
+				Name: &s.nodeID, OsType: &osType, Initiators: &reqInitiators,
+				Description: &description, Metadata: &metadata,
+			}
 		}
 	} else {
-		createParams = gopowerstore.HostCreate{Name: &s.nodeID, OsType: &osType, Initiators: &reqInitiators,
-			Description: &description}
+		createParams = gopowerstore.HostCreate{
+			Name: &s.nodeID, OsType: &osType, Initiators: &reqInitiators,
+			Description: &description,
+		}
 	}
 	resp, err := client.CreateHost(ctx, &createParams)
 	// reset custom header
@@ -1572,7 +1577,8 @@ func (s *Service) createHost(ctx context.Context, initiators []string, client go
 
 // add or remove initiators from host
 func (s *Service) modifyHostInitiators(ctx context.Context, hostID string, client gopowerstore.Client,
-	initiatorsToAdd []string, initiatorsToDelete []string, initiatorsToModify []string) error {
+	initiatorsToAdd []string, initiatorsToDelete []string, initiatorsToModify []string,
+) error {
 	if len(initiatorsToDelete) > 0 {
 		modifyParams := gopowerstore.HostModify{}
 		modifyParams.RemoveInitiators = &initiatorsToDelete

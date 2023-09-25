@@ -87,7 +87,6 @@ func TestRmSockFile(t *testing.T) {
 
 		common.RmSockFile(fsMock)
 	})
-
 }
 
 func TestSetLogFields(t *testing.T) {

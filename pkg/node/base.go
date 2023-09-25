@@ -289,7 +289,7 @@ func consistentRead(filename string, retry int, fs fs.Interface) ([]byte, error)
 }
 
 func createMapping(volID, deviceName, tmpDir string, fs fs.Interface) error {
-	return fs.WriteFile(path.Join(tmpDir, volID), []byte(deviceName), 0640)
+	return fs.WriteFile(path.Join(tmpDir, volID), []byte(deviceName), 0o640)
 }
 
 func getMapping(volID, tmpDir string, fs fs.Interface) (string, error) {

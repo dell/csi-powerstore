@@ -377,7 +377,6 @@ var _ = Describe("CSIControllerService", func() {
 		})
 
 		It("should create volume and update volumeGroup without policy, but policy exists", func() {
-
 			clientMock.On("GetVolumeGroupByName", mock.Anything, validGroupName).
 				Return(gopowerstore.VolumeGroup{ID: validGroupID, ProtectionPolicyID: validPolicyID}, nil)
 
@@ -427,7 +426,6 @@ var _ = Describe("CSIControllerService", func() {
 			Expect(res).To(BeNil())
 			Expect(err).NotTo(BeNil())
 			Expect(err.Error()).To(ContainSubstring("can't ensure protection policy exists"))
-
 		})
 
 		It("should fail when rpo incorrect", func() {
@@ -439,18 +437,15 @@ var _ = Describe("CSIControllerService", func() {
 			Expect(res).To(BeNil())
 			Expect(err).NotTo(BeNil())
 			Expect(err.Error()).To(ContainSubstring("invalid rpo value"))
-
 		})
 
 		It("should fail when rpo not declared in parameters", func() {
-
 			delete(req.Parameters, ctrlSvc.WithRP(controller.KeyReplicationRPO))
 
 			res, err := ctrlSvc.CreateVolume(context.Background(), req)
 			Expect(res).To(BeNil())
 			Expect(err).NotTo(BeNil())
 			Expect(err.Error()).To(ContainSubstring("replication enabled but no RPO specified in storage class"))
-
 		})
 
 		It("should fail when remote system not declared in parameters", func() {
@@ -1975,7 +1970,7 @@ var _ = Describe("CSIControllerService", func() {
 				}))
 			})
 			It("should succeed [NFS] with externalAccess", func() {
-				//setting externalAccess environment variable
+				// setting externalAccess environment variable
 				err := csictx.Setenv(context.Background(), common.EnvExternalAccess, "10.0.0.0/24")
 				Expect(err).To(BeNil())
 				_ = ctrlSvc.Init()
@@ -2510,7 +2505,7 @@ var _ = Describe("CSIControllerService", func() {
 			})
 
 			It("should succeed [NFS] with external access", func() {
-				//setting externalAccess environment variable
+				// setting externalAccess environment variable
 				err := csictx.Setenv(context.Background(), common.EnvExternalAccess, "10.0.0.0/24")
 				Expect(err).To(BeNil())
 				_ = ctrlSvc.Init()
@@ -2538,7 +2533,7 @@ var _ = Describe("CSIControllerService", func() {
 				Expect(err).To(BeNil())
 				Expect(res).To(Equal(&csi.ControllerUnpublishVolumeResponse{}))
 
-				//setting externalAccess environment variable
+				// setting externalAccess environment variable
 				err = csictx.Setenv(context.Background(), common.EnvExternalAccess, "")
 				Expect(err).To(BeNil())
 				_ = ctrlSvc.Init()
@@ -2546,7 +2541,7 @@ var _ = Describe("CSIControllerService", func() {
 		})
 
 		It("should succeed [NFS] by removing external access from the HostAccessList", func() {
-			//setting externalAccess environment variable
+			// setting externalAccess environment variable
 			err := csictx.Setenv(context.Background(), common.EnvExternalAccess, "10.0.0.0/16")
 			Expect(err).To(BeNil())
 			_ = ctrlSvc.Init()
@@ -2579,7 +2574,7 @@ var _ = Describe("CSIControllerService", func() {
 			Expect(err).To(BeNil())
 			Expect(res).To(Equal(&csi.DeleteVolumeResponse{}))
 
-			//setting externalAccess environment variable
+			// setting externalAccess environment variable
 			err = csictx.Setenv(context.Background(), common.EnvExternalAccess, "")
 
 			Expect(err).To(BeNil())
@@ -2587,7 +2582,7 @@ var _ = Describe("CSIControllerService", func() {
 		})
 
 		It("should return error since HostAccessList contain external as well as Host IP too", func() {
-			//setting externalAccess environment variable
+			// setting externalAccess environment variable
 			err := csictx.Setenv(context.Background(), common.EnvExternalAccess, "10.0.0.0/16")
 			Expect(err).To(BeNil())
 			_ = ctrlSvc.Init()
@@ -2612,7 +2607,7 @@ var _ = Describe("CSIControllerService", func() {
 
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(ContainSubstring("cannot be deleted as it has associated NFS or SMB shares"))
-			//setting externalAccess environment variable
+			// setting externalAccess environment variable
 			err = csictx.Setenv(context.Background(), common.EnvExternalAccess, "")
 
 			Expect(err).To(BeNil())
@@ -2783,7 +2778,6 @@ var _ = Describe("CSIControllerService", func() {
 					Expect(err).ToNot(BeNil())
 					Expect(err.Error()).To(ContainSubstring("can't find IP in nodeID"))
 				})
-
 			})
 
 			When("host does not exist", func() {
@@ -3439,7 +3433,6 @@ var _ = Describe("CSIControllerService", func() {
 					VolumeId:      validBlockVolumeID,
 					VolumeContext: nil,
 					VolumeCapabilities: []*csi.VolumeCapability{
-
 						{
 							AccessMode: &csi.VolumeCapability_AccessMode{Mode: csi.VolumeCapability_AccessMode_UNKNOWN},
 							AccessType: accessType,
@@ -3617,7 +3610,8 @@ var _ = Describe("CSIControllerService", func() {
 		When("get info about protection group", func() {
 			getLocalAndRemoteParams := func(localSystemName string, localAddress string,
 				remoteSystemName string, remoteAddress string,
-				remoteSerialNumber string, volumeGroupName string) (map[string]string, map[string]string) {
+				remoteSerialNumber string, volumeGroupName string,
+			) (map[string]string, map[string]string) {
 				localParams := map[string]string{
 					"globalID":                localAddress,
 					"systemName":              localSystemName,
@@ -3652,7 +3646,8 @@ var _ = Describe("CSIControllerService", func() {
 						StorageElementPairs: []gopowerstore.StorageElementPair{{
 							LocalStorageElementID:  validBaseVolID,
 							RemoteStorageElementID: validRemoteVolId,
-						}}}, nil)
+						}},
+					}, nil)
 
 				clientMock.On("GetCluster", mock.Anything).
 					Return(gopowerstore.Cluster{Name: validClusterName, ManagementAddress: firstValidID}, nil)
@@ -3661,7 +3656,8 @@ var _ = Describe("CSIControllerService", func() {
 					Return(gopowerstore.RemoteSystem{
 						Name:              validRemoteSystemName,
 						ManagementAddress: secondValidID,
-						SerialNumber:      validRemoteSystemGlobalID}, nil)
+						SerialNumber:      validRemoteSystemGlobalID,
+					}, nil)
 
 				req := &csiext.CreateStorageProtectionGroupRequest{
 					VolumeHandle: validBaseVolID + "/" + firstValidID + "/" + "iscsi",
@@ -3674,7 +3670,6 @@ var _ = Describe("CSIControllerService", func() {
 
 				Expect(err).To(BeNil())
 				Expect(res).To(Equal(&csiext.CreateStorageProtectionGroupResponse{
-
 					LocalProtectionGroupId:          validGroupID,
 					RemoteProtectionGroupId:         validRemoteGroupID,
 					LocalProtectionGroupAttributes:  localParams,
@@ -3695,7 +3690,6 @@ var _ = Describe("CSIControllerService", func() {
 			})
 
 			It("should fail if volume is single", func() {
-
 				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).
 					Return(gopowerstore.VolumeGroups{}, gopowerstore.APIError{})
 
@@ -3774,7 +3768,6 @@ var _ = Describe("CSIControllerService", func() {
 							"arrayID":           validRemoteSystemGlobalID,
 						},
 					}}))
-
 			})
 			It("should fail if volume id is empty", func() {
 				req := &csiext.CreateRemoteVolumeRequest{
@@ -3842,7 +3835,6 @@ var _ = Describe("CSIControllerService", func() {
 			})
 
 			It("should fail if the array id is nil", func() {
-
 				// create volume handle with nil array ID
 				req := &csiext.CreateRemoteVolumeRequest{
 					VolumeHandle: validBaseVolID + "/" + "/" + "iscsi",
@@ -3857,7 +3849,6 @@ var _ = Describe("CSIControllerService", func() {
 			})
 
 			It("should fail if a volume group does not exist for the volume", func() {
-
 				// return an empty volume group
 				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).Return(gopowerstore.VolumeGroups{}, nil)
 
@@ -3872,7 +3863,6 @@ var _ = Describe("CSIControllerService", func() {
 					"replication of volumes that aren't assigned to group is not implemented yet",
 				))
 			})
-
 		})
 	})
 
@@ -3888,7 +3878,6 @@ var _ = Describe("CSIControllerService", func() {
 			})
 
 			It("should return existing policy", func() {
-
 				clientMock.On("GetRemoteSystemByName", mock.Anything, validRemoteSystemName).
 					Return(gopowerstore.RemoteSystem{ID: validRemoteSystemID, Name: validRemoteSystemName}, nil)
 
@@ -3921,7 +3910,6 @@ var _ = Describe("CSIControllerService", func() {
 				Expect(err).To(BeNil())
 				Expect(res).To(Equal(validPolicyID))
 			})
-
 		})
 	})
 
@@ -3958,7 +3946,6 @@ var _ = Describe("CSIControllerService", func() {
 			})
 
 			It("should fail to create a replication rule", func() {
-
 				clientMock.On("GetReplicationRuleByName", mock.Anything, validRuleName).Return(
 					gopowerstore.ReplicationRule{ID: validRuleID},
 					gopowerstore.NewNotFoundError(),
@@ -3984,7 +3971,6 @@ var _ = Describe("CSIControllerService", func() {
 				Expect(err.Error()).To(ContainSubstring("can't create replication rule"))
 			})
 		})
-
 	})
 
 	Describe("calling ControllerGetVolume", func() {

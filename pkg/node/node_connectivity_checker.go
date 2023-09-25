@@ -138,7 +138,7 @@ func getArrayConnectivityStatus(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "array %s not found \n", arrayID)
 		return
 	}
-	//convert status struct to JSON
+	// convert status struct to JSON
 	jsonResponse, err := json.Marshal(status)
 	if err != nil {
 		log.Errorf("error %s during marshaling to json", err)
@@ -147,7 +147,7 @@ func getArrayConnectivityStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	log.Infof("sending response %+v for array %s \n", status, arrayID)
-	//update response
+	// update response
 	_, err = w.Write(jsonResponse)
 	if err != nil {
 		log.Errorf("unable to write response %s", err)

@@ -21,6 +21,10 @@ package controller
 import (
 	"context"
 	"errors"
+	"net/http"
+	"strings"
+	"testing"
+
 	"github.com/dell/gopowerstore"
 	"github.com/dell/gopowerstore/api"
 	"github.com/dell/gopowerstore/mocks"
@@ -28,9 +32,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"net/http"
-	"strings"
-	"testing"
 )
 
 func TestVolumeName(t *testing.T) {
@@ -40,8 +41,10 @@ func TestVolumeName(t *testing.T) {
 	}{
 		{"IsOkName", nil},
 		{"", status.Errorf(codes.InvalidArgument, "name cannot be empty")},
-		{strings.Repeat("N", MaxVolumeNameLength+1),
-			status.Errorf(codes.InvalidArgument, "name must contain %d or fewer printable Unicode characters", MaxVolumeNameLength)},
+		{
+			strings.Repeat("N", MaxVolumeNameLength+1),
+			status.Errorf(codes.InvalidArgument, "name must contain %d or fewer printable Unicode characters", MaxVolumeNameLength),
+		},
 	}
 
 	for _, test := range tests {
@@ -154,5 +157,4 @@ func TestDetachVolumeFromHost(t *testing.T) {
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "unexpected api error when detaching volume from host")
 	})
-
 }

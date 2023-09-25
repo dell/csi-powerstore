@@ -142,7 +142,8 @@ func (_m *NodeLabelsRetrieverInterface) NewForConfig(config *rest.Config) (*kube
 func NewNodeLabelsRetrieverInterface(t interface {
 	mock.TestingT
 	Cleanup(func())
-}) *NodeLabelsRetrieverInterface {
+},
+) *NodeLabelsRetrieverInterface {
 	mock := &NodeLabelsRetrieverInterface{}
 	mock.Mock.Test(t)
 

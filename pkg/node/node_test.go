@@ -97,52 +97,79 @@ var (
 	validFCTargetWWNNVMe         = []string{"58ccf090496008aa", "58ccf090496008aa"}
 	validFCTargetWWNNode         = []string{"58ccf090c96008aa", "58ccf090c96008aa"}
 	validFCTargetsWWPNPowerstore = []string{"58:cc:f0:93:48:a0:03:a3", "58:cc:f0:93:48:a0:02:a3"}
-	validFCTargetsInfo           = []gobrick.FCTargetInfo{{WWPN: validFCTargetsWWPN[0]},
-		{WWPN: validFCTargetsWWPN[1]}}
+	validFCTargetsInfo           = []gobrick.FCTargetInfo{
+		{WWPN: validFCTargetsWWPN[0]},
+		{WWPN: validFCTargetsWWPN[1]},
+	}
 	validISCSIInitiators = []string{"iqn.1994-05.com.redhat:4db86abbe3c", "iqn.1994-05.com.redhat:2950c9ca441b"}
 	validISCSIPortals    = []string{"192.168.1.1:3260", "192.168.1.2:3260"}
-	validISCSITargets    = []string{"iqn.2015-10.com.dell:dellemc-powerstore-fnm00180700173-a-39f17e0e",
-		"iqn.2015-10.com.dell:dellemc-powerstore-fnm00180700173-b-10de15a5"}
-	validNVMEInitiators = []string{"nqn.2014-08.org.nvmexpress:uuid:02a08600-57d6-4089-8736-bf1f7326990e",
-		"nqn.2014-08.org.nvmexpress:uuid:fa363a22-1c74-44f3-9932-1c35d5cf5c4d"}
+	validISCSITargets    = []string{
+		"iqn.2015-10.com.dell:dellemc-powerstore-fnm00180700173-a-39f17e0e",
+		"iqn.2015-10.com.dell:dellemc-powerstore-fnm00180700173-b-10de15a5",
+	}
+	validNVMEInitiators = []string{
+		"nqn.2014-08.org.nvmexpress:uuid:02a08600-57d6-4089-8736-bf1f7326990e",
+		"nqn.2014-08.org.nvmexpress:uuid:fa363a22-1c74-44f3-9932-1c35d5cf5c4d",
+	}
 	validNVMETCPPortals = []string{"192.168.1.1:4420", "192.168.1.2:4420"}
-	validNVMETCPTargets = []string{"nqn.1988-11.com.dell:powerstore:00:e6e2d5b871f1403E169D",
-		"nqn.1988-11.com.dell:powerstore:00:e6e2d5b871f1403E169D"}
+	validNVMETCPTargets = []string{
+		"nqn.1988-11.com.dell:powerstore:00:e6e2d5b871f1403E169D",
+		"nqn.1988-11.com.dell:powerstore:00:e6e2d5b871f1403E169D",
+	}
 	validNVMEFCPortals = []string{"nn-0x11ccf090c9200b1a:pn-0x11ccf09149280b1a", "nn-0x11ccf090c9200b1a:pn-0x11ccf09149280b1a"}
-	validNVMEFCTargets = []string{"nqn.1988-11.com.dell:powerstore:00:e6e2d5b871f1403E169D",
-		"nqn.1988-11.com.dell:powerstore:00:e6e2d5b871f1403E169D"}
+	validNVMEFCTargets = []string{
+		"nqn.1988-11.com.dell:powerstore:00:e6e2d5b871f1403E169D",
+		"nqn.1988-11.com.dell:powerstore:00:e6e2d5b871f1403E169D",
+	}
 	validISCSITargetInfo = []gobrick.ISCSITargetInfo{
 		{Portal: validISCSIPortals[0], Target: validISCSITargets[0]},
-		{Portal: validISCSIPortals[1], Target: validISCSITargets[1]}}
+		{Portal: validISCSIPortals[1], Target: validISCSITargets[1]},
+	}
 	validGobrickISCSIVolumeINFO = gobrick.ISCSIVolumeInfo{
 		Targets: []gobrick.ISCSITargetInfo{
-			{Portal: validISCSITargetInfo[0].Portal,
-				Target: validISCSITargetInfo[0].Target},
-			{Portal: validISCSITargetInfo[1].Portal, Target: validISCSITargetInfo[1].Target}},
-		Lun: validLUNIDINT}
+			{
+				Portal: validISCSITargetInfo[0].Portal,
+				Target: validISCSITargetInfo[0].Target,
+			},
+			{Portal: validISCSITargetInfo[1].Portal, Target: validISCSITargetInfo[1].Target},
+		},
+		Lun: validLUNIDINT,
+	}
 	validNVMETCPTargetInfo = []gobrick.NVMeTargetInfo{
 		{Portal: validNVMETCPPortals[0], Target: validNVMETCPTargets[0]},
-		{Portal: validNVMETCPPortals[1], Target: validNVMETCPTargets[1]}}
+		{Portal: validNVMETCPPortals[1], Target: validNVMETCPTargets[1]},
+	}
 	validGobrickNVMETCPVolumeINFO = gobrick.NVMeVolumeInfo{
 		Targets: []gobrick.NVMeTargetInfo{
-			{Portal: validNVMETCPTargetInfo[0].Portal,
-				Target: validNVMETCPTargetInfo[0].Target},
-			{Portal: validNVMETCPTargetInfo[1].Portal, Target: validNVMETCPTargetInfo[1].Target}},
-		WWN: validDeviceWWN}
+			{
+				Portal: validNVMETCPTargetInfo[0].Portal,
+				Target: validNVMETCPTargetInfo[0].Target,
+			},
+			{Portal: validNVMETCPTargetInfo[1].Portal, Target: validNVMETCPTargetInfo[1].Target},
+		},
+		WWN: validDeviceWWN,
+	}
 	validNVMEFCTargetInfo = []gobrick.NVMeTargetInfo{
 		{Portal: validNVMEFCPortals[0], Target: validNVMEFCTargets[0]},
-		{Portal: validNVMEFCPortals[1], Target: validNVMEFCTargets[1]}}
+		{Portal: validNVMEFCPortals[1], Target: validNVMEFCTargets[1]},
+	}
 	validGobrickNVMEFCVolumeINFO = gobrick.NVMeVolumeInfo{
 		Targets: []gobrick.NVMeTargetInfo{
-			{Portal: validNVMEFCTargetInfo[0].Portal,
-				Target: validNVMEFCTargetInfo[0].Target},
-			{Portal: validNVMEFCTargetInfo[1].Portal, Target: validNVMEFCTargetInfo[1].Target}},
-		WWN: validDeviceWWN}
+			{
+				Portal: validNVMEFCTargetInfo[0].Portal,
+				Target: validNVMEFCTargetInfo[0].Target,
+			},
+			{Portal: validNVMEFCTargetInfo[1].Portal, Target: validNVMEFCTargetInfo[1].Target},
+		},
+		WWN: validDeviceWWN,
+	}
 	validGobrickFCVolumeINFO = gobrick.FCVolumeInfo{
 		Targets: []gobrick.FCTargetInfo{
 			{WWPN: validFCTargetsWWPN[0]},
-			{WWPN: validFCTargetsWWPN[1]}},
-		Lun: validLUNIDINT}
+			{WWPN: validFCTargetsWWPN[1]},
+		},
+		Lun: validLUNIDINT,
+	}
 	validGobrickDevice = gobrick.Device{Name: validDevName, WWN: validDeviceWWN, MultipathID: validDeviceWWN}
 )
 
@@ -383,14 +410,16 @@ var _ = Describe("CSINodeService", func() {
 					clientMock.On("GetHostByName", mock.Anything, mock.AnythingOfType("string")).
 						Return(gopowerstore.Host{
 							ID: "host-id",
-							Initiators: []gopowerstore.InitiatorInstance{{
-								PortName: validISCSIInitiators[0],
-								PortType: gopowerstore.InitiatorProtocolTypeEnumISCSI,
-							},
+							Initiators: []gopowerstore.InitiatorInstance{
+								{
+									PortName: validISCSIInitiators[0],
+									PortType: gopowerstore.InitiatorProtocolTypeEnumISCSI,
+								},
 								{
 									PortName: validISCSIInitiators[1],
 									PortType: gopowerstore.InitiatorProtocolTypeEnumISCSI,
-								}},
+								},
+							},
 							Name: "host-name",
 						}, nil)
 					err := nodeSvc.Init()
@@ -596,7 +625,6 @@ var _ = Describe("CSINodeService", func() {
 	})
 
 	Describe("calling nodeProbe", func() {
-
 		When("failed to get host on array", func() {
 			It("should fail", func() {
 				nodeSvc.nodeID = "some-random-text"
@@ -685,7 +713,8 @@ var _ = Describe("CSINodeService", func() {
 							{
 								PortName: validISCSIPortals[0],
 								PortType: gopowerstore.InitiatorProtocolTypeEnumISCSI,
-							}},
+							},
+						},
 						Name: "host-name",
 					}, nil)
 				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
@@ -709,7 +738,8 @@ var _ = Describe("CSINodeService", func() {
 							{
 								PortName: validISCSIPortals[0],
 								PortType: gopowerstore.InitiatorProtocolTypeEnumISCSI,
-							}},
+							},
+						},
 						Name: "host-name",
 					}, nil)
 				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
@@ -749,7 +779,8 @@ var _ = Describe("CSINodeService", func() {
 								},
 								PortName: validISCSIPortals[1],
 								PortType: gopowerstore.InitiatorProtocolTypeEnumISCSI,
-							}},
+							},
+						},
 						Name: "host-name",
 					}, nil)
 				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
@@ -789,7 +820,8 @@ var _ = Describe("CSINodeService", func() {
 								},
 								PortName: validNVMETCPPortals[1],
 								PortType: gopowerstore.InitiatorProtocolTypeEnumNVME,
-							}},
+							},
+						},
 						Name: "host-name",
 					}, nil)
 				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
@@ -812,14 +844,16 @@ var _ = Describe("CSINodeService", func() {
 				clientMock.On("GetHostByName", mock.Anything, mock.AnythingOfType("string")).Return(
 					gopowerstore.Host{
 						ID: "host-id",
-						Initiators: []gopowerstore.InitiatorInstance{{
-							PortName: validISCSIInitiators[0],
-							PortType: gopowerstore.InitiatorProtocolTypeEnumISCSI,
-						},
+						Initiators: []gopowerstore.InitiatorInstance{
+							{
+								PortName: validISCSIInitiators[0],
+								PortType: gopowerstore.InitiatorProtocolTypeEnumISCSI,
+							},
 							{
 								PortName: validISCSIInitiators[1],
 								PortType: gopowerstore.InitiatorProtocolTypeEnumISCSI,
-							}},
+							},
+						},
 						Name: "host-name",
 					}, nil)
 				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
@@ -837,14 +871,16 @@ var _ = Describe("CSINodeService", func() {
 				clientMock.On("GetHostByName", mock.Anything, mock.AnythingOfType("string")).Return(
 					gopowerstore.Host{
 						ID: "host-id",
-						Initiators: []gopowerstore.InitiatorInstance{{
-							PortName: validISCSIInitiators[0],
-							PortType: gopowerstore.InitiatorProtocolTypeEnumISCSI,
-						},
+						Initiators: []gopowerstore.InitiatorInstance{
+							{
+								PortName: validISCSIInitiators[0],
+								PortType: gopowerstore.InitiatorProtocolTypeEnumISCSI,
+							},
 							{
 								PortName: validISCSIInitiators[1],
 								PortType: gopowerstore.InitiatorProtocolTypeEnumISCSI,
-							}},
+							},
+						},
 						Name: "host-name",
 					}, nil)
 
@@ -882,7 +918,8 @@ var _ = Describe("CSINodeService", func() {
 								},
 								PortName: validFCTargetsWWPN[1],
 								PortType: gopowerstore.InitiatorProtocolTypeEnumFC,
-							}},
+							},
+						},
 						Name: "host-name",
 					}, nil)
 
@@ -1408,7 +1445,7 @@ var _ = Describe("CSINodeService", func() {
 				utilMock.On("Unmount", mock.Anything, stagingPath).Return(nil)
 
 				fsMock.On("Remove", stagingPath).Return(nil)
-				fsMock.On("WriteFile", path.Join(nodeSvc.opts.TmpDir, validBaseVolumeID), []byte(validDevName), os.FileMode(0640)).Return(nil)
+				fsMock.On("WriteFile", path.Join(nodeSvc.opts.TmpDir, validBaseVolumeID), []byte(validDevName), os.FileMode(0o640)).Return(nil)
 
 				iscsiConnectorMock.On("DisconnectVolumeByDeviceName", mock.Anything, validDevName).Return(nil)
 
@@ -1437,7 +1474,7 @@ var _ = Describe("CSINodeService", func() {
 				utilMock.On("Unmount", mock.Anything, stagingPath).Return(nil)
 
 				fsMock.On("Remove", stagingPath).Return(nil)
-				fsMock.On("WriteFile", path.Join(nodeSvc.opts.TmpDir, validBaseVolumeID), []byte(validDevName), os.FileMode(0640)).Return(nil)
+				fsMock.On("WriteFile", path.Join(nodeSvc.opts.TmpDir, validBaseVolumeID), []byte(validDevName), os.FileMode(0o640)).Return(nil)
 
 				iscsiConnectorMock.On("DisconnectVolumeByDeviceName", mock.Anything, validDevName).Return(nil)
 
@@ -1465,7 +1502,7 @@ var _ = Describe("CSINodeService", func() {
 				utilMock.On("Unmount", mock.Anything, stagingPath).Return(nil)
 
 				fsMock.On("Remove", stagingPath).Return(nil)
-				fsMock.On("WriteFile", path.Join(nodeSvc.opts.TmpDir, validBaseVolumeID), []byte(validDevName), os.FileMode(0640)).Return(nil)
+				fsMock.On("WriteFile", path.Join(nodeSvc.opts.TmpDir, validBaseVolumeID), []byte(validDevName), os.FileMode(0o640)).Return(nil)
 
 				iscsiConnectorMock.On("DisconnectVolumeByDeviceName", mock.Anything, validDevName).Return(nil)
 
@@ -1493,7 +1530,7 @@ var _ = Describe("CSINodeService", func() {
 				utilMock.On("Unmount", mock.Anything, stagingPath).Return(errors.New("failed unmount"))
 
 				fsMock.On("Remove", stagingPath).Return(nil)
-				fsMock.On("WriteFile", path.Join(nodeSvc.opts.TmpDir, validBaseVolumeID), []byte(validDevName), os.FileMode(0640)).Return(nil)
+				fsMock.On("WriteFile", path.Join(nodeSvc.opts.TmpDir, validBaseVolumeID), []byte(validDevName), os.FileMode(0o640)).Return(nil)
 
 				iscsiConnectorMock.On("DisconnectVolumeByDeviceName", mock.Anything, validDevName).Return(nil)
 
@@ -1521,7 +1558,7 @@ var _ = Describe("CSINodeService", func() {
 				utilMock.On("Unmount", mock.Anything, stagingPath).Return(nil)
 
 				fsMock.On("Remove", stagingPath).Return(nil)
-				fsMock.On("WriteFile", path.Join(nodeSvc.opts.TmpDir, validBaseVolumeID), []byte(validDevName), os.FileMode(0640)).Return(nil)
+				fsMock.On("WriteFile", path.Join(nodeSvc.opts.TmpDir, validBaseVolumeID), []byte(validDevName), os.FileMode(0o640)).Return(nil)
 
 				iscsiConnectorMock.On("DisconnectVolumeByDeviceName", mock.Anything, validDevName).Return(nil)
 
@@ -1551,7 +1588,7 @@ var _ = Describe("CSINodeService", func() {
 				utilMock.On("Unmount", mock.Anything, stagingPath).Return(nil)
 
 				fsMock.On("Remove", stagingPath).Return(nil)
-				fsMock.On("WriteFile", path.Join(nodeSvc.opts.TmpDir, validBaseVolumeID), []byte(validDevName), os.FileMode(0640)).Return(nil)
+				fsMock.On("WriteFile", path.Join(nodeSvc.opts.TmpDir, validBaseVolumeID), []byte(validDevName), os.FileMode(0o640)).Return(nil)
 
 				fcConnectorMock.On("DisconnectVolumeByDeviceName", mock.Anything, validDevName).Return(nil)
 
@@ -1582,7 +1619,7 @@ var _ = Describe("CSINodeService", func() {
 				utilMock.On("Unmount", mock.Anything, stagingPath).Return(nil)
 
 				fsMock.On("Remove", stagingPath).Return(nil)
-				fsMock.On("WriteFile", path.Join(nodeSvc.opts.TmpDir, validBaseVolumeID), []byte(validDevName), os.FileMode(0640)).Return(nil)
+				fsMock.On("WriteFile", path.Join(nodeSvc.opts.TmpDir, validBaseVolumeID), []byte(validDevName), os.FileMode(0o640)).Return(nil)
 
 				nvmeConnectorMock.On("DisconnectVolumeByDeviceName", mock.Anything, validDevName).Return(nil)
 
@@ -1620,7 +1657,7 @@ var _ = Describe("CSINodeService", func() {
 				fsMock.On("Remove", stagingPath).Return(nil).Once()
 				fsMock.On("IsNotExist", mock.Anything).Return(false)
 
-				fsMock.On("WriteFile", path.Join(nodeSvc.opts.TmpDir, validBaseVolumeID), []byte(validDevName), os.FileMode(0640)).Return(nil)
+				fsMock.On("WriteFile", path.Join(nodeSvc.opts.TmpDir, validBaseVolumeID), []byte(validDevName), os.FileMode(0o640)).Return(nil)
 
 				iscsiConnectorMock.On("DisconnectVolumeByDeviceName", mock.Anything, validDevName).Return(nil)
 
@@ -2099,7 +2136,6 @@ var _ = Describe("CSINodeService", func() {
 		})
 		When("No target path specified", func() {
 			It("should fail", func() {
-
 				res, err := nodeSvc.NodeUnpublishVolume(context.Background(), &csi.NodeUnpublishVolumeRequest{
 					VolumeId:   validBlockVolumeID,
 					TargetPath: "",
@@ -2110,7 +2146,6 @@ var _ = Describe("CSINodeService", func() {
 		})
 		When("Unable to get volID", func() {
 			It("should fail", func() {
-
 				res, err := nodeSvc.NodeUnpublishVolume(context.Background(), &csi.NodeUnpublishVolumeRequest{
 					VolumeId:   "",
 					TargetPath: validTargetPath,
@@ -2162,7 +2197,6 @@ var _ = Describe("CSINodeService", func() {
 		stagingPath := filepath.Join(validStagingPath, validBaseVolumeID)
 		When("everything is correct", func() {
 			It("should succeed [ext4]", func() {
-
 				fsMock.On("GetUtil").Return(utilMock)
 				clientMock.On("GetVolume", mock.Anything, mock.Anything).Return(gopowerstore.Volume{
 					Description: "",
@@ -2184,7 +2218,6 @@ var _ = Describe("CSINodeService", func() {
 				Ω(res).To(Equal(&csi.NodeExpandVolumeResponse{}))
 			})
 			It("should succeed [xfs]", func() {
-
 				fsMock.On("GetUtil").Return(utilMock)
 				clientMock.On("GetVolume", mock.Anything, mock.Anything).Return(gopowerstore.Volume{
 					Description: "",
@@ -2251,14 +2284,12 @@ var _ = Describe("CSINodeService", func() {
 				Ω(res).To(BeNil())
 			})
 		})
-
 	})
 
 	Describe("calling NodeExpandVolume() offline", func() {
 		stagingPath := filepath.Join(validStagingPath, validBaseVolumeID)
 		When("everything is correct", func() {
 			It("should succeed [ext4]", func() {
-
 				fsMock.On("GetUtil").Return(utilMock)
 				clientMock.On("GetVolume", mock.Anything, mock.Anything).Return(gopowerstore.Volume{
 					Description: "",
@@ -2293,7 +2324,6 @@ var _ = Describe("CSINodeService", func() {
 		})
 		When("using multipath", func() {
 			It("should succeed [ext4]", func() {
-
 				fsMock.On("GetUtil").Return(utilMock)
 				clientMock.On("GetVolume", mock.Anything, mock.Anything).Return(gopowerstore.Volume{
 					Description: "",
@@ -2329,7 +2359,6 @@ var _ = Describe("CSINodeService", func() {
 		})
 		When("using block mode", func() {
 			It("should succeed [ext4]", func() {
-
 				fsMock.On("GetUtil").Return(utilMock)
 
 				clientMock.On("GetVolume", mock.Anything, mock.Anything).Return(gopowerstore.Volume{
@@ -2364,12 +2393,10 @@ var _ = Describe("CSINodeService", func() {
 				}, nil)
 				_, err := nodeSvc.NodeExpandVolume(context.Background(), getNodeVolumeExpandValidRequest("", true))
 				Ω(err.Error()).To(ContainSubstring("incorrect volume id"))
-
 			})
 		})
 		When("no target path", func() {
 			It("should fail", func() {
-
 				fsMock.On("GetUtil").Return(utilMock)
 
 				clientMock.On("GetVolume", mock.Anything, mock.Anything).Return(gopowerstore.Volume{
@@ -2389,12 +2416,10 @@ var _ = Describe("CSINodeService", func() {
 					},
 				})
 				Ω(err.Error()).To(ContainSubstring("targetPath is required"))
-
 			})
 		})
 		When("volume is not found", func() {
 			It("should fail", func() {
-
 				fsMock.On("GetUtil").Return(utilMock)
 
 				clientMock.On("GetVolume", mock.Anything, mock.Anything).Return(gopowerstore.Volume{
@@ -2414,12 +2439,10 @@ var _ = Describe("CSINodeService", func() {
 					},
 				})
 				Ω(err.Error()).To(ContainSubstring("Volume not found"))
-
 			})
 		})
 		When("Unable to create mount target", func() {
 			It("should fail", func() {
-
 				fsMock.On("GetUtil").Return(utilMock)
 				clientMock.On("GetVolume", mock.Anything, mock.Anything).Return(gopowerstore.Volume{
 					Description: "",
@@ -2435,12 +2458,10 @@ var _ = Describe("CSINodeService", func() {
 				fsMock.On("MkdirAll", mock.Anything, mock.Anything).Return(errors.New("Unable to create dirs"))
 				_, err := nodeSvc.NodeExpandVolume(context.Background(), getNodeVolumeExpandValidRequest(validBlockVolumeID, false))
 				Ω(err.Error()).To(ContainSubstring("Failed to find mount info for"))
-
 			})
 		})
 		When("Unable to perform mount", func() {
 			It("should fail", func() {
-
 				fsMock.On("GetUtil").Return(utilMock)
 				clientMock.On("GetVolume", mock.Anything, mock.Anything).Return(gopowerstore.Volume{
 					Description: "",
@@ -2457,12 +2478,10 @@ var _ = Describe("CSINodeService", func() {
 				utilMock.On("Mount", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(errors.New("bad mount"))
 				_, err := nodeSvc.NodeExpandVolume(context.Background(), getNodeVolumeExpandValidRequest(validBlockVolumeID, false))
 				Ω(err.Error()).To(ContainSubstring("Failed to find mount info for"))
-
 			})
 		})
 		When("Unable to perform unmount", func() {
 			It("should succeed", func() {
-
 				fsMock.On("GetUtil").Return(utilMock)
 				clientMock.On("GetVolume", mock.Anything, mock.Anything).Return(gopowerstore.Volume{
 					Description: "",
@@ -2494,12 +2513,10 @@ var _ = Describe("CSINodeService", func() {
 				res, err := nodeSvc.NodeExpandVolume(context.Background(), getNodeVolumeExpandValidRequest(validBlockVolumeID, false))
 				Ω(err).To(BeNil())
 				Ω(res).To(Equal(&csi.NodeExpandVolumeResponse{}))
-
 			})
 		})
 		When("Unable to find mount info", func() {
 			It("should fail", func() {
-
 				fsMock.On("GetUtil").Return(utilMock)
 				clientMock.On("GetVolume", mock.Anything, mock.Anything).Return(gopowerstore.Volume{
 					Description: "",
@@ -2525,12 +2542,10 @@ var _ = Describe("CSINodeService", func() {
 
 				_, err := nodeSvc.NodeExpandVolume(context.Background(), getNodeVolumeExpandValidRequest(validBlockVolumeID, false))
 				Ω(err.Error()).To(ContainSubstring("Failed to find mount info for"))
-
 			})
 		})
 		When("Unable to rescan the device", func() {
 			It("should fail", func() {
-
 				fsMock.On("GetUtil").Return(utilMock)
 				clientMock.On("GetVolume", mock.Anything, mock.Anything).Return(gopowerstore.Volume{
 					Description: "",
@@ -2556,12 +2571,10 @@ var _ = Describe("CSINodeService", func() {
 				utilMock.On("DeviceRescan", mock.Anything, mock.Anything).Return(errors.New("Failed to rescan device"))
 				_, err := nodeSvc.NodeExpandVolume(context.Background(), getNodeVolumeExpandValidRequest(validBlockVolumeID, false))
 				Ω(err.Error()).To(ContainSubstring("Failed to rescan device"))
-
 			})
 		})
 		When("Unable to resize mpath", func() {
 			It("should fail", func() {
-
 				fsMock.On("GetUtil").Return(utilMock)
 				clientMock.On("GetVolume", mock.Anything, mock.Anything).Return(gopowerstore.Volume{
 					Description: "",
@@ -2588,7 +2601,6 @@ var _ = Describe("CSINodeService", func() {
 				utilMock.On("ResizeMultipath", mock.Anything, mock.Anything).Return(errors.New("mpath resize error"))
 				_, err := nodeSvc.NodeExpandVolume(context.Background(), getNodeVolumeExpandValidRequest(validBlockVolumeID, false))
 				Ω(err.Error()).To(ContainSubstring("mpath resize error"))
-
 			})
 		})
 	})
@@ -2664,7 +2676,8 @@ var _ = Describe("CSINodeService", func() {
 					VolumeCapabilities: []*csi.VolumeCapability{capabilities},
 					Parameters: map[string]string{
 						"csi.storage.k8s.io/ephemeral": "true",
-						"size":                         "2Gi"},
+						"size":                         "2Gi",
+					},
 				}).Return(&csi.CreateVolumeResponse{
 					Volume: &csi.Volume{
 						CapacityBytes: validVolSize,
@@ -2994,7 +3007,7 @@ var _ = Describe("CSINodeService", func() {
 				utilMock.On("Unmount", mock.Anything, mock.Anything).Return(nil)
 
 				fsMock.On("Remove", mock.Anything).Return(nil)
-				fsMock.On("WriteFile", mock.Anything, mock.Anything, os.FileMode(0640)).Return(nil)
+				fsMock.On("WriteFile", mock.Anything, mock.Anything, os.FileMode(0o640)).Return(nil)
 
 				iscsiConnectorMock.On("DisconnectVolumeByDeviceName", mock.Anything, mock.Anything).Return(nil)
 
@@ -3057,7 +3070,7 @@ var _ = Describe("CSINodeService", func() {
 				utilMock.On("Unmount", mock.Anything, mock.Anything).Return(nil)
 
 				fsMock.On("Remove", mock.Anything).Return(nil)
-				fsMock.On("WriteFile", mock.Anything, mock.Anything, os.FileMode(0640)).Return(nil)
+				fsMock.On("WriteFile", mock.Anything, mock.Anything, os.FileMode(0o640)).Return(nil)
 
 				iscsiConnectorMock.On("DisconnectVolumeByDeviceName", mock.Anything, mock.Anything).Return(nil)
 
@@ -3096,7 +3109,7 @@ var _ = Describe("CSINodeService", func() {
 				utilMock.On("Unmount", mock.Anything, mock.Anything).Return(nil)
 
 				fsMock.On("Remove", mock.Anything).Return(nil)
-				fsMock.On("WriteFile", mock.Anything, mock.Anything, os.FileMode(0640)).Return(nil)
+				fsMock.On("WriteFile", mock.Anything, mock.Anything, os.FileMode(0o640)).Return(nil)
 
 				iscsiConnectorMock.On("DisconnectVolumeByDeviceName", mock.Anything, mock.Anything).Return(nil)
 
@@ -3398,7 +3411,8 @@ var _ = Describe("CSINodeService", func() {
 								},
 								PortName: validFCTargetsWWPN[1],
 								PortType: gopowerstore.InitiatorProtocolTypeEnumFC,
-							}},
+							},
+						},
 						Name: "host-name",
 					}, nil)
 				setDefaultNodeLabelsRetrieverMock()
@@ -3450,7 +3464,8 @@ var _ = Describe("CSINodeService", func() {
 									},
 									PortName: validFCTargetsWWPN[1],
 									PortType: gopowerstore.InitiatorProtocolTypeEnumFC,
-								}},
+								},
+							},
 							Name: "host-name",
 						}, nil)
 					setDefaultNodeLabelsRetrieverMock()
@@ -3502,7 +3517,8 @@ var _ = Describe("CSINodeService", func() {
 										},
 										PortName: validFCTargetsWWPN[1],
 										PortType: gopowerstore.InitiatorProtocolTypeEnumFC,
-									}},
+									},
+								},
 								Name: "host-name",
 							}, nil)
 						setDefaultNodeLabelsRetrieverMock()
@@ -3601,7 +3617,8 @@ var _ = Describe("CSINodeService", func() {
 								{
 									PortName: validFCTargetsWWPN[1],
 									PortType: gopowerstore.InitiatorProtocolTypeEnumFC,
-								}},
+								},
+							},
 							Name: "host-name",
 						}, nil)
 					setDefaultNodeLabelsRetrieverMock()
@@ -3846,11 +3863,12 @@ var _ = Describe("CSINodeService", func() {
 			Ω(err).To(BeNil())
 			Ω(res).To(Equal(&csi.NodeGetCapabilitiesResponse{
 				Capabilities: []*csi.NodeServiceCapability{
-					{Type: &csi.NodeServiceCapability_Rpc{
-						Rpc: &csi.NodeServiceCapability_RPC{
-							Type: csi.NodeServiceCapability_RPC_STAGE_UNSTAGE_VOLUME,
+					{
+						Type: &csi.NodeServiceCapability_Rpc{
+							Rpc: &csi.NodeServiceCapability_RPC{
+								Type: csi.NodeServiceCapability_RPC_STAGE_UNSTAGE_VOLUME,
+							},
 						},
-					},
 					},
 					{
 						Type: &csi.NodeServiceCapability_Rpc{
@@ -3894,7 +3912,8 @@ var _ = Describe("CSINodeService", func() {
 				iinit, fcinit, nvmeinit, err := nodeSvc.getInitiators()
 				Ω(iinit).To(Equal([]string{
 					"iqn.1994-05.com.redhat:4db86abbe3c",
-					"iqn.1994-05.com.redhat:2950c9ca441b"}))
+					"iqn.1994-05.com.redhat:2950c9ca441b",
+				}))
 				Ω(nvmeinit).To(Equal([]string{}))
 				Ω(fcinit).To(BeNil())
 				Ω(err).To(BeNil())
@@ -3908,7 +3927,8 @@ var _ = Describe("CSINodeService", func() {
 				iinit, fcinit, nvmeinit, err := nodeSvc.getInitiators()
 				Ω(nvmeinit).To(Equal([]string{
 					"nqn.2014-08.org.nvmexpress:uuid:02a08600-57d6-4089-8736-bf1f7326990e",
-					"nqn.2014-08.org.nvmexpress:uuid:fa363a22-1c74-44f3-9932-1c35d5cf5c4d"}))
+					"nqn.2014-08.org.nvmexpress:uuid:fa363a22-1c74-44f3-9932-1c35d5cf5c4d",
+				}))
 				Ω(iinit).To(Equal([]string{}))
 				Ω(fcinit).To(BeNil())
 				Ω(err).To(BeNil())
@@ -3922,13 +3942,16 @@ var _ = Describe("CSINodeService", func() {
 				iinit, fcinit, nvmeinit, err := nodeSvc.getInitiators()
 				Ω(iinit).To(Equal([]string{
 					"iqn.1994-05.com.redhat:4db86abbe3c",
-					"iqn.1994-05.com.redhat:2950c9ca441b"}))
+					"iqn.1994-05.com.redhat:2950c9ca441b",
+				}))
 				Ω(nvmeinit).To(Equal([]string{
 					"nqn.2014-08.org.nvmexpress:uuid:02a08600-57d6-4089-8736-bf1f7326990e",
-					"nqn.2014-08.org.nvmexpress:uuid:fa363a22-1c74-44f3-9932-1c35d5cf5c4d"}))
+					"nqn.2014-08.org.nvmexpress:uuid:fa363a22-1c74-44f3-9932-1c35d5cf5c4d",
+				}))
 				Ω(fcinit).To(Equal([]string{
 					"58:cc:f0:93:48:a0:03:a3",
-					"58:cc:f0:93:48:a0:02:a3"}))
+					"58:cc:f0:93:48:a0:02:a3",
+				}))
 				Ω(err).To(BeNil())
 			})
 		})
@@ -3954,7 +3977,8 @@ var _ = Describe("CSINodeService", func() {
 				Ω(nvmeinit).To(Equal([]string{}))
 				Ω(fcinit).To(Equal([]string{
 					"58:cc:f0:93:48:a0:03:a3",
-					"58:cc:f0:93:48:a0:02:a3"}))
+					"58:cc:f0:93:48:a0:02:a3",
+				}))
 				Ω(err).To(BeNil())
 			})
 		})
@@ -4024,7 +4048,6 @@ func TestGetNodeOptions(t *testing.T) {
 		csictx.Setenv(context.Background(), common.EnvFCPortsFilterFilePath, "")
 		csictx.Setenv(context.Background(), common.EnvEnableCHAP, "")
 		getNodeOptions()
-
 	})
 }
 

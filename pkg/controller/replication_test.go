@@ -283,7 +283,6 @@ var _ = Describe("Replication", func() {
 
 		When("GlobalID is missing", func() {
 			It("should fail", func() {
-
 				req := new(csiext.GetStorageProtectionGroupStatusRequest)
 				res, err := ctrlSvc.GetStorageProtectionGroupStatus(context.Background(), req)
 
@@ -297,7 +296,6 @@ var _ = Describe("Replication", func() {
 
 		When("Array with specified globalID couldn't be found", func() {
 			It("should fail", func() {
-
 				req := new(csiext.GetStorageProtectionGroupStatusRequest)
 				params := make(map[string]string)
 				params["globalID"] = "SOMETHING WRONG"
@@ -353,7 +351,6 @@ var _ = Describe("Replication", func() {
 				err := controller.ExecuteAction(&session, clientMock, action, &failoverParams)
 
 				Expect(err).To(BeNil())
-
 			})
 		})
 
@@ -380,7 +377,6 @@ var _ = Describe("Replication", func() {
 				Expect(err).ToNot(BeNil())
 				Expect(err.Error()).To(
 					ContainSubstring("Execute action: RS (test) is still executing previous action"))
-
 			})
 		})
 
@@ -393,9 +389,7 @@ var _ = Describe("Replication", func() {
 				err := controller.ExecuteAction(&session, clientMock, action, &failoverParams)
 
 				Expect(err).To(BeNil())
-
 			})
-
 		})
 
 		Describe("calling DeleteLocalVolume()", func() {
@@ -412,7 +406,6 @@ var _ = Describe("Replication", func() {
 			})
 			When("Array with specified globalID couldn't be found", func() {
 				It("should fail", func() {
-
 					req := new(csiext.DeleteLocalVolumeRequest)
 					handle := "valid-id/SOMETHING-WRONG/iscsi"
 					req.VolumeHandle = handle
@@ -426,7 +419,6 @@ var _ = Describe("Replication", func() {
 			})
 			When("the volume cannot be found on the powerstore array", func() {
 				It("should fail with 'not found'", func() {
-
 					// GetVolume should return a NotFound error.
 					clientMock.On("GetVolume", mock.Anything, validBaseVolID).Return(
 						gopowerstore.Volume{}, gopowerstore.WrapErr(gopowerstore.NewNotFoundError()),
@@ -475,7 +467,6 @@ var _ = Describe("Replication", func() {
 			})
 			When("Array with specified globalID couldn't be found", func() {
 				It("should fail", func() {
-
 					req := new(csiext.DeleteStorageProtectionGroupRequest)
 					params := make(map[string]string)
 					params["globalID"] = "SOMETHING WRONG"
@@ -696,7 +687,7 @@ var _ = Describe("Replication", func() {
 				It("should pass", func() {
 					context := context.Background()
 					req := new(csiext.GetReplicationCapabilityRequest)
-					var rep = new(csiext.GetReplicationCapabilityResponse)
+					rep := new(csiext.GetReplicationCapabilityResponse)
 					rep.Capabilities = []*csiext.ReplicationCapability{
 						{
 							Type: &csiext.ReplicationCapability_Rpc{
@@ -769,7 +760,6 @@ var _ = Describe("Replication", func() {
 					res, err := ctrlSvc.GetReplicationCapabilities(context, req)
 					Expect(err).To(BeNil())
 					Expect(res).To(Equal(rep))
-
 				})
 			})
 		})
@@ -777,7 +767,6 @@ var _ = Describe("Replication", func() {
 		Describe("calling ExecuteAction()", func() {
 			When("action is unknown", func() {
 				It("should fail", func() {
-
 					action := &csiext.Action{
 						ActionTypes: csiext.ActionTypes_UNKNOWN_ACTION,
 					}
@@ -793,12 +782,10 @@ var _ = Describe("Replication", func() {
 					}
 					_, err := ctrlSvc.ExecuteAction(context.Background(), req)
 					Expect(err).NotTo(BeNil())
-
 				})
 			})
 			When("Array can't be found", func() {
 				It("should fail", func() {
-
 					action := &csiext.Action{
 						ActionTypes: csiext.ActionTypes_FAILOVER_REMOTE,
 					}
@@ -821,12 +808,10 @@ var _ = Describe("Replication", func() {
 					Expect(err).NotTo(BeNil())
 					Expect(err.Error()).To(
 						ContainSubstring("can't find array with global id "))
-
 				})
 			})
 			When("the action is not supported", func() {
 				It("should fail", func() {
-
 					action := &csiext.Action{
 						ActionTypes: csiext.ActionTypes_UNKNOWN_ACTION,
 					}
@@ -848,13 +833,11 @@ var _ = Describe("Replication", func() {
 					Expect(err).NotTo(BeNil())
 					Expect(err.Error()).To(
 						ContainSubstring("The requested action does not match with supported actions"))
-
 				})
 			})
 
 			When("the replication session is executing previous action. the action type is unplanned failover local", func() {
 				It("should fail", func() {
-
 					action := &csiext.Action{
 						ActionTypes: csiext.ActionTypes_UNPLANNED_FAILOVER_LOCAL,
 					}
@@ -879,12 +862,10 @@ var _ = Describe("Replication", func() {
 					Expect(err).NotTo(BeNil())
 					Expect(err.Error()).To(
 						ContainSubstring("Execute action: RS (test) is still executing previous action"))
-
 				})
 			})
 			When("the action type is suspend", func() {
 				It("pass", func() {
-
 					action := &csiext.Action{
 						ActionTypes: csiext.ActionTypes_SUSPEND,
 					}
@@ -907,12 +888,10 @@ var _ = Describe("Replication", func() {
 					_, err := ctrlSvc.ExecuteAction(context.Background(), req)
 
 					Expect(err).To(BeNil())
-
 				})
 			})
 			When("the replication session is executing previous action. the action type is failover remote.", func() {
 				It("should fail", func() {
-
 					action := &csiext.Action{
 						ActionTypes: csiext.ActionTypes_FAILOVER_REMOTE,
 					}
@@ -937,12 +916,10 @@ var _ = Describe("Replication", func() {
 					Expect(err).NotTo(BeNil())
 					Expect(err.Error()).To(
 						ContainSubstring("Execute action: RS (test) is still executing previous action"))
-
 				})
 			})
 			When("the replication session can't be modified due to sync action type.", func() {
 				It("should fail", func() {
-
 					action := &csiext.Action{
 						ActionTypes: csiext.ActionTypes_SYNC,
 					}
@@ -967,12 +944,10 @@ var _ = Describe("Replication", func() {
 					Expect(err).NotTo(BeNil())
 					Expect(err.Error()).To(
 						ContainSubstring("Execute action: Failed to modify RS (test) - Error ()"))
-
 				})
 			})
 			When("the action type is resume", func() {
 				It("should pass", func() {
-
 					action := &csiext.Action{
 						ActionTypes: csiext.ActionTypes_RESUME,
 					}
@@ -995,12 +970,10 @@ var _ = Describe("Replication", func() {
 					_, err := ctrlSvc.ExecuteAction(context.Background(), req)
 
 					Expect(err).To(BeNil())
-
 				})
 			})
 			When("the action type is sync", func() {
 				It("should pass", func() {
-
 					action := &csiext.Action{
 						ActionTypes: csiext.ActionTypes_SYNC,
 					}
@@ -1023,12 +996,10 @@ var _ = Describe("Replication", func() {
 					_, err := ctrlSvc.ExecuteAction(context.Background(), req)
 
 					Expect(err).To(BeNil())
-
 				})
 			})
 			When("the action type is reprotect local", func() {
 				It("should pass", func() {
-
 					action := &csiext.Action{
 						ActionTypes: csiext.ActionTypes_REPROTECT_LOCAL,
 					}
@@ -1051,11 +1022,8 @@ var _ = Describe("Replication", func() {
 					_, err := ctrlSvc.ExecuteAction(context.Background(), req)
 
 					Expect(err).To(BeNil())
-
 				})
 			})
-
 		})
-
 	})
 })

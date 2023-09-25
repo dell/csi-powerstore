@@ -43,12 +43,12 @@ type VolumePublisher interface {
 }
 
 // SCSIPublisher implementation of VolumePublisher for SCSI based (FC, iSCSI) volumes
-type SCSIPublisher struct {
-}
+type SCSIPublisher struct{}
 
 // Publish publishes Volume by attaching it to the host
 func (s *SCSIPublisher) Publish(ctx context.Context, req *csi.ControllerPublishVolumeRequest, client gopowerstore.Client,
-	kubeNodeID string, volumeID string) (*csi.ControllerPublishVolumeResponse, error) {
+	kubeNodeID string, volumeID string,
+) (*csi.ControllerPublishVolumeResponse, error) {
 	volume, err := client.GetVolume(ctx, volumeID)
 	if err != nil {
 		if apiError, ok := err.(gopowerstore.APIError); ok && apiError.NotFound() {
@@ -99,7 +99,8 @@ func (s *SCSIPublisher) Publish(ctx context.Context, req *csi.ControllerPublishV
 			log.Debug("Volume already mapped")
 			s.addLUNIDToPublishContext(publishContext, m, volume)
 			return &csi.ControllerPublishVolumeResponse{
-				PublishContext: publishContext}, nil
+				PublishContext: publishContext,
+			}, nil
 		}
 	}
 
@@ -158,13 +159,15 @@ func (s *SCSIPublisher) CheckIfVolumeExists(ctx context.Context, client gopowers
 func (s *SCSIPublisher) addLUNIDToPublishContext(
 	publishContext map[string]string,
 	mapping gopowerstore.HostVolumeMapping,
-	volume gopowerstore.Volume) {
+	volume gopowerstore.Volume,
+) {
 	publishContext[common.PublishContextDeviceWWN] = strings.TrimPrefix(volume.Wwn, common.WWNPrefix)
 	publishContext[common.PublishContextLUNAddress] = strconv.FormatInt(mapping.LogicalUnitNumber, 10)
 }
 
 func (s *SCSIPublisher) addTargetsInfoToPublishContext(
-	publishContext map[string]string, volumeApplianceID string, client gopowerstore.Client) error {
+	publishContext map[string]string, volumeApplianceID string, client gopowerstore.Client,
+) error {
 	iscsiTargetsInfo, err := common.GetISCSITargetsInfoFromStorage(client, volumeApplianceID)
 	if err != nil {
 		log.Error("error unable to get iSCSI targets from array", err)
@@ -205,7 +208,8 @@ type NfsPublisher struct {
 
 // Publish publishes FileSystem by adding host (node) to the NFS Export 'hosts' list
 func (n *NfsPublisher) Publish(ctx context.Context, req *csi.ControllerPublishVolumeRequest, client gopowerstore.Client,
-	kubeNodeID string, volumeID string) (*csi.ControllerPublishVolumeResponse, error) {
+	kubeNodeID string, volumeID string,
+) (*csi.ControllerPublishVolumeResponse, error) {
 	fs, err := client.GetFS(ctx, volumeID)
 	if err != nil {
 		if apiError, ok := err.(gopowerstore.APIError); ok && apiError.NotFound() {

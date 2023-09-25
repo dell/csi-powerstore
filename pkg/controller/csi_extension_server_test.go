@@ -81,7 +81,6 @@ var _ = Describe("csi-extension-server", func() {
 
 		When("neither arrayId nor volId is present in the request body ", func() {
 			It("should not return error", func() {
-
 				req := &podmon.ValidateVolumeHostConnectivityRequest{
 					NodeId: "csi-node-003c684ccb0c4ca0a9c99423563dfd2c-127.0.0.1",
 				}
@@ -93,7 +92,6 @@ var _ = Describe("csi-extension-server", func() {
 
 		When("Invalid nodeID is sent in the request body ", func() {
 			It("should return error", func() {
-
 				req := &podmon.ValidateVolumeHostConnectivityRequest{
 					NodeId: "csi-node-003c684ccb0c4ca0a9c99423563dfd2c-@@@",
 				}
