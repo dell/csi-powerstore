@@ -9,13 +9,15 @@
 #  http://www.apache.org/licenses/LICENSE-2.0
 
 SCRIPTDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
-DRIVERDIR="${SCRIPTDIR}/../helm"
+DRIVERDIR="${SCRIPTDIR}/../"
+HELMCHARTVERSION="csi-powerstore-2.8.0"
+DRIVER="csi-powerstore"
 VERIFYSCRIPT="${SCRIPTDIR}/verify.sh"
 PROG="${0}"
 NODE_VERIFY=1
 VERIFY=1
 MODE="install"
-DEFAULT_DRIVER_VERSION="v2.7.0"
+DEFAULT_DRIVER_VERSION="v2.8.0"
 WATCHLIST=""
 
 # export the name of the debug log, so child processes will see it
@@ -44,6 +46,7 @@ function usage() {
   decho "  --release[=]<helm release>               Name to register with helm, default value will match the driver name"
   decho "  --upgrade                                Perform an upgrade of the specified driver, default is false"
   decho "  --version                                Use this version for CSI Driver Image"
+  decho "  --helm-charts-version                    Pass the helm chart version "
   decho "  --node-verify-user[=]<username>          Username to SSH to worker nodes as, used to validate node requirements. Default is root"
   decho "  --skip-verify                            Skip the kubernetes configuration verification to use the CSI driver, default will run verification"
   decho "  --skip-verify-node                       Skip worker node verification checks"
@@ -100,13 +103,6 @@ function validate_params() {
   # make sure the driver was specified
   if [ -z "${DRIVER}" ]; then
     decho "No driver specified"
-    usage
-    exit 1
-  fi
-  # make sure the driver name is valid
-  if [[ ! "${VALIDDRIVERS[@]}" =~ "${DRIVER}" ]]; then
-    decho "Driver: ${DRIVER} is invalid."
-    decho "Valid options are: ${VALIDDRIVERS[@]}"
     usage
     exit 1
   fi
@@ -293,11 +289,6 @@ VERIFYOPTS=""
 ASSUMEYES="false"
 
 # get the list of valid CSI Drivers, this will be the list of directories in drivers/ that contain helm charts
-get_drivers "${DRIVERDIR}"
-# if only one driver was found, set the DRIVER to that one
-if [ ${#VALIDDRIVERS[@]} -eq 1 ]; then
-  DRIVER="${VALIDDRIVERS[0]}"
-fi
 
 while getopts ":h-:" optchar; do
   case "${optchar}" in
@@ -338,6 +329,10 @@ while getopts ":h-:" optchar; do
     release=*)
       RELEASE=${OPTARG#*=}
       ;;
+    helm-charts-version)
+      HELMCHARTVERSION="${!OPTIND}"
+      OPTIND=$((OPTIND + 1))
+      ;;
       # VALUES
     values)
       VALUES="${!OPTIND}"
@@ -372,7 +367,19 @@ while getopts ":h-:" optchar; do
   esac
 done
 
-# by default the NAME of the helm release of the driver is the same as the driver name
+if [ ! -d "$DRIVERDIR/helm-charts" ]; then
+  
+  if  [ ! -d "$SCRIPTDIR/helm-charts" ]; then
+    git clone --quiet -c advice.detachedHead=false -b $HELMCHARTVERSION https://github.com/dell/helm-charts
+  fi
+  mv helm-charts $DRIVERDIR
+else 
+  if [  -d "$SCRIPTDIR/helm-charts" ]; then
+    rm -rf $SCRIPTDIR/helm-charts
+  fi
+fi
+DRIVERDIR="${SCRIPTDIR}/../helm-charts/charts"
+
 RELEASE=$(get_release_name "${DRIVER}")
 # by default, NODEUSER is root
 NODEUSER="${NODEUSER:-root}"
@@ -395,12 +402,12 @@ helm --help >&/dev/null || {
 OPENSHIFT=$(isOpenShift)
 
 # Get the kubernetes major and minor version numbers.
-kMajorVersion=$(run_command kubectl version | grep 'Server Version' | sed -e 's/^.*Major:"//' -e 's/[^0-9].*//g')
-kMinorVersion=$(run_command kubectl version | grep 'Server Version' | sed -e 's/^.*Minor:"//' -e 's/[^0-9].*//g')
+kMajorVersion=$(run_command kubectl version | grep 'Server Version' | sed -E 's/.*v([0-9]+)\.[0-9]+\.[0-9]+.*/\1/')
+kMinorVersion=$(run_command kubectl version | grep 'Server Version' |  sed -E 's/.*v[0-9]+\.([0-9]+)\.[0-9]+.*/\1/')
 
 # validate the parameters passed in
-validate_params "${MODE}"
 
+validate_params "${MODE}"
 header
 check_for_driver "${MODE}"
 verify_kubernetes

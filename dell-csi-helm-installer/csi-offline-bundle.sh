@@ -24,6 +24,7 @@ usage() {
    echo "               Supply the registry name/path which will hold the images"
    echo "               For example: my.registry.com:5000/dell/csi"
    echo "-h             Displays this information"
+   echo "-v             Pass the helm chart version "
    echo
    echo "Exactly one of '-c' or '-p' needs to be specified"
    echo
@@ -138,7 +139,13 @@ copy_files() {
   status "Copying necessary files"
   for f in ${REQUIRED_FILES[@]}; do
     echo " ${f}"
-    cp -R "${f}" "${DISTDIR}"
+    if [[ ${f} == *$DRIVER ]]; then
+      mkdir -p ${DISTDIR}/helm-charts/charts
+      cp -R "${f}" "${DISTDIR}/helm-charts/charts"
+    else
+      cp -R "${f}" "${DISTDIR}"
+    fi
+    
     if [ $? -ne 0 ]; then
       echo "Unable to copy ${f} to the distribution directory"
       exit 1
@@ -193,7 +200,7 @@ copy_helm_dir() {
   fi
 
   mkdir -p "${HELMBACKUPDIR}"
-  cp -R "${HELMDIR}"/* "${HELMBACKUPDIR}"
+  cp -R "${HELMDIR}/../.."/* "${HELMBACKUPDIR}"
 }
 
 # set_mode
@@ -218,11 +225,57 @@ set_mode() {
 CREATE="false"
 PREPARE="false"
 REGISTRY=""
+DRIVER="csi-powerstore"
+HELMCHARTVERSION="csi-powerstore-2.8.0"
+
+while getopts "cprv:h" opt; do
+  case $opt in
+    
+    c)
+      CREATE="true"
+      ;;
+    p)
+      PREPARE="true"
+      ;;
+    r)
+      REGISTRY="${!OPTIND}"
+      OPTIND=$((OPTIND + 1))
+      ;;
+    v)
+      HELMCHARTVERSION="${OPTARG}"
+      ;;
+    h)
+      usage
+      exit 0
+      ;;
+    \?)
+      echo "Invalid option: -$OPTARG" >&2
+      exit 1
+      ;;
+    :)
+      echo "Option -$OPTARG requires an argument." >&2
+      exit 1
+      ;;
+  esac
+done
+
 
 # some directories
 SCRIPTDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 REPODIR="$( dirname "${SCRIPTDIR}" )"
-HELMDIR="${REPODIR}/helm"
+if [ ! -d "$REPODIR/helm-charts" ]; then
+  
+  if  [ ! -d "$SCRIPTDIR/helm-charts" ]; then
+    git clone --quiet -c advice.detachedHead=false -b $HELMCHARTVERSION https://github.com/dell/helm-charts
+  fi
+  mv helm-charts $REPODIR
+else 
+  if [  -d "$SCRIPTDIR/helm-charts" ]; then
+    rm -rf $SCRIPTDIR/helm-charts
+  fi
+fi
+
+HELMDIR="${REPODIR}/helm-charts/charts/$DRIVER"
 HELMBACKUPDIR="${REPODIR}/helm-original"
 
 # mode we are using for install, "helm" or "operator"
@@ -233,7 +286,7 @@ if [ "${MODE}" == "helm" ]; then
   CHARTFILE=$(find "${HELMDIR}" -maxdepth 2 -type f -name Chart.yaml)
   VALUESFILE=$(find "${HELMDIR}" -maxdepth 2 -type f -name values.yaml)
 
-  # some output files
+   # some output files
   DRIVERNAME=$(grep -oh "^name:\s.*" "${CHARTFILE}" | awk '{print $2}')
   DRIVERNAME=${DRIVERNAME:-"dell-csi-driver"}
   DRIVERVERSION=$(grep -oh "^version:\s.*" "${CHARTFILE}" | awk '{print $2}' | sed -e 's/^"//' -e 's/"$//')
@@ -285,32 +338,6 @@ else
     "${REPODIR}/LICENSE"
   )
 fi
-
-while getopts "cpr:h" opt; do
-  case $opt in
-    c)
-      CREATE="true"
-      ;;
-    p)
-      PREPARE="true"
-      ;;
-    r)
-      REGISTRY="${OPTARG}"
-      ;;
-    h)
-      usage
-      exit 0
-      ;;
-    \?)
-      echo "Invalid option: -$OPTARG" >&2
-      exit 1
-      ;;
-    :)
-      echo "Option -$OPTARG requires an argument." >&2
-      exit 1
-      ;;
-  esac
-done
 
 # make sure exatly one option for create/prepare was specified
 if [ "${CREATE}" == "${PREPARE}" ]; then
