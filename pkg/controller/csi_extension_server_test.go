@@ -127,7 +127,7 @@ var _ = Describe("csi-extension-server", func() {
 				})
 
 				fmt.Printf("Starting server at port 9028\n")
-				go http.ListenAndServe(":9028", nil)
+				go http.ListenAndServe(":9028", nil) // #nosec G114
 
 				response, err := ctrlSvc.ValidateVolumeHostConnectivity(context.Background(), req)
 				Expect(err).To(BeNil())
@@ -301,7 +301,7 @@ var _ = Describe("csi-extension-server", func() {
 					w.Write(input)
 				})
 
-				server := &http.Server{Addr: ":49154"}
+				server := &http.Server{Addr: ":49154"} // #nosec G112
 				fmt.Printf("Starting server at port 49154 \n")
 				go func() {
 					err := server.ListenAndServe()
@@ -328,7 +328,7 @@ var _ = Describe("csi-extension-server", func() {
 					w.Write(input)
 				})
 
-				server := &http.Server{Addr: ":49153"}
+				server := &http.Server{Addr: ":49153"} // #nosec G112
 				fmt.Printf("Starting server at port 49153 \n")
 				go func() {
 					err := server.ListenAndServe()
@@ -358,7 +358,7 @@ var _ = Describe("csi-extension-server", func() {
 				http.HandleFunc("/array/id4", func(w http.ResponseWriter, r *http.Request) {
 					w.Write([]byte("invalid type response"))
 				})
-				server := &http.Server{Addr: ":49152"}
+				server := &http.Server{Addr: ":49152"} // #nosec G112
 				fmt.Printf("Starting server at port 49152 \n")
 				go func() {
 					err := server.ListenAndServe()

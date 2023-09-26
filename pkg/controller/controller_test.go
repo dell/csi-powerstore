@@ -2962,7 +2962,7 @@ var _ = Describe("CSIControllerService", func() {
 
 		When("using wrong token", func() {
 			It("should fail [not parsable]", func() {
-				token := "as!512$25%!_"
+				token := "as!512$25%!_" // #nosec G101
 				req := &csi.ListVolumesRequest{
 					MaxEntries:    1,
 					StartingToken: token,
@@ -3103,7 +3103,7 @@ var _ = Describe("CSIControllerService", func() {
 
 		When("using wrong token", func() {
 			It("should fail [not parsable]", func() {
-				token := "as!512$25%!_"
+				token := "as!512$25%!_" // #nosec G101
 				req := &csi.ListSnapshotsRequest{
 					MaxEntries:    1,
 					StartingToken: token,
