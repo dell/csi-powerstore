@@ -45,7 +45,7 @@ type Service struct {
 }
 
 // GetPluginInfo returns general information about plugin (driver) such as name, version and manifest
-func (s Service) GetPluginInfo(context context.Context, request *csi.GetPluginInfoRequest) (*csi.GetPluginInfoResponse, error) {
+func (s Service) GetPluginInfo(_ context.Context, _ *csi.GetPluginInfoRequest) (*csi.GetPluginInfoResponse, error) {
 	return &csi.GetPluginInfoResponse{
 		Name:          s.name,
 		VendorVersion: s.version,
@@ -54,7 +54,7 @@ func (s Service) GetPluginInfo(context context.Context, request *csi.GetPluginIn
 }
 
 // GetPluginCapabilities returns capabilities that are supported by the driver
-func (s Service) GetPluginCapabilities(context context.Context, request *csi.GetPluginCapabilitiesRequest) (*csi.GetPluginCapabilitiesResponse, error) {
+func (s Service) GetPluginCapabilities(_ context.Context, _ *csi.GetPluginCapabilitiesRequest) (*csi.GetPluginCapabilitiesResponse, error) {
 	var rep csi.GetPluginCapabilitiesResponse
 	rep.Capabilities = []*csi.PluginCapability{
 		{

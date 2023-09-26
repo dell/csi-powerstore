@@ -76,7 +76,7 @@ func (s *Service) apiRouter(ctx context.Context) {
 }
 
 // connectivityStatus handler returns array connectivity status
-func connectivityStatus(w http.ResponseWriter, r *http.Request) {
+func connectivityStatus(w http.ResponseWriter, _ *http.Request) {
 	log.Infof("connectivityStatus called, status is %v \n", probeStatus)
 	// w.Header().Set("Content-Type", "application/json")
 	if probeStatus == nil {

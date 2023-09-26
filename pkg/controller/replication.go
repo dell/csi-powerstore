@@ -231,7 +231,7 @@ func EnsureReplicationRuleExists(ctx context.Context, arr *array.PowerStoreArray
 }
 
 // GetReplicationCapabilities is a getter for replication capabilities
-func (s *Service) GetReplicationCapabilities(ctx context.Context, req *csiext.GetReplicationCapabilityRequest) (*csiext.GetReplicationCapabilityResponse, error) {
+func (s *Service) GetReplicationCapabilities(_ context.Context, _ *csiext.GetReplicationCapabilityRequest) (*csiext.GetReplicationCapabilityResponse, error) {
 	rep := new(csiext.GetReplicationCapabilityResponse)
 	rep.Capabilities = []*csiext.ReplicationCapability{
 		{
@@ -337,7 +337,7 @@ func (s *Service) ExecuteAction(ctx context.Context,
 	}
 	client := pstoreClient
 	var execAction gopowerstore.ActionType
-	var params *gopowerstore.FailoverParams = nil
+	var params *gopowerstore.FailoverParams
 	switch action {
 	case csiext.ActionTypes_FAILOVER_REMOTE.String():
 		execAction = gopowerstore.RsActionFailover
