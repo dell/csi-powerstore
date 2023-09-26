@@ -54,7 +54,7 @@ func (s *Service) startAPIService(ctx context.Context) {
 }
 
 // apiRouter serves http requests
-func (s *Service) apiRouter(ctx context.Context) {
+func (s *Service) apiRouter(_ context.Context) {
 	log.Infof("starting http server on port %s", common.APIPort)
 	// create a new mux router
 	router := mux.NewRouter()
@@ -355,9 +355,8 @@ func (s *Service) populateTargetsInCache(array *array.PowerStoreArray) {
 					s.iscsiTargets[array.GlobalID] = append(otherTargets, target.Target)
 				}
 				break
-			} else {
-				log.Debugf("Portal %s is not rechable from the node", address.Portal)
 			}
+			log.Debugf("Portal %s is not rechable from the node", address.Portal)
 		}
 
 	}

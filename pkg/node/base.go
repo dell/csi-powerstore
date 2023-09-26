@@ -349,7 +349,7 @@ func getRWModeString(isRO bool) string {
 	return "rw"
 }
 
-func format(ctx context.Context, source, fsType string, fs fs.Interface, opts ...string) error {
+func format(_ context.Context, source, fsType string, fs fs.Interface, opts ...string) error {
 	f := log.Fields{
 		"source":  source,
 		"fsType":  fsType,

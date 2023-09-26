@@ -56,7 +56,7 @@ func (sp *SCSIPublisher) Publish(ctx context.Context, logFields log.Fields, fs f
 	return sp.publishMount(ctx, logFields, fs, cap, isRO, targetPath, stagingPath)
 }
 
-func (sp *SCSIPublisher) publishBlock(ctx context.Context, logFields log.Fields, fs fs.Interface, cap *csi.VolumeCapability, isRO bool, targetPath string, stagingPath string) (*csi.NodePublishVolumeResponse, error) {
+func (sp *SCSIPublisher) publishBlock(ctx context.Context, logFields log.Fields, fs fs.Interface, _ *csi.VolumeCapability, isRO bool, targetPath string, stagingPath string) (*csi.NodePublishVolumeResponse, error) {
 	log.WithFields(logFields).Info("start publishing as block device")
 
 	if isRO {
