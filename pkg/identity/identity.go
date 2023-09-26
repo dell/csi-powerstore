@@ -91,6 +91,6 @@ func (s Service) GetPluginCapabilities(_ context.Context, _ *csi.GetPluginCapabi
 }
 
 // Probe returns current state of the driver and if it is ready to receive requests
-func (s Service) Probe(context context.Context, request *csi.ProbeRequest) (*csi.ProbeResponse, error) {
+func (s Service) Probe(_ context.Context, _ *csi.ProbeRequest) (*csi.ProbeResponse, error) {
 	return &csi.ProbeResponse{Ready: &wrappers.BoolValue{Value: s.ready}}, nil
 }

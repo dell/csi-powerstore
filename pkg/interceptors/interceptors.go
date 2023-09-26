@@ -49,7 +49,7 @@ import (
 type rewriteRequestIDInterceptor struct{}
 
 func (r *rewriteRequestIDInterceptor) handleServer(ctx context.Context, req interface{},
-	info *grpc.UnaryServerInfo, handler grpc.UnaryHandler,
+	_ *grpc.UnaryServerInfo, handler grpc.UnaryHandler,
 ) (interface{}, error) {
 	// Retrieve the gRPC metadata from the incoming context.
 	md, mdOK := metadata.FromIncomingContext(ctx)
@@ -79,7 +79,7 @@ type lockProvider struct {
 	volNameLocks  map[string]gosync.TryLocker
 }
 
-func (i *lockProvider) GetLockWithID(ctx context.Context, id string) (gosync.TryLocker, error) {
+func (i *lockProvider) GetLockWithID(_ context.Context, id string) (gosync.TryLocker, error) {
 	i.volIDLocksL.Lock()
 	defer i.volIDLocksL.Unlock()
 
@@ -92,7 +92,7 @@ func (i *lockProvider) GetLockWithID(ctx context.Context, id string) (gosync.Try
 	return lock, nil
 }
 
-func (i *lockProvider) GetLockWithName(ctx context.Context, name string) (gosync.TryLocker, error) {
+func (i *lockProvider) GetLockWithName(_ context.Context, name string) (gosync.TryLocker, error) {
 	i.volNameLocksL.Lock()
 	defer i.volNameLocksL.Unlock()
 
@@ -168,7 +168,7 @@ func (i *interceptor) createMetadataRetrieverClient(ctx context.Context) {
 const pending = "pending"
 
 func (i *interceptor) nodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest,
-	info *grpc.UnaryServerInfo, handler grpc.UnaryHandler,
+	_ *grpc.UnaryServerInfo, handler grpc.UnaryHandler,
 ) (res interface{}, resErr error) {
 	lock, err := i.opts.locker.GetLockWithID(ctx, req.VolumeId)
 	if err != nil {
@@ -188,7 +188,7 @@ func (i *interceptor) nodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 }
 
 func (i *interceptor) nodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest,
-	info *grpc.UnaryServerInfo, handler grpc.UnaryHandler,
+	_ *grpc.UnaryServerInfo, handler grpc.UnaryHandler,
 ) (res interface{}, resErr error) {
 	lock, err := i.opts.locker.GetLockWithID(ctx, req.VolumeId)
 	if err != nil {
@@ -206,7 +206,7 @@ func (i *interceptor) nodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 }
 
 func (i *interceptor) createVolume(ctx context.Context, req *csi.CreateVolumeRequest,
-	info *grpc.UnaryServerInfo, handler grpc.UnaryHandler,
+	_ *grpc.UnaryServerInfo, handler grpc.UnaryHandler,
 ) (res interface{}, resErr error) {
 	lock, err := i.opts.locker.GetLockWithID(ctx, req.Name)
 	if err != nil {

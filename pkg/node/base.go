@@ -255,7 +255,7 @@ func getTargetMount(ctx context.Context, target string, fs fs.Interface) (gofsut
 	return targetMount, found, nil
 }
 
-func getMounts(ctx context.Context, fs fs.Interface) ([]gofsutil.Info, error) {
+func getMounts(_ context.Context, fs fs.Interface) ([]gofsutil.Info, error) {
 	data, err := consistentRead(procMountsPath, procMountsRetries, fs)
 	if err != nil {
 		return []gofsutil.Info{}, err
