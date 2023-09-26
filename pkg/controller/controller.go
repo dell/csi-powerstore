@@ -909,7 +909,7 @@ func (s *Service) GetCapacity(ctx context.Context, req *csi.GetCapacityRequest) 
 }
 
 // ControllerGetCapabilities returns list of capabilities that are supported by the driver.
-func (s *Service) ControllerGetCapabilities(_ context.Context, _ *csi.ControllerGetCapabilitiesRequest) (*csi.ControllerGetCapabilitiesResponse, error) {
+func (s *Service) ControllerGetCapabilities(ctx context.Context, request *csi.ControllerGetCapabilitiesRequest) (*csi.ControllerGetCapabilitiesResponse, error) {
 	newCap := func(cap csi.ControllerServiceCapability_RPC_Type) *csi.ControllerServiceCapability {
 		return &csi.ControllerServiceCapability{
 			Type: &csi.ControllerServiceCapability_Rpc{
@@ -1272,7 +1272,7 @@ func (s *Service) RegisterAdditionalServers(server *grpc.Server) {
 }
 
 // ProbeController probes the controller service
-func (s *Service) ProbeController(_ context.Context, _ *commonext.ProbeControllerRequest) (*commonext.ProbeControllerResponse, error) {
+func (s *Service) ProbeController(ctx context.Context, req *commonext.ProbeControllerRequest) (*commonext.ProbeControllerResponse, error) {
 	ready := new(wrappers.BoolValue)
 	ready.Value = true
 	rep := new(commonext.ProbeControllerResponse)

@@ -79,7 +79,7 @@ type lockProvider struct {
 	volNameLocks  map[string]gosync.TryLocker
 }
 
-func (i *lockProvider) GetLockWithID(_ context.Context, id string) (gosync.TryLocker, error) {
+func (i *lockProvider) GetLockWithID(ctx context.Context, id string) (gosync.TryLocker, error) {
 	i.volIDLocksL.Lock()
 	defer i.volIDLocksL.Unlock()
 
@@ -92,7 +92,7 @@ func (i *lockProvider) GetLockWithID(_ context.Context, id string) (gosync.TryLo
 	return lock, nil
 }
 
-func (i *lockProvider) GetLockWithName(_ context.Context, name string) (gosync.TryLocker, error) {
+func (i *lockProvider) GetLockWithName(ctx context.Context, name string) (gosync.TryLocker, error) {
 	i.volNameLocksL.Lock()
 	defer i.volNameLocksL.Unlock()
 

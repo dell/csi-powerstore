@@ -180,7 +180,7 @@ func setNFSCreateAttributes(reqParams map[string]string, createParams *gopowerst
 }
 
 // CheckSize validates that size is correct and returns size in bytes
-func (*SCSICreator) CheckSize(_ context.Context, cr *csi.CapacityRange, isAutoRoundOffFsSizeEnabled bool) (int64, error) {
+func (*SCSICreator) CheckSize(ctx context.Context, cr *csi.CapacityRange, isAutoRoundOffFsSizeEnabled bool) (int64, error) {
 	minSize := cr.GetRequiredBytes()
 	maxSize := cr.GetLimitBytes()
 
@@ -204,7 +204,7 @@ func (*SCSICreator) CheckSize(_ context.Context, cr *csi.CapacityRange, isAutoRo
 }
 
 // CheckName validates volume name
-func (*SCSICreator) CheckName(_ context.Context, name string) error {
+func (*SCSICreator) CheckName(ctx context.Context, name string) error {
 	return volumeNameValidation(name)
 }
 
@@ -372,7 +372,7 @@ type NfsCreator struct {
 }
 
 // CheckSize validates that size is correct and returns size in bytes
-func (*NfsCreator) CheckSize(_ context.Context, cr *csi.CapacityRange, isAutoRoundOffFsSizeEnabled bool) (int64, error) {
+func (*NfsCreator) CheckSize(ctx context.Context, cr *csi.CapacityRange, isAutoRoundOffFsSizeEnabled bool) (int64, error) {
 	minSize := cr.GetRequiredBytes()
 	maxSize := cr.GetLimitBytes()
 
@@ -402,7 +402,7 @@ func (*NfsCreator) CheckSize(_ context.Context, cr *csi.CapacityRange, isAutoRou
 }
 
 // CheckName validates volume name
-func (*NfsCreator) CheckName(_ context.Context, name string) error {
+func (*NfsCreator) CheckName(ctx context.Context, name string) error {
 	return volumeNameValidation(name)
 }
 

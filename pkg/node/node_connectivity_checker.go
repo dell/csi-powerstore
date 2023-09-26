@@ -54,7 +54,7 @@ func (s *Service) startAPIService(ctx context.Context) {
 }
 
 // apiRouter serves http requests
-func (s *Service) apiRouter(_ context.Context) {
+func (s *Service) apiRouter(ctx context.Context) {
 	log.Infof("starting http server on port %s", common.APIPort)
 	// create a new mux router
 	router := mux.NewRouter()

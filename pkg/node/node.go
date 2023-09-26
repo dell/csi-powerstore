@@ -1000,7 +1000,7 @@ func (s *Service) nodeExpandRawBlockVolume(ctx context.Context, volumeWWN string
 }
 
 // NodeGetCapabilities returns supported features by the node service
-func (s *Service) NodeGetCapabilities(_ context.Context, _ *csi.NodeGetCapabilitiesRequest) (*csi.NodeGetCapabilitiesResponse, error) {
+func (s *Service) NodeGetCapabilities(context context.Context, request *csi.NodeGetCapabilitiesRequest) (*csi.NodeGetCapabilitiesResponse, error) {
 	newCap := func(cap csi.NodeServiceCapability_RPC_Type) *csi.NodeServiceCapability {
 		return &csi.NodeServiceCapability{
 			Type: &csi.NodeServiceCapability_Rpc{
@@ -1034,7 +1034,7 @@ func (s *Service) NodeGetCapabilities(_ context.Context, _ *csi.NodeGetCapabilit
 }
 
 // NodeGetInfo returns id of the node and topology constraints
-func (s *Service) NodeGetInfo(ctx context.Context, _ *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
+func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
 	// Create the topology keys
 	// <driver name>/<endpoint>-<protocol>: true
 	resp := &csi.NodeGetInfoResponse{
