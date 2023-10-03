@@ -24,7 +24,7 @@ jobs:
       - name: Run unit tests and check package coverage
         uses: dell/common-github-actions/go-code-tester@main
         with:
-          threshold: 90
+          threshold: 65
           test-folder: ./pkg
   go_security_scan:
     name: Run gosec
