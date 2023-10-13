@@ -307,8 +307,14 @@ var goarchToUname = map[string]string{
 }
 
 func fileExists(filePath string) bool {
-	if _, err := os.Stat(filePath); !os.IsNotExist(err) {
-		return true
+	_, err := os.Stat(filePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			fmt.Printf("File %s doesn't exist", filePath)
+		} else {
+			fmt.Printf("Found error %v while checking stat of file %s ", err, filePath)
+		}
+		return false
 	}
-	return false
+	return true
 }

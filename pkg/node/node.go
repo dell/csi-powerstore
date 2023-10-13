@@ -1650,7 +1650,18 @@ func (s *Service) buildInitiatorsArrayModify(initiators []string) []gopowerstore
 
 func (s *Service) fileExists(filename string) bool {
 	_, err := s.Fs.Stat(filename)
-	if os.IsNotExist(err) {
+	if err != nil {
+		if os.IsNotExist(err) {
+			log.WithFields(log.Fields{
+				"filename": filename,
+				"error":    err,
+			}).Error("File doesn't exist")
+		} else {
+			log.WithFields(log.Fields{
+				"filename": filename,
+				"error":    err,
+			}).Error("Error while checking stat of file")
+		}
 		return false
 	}
 	return true
