@@ -317,5 +317,4 @@ func fileExists(filePath string) bool {
 		fmt.Printf("Found error %v while checking stat of file %s ", err, filePath)
 	}
 	return false
-
 }
