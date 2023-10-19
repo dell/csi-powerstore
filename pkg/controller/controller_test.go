@@ -1206,7 +1206,7 @@ var _ = Describe("CSIControllerService", func() {
 				clientMock.On("GetSnapshotsByVolumeID", mock.Anything, validBaseVolID).Return([]gopowerstore.Volume{}, nil)
 				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).Return(gopowerstore.VolumeGroups{}, nil)
 				clientMock.On("DeleteVolume",
-					mock.AnythingOfType("*context.emptyCtx"),
+					mock.Anything,
 					mock.AnythingOfType("*gopowerstore.VolumeDelete"),
 					validBaseVolID).
 					Return(gopowerstore.EmptyResponse(""), nil)
@@ -1224,7 +1224,7 @@ var _ = Describe("CSIControllerService", func() {
 				clientMock.On("GetSnapshotsByVolumeID", mock.Anything, validBaseVolID).Return([]gopowerstore.Volume{}, nil)
 				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).Return(gopowerstore.VolumeGroups{}, nil)
 				clientMock.On("DeleteVolume",
-					mock.AnythingOfType("*context.emptyCtx"),
+					mock.Anything,
 					mock.AnythingOfType("*gopowerstore.VolumeDelete"),
 					validBaseVolID).
 					Return(gopowerstore.EmptyResponse(""), nil)
@@ -1258,7 +1258,7 @@ var _ = Describe("CSIControllerService", func() {
 				req := &csi.DeleteVolumeRequest{VolumeId: validBlockVolumeID}
 
 				clientMock.On("DeleteVolume",
-					mock.AnythingOfType("*context.emptyCtx"),
+					mock.Anything,
 					mock.AnythingOfType("*gopowerstore.VolumeDelete"),
 					validBaseVolID).
 					Return(gopowerstore.EmptyResponse(""), nil)
@@ -1274,7 +1274,7 @@ var _ = Describe("CSIControllerService", func() {
 			It("should successfully delete nfs volume", func() {
 				clientMock.On("GetFsSnapshotsByVolumeID", mock.Anything, validBaseVolID).Return([]gopowerstore.FileSystem{}, nil)
 				clientMock.On("DeleteFS",
-					mock.AnythingOfType("*context.emptyCtx"),
+					mock.Anything,
 					validBaseVolID).
 					Return(gopowerstore.EmptyResponse(""), nil)
 				clientMock.On("GetNFSExportByFileSystemID", mock.Anything, validBaseVolID).
@@ -1367,7 +1367,7 @@ var _ = Describe("CSIControllerService", func() {
 				clientMock.On("GetSnapshotsByVolumeID", mock.Anything, validBaseVolID).Return([]gopowerstore.Volume{}, nil)
 				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).Return(gopowerstore.VolumeGroups{}, nil)
 				clientMock.On("DeleteVolume",
-					mock.AnythingOfType("*context.emptyCtx"),
+					mock.Anything,
 					mock.AnythingOfType("*gopowerstore.VolumeDelete"),
 					validBaseVolID).
 					Return(gopowerstore.EmptyResponse(""), gopowerstore.APIError{
@@ -1389,7 +1389,7 @@ var _ = Describe("CSIControllerService", func() {
 				clientMock.On("GetNFSExportByFileSystemID", mock.Anything, validBaseVolID).
 					Return(gopowerstore.NFSExport{}, nil)
 				clientMock.On("DeleteFS",
-					mock.AnythingOfType("*context.emptyCtx"),
+					mock.Anything,
 					validBaseVolID).
 					Return(gopowerstore.EmptyResponse(""), gopowerstore.APIError{
 						ErrorMsg: &api.ErrorMsg{
@@ -1411,7 +1411,7 @@ var _ = Describe("CSIControllerService", func() {
 				clientMock.On("GetSnapshotsByVolumeID", mock.Anything, validBaseVolID).Return([]gopowerstore.Volume{}, nil)
 				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).Return(gopowerstore.VolumeGroups{}, nil)
 				clientMock.On("DeleteVolume",
-					mock.AnythingOfType("*context.emptyCtx"),
+					mock.Anything,
 					mock.AnythingOfType("*gopowerstore.VolumeDelete"),
 					validBaseVolID).
 					Return(gopowerstore.EmptyResponse(""), gopowerstore.APIError{
@@ -1736,7 +1736,7 @@ var _ = Describe("CSIControllerService", func() {
 					Size: validVolSize,
 				}, nil)
 				clientMock.On("ModifyVolume",
-					mock.AnythingOfType("*context.emptyCtx"),
+					mock.Anything,
 					mock.AnythingOfType("*gopowerstore.VolumeModify"),
 					validBaseVolID).
 					Return(gopowerstore.EmptyResponse(""), nil)
@@ -1772,7 +1772,7 @@ var _ = Describe("CSIControllerService", func() {
 						Size: validVolSize,
 					}, nil)
 					clientMock.On("ModifyVolume",
-						mock.AnythingOfType("*context.emptyCtx"),
+						mock.Anything,
 						mock.AnythingOfType("*gopowerstore.VolumeModify"),
 						validBaseVolID).
 						Return(gopowerstore.EmptyResponse(""), e)
@@ -1793,7 +1793,7 @@ var _ = Describe("CSIControllerService", func() {
 					SizeTotal: validVolSize,
 				}, nil)
 				clientMock.On("ModifyFS",
-					mock.AnythingOfType("*context.emptyCtx"),
+					mock.Anything,
 					mock.AnythingOfType("*gopowerstore.FSModify"),
 					validBaseVolID).
 					Return(gopowerstore.EmptyResponse(""), nil)
@@ -1816,7 +1816,7 @@ var _ = Describe("CSIControllerService", func() {
 						SizeTotal: validVolSize,
 					}, nil)
 					clientMock.On("ModifyFS",
-						mock.AnythingOfType("*context.emptyCtx"),
+						mock.Anything,
 						mock.AnythingOfType("*gopowerstore.FSModify"),
 						validBaseVolID).
 						Return(gopowerstore.EmptyResponse(""), e)
@@ -2569,7 +2569,7 @@ var _ = Describe("CSIControllerService", func() {
 				mock.Anything, exportID).Return(gopowerstore.CreateResponse{}, nil)
 
 			clientMock.On("DeleteFS",
-				mock.AnythingOfType("*context.emptyCtx"),
+				mock.Anything,
 				validBaseVolID).
 				Return(gopowerstore.EmptyResponse(""), nil)
 			req := &csi.DeleteVolumeRequest{VolumeId: validNfsVolumeID}
@@ -3231,7 +3231,10 @@ var _ = Describe("CSIControllerService", func() {
 	Describe("calling GetCapacity()", func() {
 		When("everything is ok and arrayip is provided", func() {
 			It("should succeed", func() {
+				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
+				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
 				clientMock.On("GetCapacity", mock.Anything).Return(int64(123123123), nil)
+				clientMock.On("GetMaxVolumeSize", mock.Anything).Return(int64(-1), nil)
 				req := &csi.GetCapacityRequest{
 					Parameters: map[string]string{
 						"arrayIP": "192.168.0.1",
@@ -3245,7 +3248,10 @@ var _ = Describe("CSIControllerService", func() {
 
 		When("everything is ok and array ip is not provided", func() {
 			It("should succeed", func() {
+				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
+				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
 				clientMock.On("GetCapacity", mock.Anything).Return(int64(123123123), nil)
+				clientMock.On("GetMaxVolumeSize", mock.Anything).Return(int64(-1), nil)
 				req := &csi.GetCapacityRequest{
 					Parameters: map[string]string{},
 				}
@@ -3257,7 +3263,10 @@ var _ = Describe("CSIControllerService", func() {
 
 		When("wrong arrayIP in params", func() {
 			It("should fail with predefined errmsg", func() {
+				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
+				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
 				clientMock.On("GetCapacity", mock.Anything).Return(int64(123123123), nil)
+				clientMock.On("GetMaxVolumeSize", mock.Anything).Return(int64(-1), nil)
 				req := &csi.GetCapacityRequest{
 					Parameters: map[string]string{
 						"arrayID": "10.10.10.10",
@@ -3272,7 +3281,10 @@ var _ = Describe("CSIControllerService", func() {
 
 		When("everything is correct, but API failed", func() {
 			It("should fail with predefined errmsg", func() {
+				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
+				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
 				clientMock.On("GetCapacity", mock.Anything).Return(int64(123123123), errors.New("APIErrorUnexpected"))
+				clientMock.On("GetMaxVolumeSize", mock.Anything).Return(int64(-1), nil)
 				req := &csi.GetCapacityRequest{
 					Parameters: map[string]string{
 						"arrayIP": "192.168.0.1",
@@ -3284,6 +3296,55 @@ var _ = Describe("CSIControllerService", func() {
 				Expect(err.Error()).To(ContainSubstring("APIErrorUnexpected"))
 			})
 		})
+
+		When("everything is correct, but GetMaxVolumeSize API failed", func() {
+			It("MaximumVolumeSize should not be set in the response", func() {
+				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
+				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+				clientMock.On("GetCapacity", mock.Anything).Return(int64(123123123), nil)
+				req := &csi.GetCapacityRequest{
+					Parameters: map[string]string{},
+				}
+				clientMock.On("GetMaxVolumeSize", mock.Anything).Return(int64(-1), errors.New("APIErrorUnexpected"))
+
+				res, err := ctrlSvc.GetCapacity(context.Background(), req)
+				Expect(res).ToNot(BeNil())
+				Expect(err).To(BeNil())
+			})
+		})
+
+		When("negative MaximumVolumeSize", func() {
+			It("MaximumVolumeSize should not be set in the response", func() {
+				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
+				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+				clientMock.On("GetCapacity", mock.Anything).Return(int64(123123123), nil)
+				req := &csi.GetCapacityRequest{
+					Parameters: map[string]string{},
+				}
+				clientMock.On("GetMaxVolumeSize", mock.Anything).Return(int64(-1), nil)
+
+				res, err := ctrlSvc.GetCapacity(context.Background(), req)
+				Expect(res.MaximumVolumeSize).To(BeNil())
+				Expect(err).To(BeNil())
+			})
+		})
+
+		When("non negative MaximumVolumeSize", func() {
+			It("MaximumVolumeSize should be set in the response", func() {
+				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
+				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+				clientMock.On("GetCapacity", mock.Anything).Return(int64(123123123), nil)
+				req := &csi.GetCapacityRequest{
+					Parameters: map[string]string{},
+				}
+				clientMock.On("GetMaxVolumeSize", mock.Anything).Return(int64(100000), nil)
+				res, err := ctrlSvc.GetCapacity(context.Background(), req)
+
+				Expect(res.MaximumVolumeSize).ToNot(BeNil())
+				Expect(err).To(BeNil())
+			})
+		})
+
 	})
 
 	Describe("calling ValidateVolumeCapabilities()", func() {

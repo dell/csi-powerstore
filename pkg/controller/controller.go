@@ -23,9 +23,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-powerstore/v2/core"
@@ -43,6 +45,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 )
 
 // Interface provides most important controller methods.
@@ -71,6 +74,11 @@ type Service struct {
 
 	K8sVisibilityAutoRegistration bool
 }
+
+// maxVolumesSizeForArray -  store the maxVolumesSizeForArray
+var maxVolumesSizeForArray = make(map[string]int64)
+
+var mutex = &sync.Mutex{}
 
 // Init is a method that initializes internal variables of controller service
 func (s *Service) Init() error {
@@ -902,10 +910,57 @@ func (s *Service) GetCapacity(ctx context.Context, req *csi.GetCapacityRequest) 
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-
+	valueInCache := getMaximumVolumeSize(ctx, arr)
+	if valueInCache < 0 {
+		return &csi.GetCapacityResponse{
+			AvailableCapacity: resp,
+		}, nil
+	}
+	value := wrapperspb.Int64(valueInCache)
 	return &csi.GetCapacityResponse{
 		AvailableCapacity: resp,
+		MaximumVolumeSize: value,
 	}, nil
+}
+
+func getMaximumVolumeSize(ctx context.Context, arr *array.PowerStoreArray) int64 {
+	valueInCache, found := getCachedMaximumVolumeSize(arr.GlobalID)
+	if !found || valueInCache < 0 {
+		defaultHeaders := arr.Client.GetCustomHTTPHeaders()
+		if defaultHeaders == nil {
+			defaultHeaders = make(http.Header)
+		}
+		customHeaders := defaultHeaders
+		customHeaders.Add("DELL-VISIBILITY", "internal")
+		arr.Client.SetCustomHTTPHeaders(customHeaders)
+
+		value, err := arr.Client.GetMaxVolumeSize(ctx)
+		if err != nil {
+			log.Debug(fmt.Sprintf("GetMaxVolumeSize returning: %v for Array having GlobalId %s", err, arr.GlobalID))
+		}
+		// reset custom header
+		customHeaders.Del("DELL-VISIBILITY")
+		arr.Client.SetCustomHTTPHeaders(customHeaders)
+		// Add a new entry to the MaximumVolumeSize
+		cacheMaximumVolumeSize(arr.GlobalID, value)
+		valueInCache = value
+	}
+	return valueInCache
+}
+
+func getCachedMaximumVolumeSize(key string) (int64, bool) {
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	value, found := maxVolumesSizeForArray[key]
+	return value, found
+}
+
+func cacheMaximumVolumeSize(key string, value int64) {
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	maxVolumesSizeForArray[key] = value
 }
 
 // ControllerGetCapabilities returns list of capabilities that are supported by the driver.
