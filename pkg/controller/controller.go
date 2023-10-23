@@ -906,20 +906,20 @@ func (s *Service) GetCapacity(ctx context.Context, req *csi.GetCapacityRequest) 
 			return nil, status.Errorf(codes.Internal, "can't find array with provided id %s", arrayID)
 		}
 	}
-	resp, err := arr.Client.GetCapacity(ctx)
+	capacity, err := arr.Client.GetCapacity(ctx)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	valueInCache := getMaximumVolumeSize(ctx, arr)
-	if valueInCache < 0 {
+	maxVolSize := getMaximumVolumeSize(ctx, arr)
+	if maxVolSize < 0 {
 		return &csi.GetCapacityResponse{
-			AvailableCapacity: resp,
+			AvailableCapacity: capacity,
 		}, nil
 	}
-	value := wrapperspb.Int64(valueInCache)
+	maxVol := wrapperspb.Int64(maxVolSize)
 	return &csi.GetCapacityResponse{
-		AvailableCapacity: resp,
-		MaximumVolumeSize: value,
+		AvailableCapacity: capacity,
+		MaximumVolumeSize: maxVol,
 	}, nil
 }
 
