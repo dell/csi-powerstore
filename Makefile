@@ -39,7 +39,7 @@ ifndef NOTES
 	NOTES=
 endif
 ifndef TAGMSG
-    TAGMSG="CSI Spec 1.5"
+    TAGMSG="CSI Spec 1.6"
 endif
 
 clean:

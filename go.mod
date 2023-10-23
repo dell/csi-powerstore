@@ -5,18 +5,18 @@ go 1.21
 require (
 	github.com/akutz/gosync v0.1.0
 	github.com/apparentlymart/go-cidr v1.1.0
-	github.com/container-storage-interface/spec v1.5.0
+	github.com/container-storage-interface/spec v1.6.0
 	github.com/dell/csi-metadata-retriever v1.5.0
 	github.com/dell/dell-csi-extensions/common v1.2.0
 	github.com/dell/dell-csi-extensions/podmon v1.2.0
 	github.com/dell/dell-csi-extensions/replication v1.5.0
 	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.3.0
 	github.com/dell/gobrick v1.9.0
-	github.com/dell/gocsi v1.8.0
+	github.com/dell/gocsi v1.8.1-0.20230915044639-4bab90258ed0
 	github.com/dell/gofsutil v1.13.1
 	github.com/dell/goiscsi v1.8.0
 	github.com/dell/gonvme v1.5.0
-	github.com/dell/gopowerstore v1.13.0
+	github.com/dell/gopowerstore v1.13.1-0.20231012074319-4009fe74aa49
 	github.com/fsnotify/fsnotify v1.5.4
 	github.com/go-openapi/strfmt v0.21.3
 	github.com/golang/mock v1.6.0
@@ -34,6 +34,7 @@ require (
 	github.com/uber/jaeger-lib v2.4.1+incompatible
 	golang.org/x/net v0.14.0
 	google.golang.org/grpc v1.57.0
+	google.golang.org/protobuf v1.31.0
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/apimachinery v0.26.1
 	k8s.io/client-go v0.26.1
@@ -102,7 +103,6 @@ require (
 	google.golang.org/genproto v0.0.0-20230803162519-f966b187b2e5 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20230726155614-23370e0ffb3e // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20230815205213-6bfd019c3878 // indirect
-	google.golang.org/protobuf v1.31.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/ini.v1 v1.66.6 // indirect
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
