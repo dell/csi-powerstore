@@ -41,7 +41,7 @@ require (
 	github.com/containerd/console v1.0.3 // indirect
 	github.com/containerd/ttrpc v1.1.0 // indirect
 	github.com/coreos/go-systemd/v22 v22.3.2 // indirect
-	github.com/cyphar/filepath-securejoin v0.2.3 // indirect
+	github.com/cyphar/filepath-securejoin v0.2.4 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dell/gobrick v1.9.0 // indirect
 	github.com/dell/gocsi v1.8.1-0.20230915044639-4bab90258ed0 // indirect
