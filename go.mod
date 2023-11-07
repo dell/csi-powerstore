@@ -6,17 +6,17 @@ require (
 	github.com/akutz/gosync v0.1.0
 	github.com/apparentlymart/go-cidr v1.1.0
 	github.com/container-storage-interface/spec v1.6.0
-	github.com/dell/csi-metadata-retriever v1.5.0
+	github.com/dell/csi-metadata-retriever v1.5.1-0.20231027130919-1b5946bdcfd0
 	github.com/dell/dell-csi-extensions/common v1.2.0
-	github.com/dell/dell-csi-extensions/podmon v1.2.0
-	github.com/dell/dell-csi-extensions/replication v1.5.0
-	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.3.0
+	github.com/dell/dell-csi-extensions/podmon v1.2.1-0.20231031131730-68f55c8c3ba2
+	github.com/dell/dell-csi-extensions/replication v1.5.1-0.20231031131631-0552297c9ca6
+	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.3.1-0.20231031131659-8bcbc0428119
 	github.com/dell/gobrick v1.9.0
-	github.com/dell/gocsi v1.8.1-0.20230915044639-4bab90258ed0
-	github.com/dell/gofsutil v1.13.1
-	github.com/dell/goiscsi v1.8.0
-	github.com/dell/gonvme v1.5.0
-	github.com/dell/gopowerstore v1.13.1-0.20231012074319-4009fe74aa49
+	github.com/dell/gocsi v1.8.1-0.20231031194001-10803e35d2e5
+	github.com/dell/gofsutil v1.13.2-0.20231013133348-d635f385fc6d
+	github.com/dell/goiscsi v1.8.1-0.20230925132356-9ad6f6b58261
+	github.com/dell/gonvme v1.5.1-0.20230925132626-539ac86fd44a
+	github.com/dell/gopowerstore v1.13.1-0.20231027052515-dfba84581c26
 	github.com/fsnotify/fsnotify v1.5.4
 	github.com/go-openapi/strfmt v0.21.3
 	github.com/golang/mock v1.6.0
@@ -89,12 +89,12 @@ require (
 	go.etcd.io/etcd/api/v3 v3.5.4 // indirect
 	go.etcd.io/etcd/client/pkg/v3 v3.5.4 // indirect
 	go.etcd.io/etcd/client/v3 v3.5.4 // indirect
-	go.mongodb.org/mongo-driver v1.11.2 // indirect
+	go.mongodb.org/mongo-driver v1.12.1 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/multierr v1.8.0 // indirect
 	go.uber.org/zap v1.21.0 // indirect
 	golang.org/x/oauth2 v0.7.0 // indirect
-	golang.org/x/sync v0.0.0-20220601150217-0de741cfad7f // indirect
+	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4 // indirect
 	golang.org/x/sys v0.13.0 // indirect
 	golang.org/x/term v0.13.0 // indirect
 	golang.org/x/text v0.13.0 // indirect
