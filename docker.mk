@@ -33,10 +33,6 @@ ifndef DOCKER_IMAGE_NAME
     DOCKER_IMAGE_NAME=csi-powerstore
 endif
 
-ifndef BASEIMAGE
-	BASEIMAGE=registry.access.redhat.com/ubi9/ubi-micro@sha256:630cf7bdef807f048cadfe7180d6c27eb3aaa99323ffc3628811da230ed3322a
-endif
-
 # Add 'build-base-image' as a dependency if UBI Micro is used as the base image.
 # This is required to load all the depedent packages into UBI Miro image.
 ifeq ($(DOCKER_FILE), docker-files/Dockerfile.ubi.micro)
@@ -65,8 +61,12 @@ push:
 	echo "MAJOR $(MAJOR) MINOR $(MINOR) PATCH $(PATCH) RELNOTE $(RELNOTE) SEMVER $(SEMVER)"
 	$(BUILDER) push "$(DOCKER_REGISTRY)/$(DOCKER_IMAGE_NAME):v$(MAJOR).$(MINOR).$(PATCH)$(RELNOTE)"
 
-build-base-image:
-	@echo "Building base image from $(BASEIMAGE) and loading dependencies..."
-	./buildubimicro.sh $(BASEIMAGE)
+build-base-image: download-csm-common
+	$(eval include csm-common.mk)
+	@echo "Building base image from $(DEFAULT_BASEIMAGE) and loading dependencies..."
+	./buildubimicro.sh $(DEFAULT_BASEIMAGE)
 	@echo "Base image build: SUCCESS"
 	$(eval BASEIMAGE=localhost/csipowerstore-ubimicro:latest)
+
+download-csm-common:
+	curl -O -L https://raw.githubusercontent.com/dell/csm/main/config/csm-common.mk
