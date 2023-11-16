@@ -30,7 +30,7 @@ ifndef MAJOR
     MAJOR=2
 endif
 ifndef MINOR
-    MINOR=8
+    MINOR=9
 endif
 ifndef PATCH
     PATCH=0
@@ -39,7 +39,7 @@ ifndef NOTES
 	NOTES=
 endif
 ifndef TAGMSG
-    TAGMSG="CSI Spec 1.5"
+    TAGMSG="CSI Spec 1.6"
 endif
 
 clean:
