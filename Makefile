@@ -78,6 +78,9 @@ push:	docker
 
 check:	gosec
 	gofmt -w ./.
+ifeq (, $(shell which golint))
+	go install golang.org/x/lint/golint@latest
+endif
 	golint -set_exit_status ./.
 	go vet ./...
 
