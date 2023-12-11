@@ -5,18 +5,18 @@ go 1.21
 require (
 	github.com/akutz/gosync v0.1.0
 	github.com/apparentlymart/go-cidr v1.1.0
-	github.com/container-storage-interface/spec v1.5.0
-	github.com/dell/csi-metadata-retriever v1.5.0
-	github.com/dell/dell-csi-extensions/common v1.2.0
-	github.com/dell/dell-csi-extensions/podmon v1.2.0
-	github.com/dell/dell-csi-extensions/replication v1.5.0
-	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.3.0
+	github.com/container-storage-interface/spec v1.6.0
+	github.com/dell/csi-metadata-retriever v1.6.0
+	github.com/dell/dell-csi-extensions/common v1.3.0
+	github.com/dell/dell-csi-extensions/podmon v1.3.0
+	github.com/dell/dell-csi-extensions/replication v1.6.0
+	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.4.0
 	github.com/dell/gobrick v1.9.0
-	github.com/dell/gocsi v1.8.0
-	github.com/dell/gofsutil v1.13.1
+	github.com/dell/gocsi v1.9.0
+	github.com/dell/gofsutil v1.14.0
 	github.com/dell/goiscsi v1.8.0
-	github.com/dell/gonvme v1.5.0
-	github.com/dell/gopowerstore v1.13.1-0.20230921110627-984cf3107665
+	github.com/dell/gonvme v1.6.0
+	github.com/dell/gopowerstore v1.14.0
 	github.com/fsnotify/fsnotify v1.5.4
 	github.com/go-openapi/strfmt v0.21.3
 	github.com/golang/mock v1.6.0
@@ -32,8 +32,9 @@ require (
 	github.com/stretchr/testify v1.8.0
 	github.com/uber/jaeger-client-go v2.30.0+incompatible
 	github.com/uber/jaeger-lib v2.4.1+incompatible
-	golang.org/x/net v0.14.0
-	google.golang.org/grpc v1.57.0
+	golang.org/x/net v0.17.0
+	google.golang.org/grpc v1.57.1
+	google.golang.org/protobuf v1.31.0
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/apimachinery v0.26.1
 	k8s.io/client-go v0.26.1
@@ -88,21 +89,20 @@ require (
 	go.etcd.io/etcd/api/v3 v3.5.4 // indirect
 	go.etcd.io/etcd/client/pkg/v3 v3.5.4 // indirect
 	go.etcd.io/etcd/client/v3 v3.5.4 // indirect
-	go.mongodb.org/mongo-driver v1.11.2 // indirect
+	go.mongodb.org/mongo-driver v1.12.1 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/multierr v1.8.0 // indirect
 	go.uber.org/zap v1.21.0 // indirect
 	golang.org/x/oauth2 v0.7.0 // indirect
-	golang.org/x/sync v0.0.0-20220601150217-0de741cfad7f // indirect
-	golang.org/x/sys v0.11.0 // indirect
-	golang.org/x/term v0.11.0 // indirect
-	golang.org/x/text v0.12.0 // indirect
+	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4 // indirect
+	golang.org/x/sys v0.13.0 // indirect
+	golang.org/x/term v0.13.0 // indirect
+	golang.org/x/text v0.13.0 // indirect
 	golang.org/x/time v0.0.0-20220411224347-583f2d630306 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20230803162519-f966b187b2e5 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20230726155614-23370e0ffb3e // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20230815205213-6bfd019c3878 // indirect
-	google.golang.org/protobuf v1.31.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/ini.v1 v1.66.6 // indirect
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect

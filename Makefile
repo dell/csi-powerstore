@@ -30,7 +30,7 @@ ifndef MAJOR
     MAJOR=2
 endif
 ifndef MINOR
-    MINOR=8
+    MINOR=9
 endif
 ifndef PATCH
     PATCH=0
@@ -39,7 +39,7 @@ ifndef NOTES
 	NOTES=
 endif
 ifndef TAGMSG
-    TAGMSG="CSI Spec 1.5"
+    TAGMSG="CSI Spec 1.6"
 endif
 
 clean:
@@ -78,6 +78,9 @@ push:	docker
 
 check:	gosec
 	gofmt -w ./.
+ifeq (, $(shell which golint))
+	go install golang.org/x/lint/golint@latest
+endif
 	golint -set_exit_status ./.
 	go vet ./...
 
@@ -91,4 +94,10 @@ coverage:
 	cd ./pkg; go tool cover -html=coverage.out -o coverage.html
 
 gosec:
-	gosec -quiet -log gosec.log -out=gosecresults.csv -fmt=csv ./...
+ifeq (, $(shell which gosec))
+	go install github.com/securego/gosec/v2/cmd/gosec@latest
+	$(shell $(GOBIN)/gosec -quiet -log gosec.log -out=gosecresults.csv -fmt=csv ./...)
+else
+	$(shell gosec -quiet -log gosec.log -out=gosecresults.csv -fmt=csv ./...)
+endif
+	@echo "Logs are stored at gosec.log, Outputfile at gosecresults.csv"
