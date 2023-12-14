@@ -1,6 +1,6 @@
 #
 #
-# Copyright © 2020-2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+# Copyright © 2020-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,14 +13,19 @@
 # limitations under the License.
 #
 #
-
+apiVersion: v2
+appVersion: "2.9.0"
 name: sanity-csi-powerstore
-version: 1.0.0
-appVersion: 1.0.0
+version: 2.9.0
 description: |
   PowerStore CSI (Container Storage Interface) driver Kubernetes
   integration. This chart includes everything required to provision via CSI as
   well as a PowerStore StorageClass.
+type: application
+kubeVersion: ">= 1.24.0 < 1.29.0"
+# If you are using a complex K8s version like "v1.24.3-mirantis-1", use this kubeVersion check instead
+# WARNING: this version of the check will allow the use of alpha and beta versions, which is NOT SUPPORTED
+# kubeVersion: ">= 1.24.0-0 < 1.29.0-0"
 keywords:
 - csi
 - storage
@@ -29,4 +34,3 @@ sources:
 - https://github.com/dell/csi-powerstore
 maintainers:
 - name: DellEMC
-engine: gotpl

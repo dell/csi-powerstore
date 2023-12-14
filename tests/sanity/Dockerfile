@@ -14,12 +14,15 @@
 #
 #
 
-FROM golang:1.13.4 as build-env
+FROM golang:1.20.2 as build-env
 
-RUN go get -u github.com/kubernetes-csi/csi-test/...
+RUN git clone https://github.com/kubernetes-csi/csi-test.git && \
+    cd csi-test/cmd/csi-sanity && \
+    make clean install && \
+    cp ./csi-sanity /csi-sanity
 
 FROM frolvlad/alpine-glibc
 WORKDIR /app/csi-sanity/
-COPY --from=build-env /go/bin/csi-sanity .
+COPY --from=build-env /csi-sanity .
 
 ENTRYPOINT [ "./csi-sanity" ]
