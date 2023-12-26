@@ -21,6 +21,7 @@ package identity
 
 import (
 	"context"
+
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/golang/protobuf/ptypes/wrappers"
 )
@@ -44,7 +45,7 @@ type Service struct {
 }
 
 // GetPluginInfo returns general information about plugin (driver) such as name, version and manifest
-func (s Service) GetPluginInfo(context context.Context, request *csi.GetPluginInfoRequest) (*csi.GetPluginInfoResponse, error) {
+func (s Service) GetPluginInfo(_ context.Context, _ *csi.GetPluginInfoRequest) (*csi.GetPluginInfoResponse, error) {
 	return &csi.GetPluginInfoResponse{
 		Name:          s.name,
 		VendorVersion: s.version,
@@ -53,7 +54,7 @@ func (s Service) GetPluginInfo(context context.Context, request *csi.GetPluginIn
 }
 
 // GetPluginCapabilities returns capabilities that are supported by the driver
-func (s Service) GetPluginCapabilities(context context.Context, request *csi.GetPluginCapabilitiesRequest) (*csi.GetPluginCapabilitiesResponse, error) {
+func (s Service) GetPluginCapabilities(_ context.Context, _ *csi.GetPluginCapabilitiesRequest) (*csi.GetPluginCapabilitiesResponse, error) {
 	var rep csi.GetPluginCapabilitiesResponse
 	rep.Capabilities = []*csi.PluginCapability{
 		{
@@ -90,6 +91,6 @@ func (s Service) GetPluginCapabilities(context context.Context, request *csi.Get
 }
 
 // Probe returns current state of the driver and if it is ready to receive requests
-func (s Service) Probe(context context.Context, request *csi.ProbeRequest) (*csi.ProbeResponse, error) {
+func (s Service) Probe(_ context.Context, _ *csi.ProbeRequest) (*csi.ProbeResponse, error) {
 	return &csi.ProbeResponse{Ready: &wrappers.BoolValue{Value: s.ready}}, nil
 }

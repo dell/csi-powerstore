@@ -52,10 +52,11 @@ func parseSize(size string) (int64, error) {
 func (s *Service) ephemeralNodePublish(
 	ctx context.Context,
 	req *csi.NodePublishVolumeRequest) (
-	*csi.NodePublishVolumeResponse, error) {
+	*csi.NodePublishVolumeResponse, error,
+) {
 	if _, err := s.Fs.Stat(ephemeralStagingMountPath); os.IsNotExist(err) {
 		log.Debug("path does not exists")
-		err = s.Fs.MkdirAll(ephemeralStagingMountPath, 0750)
+		err = s.Fs.MkdirAll(ephemeralStagingMountPath, 0o750)
 		if err != nil {
 			log.Errorf("NodestageErrorEph %s", err.Error())
 			return nil, status.Error(codes.Internal, "Unable to create directory for mounting ephemeral volumes")
@@ -85,7 +86,7 @@ func (s *Service) ephemeralNodePublish(
 		return nil, status.Error(codes.Internal, "inline ephemeral create volume failed")
 	}
 
-	errLock := s.Fs.MkdirAll(ephemeralStagingMountPath+volID, 0750)
+	errLock := s.Fs.MkdirAll(ephemeralStagingMountPath+volID, 0o750)
 	if errLock != nil {
 		return nil, errLock
 	}
@@ -155,12 +156,12 @@ func (s *Service) ephemeralNodePublish(
 	}
 
 	return &csi.NodePublishVolumeResponse{}, nil
-
 }
 
 func (s *Service) ephemeralNodeUnpublish(
 	ctx context.Context,
-	req *csi.NodeUnpublishVolumeRequest) error {
+	req *csi.NodeUnpublishVolumeRequest,
+) error {
 	volID := req.GetVolumeId()
 	if volID == "" {
 		return status.Error(codes.InvalidArgument, "volume ID is required")

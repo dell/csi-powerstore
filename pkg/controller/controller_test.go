@@ -38,9 +38,9 @@ import (
 	"github.com/dell/gopowerstore"
 	"github.com/dell/gopowerstore/api"
 	gopowerstoremock "github.com/dell/gopowerstore/mocks"
-	. "github.com/onsi/ginkgo"
+	ginkgo "github.com/onsi/ginkgo"
 	"github.com/onsi/ginkgo/reporters"
-	. "github.com/onsi/gomega"
+	gomega "github.com/onsi/gomega"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -59,7 +59,7 @@ const (
 	validHostName             = "csi-node-1a47a1b91c444a8a90193d8066669603"
 	validHostID               = "24aefac2-a796-47dc-886a-c73ff8c1a671"
 	validClusterName          = "localSystemName"
-	validRemoteVolId          = "9f840c56-96e6-4de9-b5a3-27e7c20eaa77"
+	validRemoteVolID          = "9f840c56-96e6-4de9-b5a3-27e7c20eaa77"
 	validRemoteSystemName     = "remoteName"
 	validRemoteSystemID       = "df7f804c-6373-4659-b197-36654d17979c"
 	validRPO                  = "Five_Minutes"
@@ -88,9 +88,9 @@ var (
 )
 
 func TestCSIControllerService(t *testing.T) {
-	RegisterFailHandler(Fail)
+	gomega.RegisterFailHandler(ginkgo.Fail)
 	junitReporter := reporters.NewJUnitReporter("ctrl-svc.xml")
-	RunSpecsWithDefaultAndCustomReporters(t, "CSIControllerService testing suite", []Reporter{junitReporter})
+	ginkgo.RunSpecsWithDefaultAndCustomReporters(t, "CSIControllerService testing suite", []ginkgo.Reporter{junitReporter})
 }
 
 func setVariables() {
@@ -145,14 +145,14 @@ func addMetaData(createParams interface{}) {
 	}
 }
 
-var _ = Describe("CSIControllerService", func() {
-	BeforeEach(func() {
+var _ = ginkgo.Describe("CSIControllerService", func() {
+	ginkgo.BeforeEach(func() {
 		setVariables()
 	})
 
-	Describe("calling CreateVolume()", func() {
-		When("creating block volume", func() {
-			It("should successfully create block volume", func() {
+	ginkgo.Describe("calling CreateVolume()", func() {
+		ginkgo.When("creating block volume", func() {
+			ginkgo.It("should successfully create block volume", func() {
 				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
 				clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
 				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
@@ -166,8 +166,8 @@ var _ = Describe("CSIControllerService", func() {
 				req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
 
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.CreateVolumeResponse{
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.CreateVolumeResponse{
 					Volume: &csi.Volume{
 						CapacityBytes: validVolSize,
 						VolumeId:      filepath.Join(validBaseVolID, firstValidID, "scsi"),
@@ -185,7 +185,7 @@ var _ = Describe("CSIControllerService", func() {
 			})
 		})
 
-		It("should successfully create block volume and vol attributes should be set", func() {
+		ginkgo.It("should successfully create block volume and vol attributes should be set", func() {
 			clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
 			clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
 			clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
@@ -205,8 +205,8 @@ var _ = Describe("CSIControllerService", func() {
 			req.Parameters[common.KeyPerformancePolicyID] = "abc"
 			res, err := ctrlSvc.CreateVolume(context.Background(), req)
 
-			Expect(err).To(BeNil())
-			Expect(res).To(Equal(&csi.CreateVolumeResponse{
+			gomega.Expect(err).To(gomega.BeNil())
+			gomega.Expect(res).To(gomega.Equal(&csi.CreateVolumeResponse{
 				Volume: &csi.Volume{
 					CapacityBytes: validVolSize,
 					VolumeId:      filepath.Join(validBaseVolID, firstValidID, "scsi"),
@@ -228,9 +228,9 @@ var _ = Describe("CSIControllerService", func() {
 			}))
 		})
 	})
-	When("create block volume with replication properties", func() {
+	ginkgo.When("create block volume with replication properties", func() {
 		var req *csi.CreateVolumeRequest
-		BeforeEach(func() {
+		ginkgo.BeforeEach(func() {
 			req = getTypicalCreateVolumeRequest("my-vol", validVolSize)
 			req.Parameters[common.KeyArrayID] = firstValidID
 			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationEnabled)] = "true"
@@ -242,7 +242,7 @@ var _ = Describe("CSIControllerService", func() {
 			req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
 		})
 
-		It("should create volume and volumeGroup if policy exists", func() {
+		ginkgo.It("should create volume and volumeGroup if policy exists", func() {
 			clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
 			clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
 			clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
@@ -261,8 +261,8 @@ var _ = Describe("CSIControllerService", func() {
 			clientMock.On("GetAppliance", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
 
 			res, err := ctrlSvc.CreateVolume(context.Background(), req)
-			Expect(err).To(BeNil())
-			Expect(res).To(Equal(&csi.CreateVolumeResponse{
+			gomega.Expect(err).To(gomega.BeNil())
+			gomega.Expect(res).To(gomega.Equal(&csi.CreateVolumeResponse{
 				Volume: &csi.Volume{
 					CapacityBytes: validVolSize,
 					VolumeId:      filepath.Join(validBaseVolID, firstValidID, "scsi"),
@@ -284,7 +284,7 @@ var _ = Describe("CSIControllerService", func() {
 			}))
 		})
 
-		It("should create vg with namespace if namespaces not ignored", func() {
+		ginkgo.It("should create vg with namespace if namespaces not ignored", func() {
 			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationIgnoreNamespaces)] = "false"
 			req.Parameters[controller.KeyCSIPVCName] = req.Name
 			req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
@@ -316,8 +316,8 @@ var _ = Describe("CSIControllerService", func() {
 			clientMock.On("GetAppliance", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
 
 			res, err := ctrlSvc.CreateVolume(context.Background(), req)
-			Expect(err).To(BeNil())
-			Expect(res).To(Equal(&csi.CreateVolumeResponse{
+			gomega.Expect(err).To(gomega.BeNil())
+			gomega.Expect(res).To(gomega.Equal(&csi.CreateVolumeResponse{
 				Volume: &csi.Volume{
 					CapacityBytes: validVolSize,
 					VolumeId:      filepath.Join(validBaseVolID, firstValidID, "scsi"),
@@ -339,7 +339,7 @@ var _ = Describe("CSIControllerService", func() {
 			}))
 		})
 
-		It("should create new volume with existing volumeGroup with policy", func() {
+		ginkgo.It("should create new volume with existing volumeGroup with policy", func() {
 			clientMock.On("GetVolumeGroupByName", mock.Anything, validGroupName).
 				Return(gopowerstore.VolumeGroup{ID: validGroupID, ProtectionPolicyID: validPolicyID}, nil)
 
@@ -353,8 +353,8 @@ var _ = Describe("CSIControllerService", func() {
 			clientMock.On("GetAppliance", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
 
 			res, err := ctrlSvc.CreateVolume(context.Background(), req)
-			Expect(err).To(BeNil())
-			Expect(res).To(Equal(&csi.CreateVolumeResponse{
+			gomega.Expect(err).To(gomega.BeNil())
+			gomega.Expect(res).To(gomega.Equal(&csi.CreateVolumeResponse{
 				Volume: &csi.Volume{
 					CapacityBytes: validVolSize,
 					VolumeId:      filepath.Join(validBaseVolID, firstValidID, "scsi"),
@@ -376,8 +376,7 @@ var _ = Describe("CSIControllerService", func() {
 			}))
 		})
 
-		It("should create volume and update volumeGroup without policy, but policy exists", func() {
-
+		ginkgo.It("should create volume and update volumeGroup without policy, but policy exists", func() {
 			clientMock.On("GetVolumeGroupByName", mock.Anything, validGroupName).
 				Return(gopowerstore.VolumeGroup{ID: validGroupID, ProtectionPolicyID: validPolicyID}, nil)
 
@@ -393,8 +392,8 @@ var _ = Describe("CSIControllerService", func() {
 			clientMock.On("GetAppliance", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
 
 			res, err := ctrlSvc.CreateVolume(context.Background(), req)
-			Expect(err).To(BeNil())
-			Expect(res).To(Equal(&csi.CreateVolumeResponse{
+			gomega.Expect(err).To(gomega.BeNil())
+			gomega.Expect(res).To(gomega.Equal(&csi.CreateVolumeResponse{
 				Volume: &csi.Volume{
 					CapacityBytes: validVolSize,
 					VolumeId:      filepath.Join(validBaseVolID, firstValidID, "scsi"),
@@ -416,7 +415,7 @@ var _ = Describe("CSIControllerService", func() {
 			}))
 		})
 
-		It("should fail create volume and update volumeGroup if we can't ensure that policy exists", func() {
+		ginkgo.It("should fail create volume and update volumeGroup if we can't ensure that policy exists", func() {
 			clientMock.On("GetVolumeGroupByName", mock.Anything, validGroupName).
 				Return(gopowerstore.VolumeGroup{}, gopowerstore.NewNotFoundError())
 
@@ -424,56 +423,52 @@ var _ = Describe("CSIControllerService", func() {
 				Return(gopowerstore.RemoteSystem{}, gopowerstore.NewHostIsNotExistError())
 
 			res, err := ctrlSvc.CreateVolume(context.Background(), req)
-			Expect(res).To(BeNil())
-			Expect(err).NotTo(BeNil())
-			Expect(err.Error()).To(ContainSubstring("can't ensure protection policy exists"))
-
+			gomega.Expect(res).To(gomega.BeNil())
+			gomega.Expect(err).NotTo(gomega.BeNil())
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("can't ensure protection policy exists"))
 		})
 
-		It("should fail when rpo incorrect", func() {
+		ginkgo.It("should fail when rpo incorrect", func() {
 			clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
 
 			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationRPO)] = "invalidRpo"
 
 			res, err := ctrlSvc.CreateVolume(context.Background(), req)
-			Expect(res).To(BeNil())
-			Expect(err).NotTo(BeNil())
-			Expect(err.Error()).To(ContainSubstring("invalid rpo value"))
-
+			gomega.Expect(res).To(gomega.BeNil())
+			gomega.Expect(err).NotTo(gomega.BeNil())
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("invalid rpo value"))
 		})
 
-		It("should fail when rpo not declared in parameters", func() {
-
+		ginkgo.It("should fail when rpo not declared in parameters", func() {
 			delete(req.Parameters, ctrlSvc.WithRP(controller.KeyReplicationRPO))
 
 			res, err := ctrlSvc.CreateVolume(context.Background(), req)
-			Expect(res).To(BeNil())
-			Expect(err).NotTo(BeNil())
-			Expect(err.Error()).To(ContainSubstring("replication enabled but no RPO specified in storage class"))
-
+			gomega.Expect(res).To(gomega.BeNil())
+			gomega.Expect(err).NotTo(gomega.BeNil())
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("replication enabled but no RPO specified in storage class"))
 		})
 
-		It("should fail when remote system not declared in parameters", func() {
+		ginkgo.It("should fail when remote system not declared in parameters", func() {
 			delete(req.Parameters, ctrlSvc.WithRP(controller.KeyReplicationRemoteSystem))
 
 			res, err := ctrlSvc.CreateVolume(context.Background(), req)
-			Expect(res).To(BeNil())
-			Expect(err).NotTo(BeNil())
-			Expect(err.Error()).To(ContainSubstring("replication enabled but no remote system specified in storage class"))
+			gomega.Expect(res).To(gomega.BeNil())
+			gomega.Expect(err).NotTo(gomega.BeNil())
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("replication enabled but no remote system specified in storage class"))
 		})
 
-		It("should fail when volume group prefix not declared in parameters", func() {
+		ginkgo.It("should fail when volume group prefix not declared in parameters", func() {
 			delete(req.Parameters, ctrlSvc.WithRP(controller.KeyReplicationVGPrefix))
 
 			res, err := ctrlSvc.CreateVolume(context.Background(), req)
-			Expect(res).To(BeNil())
-			Expect(err).NotTo(BeNil())
-			Expect(err.Error()).To(ContainSubstring("replication enabled but no volume group prefix specified in storage class"))
+			gomega.Expect(res).To(gomega.BeNil())
+			gomega.Expect(err).NotTo(gomega.BeNil())
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("replication enabled but no volume group prefix specified in storage class"))
 		})
 	})
 
-	When("creating nfs volume", func() {
-		It("should successfully create nfs volume", func() {
+	ginkgo.When("creating nfs volume", func() {
+		ginkgo.It("should successfully create nfs volume", func() {
 			clientMock.On("GetNASByName", mock.Anything, validNasName).Return(gopowerstore.NAS{ID: validNasID}, nil)
 			clientMock.On("CreateFS", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
 			clientMock.On("GetFS", context.Background(), mock.Anything).Return(gopowerstore.FileSystem{NasServerID: validNasID}, nil)
@@ -487,8 +482,8 @@ var _ = Describe("CSIControllerService", func() {
 			req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
 
 			res, err := ctrlSvc.CreateVolume(context.Background(), req)
-			Expect(err).To(BeNil())
-			Expect(res).To(Equal(&csi.CreateVolumeResponse{
+			gomega.Expect(err).To(gomega.BeNil())
+			gomega.Expect(res).To(gomega.Equal(&csi.CreateVolumeResponse{
 				Volume: &csi.Volume{
 					CapacityBytes: validVolSize,
 					VolumeId:      filepath.Join(validBaseVolID, secondValidID, "nfs"),
@@ -508,7 +503,7 @@ var _ = Describe("CSIControllerService", func() {
 			}))
 		})
 
-		It("should successfully create nfs volume & all vol attribute should get set", func() {
+		ginkgo.It("should successfully create nfs volume & all vol attribute should get set", func() {
 			clientMock.On("GetNASByName", mock.Anything, validNasName).Return(gopowerstore.NAS{ID: validNasID}, nil)
 			clientMock.On("CreateFS", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
 			clientMock.On("GetFS", context.Background(), mock.Anything).Return(gopowerstore.FileSystem{NasServerID: validNasID}, nil)
@@ -535,8 +530,8 @@ var _ = Describe("CSIControllerService", func() {
 			req.Parameters[common.KeyFlrMaxRetention] = "KeyFlrMaxRetention"
 
 			res, err := ctrlSvc.CreateVolume(context.Background(), req)
-			Expect(err).To(BeNil())
-			Expect(res).To(Equal(&csi.CreateVolumeResponse{
+			gomega.Expect(err).To(gomega.BeNil())
+			gomega.Expect(res).To(gomega.Equal(&csi.CreateVolumeResponse{
 				Volume: &csi.Volume{
 					CapacityBytes: validVolSize,
 					VolumeId:      filepath.Join(validBaseVolID, secondValidID, "nfs"),
@@ -568,8 +563,8 @@ var _ = Describe("CSIControllerService", func() {
 			}))
 		})
 
-		When("creating nfs volume with NFS acls in array config and storage class", func() {
-			It("should successfully create nfs volume with storage class NFS acls in volume response", func() {
+		ginkgo.When("creating nfs volume with NFS acls in array config and storage class", func() {
+			ginkgo.It("should successfully create nfs volume with storage class NFS acls in volume response", func() {
 				clientMock.On("GetNASByName", mock.Anything, validNasName).Return(gopowerstore.NAS{ID: validNasID}, nil)
 				clientMock.On("CreateFS", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
 				clientMock.On("GetNfsServer", mock.Anything, mock.Anything).Return(gopowerstore.NFSServerInstance{Id: validNfsServerID, IsNFSv4Enabled: true}, nil)
@@ -586,8 +581,8 @@ var _ = Describe("CSIControllerService", func() {
 				req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
 
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.CreateVolumeResponse{
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.CreateVolumeResponse{
 					Volume: &csi.Volume{
 						CapacityBytes: validVolSize,
 						VolumeId:      filepath.Join(validBaseVolID, secondValidID, "nfs"),
@@ -608,8 +603,8 @@ var _ = Describe("CSIControllerService", func() {
 			})
 		})
 
-		When("creating nfs volume with NFS acls in array config and not in storage class", func() {
-			It("should successfully create nfs volume with array config NFS acls in volume response", func() {
+		ginkgo.When("creating nfs volume with NFS acls in array config and not in storage class", func() {
+			ginkgo.It("should successfully create nfs volume with array config NFS acls in volume response", func() {
 				clientMock.On("GetNASByName", mock.Anything, validNasName).Return(gopowerstore.NAS{ID: validNasID}, nil)
 				clientMock.On("CreateFS", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
 				clientMock.On("GetNfsServer", mock.Anything, mock.Anything).Return(gopowerstore.NFSServerInstance{Id: validNfsServerID, IsNFSv4Enabled: true}, nil)
@@ -625,8 +620,8 @@ var _ = Describe("CSIControllerService", func() {
 				req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
 
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.CreateVolumeResponse{
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.CreateVolumeResponse{
 					Volume: &csi.Volume{
 						CapacityBytes: validVolSize,
 						VolumeId:      filepath.Join(validBaseVolID, secondValidID, "nfs"),
@@ -647,8 +642,8 @@ var _ = Describe("CSIControllerService", func() {
 			})
 		})
 
-		When("creating nfs volume with NFS acls not in array config and not in storage class", func() {
-			It("should successfully create nfs volume with default NFS acls in volume response", func() {
+		ginkgo.When("creating nfs volume with NFS acls not in array config and not in storage class", func() {
+			ginkgo.It("should successfully create nfs volume with default NFS acls in volume response", func() {
 				clientMock.On("GetNASByName", mock.Anything, validNasName).Return(gopowerstore.NAS{ID: validNasID}, nil)
 				clientMock.On("CreateFS", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
 				clientMock.On("GetNfsServer", mock.Anything, mock.Anything).Return(gopowerstore.NFSServerInstance{Id: validNfsServerID, IsNFSv4Enabled: true}, nil)
@@ -662,8 +657,8 @@ var _ = Describe("CSIControllerService", func() {
 				req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
 
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.CreateVolumeResponse{
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.CreateVolumeResponse{
 					Volume: &csi.Volume{
 						CapacityBytes: validVolSize,
 						VolumeId:      filepath.Join(validBaseVolID, secondValidID, "nfs"),
@@ -684,8 +679,8 @@ var _ = Describe("CSIControllerService", func() {
 			})
 		})
 
-		When("creating nfs volume with NFS acls in not in secrets & default", func() {
-			It("should successfully create nfs volume with empty NFS acls in volume response", func() {
+		ginkgo.When("creating nfs volume with NFS acls in not in secrets & default", func() {
+			ginkgo.It("should successfully create nfs volume with empty NFS acls in volume response", func() {
 				clientMock.On("GetNASByName", mock.Anything, validNasName).Return(gopowerstore.NAS{ID: validNasID}, nil)
 				clientMock.On("CreateFS", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
 				clientMock.On("GetNfsServer", mock.Anything, mock.Anything).Return(gopowerstore.NFSServerInstance{Id: validNfsServerID, IsNFSv4Enabled: true}, nil)
@@ -704,8 +699,8 @@ var _ = Describe("CSIControllerService", func() {
 				_ = ctrlSvc.Init()
 
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.CreateVolumeResponse{
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.CreateVolumeResponse{
 					Volume: &csi.Volume{
 						CapacityBytes: validVolSize,
 						VolumeId:      filepath.Join(validBaseVolID, secondValidID, "nfs"),
@@ -726,8 +721,8 @@ var _ = Describe("CSIControllerService", func() {
 			})
 		})
 
-		When("creating nfs volume without nfs topology in AccessibilityRequirements", func() {
-			It("should fail", func() {
+		ginkgo.When("creating nfs volume without nfs topology in AccessibilityRequirements", func() {
+			ginkgo.It("should fail", func() {
 				req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
 				req.Parameters[common.KeyArrayID] = secondValidID
 
@@ -741,14 +736,14 @@ var _ = Describe("CSIControllerService", func() {
 
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
 
-				Expect(res).To(BeNil())
-				Expect(err).ToNot(BeNil())
-				Expect(err.Error()).To(ContainSubstring("invalid topology requested for NFS Volume. Please validate your storage class has nfs topology."))
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("invalid topology requested for NFS Volume. Please validate your storage class has nfs topology."))
 			})
 		})
 
-		When("creating nfs volume with more than one topology in AccessibilityRequirements", func() {
-			It("should return only nfs topology", func() {
+		ginkgo.When("creating nfs volume with more than one topology in AccessibilityRequirements", func() {
+			ginkgo.It("should return only nfs topology", func() {
 				clientMock.On("GetNASByName", mock.Anything, validNasName).Return(gopowerstore.NAS{ID: validNasID}, nil)
 				clientMock.On("CreateFS", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
 				clientMock.On("GetFS", context.Background(), mock.Anything).Return(gopowerstore.FileSystem{NasServerID: validNasID}, nil)
@@ -765,8 +760,8 @@ var _ = Describe("CSIControllerService", func() {
 				req.AccessibilityRequirements.Preferred = append(req.AccessibilityRequirements.Preferred, iscsiTopology)
 
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.CreateVolumeResponse{
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.CreateVolumeResponse{
 					Volume: &csi.Volume{
 						CapacityBytes: validVolSize,
 						VolumeId:      filepath.Join(validBaseVolID, secondValidID, "nfs"),
@@ -787,8 +782,8 @@ var _ = Describe("CSIControllerService", func() {
 			})
 		})
 
-		When("volume name already in use", func() {
-			It("should return existing volume [Block]", func() {
+		ginkgo.When("volume name already in use", func() {
+			ginkgo.It("should return existing volume [Block]", func() {
 				volName := "my-vol"
 				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
 				clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
@@ -814,8 +809,8 @@ var _ = Describe("CSIControllerService", func() {
 				req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
 
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.CreateVolumeResponse{
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.CreateVolumeResponse{
 					Volume: &csi.Volume{
 						CapacityBytes: validVolSize,
 						VolumeId:      filepath.Join(validBaseVolID, firstValidID, "scsi"),
@@ -832,7 +827,7 @@ var _ = Describe("CSIControllerService", func() {
 				}))
 			})
 
-			It("should return existing volume [NFS]", func() {
+			ginkgo.It("should return existing volume [NFS]", func() {
 				volName := "my-vol"
 				clientMock.On("GetNASByName", mock.Anything, validNasName).Return(gopowerstore.NAS{ID: validNasID}, nil)
 
@@ -857,8 +852,8 @@ var _ = Describe("CSIControllerService", func() {
 				req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
 
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.CreateVolumeResponse{
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.CreateVolumeResponse{
 					Volume: &csi.Volume{
 						CapacityBytes: validVolSize,
 						VolumeId:      filepath.Join(validBaseVolID, secondValidID, "nfs"),
@@ -878,8 +873,8 @@ var _ = Describe("CSIControllerService", func() {
 				}))
 			})
 
-			When("existing volume size is smaller", func() {
-				It("should fail [Block]", func() {
+			ginkgo.When("existing volume size is smaller", func() {
+				ginkgo.It("should fail [Block]", func() {
 					volName := "my-vol"
 					clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
 					clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
@@ -901,14 +896,14 @@ var _ = Describe("CSIControllerService", func() {
 					req.Parameters[common.KeyArrayID] = firstValidID
 					res, err := ctrlSvc.CreateVolume(context.Background(), req)
 
-					Expect(res).To(BeNil())
-					Expect(err).ToNot(BeNil())
-					Expect(err.Error()).To(
-						ContainSubstring("volume '" + volName + "' already exists but is incompatible volume size"),
+					gomega.Expect(res).To(gomega.BeNil())
+					gomega.Expect(err).ToNot(gomega.BeNil())
+					gomega.Expect(err.Error()).To(
+						gomega.ContainSubstring("volume '" + volName + "' already exists but is incompatible volume size"),
 					)
 				})
 
-				It("should fail [NFS]", func() {
+				ginkgo.It("should fail [NFS]", func() {
 					volName := "my-vol"
 					clientMock.On("GetNASByName", mock.Anything, validNasName).Return(gopowerstore.NAS{ID: validNasID}, nil)
 
@@ -928,17 +923,17 @@ var _ = Describe("CSIControllerService", func() {
 					req.Parameters[common.KeyArrayID] = secondValidID
 					res, err := ctrlSvc.CreateVolume(context.Background(), req)
 
-					Expect(res).To(BeNil())
-					Expect(err).ToNot(BeNil())
-					Expect(err.Error()).To(
-						ContainSubstring("filesystem '" + volName + "' already exists but is incompatible volume size"),
+					gomega.Expect(res).To(gomega.BeNil())
+					gomega.Expect(err).ToNot(gomega.BeNil())
+					gomega.Expect(err.Error()).To(
+						gomega.ContainSubstring("filesystem '" + volName + "' already exists but is incompatible volume size"),
 					)
 				})
 			})
 		})
 
-		When("creating volume from snapshot", func() {
-			It("should create volume using snapshot as a source [Block]", func() {
+		ginkgo.When("creating volume from snapshot", func() {
+			ginkgo.It("should create volume using snapshot as a source [Block]", func() {
 				snapID := validBlockVolumeID
 
 				contentSource := &csi.VolumeContentSource{Type: &csi.VolumeContentSource_Snapshot{
@@ -961,8 +956,8 @@ var _ = Describe("CSIControllerService", func() {
 
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
 
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.CreateVolumeResponse{
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.CreateVolumeResponse{
 					Volume: &csi.Volume{
 						CapacityBytes: validVolSize,
 						VolumeId:      filepath.Join(validBaseVolID, firstValidID, "scsi"),
@@ -974,7 +969,7 @@ var _ = Describe("CSIControllerService", func() {
 				}))
 			})
 
-			It("should create volume using snapshot as a source [NFS]", func() {
+			ginkgo.It("should create volume using snapshot as a source [NFS]", func() {
 				snapID := validNfsVolumeID
 				volName := "my-vol"
 
@@ -1002,8 +997,8 @@ var _ = Describe("CSIControllerService", func() {
 
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
 
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.CreateVolumeResponse{
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.CreateVolumeResponse{
 					Volume: &csi.Volume{
 						CapacityBytes: validVolSize,
 						VolumeId:      filepath.Join(validBaseVolID, secondValidID, "nfs"),
@@ -1017,8 +1012,8 @@ var _ = Describe("CSIControllerService", func() {
 			})
 		})
 
-		When("cloning volume", func() {
-			It("should create volume using volume as a source [Block]", func() {
+		ginkgo.When("cloning volume", func() {
+			ginkgo.It("should create volume using volume as a source [Block]", func() {
 				srcID := validBlockVolumeID
 				volName := "my-vol"
 
@@ -1046,8 +1041,8 @@ var _ = Describe("CSIControllerService", func() {
 
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
 
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.CreateVolumeResponse{
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.CreateVolumeResponse{
 					Volume: &csi.Volume{
 						CapacityBytes: validVolSize,
 						VolumeId:      filepath.Join(validBaseVolID, firstValidID, "scsi"),
@@ -1059,7 +1054,7 @@ var _ = Describe("CSIControllerService", func() {
 				}))
 			})
 
-			It("should create volume using volume as a source [NFS]", func() {
+			ginkgo.It("should create volume using volume as a source [NFS]", func() {
 				srcID := validNfsVolumeID
 				volName := "my-vol"
 
@@ -1087,8 +1082,8 @@ var _ = Describe("CSIControllerService", func() {
 
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
 
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.CreateVolumeResponse{
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.CreateVolumeResponse{
 					Volume: &csi.Volume{
 						CapacityBytes: validVolSize,
 						VolumeId:      filepath.Join(validBaseVolID, secondValidID, "nfs"),
@@ -1102,8 +1097,8 @@ var _ = Describe("CSIControllerService", func() {
 			})
 		})
 
-		When("there is no array IP in storage class", func() {
-			It("should use default array", func() {
+		ginkgo.When("there is no array IP in storage class", func() {
+			ginkgo.It("should use default array", func() {
 				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
 				clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
 				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
@@ -1114,8 +1109,8 @@ var _ = Describe("CSIControllerService", func() {
 				req := getTypicalCreateVolumeRequest("my-vol", validVolSize)
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
 
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.CreateVolumeResponse{
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.CreateVolumeResponse{
 					Volume: &csi.Volume{
 						CapacityBytes: validVolSize,
 						VolumeId:      filepath.Join(validBaseVolID, firstValidID, "scsi"),
@@ -1131,20 +1126,20 @@ var _ = Describe("CSIControllerService", func() {
 			})
 		})
 
-		When("there array IP passed to storage class is not config", func() {
-			It("should fail", func() {
+		ginkgo.When("there array IP passed to storage class is not config", func() {
+			ginkgo.It("should fail", func() {
 				req := getTypicalCreateVolumeRequest("my-vol", validVolSize)
 				req.Parameters[common.KeyArrayID] = "127.0.0.1"
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
 
-				Expect(res).To(BeNil())
-				Expect(err).ToNot(BeNil())
-				Expect(err.Error()).To(ContainSubstring("can't find array with provided id"))
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("can't find array with provided id"))
 			})
 		})
 
-		When("requesting block access from nfs volume", func() {
-			It("should fail [new key]", func() {
+		ginkgo.When("requesting block access from nfs volume", func() {
+			ginkgo.It("should fail [new key]", func() {
 				req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
 				req.VolumeCapabilities[0].AccessType = &csi.VolumeCapability_Block{
 					Block: &csi.VolumeCapability_BlockVolume{},
@@ -1153,12 +1148,12 @@ var _ = Describe("CSIControllerService", func() {
 				req.Parameters[controller.KeyFsType] = "nfs"
 
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
-				Expect(res).To(BeNil())
-				Expect(err).ToNot(BeNil())
-				Expect(err.Error()).To(ContainSubstring("raw block requested from NFS Volume"))
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("raw block requested from NFS Volume"))
 			})
 
-			It("should fail [old key]", func() {
+			ginkgo.It("should fail [old key]", func() {
 				req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
 				req.VolumeCapabilities[0].AccessType = &csi.VolumeCapability_Block{
 					Block: &csi.VolumeCapability_BlockVolume{},
@@ -1167,42 +1162,42 @@ var _ = Describe("CSIControllerService", func() {
 				req.Parameters[controller.KeyFsTypeOld] = "nfs"
 
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
-				Expect(res).To(BeNil())
-				Expect(err).ToNot(BeNil())
-				Expect(err.Error()).To(ContainSubstring("raw block requested from NFS Volume"))
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("raw block requested from NFS Volume"))
 			})
 		})
 
-		When("volume name is empty", func() {
-			It("should fail", func() {
+		ginkgo.When("volume name is empty", func() {
+			ginkgo.It("should fail", func() {
 				req := getTypicalCreateVolumeRequest("", validVolSize)
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
 
-				Expect(res).To(BeNil())
-				Expect(err).ToNot(BeNil())
-				Expect(err.Error()).To(ContainSubstring("name cannot be empty"))
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("name cannot be empty"))
 			})
 		})
 
-		When("volume size is incorrect", func() {
-			It("should fail", func() {
+		ginkgo.When("volume size is incorrect", func() {
+			ginkgo.It("should fail", func() {
 				req := getTypicalCreateVolumeRequest("my-vol", validVolSize)
 				req.CapacityRange.LimitBytes = -1000
 				req.CapacityRange.RequiredBytes = -1000
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
 
-				Expect(res).To(BeNil())
-				Expect(err).ToNot(BeNil())
-				Expect(err.Error()).To(ContainSubstring(
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring(
 					fmt.Sprintf("bad capacity: volume size bytes %d and limit size bytes: %d must not be negative", req.CapacityRange.RequiredBytes, req.CapacityRange.RequiredBytes),
 				))
 			})
 		})
 	})
 
-	Describe("calling DeleteVolume()", func() {
-		When("deleting block volume", func() {
-			It("should successfully delete block volume", func() {
+	ginkgo.Describe("calling DeleteVolume()", func() {
+		ginkgo.When("deleting block volume", func() {
+			ginkgo.It("should successfully delete block volume", func() {
 				clientMock.On("GetSnapshotsByVolumeID", mock.Anything, validBaseVolID).Return([]gopowerstore.Volume{}, nil)
 				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).Return(gopowerstore.VolumeGroups{}, nil)
 				clientMock.On("DeleteVolume",
@@ -1215,12 +1210,12 @@ var _ = Describe("CSIControllerService", func() {
 
 				res, err := ctrlSvc.DeleteVolume(context.Background(), req)
 
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.DeleteVolumeResponse{}))
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.DeleteVolumeResponse{}))
 			})
 		})
-		When("deleting block volume with old volume handle naming", func() {
-			It("should successfully delete block volume", func() {
+		ginkgo.When("deleting block volume with old volume handle naming", func() {
+			ginkgo.It("should successfully delete block volume", func() {
 				clientMock.On("GetSnapshotsByVolumeID", mock.Anything, validBaseVolID).Return([]gopowerstore.Volume{}, nil)
 				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).Return(gopowerstore.VolumeGroups{}, nil)
 				clientMock.On("DeleteVolume",
@@ -1234,13 +1229,13 @@ var _ = Describe("CSIControllerService", func() {
 
 				res, err := ctrlSvc.DeleteVolume(context.Background(), req)
 
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.DeleteVolumeResponse{}))
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.DeleteVolumeResponse{}))
 			})
 		})
 
-		When("delete block volume with replication props", func() {
-			It("should successful delete block volume and remove it from group and unassigned policy", func() {
+		ginkgo.When("delete block volume with replication props", func() {
+			ginkgo.It("should successful delete block volume and remove it from group and unassigned policy", func() {
 				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).
 					Return(gopowerstore.VolumeGroups{VolumeGroup: []gopowerstore.VolumeGroup{{ID: validGroupID, ProtectionPolicyID: validPolicyID}}}, nil)
 
@@ -1265,13 +1260,13 @@ var _ = Describe("CSIControllerService", func() {
 
 				res, err := ctrlSvc.DeleteVolume(context.Background(), req)
 
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.DeleteVolumeResponse{}))
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.DeleteVolumeResponse{}))
 			})
 		})
 
-		When("deleting nfs volume", func() {
-			It("should successfully delete nfs volume", func() {
+		ginkgo.When("deleting nfs volume", func() {
+			ginkgo.It("should successfully delete nfs volume", func() {
 				clientMock.On("GetFsSnapshotsByVolumeID", mock.Anything, validBaseVolID).Return([]gopowerstore.FileSystem{}, nil)
 				clientMock.On("DeleteFS",
 					mock.Anything,
@@ -1284,24 +1279,24 @@ var _ = Describe("CSIControllerService", func() {
 
 				res, err := ctrlSvc.DeleteVolume(context.Background(), req)
 
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.DeleteVolumeResponse{}))
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.DeleteVolumeResponse{}))
 			})
 		})
 
-		When("volume id is not specified", func() {
-			It("should fail", func() {
+		ginkgo.When("volume id is not specified", func() {
+			ginkgo.It("should fail", func() {
 				req := &csi.DeleteVolumeRequest{}
 
 				res, err := ctrlSvc.DeleteVolume(context.Background(), req)
-				Expect(res).To(BeNil())
-				Expect(err).ToNot(BeNil())
-				Expect(err.Error()).To(ContainSubstring("volume ID is required"))
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("volume ID is required"))
 			})
 		})
 
-		When("there is no array ip in volume id", func() {
-			It("should check storage using default array [no volume found]", func() {
+		ginkgo.When("there is no array ip in volume id", func() {
+			ginkgo.It("should check storage using default array [no volume found]", func() {
 				clientMock.On("GetVolume", context.Background(), validBaseVolID).
 					Return(gopowerstore.Volume{}, gopowerstore.APIError{
 						ErrorMsg: &api.ErrorMsg{
@@ -1318,11 +1313,11 @@ var _ = Describe("CSIControllerService", func() {
 				req := &csi.DeleteVolumeRequest{VolumeId: validBaseVolID}
 
 				res, err := ctrlSvc.DeleteVolume(context.Background(), req)
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.DeleteVolumeResponse{}))
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.DeleteVolumeResponse{}))
 			})
 
-			It("should check storage using default array [unexpected api error]", func() {
+			ginkgo.It("should check storage using default array [unexpected api error]", func() {
 				e := errors.New("api-error")
 				clientMock.On("GetVolume", context.Background(), validBaseVolID).
 					Return(gopowerstore.Volume{}, e)
@@ -1333,17 +1328,17 @@ var _ = Describe("CSIControllerService", func() {
 
 				res, err := ctrlSvc.DeleteVolume(context.Background(), req)
 
-				Expect(err).ToNot(BeNil())
-				Expect(res).To(BeNil())
-				Expect(err.Error()).To(ContainSubstring("failure checking volume status"))
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("failure checking volume status"))
 			})
 		})
 
-		When("when trying delete volume with existing snapshots", func() {
+		ginkgo.When("when trying delete volume with existing snapshots", func() {
 			// TODO: add test after explicitly define deletion behavior
 			// It("should fail [Block]", func() {})
 
-			It("should fail [NFS]", func() {
+			ginkgo.It("should fail [NFS]", func() {
 				clientMock.On("GetFsSnapshotsByVolumeID", mock.Anything, validBaseVolID).
 					Return([]gopowerstore.FileSystem{
 						{
@@ -1356,14 +1351,14 @@ var _ = Describe("CSIControllerService", func() {
 
 				res, err := ctrlSvc.DeleteVolume(context.Background(), req)
 
-				Expect(err).ToNot(BeNil())
-				Expect(res).To(BeNil())
-				Expect(err.Error()).To(ContainSubstring("snapshots based on this volume still exist"))
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("snapshots based on this volume still exist"))
 			})
 		})
 
-		When("volume does not exist", func() {
-			It("should succeed [Block]", func() {
+		ginkgo.When("volume does not exist", func() {
+			ginkgo.It("should succeed [Block]", func() {
 				clientMock.On("GetSnapshotsByVolumeID", mock.Anything, validBaseVolID).Return([]gopowerstore.Volume{}, nil)
 				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).Return(gopowerstore.VolumeGroups{}, nil)
 				clientMock.On("DeleteVolume",
@@ -1380,11 +1375,11 @@ var _ = Describe("CSIControllerService", func() {
 
 				res, err := ctrlSvc.DeleteVolume(context.Background(), req)
 
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.DeleteVolumeResponse{}))
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.DeleteVolumeResponse{}))
 			})
 
-			It("should succeed [NFS]", func() {
+			ginkgo.It("should succeed [NFS]", func() {
 				clientMock.On("GetFsSnapshotsByVolumeID", mock.Anything, validBaseVolID).Return([]gopowerstore.FileSystem{}, nil)
 				clientMock.On("GetNFSExportByFileSystemID", mock.Anything, validBaseVolID).
 					Return(gopowerstore.NFSExport{}, nil)
@@ -1401,13 +1396,13 @@ var _ = Describe("CSIControllerService", func() {
 
 				res, err := ctrlSvc.DeleteVolume(context.Background(), req)
 
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.DeleteVolumeResponse{}))
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.DeleteVolumeResponse{}))
 			})
 		})
 
-		When("block volume still attached to host", func() {
-			It("should fail", func() {
+		ginkgo.When("block volume still attached to host", func() {
+			ginkgo.It("should fail", func() {
 				clientMock.On("GetSnapshotsByVolumeID", mock.Anything, validBaseVolID).Return([]gopowerstore.Volume{}, nil)
 				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).Return(gopowerstore.VolumeGroups{}, nil)
 				clientMock.On("DeleteVolume",
@@ -1424,14 +1419,14 @@ var _ = Describe("CSIControllerService", func() {
 
 				res, err := ctrlSvc.DeleteVolume(context.Background(), req)
 
-				Expect(err).ToNot(BeNil())
-				Expect(res).To(BeNil())
-				Expect(err.Error()).To(ContainSubstring("volume with ID '" + validBaseVolID + "' is still attached to host"))
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("volume with ID '" + validBaseVolID + "' is still attached to host"))
 			})
 		})
 
-		When("can not connect to API", func() {
-			It("should fail [Block]", func() {
+		ginkgo.When("can not connect to API", func() {
+			ginkgo.It("should fail [Block]", func() {
 				e := errors.New("can't connect")
 				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).Return(gopowerstore.VolumeGroups{}, e)
 				clientMock.On("GetSnapshotsByVolumeID", mock.Anything, validBaseVolID).
@@ -1441,12 +1436,12 @@ var _ = Describe("CSIControllerService", func() {
 
 				res, err := ctrlSvc.DeleteVolume(context.Background(), req)
 
-				Expect(err).ToNot(BeNil())
-				Expect(res).To(BeNil())
-				Expect(err.Error()).To(ContainSubstring(e.Error()))
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring(e.Error()))
 			})
 
-			It("should fail [NFS]", func() {
+			ginkgo.It("should fail [NFS]", func() {
 				e := errors.New("can't connect")
 				clientMock.On("GetFsSnapshotsByVolumeID", mock.Anything, validBaseVolID).
 					Return([]gopowerstore.FileSystem{}, e)
@@ -1455,28 +1450,28 @@ var _ = Describe("CSIControllerService", func() {
 
 				res, err := ctrlSvc.DeleteVolume(context.Background(), req)
 
-				Expect(err).ToNot(BeNil())
-				Expect(res).To(BeNil())
-				Expect(err.Error()).To(ContainSubstring("failure getting snapshot"))
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("failure getting snapshot"))
 			})
 		})
 
-		When("volume id contains unsupported protocol", func() {
-			It("should fail", func() {
+		ginkgo.When("volume id contains unsupported protocol", func() {
+			ginkgo.It("should fail", func() {
 				req := &csi.DeleteVolumeRequest{VolumeId: validBaseVolID + "/" + firstValidID + "/smb"}
 
 				res, err := ctrlSvc.DeleteVolume(context.Background(), req)
 
-				Expect(err).ToNot(BeNil())
-				Expect(res).To(BeNil())
-				Expect(err.Error()).To(ContainSubstring("can't figure out protocol"))
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("can't figure out protocol"))
 			})
 		})
 	})
 
-	Describe("calling CreateSnapshot()", func() {
-		When("parameters are correct", func() {
-			It("should successfully create new snapshot [Block]", func() {
+	ginkgo.Describe("calling CreateSnapshot()", func() {
+		ginkgo.When("parameters are correct", func() {
+			ginkgo.It("should successfully create new snapshot [Block]", func() {
 				snapName := validSnapName
 				clientMock.On("GetVolume", mock.Anything, validBaseVolID).Return(
 					gopowerstore.Volume{
@@ -1499,13 +1494,13 @@ var _ = Describe("CSIControllerService", func() {
 
 				res, err := ctrlSvc.CreateSnapshot(context.Background(), req)
 
-				Expect(err).To(BeNil())
-				Expect(res.Snapshot.SnapshotId).To(Equal("new-snap-id/globalvolid1/scsi"))
-				Expect(res.Snapshot.SizeBytes).To(Equal(int64(validVolSize)))
-				Expect(res.Snapshot.SourceVolumeId).To(Equal(validBaseVolID))
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res.Snapshot.SnapshotId).To(gomega.Equal("new-snap-id/globalvolid1/scsi"))
+				gomega.Expect(res.Snapshot.SizeBytes).To(gomega.Equal(int64(validVolSize)))
+				gomega.Expect(res.Snapshot.SourceVolumeId).To(gomega.Equal(validBaseVolID))
 			})
 
-			It("should successfully create new snapshot [NFS]", func() {
+			ginkgo.It("should successfully create new snapshot [NFS]", func() {
 				snapName := validSnapName
 				clientMock.On("GetFS", mock.Anything, validBaseVolID).Return(
 					gopowerstore.FileSystem{
@@ -1528,15 +1523,15 @@ var _ = Describe("CSIControllerService", func() {
 
 				res, err := ctrlSvc.CreateSnapshot(context.Background(), req)
 
-				Expect(err).To(BeNil())
-				Expect(res.Snapshot.SnapshotId).To(Equal("new-snap-id/globalvolid2/nfs"))
-				Expect(res.Snapshot.SizeBytes).To(Equal(int64(validVolSize - controller.ReservedSize)))
-				Expect(res.Snapshot.SourceVolumeId).To(Equal(validBaseVolID))
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res.Snapshot.SnapshotId).To(gomega.Equal("new-snap-id/globalvolid2/nfs"))
+				gomega.Expect(res.Snapshot.SizeBytes).To(gomega.Equal(int64(validVolSize - controller.ReservedSize)))
+				gomega.Expect(res.Snapshot.SourceVolumeId).To(gomega.Equal(validBaseVolID))
 			})
 		})
 
-		When("snapshot name already taken", func() {
-			It("should fail [sourceVolumeId != snap.sourceVolumeId]", func() {
+		ginkgo.When("snapshot name already taken", func() {
+			ginkgo.It("should fail [sourceVolumeId != snap.sourceVolumeId]", func() {
 				clientMock.On("GetVolume", mock.Anything, validBaseVolID).Return(
 					gopowerstore.Volume{
 						Name: "name",
@@ -1560,12 +1555,12 @@ var _ = Describe("CSIControllerService", func() {
 
 				res, err := ctrlSvc.CreateSnapshot(context.Background(), req)
 
-				Expect(res).To(BeNil())
-				Expect(err).NotTo(BeNil())
-				Expect(err.Error()).To(ContainSubstring(fmt.Sprintf("snapshot with name '%s' exists, but SourceVolumeId %s doesn't match", "my-snap", validBaseVolID)))
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err).NotTo(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring(fmt.Sprintf("snapshot with name '%s' exists, but SourceVolumeId %s doesn't match", "my-snap", validBaseVolID)))
 			})
 
-			It("should succeed [same sourceVolumeId]", func() {
+			ginkgo.It("should succeed [same sourceVolumeId]", func() {
 				clientMock.On("GetVolume", mock.Anything, validBaseVolID).Return(
 					gopowerstore.Volume{
 						Name: "name",
@@ -1589,15 +1584,15 @@ var _ = Describe("CSIControllerService", func() {
 
 				res, err := ctrlSvc.CreateSnapshot(context.Background(), req)
 
-				Expect(err).To(BeNil())
-				Expect(res.Snapshot.SnapshotId).To(Equal("old-snap-id/globalvolid1/scsi"))
-				Expect(res.Snapshot.SizeBytes).To(Equal(int64(validVolSize)))
-				Expect(res.Snapshot.SourceVolumeId).To(Equal(validBaseVolID))
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res.Snapshot.SnapshotId).To(gomega.Equal("old-snap-id/globalvolid1/scsi"))
+				gomega.Expect(res.Snapshot.SizeBytes).To(gomega.Equal(int64(validVolSize)))
+				gomega.Expect(res.Snapshot.SourceVolumeId).To(gomega.Equal(validBaseVolID))
 			})
 		})
 
-		When("there is an API error when creating snapshot", func() {
-			It("should return that error", func() {
+		ginkgo.When("there is an API error when creating snapshot", func() {
+			ginkgo.It("should return that error", func() {
 				snapName := validSnapName
 				clientMock.On("GetVolume", mock.Anything, validBaseVolID).Return(
 					gopowerstore.Volume{
@@ -1625,16 +1620,16 @@ var _ = Describe("CSIControllerService", func() {
 
 				res, err := ctrlSvc.CreateSnapshot(context.Background(), req)
 
-				Expect(res).To(BeNil())
-				Expect(err).ToNot(BeNil())
-				Expect(err.Error()).To(ContainSubstring("something went wrong"))
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("something went wrong"))
 			})
 		})
 	})
 
-	Describe("calling DeleteSnapshot()", func() {
-		When("parameters are correct", func() {
-			It("should successfully delete snapshot [Block]", func() {
+	ginkgo.Describe("calling DeleteSnapshot()", func() {
+		ginkgo.When("parameters are correct", func() {
+			ginkgo.It("should successfully delete snapshot [Block]", func() {
 				clientMock.On("GetSnapshot", mock.Anything, validBaseVolID).Return(gopowerstore.Volume{ID: validBaseVolID}, nil)
 				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).
 					Return(gopowerstore.VolumeGroups{VolumeGroup: []gopowerstore.VolumeGroup{{ID: validGroupID, Name: validVolumeGroupName}}}, nil)
@@ -1648,11 +1643,11 @@ var _ = Describe("CSIControllerService", func() {
 
 				res, err := ctrlSvc.DeleteSnapshot(context.Background(), req)
 
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.DeleteSnapshotResponse{}))
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.DeleteSnapshotResponse{}))
 			})
 
-			It("should successfully delete snapshot [NFS]", func() {
+			ginkgo.It("should successfully delete snapshot [NFS]", func() {
 				clientMock.On("GetFsSnapshot", mock.Anything, validBaseVolID).Return(gopowerstore.FileSystem{}, nil)
 
 				clientMock.On("DeleteFsSnapshot", mock.Anything, validBaseVolID).Return(gopowerstore.EmptyResponse(""), nil)
@@ -1663,13 +1658,13 @@ var _ = Describe("CSIControllerService", func() {
 
 				res, err := ctrlSvc.DeleteSnapshot(context.Background(), req)
 
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.DeleteSnapshotResponse{}))
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.DeleteSnapshotResponse{}))
 			})
 		})
 
-		When("there is no snapshot", func() {
-			It("should return no error [Block]", func() {
+		ginkgo.When("there is no snapshot", func() {
+			ginkgo.It("should return no error [Block]", func() {
 				clientMock.On("GetSnapshot", mock.Anything, validBaseVolID).Return(gopowerstore.Volume{}, nil)
 				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, "").
 					Return(gopowerstore.VolumeGroups{VolumeGroup: []gopowerstore.VolumeGroup{}}, nil)
@@ -1687,11 +1682,11 @@ var _ = Describe("CSIControllerService", func() {
 
 				res, err := ctrlSvc.DeleteSnapshot(context.Background(), req)
 
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.DeleteSnapshotResponse{}))
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.DeleteSnapshotResponse{}))
 			})
 
-			It("should return no error [NFS]", func() {
+			ginkgo.It("should return no error [NFS]", func() {
 				clientMock.On("GetFsSnapshot", mock.Anything, validBaseVolID).Return(gopowerstore.FileSystem{}, nil)
 
 				clientMock.On("DeleteFsSnapshot", mock.Anything, validBaseVolID).Return(gopowerstore.EmptyResponse(""), gopowerstore.APIError{
@@ -1706,13 +1701,13 @@ var _ = Describe("CSIControllerService", func() {
 
 				res, err := ctrlSvc.DeleteSnapshot(context.Background(), req)
 
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.DeleteSnapshotResponse{}))
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.DeleteSnapshotResponse{}))
 			})
 		})
 
-		When("there is no such source volume", func() {
-			It("should return no error", func() {
+		ginkgo.When("there is no such source volume", func() {
+			ginkgo.It("should return no error", func() {
 				clientMock.On("GetSnapshot", mock.Anything, validBaseVolID).Return(gopowerstore.Volume{}, gopowerstore.APIError{
 					ErrorMsg: &api.ErrorMsg{
 						StatusCode: http.StatusNotFound,
@@ -1724,14 +1719,14 @@ var _ = Describe("CSIControllerService", func() {
 
 				_, err := ctrlSvc.DeleteSnapshot(context.Background(), req)
 
-				Expect(err).To(BeNil())
+				gomega.Expect(err).To(gomega.BeNil())
 			})
 		})
 	})
 
-	Describe("calling ControllerExpandVolume()", func() {
-		When("expanding scsi volume", func() {
-			It("should successfully expand scsi volume", func() {
+	ginkgo.Describe("calling ControllerExpandVolume()", func() {
+		ginkgo.When("expanding scsi volume", func() {
+			ginkgo.It("should successfully expand scsi volume", func() {
 				clientMock.On("GetVolume", mock.Anything, validBaseVolID).Return(gopowerstore.Volume{
 					Size: validVolSize,
 				}, nil)
@@ -1745,28 +1740,28 @@ var _ = Describe("CSIControllerService", func() {
 
 				res, err := ctrlSvc.ControllerExpandVolume(context.Background(), req)
 
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.ControllerExpandVolumeResponse{
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.ControllerExpandVolumeResponse{
 					CapacityBytes:         validVolSize * 2,
 					NodeExpansionRequired: true,
 				}))
 			})
 
-			When("not able to get volume info", func() {
-				It("should fail", func() {
+			ginkgo.When("not able to get volume info", func() {
+				ginkgo.It("should fail", func() {
 					e := errors.New("some-api-error")
 					clientMock.On("GetVolume", mock.Anything, validBaseVolID).Return(gopowerstore.Volume{}, e)
 
 					req := getTypicalControllerExpandRequest(validBlockVolumeID, validVolSize*2)
 					_, err := ctrlSvc.ControllerExpandVolume(context.Background(), req)
 
-					Expect(err).ToNot(BeNil())
-					Expect(err.Error()).To(ContainSubstring("detected SCSI protocol but wasn't able to fetch the volume info"))
+					gomega.Expect(err).ToNot(gomega.BeNil())
+					gomega.Expect(err.Error()).To(gomega.ContainSubstring("detected SCSI protocol but wasn't able to fetch the volume info"))
 				})
 			})
 
-			When("not able to modify volume", func() {
-				It("should fail", func() {
+			ginkgo.When("not able to modify volume", func() {
+				ginkgo.It("should fail", func() {
 					e := errors.New("some-api-error")
 					clientMock.On("GetVolume", mock.Anything, validBaseVolID).Return(gopowerstore.Volume{
 						Size: validVolSize,
@@ -1781,14 +1776,14 @@ var _ = Describe("CSIControllerService", func() {
 
 					_, err := ctrlSvc.ControllerExpandVolume(context.Background(), req)
 
-					Expect(err).ToNot(BeNil())
-					Expect(err.Error()).To(ContainSubstring(e.Error()))
+					gomega.Expect(err).ToNot(gomega.BeNil())
+					gomega.Expect(err.Error()).To(gomega.ContainSubstring(e.Error()))
 				})
 			})
 		})
 
-		When("expanding nfs volume", func() {
-			It("should successfully expand nfs volume", func() {
+		ginkgo.When("expanding nfs volume", func() {
+			ginkgo.It("should successfully expand nfs volume", func() {
 				clientMock.On("GetFS", mock.Anything, validBaseVolID).Return(gopowerstore.FileSystem{
 					SizeTotal: validVolSize,
 				}, nil)
@@ -1802,15 +1797,15 @@ var _ = Describe("CSIControllerService", func() {
 
 				res, err := ctrlSvc.ControllerExpandVolume(context.Background(), req)
 
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.ControllerExpandVolumeResponse{
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.ControllerExpandVolumeResponse{
 					CapacityBytes:         validVolSize * 2,
 					NodeExpansionRequired: false,
 				}))
 			})
 
-			When("not able to modify filesystem", func() {
-				It("should fail", func() {
+			ginkgo.When("not able to modify filesystem", func() {
+				ginkgo.It("should fail", func() {
 					e := errors.New("some-api-error")
 					clientMock.On("GetFS", mock.Anything, validBaseVolID).Return(gopowerstore.FileSystem{
 						SizeTotal: validVolSize,
@@ -1825,14 +1820,14 @@ var _ = Describe("CSIControllerService", func() {
 
 					_, err := ctrlSvc.ControllerExpandVolume(context.Background(), req)
 
-					Expect(err).ToNot(BeNil())
-					Expect(err.Error()).To(ContainSubstring(e.Error()))
+					gomega.Expect(err).ToNot(gomega.BeNil())
+					gomega.Expect(err.Error()).To(gomega.ContainSubstring(e.Error()))
 				})
 			})
 		})
 
-		When("volume id is incorrect", func() {
-			It("should fail", func() {
+		ginkgo.When("volume id is incorrect", func() {
+			ginkgo.It("should fail", func() {
 				e := errors.New("api-error")
 				clientMock.On("GetVolume", mock.Anything, validBaseVolID).Return(gopowerstore.Volume{}, e)
 				clientMock.On("GetFS", mock.Anything, validBaseVolID).Return(gopowerstore.FileSystem{}, e)
@@ -1840,30 +1835,30 @@ var _ = Describe("CSIControllerService", func() {
 				req := getTypicalControllerExpandRequest(validBaseVolID, validVolSize*2)
 
 				_, err := ctrlSvc.ControllerExpandVolume(context.Background(), req)
-				Expect(err).ToNot(BeNil())
-				Expect(err.Error()).To(ContainSubstring("unable to parse the volume id"))
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("unable to parse the volume id"))
 			})
 		})
 
-		When("requested size exceeds limit", func() {
-			It("should fail", func() {
+		ginkgo.When("requested size exceeds limit", func() {
+			ginkgo.It("should fail", func() {
 				req := getTypicalControllerExpandRequest(validBlockVolumeID, controller.MaxVolumeSizeBytes+1)
 
 				_, err := ctrlSvc.ControllerExpandVolume(context.Background(), req)
-				Expect(err).ToNot(BeNil())
-				Expect(err.Error()).To(ContainSubstring("volume exceeds allowed limit"))
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("volume exceeds allowed limit"))
 			})
 		})
 	})
 
-	Describe("calling ControllerPublishVolume()", func() {
+	ginkgo.Describe("calling ControllerPublishVolume()", func() {
 		fsName := "testFS"
 		nfsID := "1ae5edac1-a796-886a-47dc-c72a3j8clw031"
 		nasID := "some-nas-id"
 		interfaceID := "215as1223-d124-ss1h-njh4-c72a3j8clw031"
 
-		When("parameters are correct", func() {
-			It("should succeed [Block]", func() {
+		ginkgo.When("parameters are correct", func() {
+			ginkgo.It("should succeed [Block]", func() {
 				clientMock.On("GetVolume", mock.Anything, validBaseVolID).
 					Return(gopowerstore.Volume{ID: validBaseVolID, Wwn: "naa.68ccf098003ceb5e4577a20be6d11bf9"}, nil)
 
@@ -1904,8 +1899,8 @@ var _ = Describe("CSIControllerService", func() {
 
 				res, err := ctrlSvc.ControllerPublishVolume(context.Background(), req)
 
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.ControllerPublishVolumeResponse{
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.ControllerPublishVolumeResponse{
 					PublishContext: map[string]string{
 						"PORTAL0":       "192.168.1.1:3260",
 						"TARGET0":       "iqn",
@@ -1918,7 +1913,7 @@ var _ = Describe("CSIControllerService", func() {
 				}))
 			})
 
-			It("should succeed [NFS]", func() {
+			ginkgo.It("should succeed [NFS]", func() {
 				clientMock.On("GetFS", mock.Anything, validBaseVolID).
 					Return(gopowerstore.FileSystem{
 						ID:          validBaseVolID,
@@ -1962,8 +1957,8 @@ var _ = Describe("CSIControllerService", func() {
 
 				res, err := ctrlSvc.ControllerPublishVolume(context.Background(), req)
 
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.ControllerPublishVolumeResponse{
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.ControllerPublishVolumeResponse{
 					PublishContext: map[string]string{
 						"nasName":       validNasName,
 						"NfsExportPath": secondValidID + ":/",
@@ -1974,10 +1969,10 @@ var _ = Describe("CSIControllerService", func() {
 					},
 				}))
 			})
-			It("should succeed [NFS] with externalAccess", func() {
-				//setting externalAccess environment variable
+			ginkgo.It("should succeed [NFS] with externalAccess", func() {
+				// setting externalAccess environment variable
 				err := csictx.Setenv(context.Background(), common.EnvExternalAccess, "10.0.0.0/24")
-				Expect(err).To(BeNil())
+				gomega.Expect(err).To(gomega.BeNil())
 				_ = ctrlSvc.Init()
 
 				clientMock.On("GetFS", mock.Anything, validBaseVolID).
@@ -2026,8 +2021,8 @@ var _ = Describe("CSIControllerService", func() {
 
 				res, err := ctrlSvc.ControllerPublishVolume(context.Background(), req)
 
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.ControllerPublishVolumeResponse{
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.ControllerPublishVolumeResponse{
 					PublishContext: map[string]string{
 						common.KeyNasName:       validNasName,
 						common.KeyNfsExportPath: secondValidID + ":/",
@@ -2040,17 +2035,17 @@ var _ = Describe("CSIControllerService", func() {
 				}))
 				// Removing externalAccess environment variable after our tests are completed
 				err = csictx.Setenv(context.Background(), common.EnvExternalAccess, "")
-				Expect(err).To(BeNil())
+				gomega.Expect(err).To(gomega.BeNil())
 				_ = ctrlSvc.Init()
 			})
 		})
 
-		When("host name does not contain ip", func() {
-			It("should truncate ip from kubeID and succeed [Block]", func() {
+		ginkgo.When("host name does not contain ip", func() {
+			ginkgo.It("should truncate ip from kubeID and succeed [Block]", func() {
 				clientMock.On("GetVolume", mock.Anything, validBaseVolID).
 					Return(gopowerstore.Volume{ID: validBaseVolID, Wwn: "naa.68ccf098003ceb5e4577a20be6d11bf9"}, nil)
 
-				By("truncating ip", func() {
+				ginkgo.By("truncating ip", func() {
 					clientMock.On("GetHostByName", mock.Anything, validNodeID).
 						Return(gopowerstore.Host{}, gopowerstore.APIError{
 							ErrorMsg: &api.ErrorMsg{
@@ -2094,8 +2089,8 @@ var _ = Describe("CSIControllerService", func() {
 
 				res, err := ctrlSvc.ControllerPublishVolume(context.Background(), req)
 
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.ControllerPublishVolumeResponse{
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.ControllerPublishVolumeResponse{
 					PublishContext: map[string]string{
 						"PORTAL0":     "192.168.1.1:3260",
 						"TARGET0":     "iqn",
@@ -2106,8 +2101,8 @@ var _ = Describe("CSIControllerService", func() {
 			})
 		})
 
-		When("using nfs nat feature", func() {
-			It("should succeed", func() {
+		ginkgo.When("using nfs nat feature", func() {
+			ginkgo.It("should succeed", func() {
 				externalAccess := "10.0.0.1"
 				_ = csictx.Setenv(context.Background(), common.EnvExternalAccess, externalAccess)
 				_ = ctrlSvc.Init()
@@ -2155,8 +2150,8 @@ var _ = Describe("CSIControllerService", func() {
 
 				res, err := ctrlSvc.ControllerPublishVolume(context.Background(), req)
 
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.ControllerPublishVolumeResponse{
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.ControllerPublishVolumeResponse{
 					PublishContext: map[string]string{
 						"nasName":       validNasName,
 						"NfsExportPath": secondValidID + ":/",
@@ -2170,9 +2165,9 @@ var _ = Describe("CSIControllerService", func() {
 			})
 		})
 
-		When("volume is already attached to some host", func() {
-			When("mapping has same hostID", func() {
-				It("should succeed", func() {
+		ginkgo.When("volume is already attached to some host", func() {
+			ginkgo.When("mapping has same hostID", func() {
+				ginkgo.It("should succeed", func() {
 					clientMock.On("GetVolume", mock.Anything, validBaseVolID).
 						Return(gopowerstore.Volume{ID: validBaseVolID, Wwn: "naa.68ccf098003ceb5e4577a20be6d11bf9"}, nil)
 
@@ -2204,8 +2199,8 @@ var _ = Describe("CSIControllerService", func() {
 
 					res, err := ctrlSvc.ControllerPublishVolume(context.Background(), req)
 
-					Expect(err).To(BeNil())
-					Expect(res).To(Equal(&csi.ControllerPublishVolumeResponse{
+					gomega.Expect(err).To(gomega.BeNil())
+					gomega.Expect(res).To(gomega.Equal(&csi.ControllerPublishVolumeResponse{
 						PublishContext: map[string]string{
 							"PORTAL0":     "192.168.1.1:3260",
 							"TARGET0":     "iqn",
@@ -2216,9 +2211,9 @@ var _ = Describe("CSIControllerService", func() {
 				})
 			})
 
-			When("mapping hostID is different", func() {
+			ginkgo.When("mapping hostID is different", func() {
 				prevNodeID := "prev-id"
-				It("should fail [single-writer]", func() {
+				ginkgo.It("should fail [single-writer]", func() {
 					clientMock.On("GetVolume", mock.Anything, validBaseVolID).
 						Return(gopowerstore.Volume{ID: validBaseVolID, Wwn: "naa.68ccf098003ceb5e4577a20be6d11bf9"}, nil)
 
@@ -2250,13 +2245,13 @@ var _ = Describe("CSIControllerService", func() {
 
 					res, err := ctrlSvc.ControllerPublishVolume(context.Background(), req)
 
-					Expect(res).To(BeNil())
-					Expect(err).ToNot(BeNil())
-					Expect(err.Error()).To(ContainSubstring(
+					gomega.Expect(res).To(gomega.BeNil())
+					gomega.Expect(err).ToNot(gomega.BeNil())
+					gomega.Expect(err.Error()).To(gomega.ContainSubstring(
 						fmt.Sprintf("volume already present in a different lun mapping on node '%s", prevNodeID)))
 				})
 
-				It("should succeed [multi-writer]", func() {
+				ginkgo.It("should succeed [multi-writer]", func() {
 					clientMock.On("GetVolume", mock.Anything, validBaseVolID).
 						Return(gopowerstore.Volume{ID: validBaseVolID, Wwn: "naa.68ccf098003ceb5e4577a20be6d11bf9"}, nil)
 
@@ -2297,8 +2292,8 @@ var _ = Describe("CSIControllerService", func() {
 
 					res, err := ctrlSvc.ControllerPublishVolume(context.Background(), req)
 
-					Expect(err).To(BeNil())
-					Expect(res).To(Equal(&csi.ControllerPublishVolumeResponse{
+					gomega.Expect(err).To(gomega.BeNil())
+					gomega.Expect(res).To(gomega.Equal(&csi.ControllerPublishVolumeResponse{
 						PublishContext: map[string]string{
 							"PORTAL0":     "192.168.1.1:3260",
 							"TARGET0":     "iqn",
@@ -2310,68 +2305,68 @@ var _ = Describe("CSIControllerService", func() {
 			})
 		})
 
-		When("volume id is empty", func() {
-			It("should fail", func() {
+		ginkgo.When("volume id is empty", func() {
+			ginkgo.It("should fail", func() {
 				req := getTypicalControllerPublishVolumeRequest("single-writer", validNodeID, validBlockVolumeID)
 
 				req.VolumeId = ""
 
 				_, err := ctrlSvc.ControllerPublishVolume(context.Background(), req)
-				Expect(err).ToNot(BeNil())
-				Expect(err.Error()).To(ContainSubstring("volume ID is required"))
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("volume ID is required"))
 			})
 		})
 
-		When("volume capability is missing", func() {
-			It("should fail", func() {
+		ginkgo.When("volume capability is missing", func() {
+			ginkgo.It("should fail", func() {
 				req := getTypicalControllerPublishVolumeRequest("single-writer", validNodeID, validBlockVolumeID)
 
 				req.VolumeCapability = nil
 
 				_, err := ctrlSvc.ControllerPublishVolume(context.Background(), req)
-				Expect(err).ToNot(BeNil())
-				Expect(err.Error()).To(ContainSubstring("volume capability is required"))
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("volume capability is required"))
 			})
 		})
 
-		When("access mode is missing", func() {
-			It("should fail", func() {
+		ginkgo.When("access mode is missing", func() {
+			ginkgo.It("should fail", func() {
 				req := getTypicalControllerPublishVolumeRequest("single-writer", validNodeID, validBlockVolumeID)
 
 				req.VolumeCapability.AccessMode = nil
 
 				_, err := ctrlSvc.ControllerPublishVolume(context.Background(), req)
-				Expect(err).ToNot(BeNil())
-				Expect(err.Error()).To(ContainSubstring("access mode is required"))
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("access mode is required"))
 			})
 		})
 
-		When("access mode is unknown", func() {
-			It("should fail", func() {
+		ginkgo.When("access mode is unknown", func() {
+			ginkgo.It("should fail", func() {
 				req := getTypicalControllerPublishVolumeRequest("single-writer", validNodeID, validBlockVolumeID)
 
 				req.VolumeCapability.AccessMode.Mode = csi.VolumeCapability_AccessMode_UNKNOWN
 
 				_, err := ctrlSvc.ControllerPublishVolume(context.Background(), req)
-				Expect(err).ToNot(BeNil())
-				Expect(err.Error()).To(ContainSubstring(controller.ErrUnknownAccessMode))
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring(controller.ErrUnknownAccessMode))
 			})
 		})
 
-		When("kube node id is empty", func() {
-			It("should fail", func() {
+		ginkgo.When("kube node id is empty", func() {
+			ginkgo.It("should fail", func() {
 				req := getTypicalControllerPublishVolumeRequest("single-writer", validNodeID, validBlockVolumeID)
 
 				req.NodeId = ""
 
 				_, err := ctrlSvc.ControllerPublishVolume(context.Background(), req)
-				Expect(err).ToNot(BeNil())
-				Expect(err.Error()).To(ContainSubstring("node ID is required"))
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("node ID is required"))
 			})
 		})
 
-		When("volume does not exist", func() {
-			It("should fail [Block]", func() {
+		ginkgo.When("volume does not exist", func() {
+			ginkgo.It("should fail [Block]", func() {
 				clientMock.On("GetVolume", mock.Anything, validBaseVolID).
 					Return(gopowerstore.Volume{}, gopowerstore.APIError{
 						ErrorMsg: &api.ErrorMsg{
@@ -2383,11 +2378,11 @@ var _ = Describe("CSIControllerService", func() {
 				req.VolumeContext = map[string]string{controller.KeyFsType: "xfs"}
 
 				_, err := ctrlSvc.ControllerPublishVolume(context.Background(), req)
-				Expect(err).ToNot(BeNil())
-				Expect(err.Error()).To(ContainSubstring(fmt.Sprintf("volume with ID '%s' not found", validBaseVolID)))
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring(fmt.Sprintf("volume with ID '%s' not found", validBaseVolID)))
 			})
 
-			It("should fail [NFS]", func() {
+			ginkgo.It("should fail [NFS]", func() {
 				clientMock.On("GetFS", mock.Anything, validBaseVolID).
 					Return(gopowerstore.FileSystem{}, gopowerstore.APIError{
 						ErrorMsg: &api.ErrorMsg{
@@ -2399,12 +2394,12 @@ var _ = Describe("CSIControllerService", func() {
 				req.VolumeContext = map[string]string{controller.KeyFsType: "xfs"}
 
 				_, err := ctrlSvc.ControllerPublishVolume(context.Background(), req)
-				Expect(err).ToNot(BeNil())
-				Expect(err.Error()).To(ContainSubstring(fmt.Sprintf("volume with ID '%s' not found", validBaseVolID)))
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring(fmt.Sprintf("volume with ID '%s' not found", validBaseVolID)))
 			})
 
-			When("using v1.2 volume id", func() {
-				It("should fail", func() {
+			ginkgo.When("using v1.2 volume id", func() {
+				ginkgo.It("should fail", func() {
 					e := errors.New("api-error")
 					clientMock.On("GetVolume", mock.Anything, validBaseVolID).Return(gopowerstore.Volume{}, e)
 					clientMock.On("GetFS", mock.Anything, validBaseVolID).Return(gopowerstore.FileSystem{}, e)
@@ -2415,14 +2410,14 @@ var _ = Describe("CSIControllerService", func() {
 
 					_, err := ctrlSvc.ControllerPublishVolume(context.Background(), req)
 
-					Expect(err).ToNot(BeNil())
-					Expect(err.Error()).To(ContainSubstring("failure checking volume status"))
+					gomega.Expect(err).ToNot(gomega.BeNil())
+					gomega.Expect(err.Error()).To(gomega.ContainSubstring("failure checking volume status"))
 				})
 			})
 		})
 
-		When("node id is not valid", func() {
-			It("should fail [Block]", func() {
+		ginkgo.When("node id is not valid", func() {
+			ginkgo.It("should fail [Block]", func() {
 				clientMock.On("GetVolume", mock.Anything, validBaseVolID).
 					Return(gopowerstore.Volume{ID: validBaseVolID, Wwn: "naa.68ccf098003ceb5e4577a20be6d11bf9"}, nil)
 
@@ -2444,13 +2439,13 @@ var _ = Describe("CSIControllerService", func() {
 				req.VolumeContext = map[string]string{controller.KeyFsType: "xfs"}
 
 				_, err := ctrlSvc.ControllerPublishVolume(context.Background(), req)
-				Expect(err).ToNot(BeNil())
-				Expect(err.Error()).To(ContainSubstring("host with k8s node ID '" + validNodeID + "' not found"))
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("host with k8s node ID '" + validNodeID + "' not found"))
 			})
 		})
 
-		When("ip is incorrect", func() {
-			It("should fail", func() {
+		ginkgo.When("ip is incorrect", func() {
+			ginkgo.It("should fail", func() {
 				ip := "127.0.0.1" // we don't have array with this ip
 				req := getTypicalControllerPublishVolumeRequest("single-writer", validNodeID,
 					validBaseVolID+"/"+ip+"/scsi")
@@ -2459,15 +2454,15 @@ var _ = Describe("CSIControllerService", func() {
 
 				_, err := ctrlSvc.ControllerPublishVolume(context.Background(), req)
 
-				Expect(err).ToNot(BeNil())
-				Expect(err.Error()).To(ContainSubstring("failed to find array with given ID"))
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to find array with given ID"))
 			})
 		})
 	})
 
-	Describe("calling ControllerUnpublishVolume()", func() {
-		When("parameters are correct", func() {
-			It("should succeed [Block]", func() {
+	ginkgo.Describe("calling ControllerUnpublishVolume()", func() {
+		ginkgo.When("parameters are correct", func() {
+			ginkgo.It("should succeed [Block]", func() {
 				clientMock.On("GetHostByName", mock.Anything, validNodeID).
 					Return(gopowerstore.Host{}, gopowerstore.APIError{
 						ErrorMsg: &api.ErrorMsg{
@@ -2484,11 +2479,11 @@ var _ = Describe("CSIControllerService", func() {
 				req := &csi.ControllerUnpublishVolumeRequest{VolumeId: validBlockVolumeID, NodeId: validNodeID}
 
 				res, err := ctrlSvc.ControllerUnpublishVolume(context.Background(), req)
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.ControllerUnpublishVolumeResponse{}))
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.ControllerUnpublishVolumeResponse{}))
 			})
 
-			It("should succeed [NFS]", func() {
+			ginkgo.It("should succeed [NFS]", func() {
 				exportID := "some-export-id"
 
 				clientMock.On("GetFS", mock.Anything, validBaseVolID).
@@ -2505,14 +2500,14 @@ var _ = Describe("CSIControllerService", func() {
 				req := &csi.ControllerUnpublishVolumeRequest{VolumeId: validNfsVolumeID, NodeId: validNodeID}
 
 				res, err := ctrlSvc.ControllerUnpublishVolume(context.Background(), req)
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.ControllerUnpublishVolumeResponse{}))
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.ControllerUnpublishVolumeResponse{}))
 			})
 
-			It("should succeed [NFS] with external access", func() {
-				//setting externalAccess environment variable
+			ginkgo.It("should succeed [NFS] with external access", func() {
+				// setting externalAccess environment variable
 				err := csictx.Setenv(context.Background(), common.EnvExternalAccess, "10.0.0.0/24")
-				Expect(err).To(BeNil())
+				gomega.Expect(err).To(gomega.BeNil())
 				_ = ctrlSvc.Init()
 
 				exportID := "some-export-id"
@@ -2535,20 +2530,20 @@ var _ = Describe("CSIControllerService", func() {
 				req := &csi.ControllerUnpublishVolumeRequest{VolumeId: validNfsVolumeID, NodeId: validNodeID}
 
 				res, err := ctrlSvc.ControllerUnpublishVolume(context.Background(), req)
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.ControllerUnpublishVolumeResponse{}))
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.ControllerUnpublishVolumeResponse{}))
 
-				//setting externalAccess environment variable
+				// setting externalAccess environment variable
 				err = csictx.Setenv(context.Background(), common.EnvExternalAccess, "")
-				Expect(err).To(BeNil())
+				gomega.Expect(err).To(gomega.BeNil())
 				_ = ctrlSvc.Init()
 			})
 		})
 
-		It("should succeed [NFS] by removing external access from the HostAccessList", func() {
-			//setting externalAccess environment variable
+		ginkgo.It("should succeed [NFS] by removing external access from the HostAccessList", func() {
+			// setting externalAccess environment variable
 			err := csictx.Setenv(context.Background(), common.EnvExternalAccess, "10.0.0.0/16")
-			Expect(err).To(BeNil())
+			gomega.Expect(err).To(gomega.BeNil())
 			_ = ctrlSvc.Init()
 			clientMock.On("GetFsSnapshotsByVolumeID", mock.Anything, validBaseVolID).Return([]gopowerstore.FileSystem{}, nil)
 
@@ -2576,20 +2571,20 @@ var _ = Describe("CSIControllerService", func() {
 
 			res, err := ctrlSvc.DeleteVolume(context.Background(), req)
 
-			Expect(err).To(BeNil())
-			Expect(res).To(Equal(&csi.DeleteVolumeResponse{}))
+			gomega.Expect(err).To(gomega.BeNil())
+			gomega.Expect(res).To(gomega.Equal(&csi.DeleteVolumeResponse{}))
 
-			//setting externalAccess environment variable
+			// setting externalAccess environment variable
 			err = csictx.Setenv(context.Background(), common.EnvExternalAccess, "")
 
-			Expect(err).To(BeNil())
+			gomega.Expect(err).To(gomega.BeNil())
 			_ = ctrlSvc.Init()
 		})
 
-		It("should return error since HostAccessList contain external as well as Host IP too", func() {
-			//setting externalAccess environment variable
+		ginkgo.It("should return error since HostAccessList contain external as well as Host IP too", func() {
+			// setting externalAccess environment variable
 			err := csictx.Setenv(context.Background(), common.EnvExternalAccess, "10.0.0.0/16")
-			Expect(err).To(BeNil())
+			gomega.Expect(err).To(gomega.BeNil())
 			_ = ctrlSvc.Init()
 			clientMock.On("GetFsSnapshotsByVolumeID", mock.Anything, validBaseVolID).Return([]gopowerstore.FileSystem{}, nil)
 
@@ -2610,17 +2605,17 @@ var _ = Describe("CSIControllerService", func() {
 
 			_, err = ctrlSvc.DeleteVolume(context.Background(), req)
 
-			Expect(err).ToNot(BeNil())
-			Expect(err.Error()).To(ContainSubstring("cannot be deleted as it has associated NFS or SMB shares"))
-			//setting externalAccess environment variable
+			gomega.Expect(err).ToNot(gomega.BeNil())
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("cannot be deleted as it has associated NFS or SMB shares"))
+			// setting externalAccess environment variable
 			err = csictx.Setenv(context.Background(), common.EnvExternalAccess, "")
 
-			Expect(err).To(BeNil())
+			gomega.Expect(err).To(gomega.BeNil())
 			_ = ctrlSvc.Init()
 		})
 
-		When("volume do not exist", func() {
-			It("should succeed", func() {
+		ginkgo.When("volume do not exist", func() {
+			ginkgo.It("should succeed", func() {
 				clientMock.On("GetFS", mock.Anything, validBaseVolID).
 					Return(gopowerstore.FileSystem{}, gopowerstore.APIError{
 						ErrorMsg: &api.ErrorMsg{
@@ -2631,44 +2626,44 @@ var _ = Describe("CSIControllerService", func() {
 				req := &csi.ControllerUnpublishVolumeRequest{VolumeId: validNfsVolumeID, NodeId: validNodeID}
 
 				res, err := ctrlSvc.ControllerUnpublishVolume(context.Background(), req)
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.ControllerUnpublishVolumeResponse{}))
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.ControllerUnpublishVolumeResponse{}))
 			})
 		})
 
-		When("volume id is empty", func() {
-			It("should fail", func() {
+		ginkgo.When("volume id is empty", func() {
+			ginkgo.It("should fail", func() {
 				req := &csi.ControllerUnpublishVolumeRequest{VolumeId: "", NodeId: validNodeID}
 
 				_, err := ctrlSvc.ControllerUnpublishVolume(context.Background(), req)
-				Expect(err).ToNot(BeNil())
-				Expect(err.Error()).To(ContainSubstring("volume ID is required"))
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("volume ID is required"))
 			})
 		})
 
-		When("volume id has wrong array id", func() {
-			It("should fail", func() {
+		ginkgo.When("volume id has wrong array id", func() {
+			ginkgo.It("should fail", func() {
 				req := &csi.ControllerUnpublishVolumeRequest{VolumeId: invalidBlockVolumeID, NodeId: validNodeID}
 
 				_, err := ctrlSvc.ControllerUnpublishVolume(context.Background(), req)
-				Expect(err).ToNot(BeNil())
-				Expect(err.Error()).To(ContainSubstring("cannot find array"))
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("cannot find array"))
 			})
 		})
 
-		When("node id is empty", func() {
-			It("should fail", func() {
+		ginkgo.When("node id is empty", func() {
+			ginkgo.It("should fail", func() {
 				req := &csi.ControllerUnpublishVolumeRequest{VolumeId: validBlockVolumeID, NodeId: ""}
 
 				_, err := ctrlSvc.ControllerUnpublishVolume(context.Background(), req)
-				Expect(err).ToNot(BeNil())
-				Expect(err.Error()).To(ContainSubstring("node ID is required"))
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("node ID is required"))
 			})
 		})
 
-		When("using v1.2 volumes", func() {
-			It("should succeed [Block]", func() {
-				By("using default array", func() {
+		ginkgo.When("using v1.2 volumes", func() {
+			ginkgo.It("should succeed [Block]", func() {
+				ginkgo.By("using default array", func() {
 					clientMock.On("GetVolume", mock.Anything, validBaseVolID).
 						Return(gopowerstore.Volume{}, nil)
 				})
@@ -2689,12 +2684,12 @@ var _ = Describe("CSIControllerService", func() {
 				req := &csi.ControllerUnpublishVolumeRequest{VolumeId: validBaseVolID, NodeId: validNodeID}
 
 				res, err := ctrlSvc.ControllerUnpublishVolume(context.Background(), req)
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.ControllerUnpublishVolumeResponse{}))
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.ControllerUnpublishVolumeResponse{}))
 			})
 
-			It("should succeed [NFS]", func() {
-				By("using default array", func() {
+			ginkgo.It("should succeed [NFS]", func() {
+				ginkgo.By("using default array", func() {
 					clientMock.On("GetVolume", mock.Anything, validBaseVolID).
 						Return(gopowerstore.Volume{}, gopowerstore.APIError{
 							ErrorMsg: &api.ErrorMsg{
@@ -2722,13 +2717,13 @@ var _ = Describe("CSIControllerService", func() {
 				req := &csi.ControllerUnpublishVolumeRequest{VolumeId: validBaseVolID, NodeId: validNodeID}
 
 				res, err := ctrlSvc.ControllerUnpublishVolume(context.Background(), req)
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.ControllerUnpublishVolumeResponse{}))
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.ControllerUnpublishVolumeResponse{}))
 			})
 
-			When("volume does not exist", func() {
-				It("should succeed", func() {
-					By("not finding volume or filesystem", func() {
+			ginkgo.When("volume does not exist", func() {
+				ginkgo.It("should succeed", func() {
+					ginkgo.By("not finding volume or filesystem", func() {
 						clientMock.On("GetVolume", mock.Anything, validBaseVolID).
 							Return(gopowerstore.Volume{}, gopowerstore.APIError{
 								ErrorMsg: &api.ErrorMsg{
@@ -2748,15 +2743,15 @@ var _ = Describe("CSIControllerService", func() {
 
 					res, err := ctrlSvc.ControllerUnpublishVolume(context.Background(), req)
 
-					Expect(err).To(BeNil())
-					Expect(res).To(Equal(&csi.ControllerUnpublishVolumeResponse{}))
+					gomega.Expect(err).To(gomega.BeNil())
+					gomega.Expect(res).To(gomega.Equal(&csi.ControllerUnpublishVolumeResponse{}))
 				})
 			})
 		})
 
-		When("kube node id is not correct", func() {
-			When("no IP found", func() {
-				It("should fail [Block]", func() {
+		ginkgo.When("kube node id is not correct", func() {
+			ginkgo.When("no IP found", func() {
+				ginkgo.It("should fail [Block]", func() {
 					nodeID := "not-valid-id"
 					clientMock.On("GetHostByName", mock.Anything, nodeID).
 						Return(gopowerstore.Host{}, gopowerstore.APIError{
@@ -2768,11 +2763,11 @@ var _ = Describe("CSIControllerService", func() {
 					req := &csi.ControllerUnpublishVolumeRequest{VolumeId: validBlockVolumeID, NodeId: nodeID}
 
 					_, err := ctrlSvc.ControllerUnpublishVolume(context.Background(), req)
-					Expect(err).ToNot(BeNil())
-					Expect(err.Error()).To(ContainSubstring("can't find IP in nodeID"))
+					gomega.Expect(err).ToNot(gomega.BeNil())
+					gomega.Expect(err.Error()).To(gomega.ContainSubstring("can't find IP in nodeID"))
 				})
 
-				It("should fail [NFS]", func() {
+				ginkgo.It("should fail [NFS]", func() {
 					nodeID := "not-valid-id"
 					clientMock.On("GetFS", mock.Anything, validBaseVolID).
 						Return(gopowerstore.FileSystem{ID: validBaseVolID}, nil)
@@ -2780,14 +2775,13 @@ var _ = Describe("CSIControllerService", func() {
 					req := &csi.ControllerUnpublishVolumeRequest{VolumeId: validNfsVolumeID, NodeId: nodeID}
 
 					_, err := ctrlSvc.ControllerUnpublishVolume(context.Background(), req)
-					Expect(err).ToNot(BeNil())
-					Expect(err.Error()).To(ContainSubstring("can't find IP in nodeID"))
+					gomega.Expect(err).ToNot(gomega.BeNil())
+					gomega.Expect(err.Error()).To(gomega.ContainSubstring("can't find IP in nodeID"))
 				})
-
 			})
 
-			When("host does not exist", func() {
-				It("should fail", func() {
+			ginkgo.When("host does not exist", func() {
+				ginkgo.It("should fail", func() {
 					clientMock.On("GetHostByName", mock.Anything, validNodeID).
 						Return(gopowerstore.Host{}, gopowerstore.APIError{
 							ErrorMsg: &api.ErrorMsg{
@@ -2805,13 +2799,13 @@ var _ = Describe("CSIControllerService", func() {
 					req := &csi.ControllerUnpublishVolumeRequest{VolumeId: validBlockVolumeID, NodeId: validNodeID}
 
 					_, err := ctrlSvc.ControllerUnpublishVolume(context.Background(), req)
-					Expect(err).ToNot(BeNil())
-					Expect(err.Error()).To(ContainSubstring("host with k8s node ID '" + validNodeID + "' not found"))
+					gomega.Expect(err).ToNot(gomega.BeNil())
+					gomega.Expect(err.Error()).To(gomega.ContainSubstring("host with k8s node ID '" + validNodeID + "' not found"))
 				})
 			})
 
-			When("fail to check host", func() {
-				It("should fail", func() {
+			ginkgo.When("fail to check host", func() {
+				ginkgo.It("should fail", func() {
 					e := errors.New("some-api-error")
 					clientMock.On("GetHostByName", mock.Anything, validNodeID).
 						Return(gopowerstore.Host{}, e).Once()
@@ -2819,14 +2813,14 @@ var _ = Describe("CSIControllerService", func() {
 					req := &csi.ControllerUnpublishVolumeRequest{VolumeId: validBlockVolumeID, NodeId: validNodeID}
 
 					_, err := ctrlSvc.ControllerUnpublishVolume(context.Background(), req)
-					Expect(err).ToNot(BeNil())
-					Expect(err.Error()).To(ContainSubstring("failure checking host '" + validNodeID + "' status for volume unpublishing"))
+					gomega.Expect(err).ToNot(gomega.BeNil())
+					gomega.Expect(err.Error()).To(gomega.ContainSubstring("failure checking host '" + validNodeID + "' status for volume unpublishing"))
 				})
 			})
 		})
 
-		When("can not check nfs export status", func() {
-			It("should fail", func() {
+		ginkgo.When("can not check nfs export status", func() {
+			ginkgo.It("should fail", func() {
 				e := errors.New("some-api-error")
 				clientMock.On("GetFS", mock.Anything, validBaseVolID).
 					Return(gopowerstore.FileSystem{
@@ -2838,13 +2832,13 @@ var _ = Describe("CSIControllerService", func() {
 
 				req := &csi.ControllerUnpublishVolumeRequest{VolumeId: validNfsVolumeID, NodeId: validNodeID}
 				_, err := ctrlSvc.ControllerUnpublishVolume(context.Background(), req)
-				Expect(err).ToNot(BeNil())
-				Expect(err.Error()).To(ContainSubstring("failure checking nfs export status for volume unpublishing"))
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("failure checking nfs export status for volume unpublishing"))
 			})
 		})
 
-		When("failed to remove hosts", func() {
-			It("should fail", func() {
+		ginkgo.When("failed to remove hosts", func() {
+			ginkgo.It("should fail", func() {
 				exportID := "some-export-id"
 				e := errors.New("some-api-error")
 
@@ -2861,13 +2855,13 @@ var _ = Describe("CSIControllerService", func() {
 
 				req := &csi.ControllerUnpublishVolumeRequest{VolumeId: validNfsVolumeID, NodeId: validNodeID}
 				_, err := ctrlSvc.ControllerUnpublishVolume(context.Background(), req)
-				Expect(err).ToNot(BeNil())
-				Expect(err.Error()).To(ContainSubstring("failure when removing new host to nfs export"))
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("failure when removing new host to nfs export"))
 			})
 		})
 	})
 
-	Describe("calling ListVolumes()", func() {
+	ginkgo.Describe("calling ListVolumes()", func() {
 		mockCalls := func() {
 			clientMock.On("GetVolumes", mock.Anything).
 				Return([]gopowerstore.Volume{
@@ -2889,14 +2883,14 @@ var _ = Describe("CSIControllerService", func() {
 				}, nil).Once()
 		}
 
-		When("there is no parameters", func() {
-			It("should return all volumes from both arrays", func() {
+		ginkgo.When("there is no parameters", func() {
+			ginkgo.It("should return all volumes from both arrays", func() {
 				mockCalls()
 
 				req := &csi.ListVolumesRequest{}
 				res, err := ctrlSvc.ListVolumes(context.Background(), req)
 
-				Expect(res).To(Equal(&csi.ListVolumesResponse{
+				gomega.Expect(res).To(gomega.Equal(&csi.ListVolumesResponse{
 					Entries: []*csi.ListVolumesResponse_Entry{
 						{
 							Volume: &csi.Volume{
@@ -2915,12 +2909,12 @@ var _ = Describe("CSIControllerService", func() {
 						},
 					},
 				}))
-				Expect(err).To(BeNil())
+				gomega.Expect(err).To(gomega.BeNil())
 			})
 		})
 
-		When("passing max entries", func() {
-			It("should return 'n' entries and next token", func() {
+		ginkgo.When("passing max entries", func() {
+			ginkgo.It("should return 'n' entries and next token", func() {
 				mockCalls()
 
 				req := &csi.ListVolumesRequest{
@@ -2928,7 +2922,7 @@ var _ = Describe("CSIControllerService", func() {
 				}
 				res, err := ctrlSvc.ListVolumes(context.Background(), req)
 
-				Expect(res).To(Equal(&csi.ListVolumesResponse{
+				gomega.Expect(res).To(gomega.Equal(&csi.ListVolumesResponse{
 					Entries: []*csi.ListVolumesResponse_Entry{
 						{
 							Volume: &csi.Volume{
@@ -2938,12 +2932,12 @@ var _ = Describe("CSIControllerService", func() {
 					},
 					NextToken: "1",
 				}))
-				Expect(err).To(BeNil())
+				gomega.Expect(err).To(gomega.BeNil())
 			})
 		})
 
-		When("using next token", func() {
-			It("should return volumes starting from token", func() {
+		ginkgo.When("using next token", func() {
+			ginkgo.It("should return volumes starting from token", func() {
 				mockCalls()
 
 				req := &csi.ListVolumesRequest{
@@ -2952,7 +2946,7 @@ var _ = Describe("CSIControllerService", func() {
 				}
 				res, err := ctrlSvc.ListVolumes(context.Background(), req)
 
-				Expect(res).To(Equal(&csi.ListVolumesResponse{
+				gomega.Expect(res).To(gomega.Equal(&csi.ListVolumesResponse{
 					Entries: []*csi.ListVolumesResponse_Entry{
 						{
 							Volume: &csi.Volume{
@@ -2962,25 +2956,25 @@ var _ = Describe("CSIControllerService", func() {
 					},
 					NextToken: "2",
 				}))
-				Expect(err).To(BeNil())
+				gomega.Expect(err).To(gomega.BeNil())
 			})
 		})
 
-		When("using wrong token", func() {
-			It("should fail [not parsable]", func() {
-				token := "as!512$25%!_"
+		ginkgo.When("using wrong token", func() {
+			ginkgo.It("should fail [not parsable]", func() {
+				token := "as!512$25%!_" // #nosec G101
 				req := &csi.ListVolumesRequest{
 					MaxEntries:    1,
 					StartingToken: token,
 				}
 				res, err := ctrlSvc.ListVolumes(context.Background(), req)
 
-				Expect(res).To(BeNil())
-				Expect(err).ToNot(BeNil())
-				Expect(err.Error()).To(ContainSubstring("unable to parse StartingToken: %v into uint32", token))
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("unable to parse StartingToken: %v into uint32", token))
 			})
 
-			It("shoud fail [too high]", func() {
+			ginkgo.It("shoud fail [too high]", func() {
 				tokenInt := 200
 				token := "200"
 
@@ -2992,14 +2986,14 @@ var _ = Describe("CSIControllerService", func() {
 				}
 				res, err := ctrlSvc.ListVolumes(context.Background(), req)
 
-				Expect(res).To(BeNil())
-				Expect(err).ToNot(BeNil())
-				Expect(err.Error()).To(ContainSubstring("startingToken=%d > len(volumes)=%d", tokenInt, 3))
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("startingToken=%d > len(volumes)=%d", tokenInt, 3))
 			})
 		})
 	})
 
-	Describe("calling ListSnapshots()", func() {
+	ginkgo.Describe("calling ListSnapshots()", func() {
 		mockCalls := func() {
 			clientMock.On("GetSnapshots", mock.Anything).
 				Return([]gopowerstore.Volume{
@@ -3051,27 +3045,27 @@ var _ = Describe("CSIControllerService", func() {
 				}).Once()
 		}
 
-		When("there is no parameters", func() {
-			It("should return all volumes from both arrays", func() {
+		ginkgo.When("there is no parameters", func() {
+			ginkgo.It("should return all volumes from both arrays", func() {
 				mockCalls()
 
 				req := &csi.ListSnapshotsRequest{}
 				res, err := ctrlSvc.ListSnapshots(context.Background(), req)
 
-				Expect(err).To(BeNil())
-				Expect(res).ToNot(BeNil())
-				Expect(res.Entries).ToNot(BeNil())
-				Expect(len(res.Entries)).To(Equal(5))
-				Expect(res.Entries[0].Snapshot.SnapshotId).To(Equal("arr1-id1"))
-				Expect(res.Entries[1].Snapshot.SnapshotId).To(Equal("arr1-id2"))
-				Expect(res.Entries[2].Snapshot.SnapshotId).To(Equal("arr1-id1-fs"))
-				Expect(res.Entries[3].Snapshot.SnapshotId).To(Equal("arr2-id1"))
-				Expect(res.Entries[4].Snapshot.SnapshotId).To(Equal("arr2-id1-fs"))
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).ToNot(gomega.BeNil())
+				gomega.Expect(res.Entries).ToNot(gomega.BeNil())
+				gomega.Expect(len(res.Entries)).To(gomega.Equal(5))
+				gomega.Expect(res.Entries[0].Snapshot.SnapshotId).To(gomega.Equal("arr1-id1"))
+				gomega.Expect(res.Entries[1].Snapshot.SnapshotId).To(gomega.Equal("arr1-id2"))
+				gomega.Expect(res.Entries[2].Snapshot.SnapshotId).To(gomega.Equal("arr1-id1-fs"))
+				gomega.Expect(res.Entries[3].Snapshot.SnapshotId).To(gomega.Equal("arr2-id1"))
+				gomega.Expect(res.Entries[4].Snapshot.SnapshotId).To(gomega.Equal("arr2-id1-fs"))
 			})
 		})
 
-		When("passing max entries", func() {
-			It("should return 'n' entries and next token", func() {
+		ginkgo.When("passing max entries", func() {
+			ginkgo.It("should return 'n' entries and next token", func() {
 				mockCalls()
 
 				req := &csi.ListSnapshotsRequest{
@@ -3079,17 +3073,17 @@ var _ = Describe("CSIControllerService", func() {
 				}
 				res, err := ctrlSvc.ListSnapshots(context.Background(), req)
 
-				Expect(err).To(BeNil())
-				Expect(res).ToNot(BeNil())
-				Expect(res.Entries).ToNot(BeNil())
-				Expect(len(res.Entries)).To(Equal(1))
-				Expect(res.Entries[0].Snapshot.SnapshotId).To(Equal("arr1-id1"))
-				Expect(res.NextToken).To(Equal("1"))
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).ToNot(gomega.BeNil())
+				gomega.Expect(res.Entries).ToNot(gomega.BeNil())
+				gomega.Expect(len(res.Entries)).To(gomega.Equal(1))
+				gomega.Expect(res.Entries[0].Snapshot.SnapshotId).To(gomega.Equal("arr1-id1"))
+				gomega.Expect(res.NextToken).To(gomega.Equal("1"))
 			})
 		})
 
-		When("using next token", func() {
-			It("should return volumes starting from token", func() {
+		ginkgo.When("using next token", func() {
+			ginkgo.It("should return volumes starting from token", func() {
 				mockCalls()
 
 				req := &csi.ListSnapshotsRequest{
@@ -3098,30 +3092,30 @@ var _ = Describe("CSIControllerService", func() {
 				}
 				res, err := ctrlSvc.ListSnapshots(context.Background(), req)
 
-				Expect(err).To(BeNil())
-				Expect(res).ToNot(BeNil())
-				Expect(res.Entries).ToNot(BeNil())
-				Expect(len(res.Entries)).To(Equal(1))
-				Expect(res.Entries[0].Snapshot.SnapshotId).To(Equal("arr1-id2"))
-				Expect(res.NextToken).To(Equal("2"))
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).ToNot(gomega.BeNil())
+				gomega.Expect(res.Entries).ToNot(gomega.BeNil())
+				gomega.Expect(len(res.Entries)).To(gomega.Equal(1))
+				gomega.Expect(res.Entries[0].Snapshot.SnapshotId).To(gomega.Equal("arr1-id2"))
+				gomega.Expect(res.NextToken).To(gomega.Equal("2"))
 			})
 		})
 
-		When("using wrong token", func() {
-			It("should fail [not parsable]", func() {
-				token := "as!512$25%!_"
+		ginkgo.When("using wrong token", func() {
+			ginkgo.It("should fail [not parsable]", func() {
+				token := "as!512$25%!_" // #nosec G101
 				req := &csi.ListSnapshotsRequest{
 					MaxEntries:    1,
 					StartingToken: token,
 				}
 				res, err := ctrlSvc.ListSnapshots(context.Background(), req)
 
-				Expect(res).To(BeNil())
-				Expect(err).ToNot(BeNil())
-				Expect(err.Error()).To(ContainSubstring("unable to parse StartingToken: %v into uint32", token))
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("unable to parse StartingToken: %v into uint32", token))
 			})
 
-			It("shoud fail [too high]", func() {
+			ginkgo.It("shoud fail [too high]", func() {
 				tokenInt := 200
 				token := "200"
 
@@ -3133,43 +3127,43 @@ var _ = Describe("CSIControllerService", func() {
 				}
 				res, err := ctrlSvc.ListSnapshots(context.Background(), req)
 
-				Expect(res).To(BeNil())
-				Expect(err).ToNot(BeNil())
-				Expect(err.Error()).To(ContainSubstring("startingToken=%d > len(generalSnapshots)=%d", tokenInt, 5))
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("startingToken=%d > len(generalSnapshots)=%d", tokenInt, 5))
 			})
 		})
 
-		When("passing snapshot id", func() {
-			It("should return existing snapshot", func() {
+		ginkgo.When("passing snapshot id", func() {
+			ginkgo.It("should return existing snapshot", func() {
 				clientMock.On("GetSnapshot", mock.Anything, validBaseVolID).
 					Return(gopowerstore.Volume{ID: validBaseVolID}, nil)
 				req := &csi.ListSnapshotsRequest{
 					SnapshotId: validBlockVolumeID,
 				}
 				res, err := ctrlSvc.ListSnapshots(context.Background(), req)
-				Expect(res).ToNot(BeNil())
-				Expect(err).To(BeNil())
-				Expect(len(res.Entries)).To(Equal(1))
-				Expect(res.Entries[0].Snapshot.SnapshotId).To(Equal(validBlockVolumeID))
+				gomega.Expect(res).ToNot(gomega.BeNil())
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(len(res.Entries)).To(gomega.Equal(1))
+				gomega.Expect(res.Entries[0].Snapshot.SnapshotId).To(gomega.Equal(validBlockVolumeID))
 			})
 
-			It("should return existing snapshot [NFS]", func() {
+			ginkgo.It("should return existing snapshot [NFS]", func() {
 				clientMock.On("GetFsSnapshot", mock.Anything, validBaseVolID).
 					Return(gopowerstore.FileSystem{ID: validBaseVolID}, nil)
 				req := &csi.ListSnapshotsRequest{
 					SnapshotId: validNfsVolumeID,
 				}
 				res, err := ctrlSvc.ListSnapshots(context.Background(), req)
-				Expect(res).ToNot(BeNil())
-				Expect(err).To(BeNil())
-				Expect(len(res.Entries)).To(Equal(1))
-				Expect(res.Entries[0].Snapshot.SnapshotId).To(Equal(validNfsVolumeID))
+				gomega.Expect(res).ToNot(gomega.BeNil())
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(len(res.Entries)).To(gomega.Equal(1))
+				gomega.Expect(res.Entries[0].Snapshot.SnapshotId).To(gomega.Equal(validNfsVolumeID))
 			})
 
-			It("should fail [incorrect id]", func() {
+			ginkgo.It("should fail [incorrect id]", func() {
 				randomID := "something-random"
 
-				By("checking with default array", func() {
+				ginkgo.By("checking with default array", func() {
 					mockCantParseVolumeID(randomID)
 				})
 
@@ -3177,44 +3171,44 @@ var _ = Describe("CSIControllerService", func() {
 					SnapshotId: randomID,
 				}
 				res, err := ctrlSvc.ListSnapshots(context.Background(), req)
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.ListSnapshotsResponse{}))
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.ListSnapshotsResponse{}))
 			})
 		})
 
-		When("passing source volume id", func() {
-			It("should return all snapshots of that volume", func() {
+		ginkgo.When("passing source volume id", func() {
+			ginkgo.It("should return all snapshots of that volume", func() {
 				clientMock.On("GetSnapshotsByVolumeID", mock.Anything, validBaseVolID).
 					Return([]gopowerstore.Volume{{ID: "snap-id-1"}, {ID: "snap-id-2"}}, nil)
 				req := &csi.ListSnapshotsRequest{
 					SourceVolumeId: validBlockVolumeID,
 				}
 				res, err := ctrlSvc.ListSnapshots(context.Background(), req)
-				Expect(res).ToNot(BeNil())
-				Expect(err).To(BeNil())
-				Expect(len(res.Entries)).To(Equal(2))
-				Expect(res.Entries[0].Snapshot.SnapshotId).To(Equal("snap-id-1"))
-				Expect(res.Entries[1].Snapshot.SnapshotId).To(Equal("snap-id-2"))
+				gomega.Expect(res).ToNot(gomega.BeNil())
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(len(res.Entries)).To(gomega.Equal(2))
+				gomega.Expect(res.Entries[0].Snapshot.SnapshotId).To(gomega.Equal("snap-id-1"))
+				gomega.Expect(res.Entries[1].Snapshot.SnapshotId).To(gomega.Equal("snap-id-2"))
 			})
 
-			It("should return all snapshots of the filesystem", func() {
+			ginkgo.It("should return all snapshots of the filesystem", func() {
 				clientMock.On("GetFsSnapshotsByVolumeID", mock.Anything, validBaseVolID).
 					Return([]gopowerstore.FileSystem{{ID: "snap-id-1"}, {ID: "snap-id-2"}}, nil)
 				req := &csi.ListSnapshotsRequest{
 					SourceVolumeId: validNfsVolumeID,
 				}
 				res, err := ctrlSvc.ListSnapshots(context.Background(), req)
-				Expect(res).ToNot(BeNil())
-				Expect(err).To(BeNil())
-				Expect(len(res.Entries)).To(Equal(2))
-				Expect(res.Entries[0].Snapshot.SnapshotId).To(Equal("snap-id-1"))
-				Expect(res.Entries[1].Snapshot.SnapshotId).To(Equal("snap-id-2"))
+				gomega.Expect(res).ToNot(gomega.BeNil())
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(len(res.Entries)).To(gomega.Equal(2))
+				gomega.Expect(res.Entries[0].Snapshot.SnapshotId).To(gomega.Equal("snap-id-1"))
+				gomega.Expect(res.Entries[1].Snapshot.SnapshotId).To(gomega.Equal("snap-id-2"))
 			})
 
-			It("should fail [incorrect id]", func() {
+			ginkgo.It("should fail [incorrect id]", func() {
 				randomID := "something-random"
 
-				By("checking with default array", func() {
+				ginkgo.By("checking with default array", func() {
 					mockCantParseVolumeID(randomID)
 				})
 
@@ -3222,15 +3216,15 @@ var _ = Describe("CSIControllerService", func() {
 					SourceVolumeId: randomID,
 				}
 				res, err := ctrlSvc.ListSnapshots(context.Background(), req)
-				Expect(res).To(Equal(&csi.ListSnapshotsResponse{}))
-				Expect(err).To(BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.ListSnapshotsResponse{}))
+				gomega.Expect(err).To(gomega.BeNil())
 			})
 		})
 	})
 
-	Describe("calling GetCapacity()", func() {
-		When("everything is ok and arrayip is provided", func() {
-			It("should succeed", func() {
+	ginkgo.Describe("calling GetCapacity()", func() {
+		ginkgo.When("everything is ok and arrayip is provided", func() {
+			ginkgo.It("should succeed", func() {
 				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
 				clientMock.On("GetCapacity", mock.Anything).Return(int64(123123123), nil)
@@ -3241,13 +3235,13 @@ var _ = Describe("CSIControllerService", func() {
 					},
 				}
 				res, err := ctrlSvc.GetCapacity(context.Background(), req)
-				Expect(err).To(BeNil())
-				Expect(res.AvailableCapacity).To(Equal(int64(123123123)))
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res.AvailableCapacity).To(gomega.Equal(int64(123123123)))
 			})
 		})
 
-		When("everything is ok and array ip is not provided", func() {
-			It("should succeed", func() {
+		ginkgo.When("everything is ok and array ip is not provided", func() {
+			ginkgo.It("should succeed", func() {
 				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
 				clientMock.On("GetCapacity", mock.Anything).Return(int64(123123123), nil)
@@ -3256,13 +3250,13 @@ var _ = Describe("CSIControllerService", func() {
 					Parameters: map[string]string{},
 				}
 				res, err := ctrlSvc.GetCapacity(context.Background(), req)
-				Expect(err).To(BeNil())
-				Expect(res.AvailableCapacity).To(Equal(int64(123123123)))
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res.AvailableCapacity).To(gomega.Equal(int64(123123123)))
 			})
 		})
 
-		When("wrong arrayIP in params", func() {
-			It("should fail with predefined errmsg", func() {
+		ginkgo.When("wrong arrayIP in params", func() {
+			ginkgo.It("should fail with predefined errmsg", func() {
 				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
 				clientMock.On("GetCapacity", mock.Anything).Return(int64(123123123), nil)
@@ -3273,14 +3267,14 @@ var _ = Describe("CSIControllerService", func() {
 					},
 				}
 				res, err := ctrlSvc.GetCapacity(context.Background(), req)
-				Expect(res).To(BeNil())
-				Expect(err).ToNot(BeNil())
-				Expect(err.Error()).To(ContainSubstring("can't find array with provided id 10.10.10.10"))
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("can't find array with provided id 10.10.10.10"))
 			})
 		})
 
-		When("everything is correct, but API failed", func() {
-			It("should fail with predefined errmsg", func() {
+		ginkgo.When("everything is correct, but API failed", func() {
+			ginkgo.It("should fail with predefined errmsg", func() {
 				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
 				clientMock.On("GetCapacity", mock.Anything).Return(int64(123123123), errors.New("APIErrorUnexpected"))
@@ -3291,14 +3285,14 @@ var _ = Describe("CSIControllerService", func() {
 					},
 				}
 				res, err := ctrlSvc.GetCapacity(context.Background(), req)
-				Expect(res).To(BeNil())
-				Expect(err).ToNot(BeNil())
-				Expect(err.Error()).To(ContainSubstring("APIErrorUnexpected"))
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("APIErrorUnexpected"))
 			})
 		})
 
-		When("everything is correct, but GetMaxVolumeSize API failed", func() {
-			It("MaximumVolumeSize should not be set in the response", func() {
+		ginkgo.When("everything is correct, but GetMaxVolumeSize API failed", func() {
+			ginkgo.It("MaximumVolumeSize should not be set in the response", func() {
 				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
 				clientMock.On("GetCapacity", mock.Anything).Return(int64(123123123), nil)
@@ -3308,13 +3302,13 @@ var _ = Describe("CSIControllerService", func() {
 				clientMock.On("GetMaxVolumeSize", mock.Anything).Return(int64(-1), errors.New("APIErrorUnexpected"))
 
 				res, err := ctrlSvc.GetCapacity(context.Background(), req)
-				Expect(res).ToNot(BeNil())
-				Expect(err).To(BeNil())
+				gomega.Expect(res).ToNot(gomega.BeNil())
+				gomega.Expect(err).To(gomega.BeNil())
 			})
 		})
 
-		When("negative MaximumVolumeSize", func() {
-			It("MaximumVolumeSize should not be set in the response", func() {
+		ginkgo.When("negative MaximumVolumeSize", func() {
+			ginkgo.It("MaximumVolumeSize should not be set in the response", func() {
 				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
 				clientMock.On("GetCapacity", mock.Anything).Return(int64(123123123), nil)
@@ -3324,13 +3318,13 @@ var _ = Describe("CSIControllerService", func() {
 				clientMock.On("GetMaxVolumeSize", mock.Anything).Return(int64(-1), nil)
 
 				res, err := ctrlSvc.GetCapacity(context.Background(), req)
-				Expect(res.MaximumVolumeSize).To(BeNil())
-				Expect(err).To(BeNil())
+				gomega.Expect(res.MaximumVolumeSize).To(gomega.BeNil())
+				gomega.Expect(err).To(gomega.BeNil())
 			})
 		})
 
-		When("non negative MaximumVolumeSize", func() {
-			It("MaximumVolumeSize should be set in the response", func() {
+		ginkgo.When("non negative MaximumVolumeSize", func() {
+			ginkgo.It("MaximumVolumeSize should be set in the response", func() {
 				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
 				clientMock.On("GetCapacity", mock.Anything).Return(int64(123123123), nil)
@@ -3340,18 +3334,17 @@ var _ = Describe("CSIControllerService", func() {
 				clientMock.On("GetMaxVolumeSize", mock.Anything).Return(int64(100000), nil)
 				res, err := ctrlSvc.GetCapacity(context.Background(), req)
 
-				Expect(res.MaximumVolumeSize).ToNot(BeNil())
-				Expect(err).To(BeNil())
+				gomega.Expect(res.MaximumVolumeSize).ToNot(gomega.BeNil())
+				gomega.Expect(err).To(gomega.BeNil())
 			})
 		})
-
 	})
 
-	Describe("calling ValidateVolumeCapabilities()", func() {
-		BeforeEach(func() { clientMock.On("GetVolume", mock.Anything, mock.Anything).Return(gopowerstore.Volume{}, nil) })
+	ginkgo.Describe("calling ValidateVolumeCapabilities()", func() {
+		ginkgo.BeforeEach(func() { clientMock.On("GetVolume", mock.Anything, mock.Anything).Return(gopowerstore.Volume{}, nil) })
 
-		When("everything is correct. Mode = SNW,block", func() {
-			It("should succeed", func() {
+		ginkgo.When("everything is correct. Mode = SNW,block", func() {
+			ginkgo.It("should succeed", func() {
 				block := new(csi.VolumeCapability_BlockVolume)
 				accessType := new(csi.VolumeCapability_Block)
 				accessType.Block = block
@@ -3365,13 +3358,13 @@ var _ = Describe("CSIControllerService", func() {
 						},
 					},
 				})
-				Expect(err).To(BeNil())
-				Expect(res.Confirmed).NotTo(BeNil())
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res.Confirmed).NotTo(gomega.BeNil())
 			})
 		})
 
-		When("everything is correct. Mode = SNRO,block", func() {
-			It("should succeed", func() {
+		ginkgo.When("everything is correct. Mode = SNRO,block", func() {
+			ginkgo.It("should succeed", func() {
 				block := new(csi.VolumeCapability_BlockVolume)
 				accessType := new(csi.VolumeCapability_Block)
 				accessType.Block = block
@@ -3385,13 +3378,13 @@ var _ = Describe("CSIControllerService", func() {
 						},
 					},
 				})
-				Expect(err).To(BeNil())
-				Expect(res.Confirmed).NotTo(BeNil())
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res.Confirmed).NotTo(gomega.BeNil())
 			})
 		})
 
-		When("everything is correct. Mode = MNRO,block", func() {
-			It("should succeed", func() {
+		ginkgo.When("everything is correct. Mode = MNRO,block", func() {
+			ginkgo.It("should succeed", func() {
 				block := new(csi.VolumeCapability_BlockVolume)
 				accessType := new(csi.VolumeCapability_Block)
 				accessType.Block = block
@@ -3405,13 +3398,13 @@ var _ = Describe("CSIControllerService", func() {
 						},
 					},
 				})
-				Expect(err).To(BeNil())
-				Expect(res.Confirmed).NotTo(BeNil())
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res.Confirmed).NotTo(gomega.BeNil())
 			})
 		})
 
-		When("everything is correct. Mode = MNSW,block", func() {
-			It("should succeed", func() {
+		ginkgo.When("everything is correct. Mode = MNSW,block", func() {
+			ginkgo.It("should succeed", func() {
 				block := new(csi.VolumeCapability_BlockVolume)
 				accessType := new(csi.VolumeCapability_Block)
 				accessType.Block = block
@@ -3425,13 +3418,13 @@ var _ = Describe("CSIControllerService", func() {
 						},
 					},
 				})
-				Expect(err).To(BeNil())
-				Expect(res.Confirmed).NotTo(BeNil())
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res.Confirmed).NotTo(gomega.BeNil())
 			})
 		})
 
-		When("everything is correct. Mode = MNMW,block", func() {
-			It("should fail", func() {
+		ginkgo.When("everything is correct. Mode = MNMW,block", func() {
+			ginkgo.It("should fail", func() {
 				block := new(csi.VolumeCapability_BlockVolume)
 				accessType := new(csi.VolumeCapability_Block)
 				accessType.Block = block
@@ -3445,13 +3438,13 @@ var _ = Describe("CSIControllerService", func() {
 						},
 					},
 				})
-				Expect(err).To(BeNil())
-				Expect(res.Confirmed).NotTo(BeNil())
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res.Confirmed).NotTo(gomega.BeNil())
 			})
 		})
 
-		When("wrong pair of AM and AT. Mode = MNMW,mount", func() {
-			It("should fail", func() {
+		ginkgo.When("wrong pair of AM and AT. Mode = MNMW,mount", func() {
+			ginkgo.It("should fail", func() {
 				mount := new(csi.VolumeCapability_MountVolume)
 				accessType := new(csi.VolumeCapability_Mount)
 				accessType.Mount = mount
@@ -3465,14 +3458,14 @@ var _ = Describe("CSIControllerService", func() {
 						},
 					},
 				})
-				Expect(err).ToNot(BeNil())
-				Expect(res.Confirmed).To(BeNil())
-				Expect(err.Error()).To(ContainSubstring("multi-node with writer(s) only supported for block access type"))
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(res.Confirmed).To(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("multi-node with writer(s) only supported for block access type"))
 			})
 		})
 
-		When("wrong AT is given", func() {
-			It("should fail", func() {
+		ginkgo.When("wrong AT is given", func() {
+			ginkgo.It("should fail", func() {
 				accessType := new(csi.VolumeCapability_Mount)
 				accessType.Mount = nil
 				res, err := ctrlSvc.ValidateVolumeCapabilities(context.Background(), &csi.ValidateVolumeCapabilitiesRequest{
@@ -3485,14 +3478,14 @@ var _ = Describe("CSIControllerService", func() {
 						},
 					},
 				})
-				Expect(err).ToNot(BeNil())
-				Expect(res.Confirmed).To(BeNil())
-				Expect(err.Error()).To(ContainSubstring("unknown access type is not Block or Mount"))
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(res.Confirmed).To(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("unknown access type is not Block or Mount"))
 			})
 		})
 
-		When("AM is nil", func() {
-			It("should fail", func() {
+		ginkgo.When("AM is nil", func() {
+			ginkgo.It("should fail", func() {
 				mount := new(csi.VolumeCapability_MountVolume)
 				accessType := new(csi.VolumeCapability_Mount)
 				accessType.Mount = mount
@@ -3500,28 +3493,27 @@ var _ = Describe("CSIControllerService", func() {
 					VolumeId:      validBlockVolumeID,
 					VolumeContext: nil,
 					VolumeCapabilities: []*csi.VolumeCapability{
-
 						{
 							AccessMode: &csi.VolumeCapability_AccessMode{Mode: csi.VolumeCapability_AccessMode_UNKNOWN},
 							AccessType: accessType,
 						},
 					},
 				})
-				Expect(err).ToNot(BeNil())
-				Expect(res.Confirmed).To(BeNil())
-				Expect(err.Error()).To(ContainSubstring("access mode cannot be UNKNOWN"))
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(res.Confirmed).To(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("access mode cannot be UNKNOWN"))
 			})
 		})
 	})
 
-	Describe("calling ControllerGetCapabilities()", func() {
-		When("plugin functions correctly with health monitor capabilities", func() {
-			It("should return supported capabilities", func() {
+	ginkgo.Describe("calling ControllerGetCapabilities()", func() {
+		ginkgo.When("plugin functions correctly with health monitor capabilities", func() {
+			ginkgo.It("should return supported capabilities", func() {
 				csictx.Setenv(context.Background(), common.EnvIsHealthMonitorEnabled, "true")
 				ctrlSvc.Init()
 				res, err := ctrlSvc.ControllerGetCapabilities(context.Background(), &csi.ControllerGetCapabilitiesRequest{})
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.ControllerGetCapabilitiesResponse{
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.ControllerGetCapabilitiesResponse{
 					Capabilities: []*csi.ControllerServiceCapability{
 						{
 							Type: &csi.ControllerServiceCapability_Rpc{
@@ -3604,13 +3596,13 @@ var _ = Describe("CSIControllerService", func() {
 				}))
 			})
 		})
-		When("plugin functions correctly without health monitor capabilities", func() {
-			It("should return supported capabilities", func() {
+		ginkgo.When("plugin functions correctly without health monitor capabilities", func() {
+			ginkgo.It("should return supported capabilities", func() {
 				csictx.Setenv(context.Background(), common.EnvIsHealthMonitorEnabled, "false")
 				ctrlSvc.Init()
 				res, err := ctrlSvc.ControllerGetCapabilities(context.Background(), &csi.ControllerGetCapabilitiesRequest{})
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.ControllerGetCapabilitiesResponse{
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.ControllerGetCapabilitiesResponse{
 					Capabilities: []*csi.ControllerServiceCapability{
 						{
 							Type: &csi.ControllerServiceCapability_Rpc{
@@ -3674,11 +3666,12 @@ var _ = Describe("CSIControllerService", func() {
 		})
 	})
 
-	Describe("calling DiscoverStorageProtectionGroup", func() {
-		When("get info about protection group", func() {
+	ginkgo.Describe("calling DiscoverStorageProtectionGroup", func() {
+		ginkgo.When("get info about protection group", func() {
 			getLocalAndRemoteParams := func(localSystemName string, localAddress string,
 				remoteSystemName string, remoteAddress string,
-				remoteSerialNumber string, volumeGroupName string) (map[string]string, map[string]string) {
+				remoteSerialNumber string, volumeGroupName string,
+			) (map[string]string, map[string]string) {
 				localParams := map[string]string{
 					"globalID":                localAddress,
 					"systemName":              localSystemName,
@@ -3701,7 +3694,7 @@ var _ = Describe("CSIControllerService", func() {
 				return localParams, remoteParams
 			}
 
-			It("should successfully discover protection group if everything is ok", func() {
+			ginkgo.It("should successfully discover protection group if everything is ok", func() {
 				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).
 					Return(gopowerstore.VolumeGroups{VolumeGroup: []gopowerstore.VolumeGroup{{ID: validGroupID, Name: validVolumeGroupName}}}, nil)
 
@@ -3712,8 +3705,9 @@ var _ = Describe("CSIControllerService", func() {
 						RemoteResourceId: validRemoteGroupID,
 						StorageElementPairs: []gopowerstore.StorageElementPair{{
 							LocalStorageElementId:  validBaseVolID,
-							RemoteStorageElementId: validRemoteVolId,
-						}}}, nil)
+							RemoteStorageElementId: validRemoteVolID,
+						}},
+					}, nil)
 
 				clientMock.On("GetCluster", mock.Anything).
 					Return(gopowerstore.Cluster{Name: validClusterName, ManagementAddress: firstValidID}, nil)
@@ -3722,7 +3716,8 @@ var _ = Describe("CSIControllerService", func() {
 					Return(gopowerstore.RemoteSystem{
 						Name:              validRemoteSystemName,
 						ManagementAddress: secondValidID,
-						SerialNumber:      validRemoteSystemGlobalID}, nil)
+						SerialNumber:      validRemoteSystemGlobalID,
+					}, nil)
 
 				req := &csiext.CreateStorageProtectionGroupRequest{
 					VolumeHandle: validBaseVolID + "/" + firstValidID + "/" + "iscsi",
@@ -3733,9 +3728,8 @@ var _ = Describe("CSIControllerService", func() {
 				localParams, remoteParams := getLocalAndRemoteParams(validClusterName, firstValidID,
 					validRemoteSystemName, secondValidID, validRemoteSystemGlobalID, validVolumeGroupName)
 
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csiext.CreateStorageProtectionGroupResponse{
-
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csiext.CreateStorageProtectionGroupResponse{
 					LocalProtectionGroupId:          validGroupID,
 					RemoteProtectionGroupId:         validRemoteGroupID,
 					LocalProtectionGroupAttributes:  localParams,
@@ -3743,20 +3737,19 @@ var _ = Describe("CSIControllerService", func() {
 				}))
 			})
 
-			It("should fail if volume doesn't exists", func() {
+			ginkgo.It("should fail if volume doesn't exists", func() {
 				req := &csiext.CreateStorageProtectionGroupRequest{
 					VolumeHandle: "",
 				}
 
 				res, err := ctrlSvc.CreateStorageProtectionGroup(context.Background(), req)
 
-				Expect(res).To(BeNil())
-				Expect(err).NotTo(BeNil())
-				Expect(err.Error()).To(ContainSubstring("volume ID is required"))
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err).NotTo(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("volume ID is required"))
 			})
 
-			It("should fail if volume is single", func() {
-
+			ginkgo.It("should fail if volume is single", func() {
 				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).
 					Return(gopowerstore.VolumeGroups{}, gopowerstore.APIError{})
 
@@ -3766,11 +3759,11 @@ var _ = Describe("CSIControllerService", func() {
 
 				res, err := ctrlSvc.CreateStorageProtectionGroup(context.Background(), req)
 
-				Expect(res).To(BeNil())
-				Expect(err).NotTo(BeNil())
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err).NotTo(gomega.BeNil())
 			})
 
-			It("should fail when volume group not in replication session", func() {
+			ginkgo.It("should fail when volume group not in replication session", func() {
 				// policy with replication rule not assigned
 				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).
 					Return(gopowerstore.VolumeGroups{VolumeGroup: []gopowerstore.VolumeGroup{{ID: validGroupID}}}, nil)
@@ -3784,15 +3777,15 @@ var _ = Describe("CSIControllerService", func() {
 
 				res, err := ctrlSvc.CreateStorageProtectionGroup(context.Background(), req)
 
-				Expect(res).To(BeNil())
-				Expect(err).NotTo(BeNil())
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err).NotTo(gomega.BeNil())
 			})
 		})
 	})
 
-	Describe("calling CreateRemoteVolume", func() {
-		When("creating remote volume", func() {
-			It("should return info if everything is ok", func() {
+	ginkgo.Describe("calling CreateRemoteVolume", func() {
+		ginkgo.When("creating remote volume", func() {
+			ginkgo.It("should return info if everything is ok", func() {
 				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).
 					Return(gopowerstore.VolumeGroups{VolumeGroup: []gopowerstore.VolumeGroup{{ID: validGroupID}}}, nil)
 
@@ -3804,7 +3797,7 @@ var _ = Describe("CSIControllerService", func() {
 						StorageElementPairs: []gopowerstore.StorageElementPair{
 							{
 								LocalStorageElementId:  validBaseVolID,
-								RemoteStorageElementId: validRemoteVolId,
+								RemoteStorageElementId: validRemoteVolID,
 							},
 						},
 					}, nil)
@@ -3824,32 +3817,31 @@ var _ = Describe("CSIControllerService", func() {
 
 				res, err := ctrlSvc.CreateRemoteVolume(context.Background(), req)
 
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(
 					&csiext.CreateRemoteVolumeResponse{RemoteVolume: &csiext.Volume{
 						CapacityBytes: validVolSize,
-						VolumeId:      validRemoteVolId + "/" + validRemoteSystemGlobalID + "/" + "iscsi",
+						VolumeId:      validRemoteVolID + "/" + validRemoteSystemGlobalID + "/" + "iscsi",
 						VolumeContext: map[string]string{
 							"remoteSystem":      validClusterName,
 							"managementAddress": secondValidID,
 							"arrayID":           validRemoteSystemGlobalID,
 						},
 					}}))
-
 			})
-			It("should fail if volume id is empty", func() {
+			ginkgo.It("should fail if volume id is empty", func() {
 				req := &csiext.CreateRemoteVolumeRequest{
 					VolumeHandle: "",
 				}
 
 				res, err := ctrlSvc.CreateRemoteVolume(context.Background(), req)
 
-				Expect(res).To(BeNil())
-				Expect(err).NotTo(BeNil())
-				Expect(err.Error()).To(ContainSubstring("volume ID is required"))
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err).NotTo(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("volume ID is required"))
 			})
 
-			It("should fail if volume not in volumeGroup", func() {
+			ginkgo.It("should fail if volume not in volumeGroup", func() {
 				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).
 					Return(gopowerstore.VolumeGroups{}, gopowerstore.APIError{})
 
@@ -3859,11 +3851,11 @@ var _ = Describe("CSIControllerService", func() {
 
 				res, err := ctrlSvc.CreateRemoteVolume(context.Background(), req)
 
-				Expect(res).To(BeNil())
-				Expect(err).NotTo(BeNil())
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err).NotTo(gomega.BeNil())
 			})
 
-			It("should fail if parent volume group not replicated", func() {
+			ginkgo.It("should fail if parent volume group not replicated", func() {
 				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).
 					Return(gopowerstore.VolumeGroups{}, gopowerstore.APIError{})
 
@@ -3875,11 +3867,11 @@ var _ = Describe("CSIControllerService", func() {
 				}
 				res, err := ctrlSvc.CreateRemoteVolume(context.Background(), req)
 
-				Expect(res).To(BeNil())
-				Expect(err).NotTo(BeNil())
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err).NotTo(gomega.BeNil())
 			})
 
-			It("should fail if volume group not synced yet", func() {
+			ginkgo.It("should fail if volume group not synced yet", func() {
 				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).
 					Return(gopowerstore.VolumeGroups{VolumeGroup: []gopowerstore.VolumeGroup{{ID: validGroupID}}}, nil)
 
@@ -3896,29 +3888,27 @@ var _ = Describe("CSIControllerService", func() {
 				}
 				res, err := ctrlSvc.CreateRemoteVolume(context.Background(), req)
 
-				Expect(res).To(BeNil())
-				Expect(err).NotTo(BeNil())
-				Expect(err.Error()).To(ContainSubstring(
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err).NotTo(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring(
 					fmt.Sprintf("couldn't find volume id %s in storage element pairs of replication session", validBaseVolID)))
 			})
 
-			It("should fail if the array id is nil", func() {
-
+			ginkgo.It("should fail if the array id is nil", func() {
 				// create volume handle with nil array ID
 				req := &csiext.CreateRemoteVolumeRequest{
 					VolumeHandle: validBaseVolID + "/" + "/" + "iscsi",
 				}
 				res, err := ctrlSvc.CreateRemoteVolume(context.Background(), req)
 
-				Expect(res).To(BeNil())
-				Expect(err).NotTo(BeNil())
-				Expect(err.Error()).To(ContainSubstring(
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err).NotTo(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring(
 					"failed to find array with given IP",
 				))
 			})
 
-			It("should fail if a volume group does not exist for the volume", func() {
-
+			ginkgo.It("should fail if a volume group does not exist for the volume", func() {
 				// return an empty volume group
 				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).Return(gopowerstore.VolumeGroups{}, nil)
 
@@ -3927,29 +3917,27 @@ var _ = Describe("CSIControllerService", func() {
 				}
 				res, err := ctrlSvc.CreateRemoteVolume(context.Background(), req)
 
-				Expect(res).To(BeNil())
-				Expect(err).ToNot(BeNil())
-				Expect(err.Error()).To(ContainSubstring(
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring(
 					"replication of volumes that aren't assigned to group is not implemented yet",
 				))
 			})
-
 		})
 	})
 
-	Describe("calling EnsureProtectionPolicyExists", func() {
-		When("ensure protection policy exists", func() {
-			It("should failed if remote system not in list", func() {
+	ginkgo.Describe("calling EnsureProtectionPolicyExists", func() {
+		ginkgo.When("ensure protection policy exists", func() {
+			ginkgo.It("should failed if remote system not in list", func() {
 				clientMock.On("GetRemoteSystemByName", mock.Anything, validRemoteSystemName).
 					Return(gopowerstore.RemoteSystem{}, gopowerstore.NewHostIsNotExistError())
 
 				_, err := controller.EnsureProtectionPolicyExists(context.Background(), ctrlSvc.DefaultArray(),
 					validGroupName, validRemoteSystemName, validRPO)
-				Expect(err).ToNot(BeNil())
+				gomega.Expect(err).ToNot(gomega.BeNil())
 			})
 
-			It("should return existing policy", func() {
-
+			ginkgo.It("should return existing policy", func() {
 				clientMock.On("GetRemoteSystemByName", mock.Anything, validRemoteSystemName).
 					Return(gopowerstore.RemoteSystem{ID: validRemoteSystemID, Name: validRemoteSystemName}, nil)
 
@@ -3958,11 +3946,11 @@ var _ = Describe("CSIControllerService", func() {
 
 				res, err := controller.EnsureProtectionPolicyExists(context.Background(), ctrlSvc.DefaultArray(),
 					validGroupName, validRemoteSystemName, validRPO)
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(validPolicyID))
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(validPolicyID))
 			})
 
-			It("should successfully create new policy with existing rule", func() {
+			ginkgo.It("should successfully create new policy with existing rule", func() {
 				clientMock.On("GetRemoteSystemByName", mock.Anything, validRemoteSystemName).
 					Return(gopowerstore.RemoteSystem{ID: validRemoteSystemID, Name: validRemoteSystemName}, nil)
 
@@ -3979,16 +3967,15 @@ var _ = Describe("CSIControllerService", func() {
 					}).Return(gopowerstore.CreateResponse{ID: validPolicyID}, nil)
 				res, err := controller.EnsureProtectionPolicyExists(context.Background(), ctrlSvc.DefaultArray(),
 					validGroupName, validRemoteSystemName, validRPO)
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(validPolicyID))
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(validPolicyID))
 			})
-
 		})
 	})
 
-	Describe("calling EnsureReplicationRuleExists", func() {
-		When("ensure replication rule exists", func() {
-			It("should successfully create new rule if it doesn't exists", func() {
+	ginkgo.Describe("calling EnsureReplicationRuleExists", func() {
+		ginkgo.When("ensure replication rule exists", func() {
+			ginkgo.It("should successfully create new rule if it doesn't exists", func() {
 				clientMock.On("GetReplicationRuleByName", mock.Anything, validRuleName).
 					Return(gopowerstore.ReplicationRule{ID: validRuleID}, gopowerstore.APIError{})
 
@@ -4003,23 +3990,22 @@ var _ = Describe("CSIControllerService", func() {
 				res, err := controller.EnsureReplicationRuleExists(context.Background(), ctrlSvc.DefaultArray(),
 					validGroupName, validRemoteSystemID, gopowerstore.RpoFiveMinutes)
 
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(validRuleID))
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(validRuleID))
 			})
 
-			It("should return existing rule", func() {
+			ginkgo.It("should return existing rule", func() {
 				clientMock.On("GetReplicationRuleByName", mock.Anything, validRuleName).
 					Return(gopowerstore.ReplicationRule{ID: validRuleID}, nil)
 
 				res, err := controller.EnsureReplicationRuleExists(context.Background(), ctrlSvc.DefaultArray(),
 					validGroupName, validRemoteSystemID, validRPO)
 
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(validRuleID))
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(validRuleID))
 			})
 
-			It("should fail to create a replication rule", func() {
-
+			ginkgo.It("should fail to create a replication rule", func() {
 				clientMock.On("GetReplicationRuleByName", mock.Anything, validRuleName).Return(
 					gopowerstore.ReplicationRule{ID: validRuleID},
 					gopowerstore.NewNotFoundError(),
@@ -4040,17 +4026,16 @@ var _ = Describe("CSIControllerService", func() {
 				res, err := controller.EnsureReplicationRuleExists(context.Background(), ctrlSvc.DefaultArray(),
 					validGroupName, validRemoteSystemID, validRPO)
 
-				Expect(res).To(BeEmpty())
-				Expect(err).ToNot(BeNil())
-				Expect(err.Error()).To(ContainSubstring("can't create replication rule"))
+				gomega.Expect(res).To(gomega.BeEmpty())
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("can't create replication rule"))
 			})
 		})
-
 	})
 
-	Describe("calling ControllerGetVolume", func() {
-		When("normal block volume exists on array", func() {
-			It("should successfully get the volume", func() {
+	ginkgo.Describe("calling ControllerGetVolume", func() {
+		ginkgo.When("normal block volume exists on array", func() {
+			ginkgo.It("should successfully get the volume", func() {
 				clientMock.On("GetVolume", mock.Anything, validBaseVolID).
 					Return(gopowerstore.Volume{ID: validBaseVolID, State: gopowerstore.VolumeStateEnumReady}, nil)
 
@@ -4069,8 +4054,8 @@ var _ = Describe("CSIControllerService", func() {
 
 				res, err := ctrlSvc.ControllerGetVolume(context.Background(), req)
 
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.ControllerGetVolumeResponse{
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.ControllerGetVolumeResponse{
 					Volume: &csi.Volume{
 						VolumeId: validBaseVolID,
 					},
@@ -4084,8 +4069,8 @@ var _ = Describe("CSIControllerService", func() {
 				}))
 			})
 		})
-		When("normal block volume does not exists on array", func() {
-			It("should fail", func() {
+		ginkgo.When("normal block volume does not exists on array", func() {
+			ginkgo.It("should fail", func() {
 				var hosts []string
 				clientMock.On("GetVolume", mock.Anything, mock.Anything).
 					Return(gopowerstore.Volume{}, gopowerstore.APIError{
@@ -4109,8 +4094,8 @@ var _ = Describe("CSIControllerService", func() {
 
 				res, err := ctrlSvc.ControllerGetVolume(context.Background(), req)
 
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.ControllerGetVolumeResponse{
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.ControllerGetVolumeResponse{
 					Volume: &csi.Volume{
 						VolumeId: validBaseVolID,
 					},
@@ -4124,8 +4109,8 @@ var _ = Describe("CSIControllerService", func() {
 				}))
 			})
 		})
-		When("normal filesystem exists on array", func() {
-			It("should successfully get the filesystem", func() {
+		ginkgo.When("normal filesystem exists on array", func() {
+			ginkgo.It("should successfully get the filesystem", func() {
 				var hosts []string
 				clientMock.On("GetVolume", mock.Anything, validBaseVolID).
 					Return(gopowerstore.Volume{ID: validBaseVolID, State: gopowerstore.VolumeStateEnumReady}, nil)
@@ -4145,8 +4130,8 @@ var _ = Describe("CSIControllerService", func() {
 
 				res, err := ctrlSvc.ControllerGetVolume(context.Background(), req)
 
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.ControllerGetVolumeResponse{
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.ControllerGetVolumeResponse{
 					Volume: &csi.Volume{
 						VolumeId: validBaseVolID,
 					},
@@ -4160,8 +4145,8 @@ var _ = Describe("CSIControllerService", func() {
 				}))
 			})
 		})
-		When("filesystem does not exists on array", func() {
-			It("should fail", func() {
+		ginkgo.When("filesystem does not exists on array", func() {
+			ginkgo.It("should fail", func() {
 				var hosts []string
 				clientMock.On("GetVolume", mock.Anything, validBaseVolID).
 					Return(gopowerstore.Volume{ID: validBaseVolID, State: gopowerstore.VolumeStateEnumReady}, nil)
@@ -4185,8 +4170,8 @@ var _ = Describe("CSIControllerService", func() {
 
 				res, err := ctrlSvc.ControllerGetVolume(context.Background(), req)
 
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.ControllerGetVolumeResponse{
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.ControllerGetVolumeResponse{
 					Volume: &csi.Volume{
 						VolumeId: validBaseVolID,
 					},

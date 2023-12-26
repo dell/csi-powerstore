@@ -35,7 +35,7 @@ type FsTestSuite struct {
 func (suite *FsTestSuite) SetupSuite() {
 	suite.fs = &Fs{Util: &gofsutil.FS{}}
 	suite.tmp = "./tmp"
-	err := os.Mkdir(suite.tmp, 0750)
+	err := os.Mkdir(suite.tmp, 0o750)
 	if err != nil {
 		suite.T().Error("couldn't create the tmp folder")
 	}
@@ -74,7 +74,7 @@ func (suite *FsTestSuite) TestCreate() {
 func (suite *FsTestSuite) TestWriteFile() {
 	str := "random string \n hello"
 	data := []byte(str)
-	err := suite.fs.WriteFile(suite.tmp+"/create", data, 0640)
+	err := suite.fs.WriteFile(suite.tmp+"/create", data, 0o640)
 	suite.Assert().NoError(err)
 
 	bytes, err := suite.fs.ReadFile(suite.tmp + "/create")
@@ -83,11 +83,11 @@ func (suite *FsTestSuite) TestWriteFile() {
 }
 
 func (suite *FsTestSuite) TestMkDir() {
-	err := suite.fs.Mkdir(suite.tmp+"/dir", 0750)
+	err := suite.fs.Mkdir(suite.tmp+"/dir", 0o750)
 	suite.Assert().NoError(err)
 	suite.Assert().DirExists(suite.tmp + "/dir")
 
-	err = suite.fs.MkdirAll(suite.tmp+"/1/2/3", 0750)
+	err = suite.fs.MkdirAll(suite.tmp+"/1/2/3", 0o750)
 	suite.Assert().NoError(err)
 	suite.Assert().DirExists(suite.tmp + "/1/2")
 
@@ -101,7 +101,7 @@ func (suite *FsTestSuite) TestMkFileIdempotent() {
 	suite.Assert().NoError(err)
 	suite.Assert().Equal(true, created)
 
-	err = suite.fs.Mkdir(suite.tmp+"/mydir", 0750)
+	err = suite.fs.Mkdir(suite.tmp+"/mydir", 0o750)
 	suite.Assert().NoError(err)
 	_, err = suite.fs.MkFileIdempotent(suite.tmp + "/mydir")
 	suite.Assert().EqualError(err, "existing path is a directory")

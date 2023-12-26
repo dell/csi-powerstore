@@ -37,7 +37,6 @@ type Configurator interface {
 func NewTracer(configurator Configurator) (opentracing.Tracer, io.Closer, error) {
 	// load config from environment variables
 	cfg, err := configurator.FromEnv()
-
 	if err != nil {
 		return nil, nil, err
 	}

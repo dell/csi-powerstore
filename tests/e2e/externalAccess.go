@@ -72,7 +72,6 @@ type ExternaAccess struct {
 }
 
 var _ = ginkgo.Describe("External Access Test", func() {
-
 	// Building a namespace api object, basename external-access
 	var (
 		namespace string
@@ -83,7 +82,7 @@ var _ = ginkgo.Describe("External Access Test", func() {
 	f := framework.NewDefaultFramework("external-access")
 	// prevent annoying psp warning
 
-	//f.SkipPrivilegedPSPBinding = true
+	// f.SkipPrivilegedPSPBinding = true
 	defer ginkgo.GinkgoRecover()
 	framework.Logf("run e2e test default timeouts  %#v ", f.Timeouts)
 	ginkgo.BeforeEach(func() {
@@ -196,8 +195,7 @@ var _ = ginkgo.Describe("External Access Test", func() {
 			statefulset := GetStatefulSetFromManifest(namespace)
 			ginkgo.By("Creating statefulset")
 
-			statefulset.Spec.VolumeClaimTemplates[len(statefulset.Spec.VolumeClaimTemplates)-1].Spec.AccessModes[0] =
-				corev1.ReadWriteMany
+			statefulset.Spec.VolumeClaimTemplates[len(statefulset.Spec.VolumeClaimTemplates)-1].Spec.AccessModes[0] = corev1.ReadWriteMany
 
 			statefulset.Spec.VolumeClaimTemplates[len(statefulset.Spec.VolumeClaimTemplates)-1].
 				Annotations["volume.beta.kubernetes.io/storage-class"] = scName2

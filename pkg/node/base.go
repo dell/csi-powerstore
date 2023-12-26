@@ -255,7 +255,7 @@ func getTargetMount(ctx context.Context, target string, fs fs.Interface) (gofsut
 	return targetMount, found, nil
 }
 
-func getMounts(ctx context.Context, fs fs.Interface) ([]gofsutil.Info, error) {
+func getMounts(_ context.Context, fs fs.Interface) ([]gofsutil.Info, error) {
 	data, err := consistentRead(procMountsPath, procMountsRetries, fs)
 	if err != nil {
 		return []gofsutil.Info{}, err
@@ -289,7 +289,7 @@ func consistentRead(filename string, retry int, fs fs.Interface) ([]byte, error)
 }
 
 func createMapping(volID, deviceName, tmpDir string, fs fs.Interface) error {
-	return fs.WriteFile(path.Join(tmpDir, volID), []byte(deviceName), 0640)
+	return fs.WriteFile(path.Join(tmpDir, volID), []byte(deviceName), 0o640)
 }
 
 func getMapping(volID, tmpDir string, fs fs.Interface) (string, error) {
@@ -349,7 +349,7 @@ func getRWModeString(isRO bool) string {
 	return "rw"
 }
 
-func format(ctx context.Context, source, fsType string, fs fs.Interface, opts ...string) error {
+func format(_ context.Context, source, fsType string, fs fs.Interface, opts ...string) error {
 	f := log.Fields{
 		"source":  source,
 		"fsType":  fsType,

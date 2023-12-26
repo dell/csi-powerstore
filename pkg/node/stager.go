@@ -63,7 +63,8 @@ type SCSIStager struct {
 
 // Stage stages volume by connecting it through either FC or iSCSI and creating bind mount to staging path
 func (s *SCSIStager) Stage(ctx context.Context, req *csi.NodeStageVolumeRequest,
-	logFields log.Fields, fs fs.Interface, id string) (*csi.NodeStageVolumeResponse, error) {
+	logFields log.Fields, fs fs.Interface, id string,
+) (*csi.NodeStageVolumeResponse, error) {
 	// append additional path to be able to do bind mounts
 	stagingPath := getStagingPath(ctx, req.GetStagingTargetPath(), id)
 
@@ -133,7 +134,8 @@ type NFSStager struct {
 
 // Stage stages volume by mounting volumes as nfs to the staging path
 func (n *NFSStager) Stage(ctx context.Context, req *csi.NodeStageVolumeRequest,
-	logFields log.Fields, fs fs.Interface, id string) (*csi.NodeStageVolumeResponse, error) {
+	logFields log.Fields, fs fs.Interface, id string,
+) (*csi.NodeStageVolumeResponse, error) {
 	// append additional path to be able to do bind mounts
 	stagingPath := getStagingPath(ctx, req.GetStagingTargetPath(), id)
 
@@ -169,7 +171,7 @@ func (n *NFSStager) Stage(ctx context.Context, req *csi.NodeStageVolumeRequest,
 		return &csi.NodeStageVolumeResponse{}, nil
 	}
 
-	if err := fs.MkdirAll(stagingPath, 0750); err != nil {
+	if err := fs.MkdirAll(stagingPath, 0o750); err != nil {
 		return nil, status.Errorf(codes.Internal,
 			"can't create target folder %s: %s", stagingPath, err.Error())
 	}
@@ -181,7 +183,7 @@ func (n *NFSStager) Stage(ctx context.Context, req *csi.NodeStageVolumeRequest,
 	}
 
 	// Create folder with 1777 in nfs share so every user can use it
-	if err := fs.MkdirAll(filepath.Join(stagingPath, commonNfsVolumeFolder), 0750); err != nil {
+	if err := fs.MkdirAll(filepath.Join(stagingPath, commonNfsVolumeFolder), 0o750); err != nil {
 		return nil, status.Errorf(codes.Internal,
 			"can't create common folder %s: %s", filepath.Join(stagingPath, "volume"), err.Error())
 	}
@@ -278,8 +280,10 @@ func readSCSIInfoFromPublishContext(publishContext map[string]string, useFC bool
 	if len(fcTargets) == 0 && useFC && !useNVMe {
 		return data, status.Error(codes.InvalidArgument, "fcTargets data must be in publish context")
 	}
-	return scsiPublishContextData{deviceWWN: deviceWWN, volumeLUNAddress: volumeLUNAddress,
-		iscsiTargets: iscsiTargets, nvmetcpTargets: nvmeTCPTargets, nvmefcTargets: nvmeFCTargets, fcTargets: fcTargets}, nil
+	return scsiPublishContextData{
+		deviceWWN: deviceWWN, volumeLUNAddress: volumeLUNAddress,
+		iscsiTargets: iscsiTargets, nvmetcpTargets: nvmeTCPTargets, nvmefcTargets: nvmeFCTargets, fcTargets: fcTargets,
+	}, nil
 }
 
 func readISCSITargetsFromPublishContext(pc map[string]string) []gobrick.ISCSITargetInfo {
@@ -391,7 +395,8 @@ func (s *SCSIStager) connectDevice(ctx context.Context, data scsiPublishContextD
 }
 
 func (s *SCSIStager) connectISCSIDevice(ctx context.Context,
-	lun int, data scsiPublishContextData) (gobrick.Device, error) {
+	lun int, data scsiPublishContextData,
+) (gobrick.Device, error) {
 	logFields := common.GetLogFields(ctx)
 	var targets []gobrick.ISCSITargetInfo
 	for _, t := range data.iscsiTargets {
@@ -409,7 +414,8 @@ func (s *SCSIStager) connectISCSIDevice(ctx context.Context,
 }
 
 func (s *SCSIStager) connectNVMEDevice(ctx context.Context,
-	wwn string, data scsiPublishContextData, useFC bool) (gobrick.Device, error) {
+	wwn string, data scsiPublishContextData, useFC bool,
+) (gobrick.Device, error) {
 	logFields := common.GetLogFields(ctx)
 	var targets []gobrick.NVMeTargetInfo
 
@@ -434,7 +440,8 @@ func (s *SCSIStager) connectNVMEDevice(ctx context.Context,
 }
 
 func (s *SCSIStager) connectFCDevice(ctx context.Context,
-	lun int, data scsiPublishContextData) (gobrick.Device, error) {
+	lun int, data scsiPublishContextData,
+) (gobrick.Device, error) {
 	logFields := common.GetLogFields(ctx)
 	var targets []gobrick.FCTargetInfo
 
