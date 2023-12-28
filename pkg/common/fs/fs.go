@@ -69,7 +69,7 @@ type Interface interface {
 	// wrapper
 	ParseProcMounts(ctx context.Context, content io.Reader) ([]gofsutil.Info, error)
 	MkFileIdempotent(path string) (bool, error)
-	//Network
+	// Network
 	NetDial(endpoint string) (net.Conn, error)
 }
 
@@ -188,7 +188,8 @@ func (fs *Fs) ExecCommandOutput(name string, args ...string) ([]byte, error) {
 // ParseProcMounts is wrapper of gofsutil.ReadProcMountsFrom global function
 func (fs *Fs) ParseProcMounts(
 	ctx context.Context,
-	content io.Reader) ([]gofsutil.Info, error) {
+	content io.Reader,
+) ([]gofsutil.Info, error) {
 	r, _, err := gofsutil.ReadProcMountsFrom(ctx, content, false,
 		gofsutil.ProcMountsFields, gofsutil.DefaultEntryScanFunc())
 	return r, err
@@ -203,7 +204,7 @@ func (fs *Fs) NetDial(endpoint string) (net.Conn, error) {
 func (fs *Fs) MkFileIdempotent(path string) (bool, error) {
 	st, err := fs.Stat(path)
 	if fs.IsNotExist(err) {
-		file, err := fs.OpenFile(path, os.O_CREATE, 0600)
+		file, err := fs.OpenFile(path, os.O_CREATE, 0o600)
 		if err != nil {
 			log.WithField("path", path).WithError(err).Error("Unable to create file")
 			return false, err

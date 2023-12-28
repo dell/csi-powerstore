@@ -157,7 +157,8 @@ func createPVCAndStorageClass(client clientset.Interface, pvcnamespace string,
 	pvclaimlabels map[string]string, testParameters map[interface{}]interface{}, ds string,
 	allowedTopologies []v1.TopologySelectorLabelRequirement, bindingMode storagev1.VolumeBindingMode,
 	allowVolumeExpansion bool, accessMode v1.PersistentVolumeAccessMode,
-	names ...string) (*storagev1.StorageClass, *v1.PersistentVolumeClaim, error) {
+	names ...string,
+) (*storagev1.StorageClass, *v1.PersistentVolumeClaim, error) {
 	scName := ""
 	if len(names) > 0 {
 		scName = names[0]
@@ -178,7 +179,8 @@ func createPVCAndStorageClass(client clientset.Interface, pvcnamespace string,
 func createStorageClass(client clientset.Interface, testParameters map[interface{}]interface{},
 	allowedTopologies []v1.TopologySelectorLabelRequirement,
 	scReclaimPolicy v1.PersistentVolumeReclaimPolicy, bindingMode storagev1.VolumeBindingMode,
-	allowVolumeExpansion bool, scName string) (*storagev1.StorageClass, error) {
+	allowVolumeExpansion bool, scName string,
+) (*storagev1.StorageClass, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	var storageclass *storagev1.StorageClass
@@ -212,8 +214,8 @@ func createStorageClass(client clientset.Interface, testParameters map[interface
 // class parameters.
 func getStorageClassSpec(scName string, testParameters map[interface{}]interface{},
 	allowedTopologies []v1.TopologySelectorLabelRequirement, scReclaimPolicy v1.PersistentVolumeReclaimPolicy,
-	bindingMode storagev1.VolumeBindingMode, allowVolumeExpansion bool) *storagev1.StorageClass {
-
+	bindingMode storagev1.VolumeBindingMode, allowVolumeExpansion bool,
+) *storagev1.StorageClass {
 	/* vals := make([]string, 0)
 	vals = append(vals, testParameters["e2eCSIDriverName"])
 
@@ -228,7 +230,7 @@ func getStorageClassSpec(scName string, testParameters map[interface{}]interface
 		bindingMode = storagev1.VolumeBindingWaitForFirstConsumer
 	}
 
-	var sc = &storagev1.StorageClass{
+	sc := &storagev1.StorageClass{
 		TypeMeta: metav1.TypeMeta{
 			Kind: "StorageClass",
 		},
@@ -276,8 +278,8 @@ func getStorageClassSpec(scName string, testParameters map[interface{}]interface
 // createPVC helps creates pvc with given namespace and labels using given
 // storage class.
 func createPVC(client clientset.Interface, pvcnamespace string, pvclaimlabels map[string]string, ds string,
-	storageclass *storagev1.StorageClass, accessMode v1.PersistentVolumeAccessMode) (*v1.PersistentVolumeClaim, error) {
-
+	storageclass *storagev1.StorageClass, accessMode v1.PersistentVolumeAccessMode,
+) (*v1.PersistentVolumeClaim, error) {
 	pvcspec := getPersistentVolumeClaimSpecWithStorageClass(pvcnamespace, ds, storageclass, pvclaimlabels, accessMode)
 
 	ginkgo.By(fmt.Sprintf("Creating PVC using the Storage Class %s with disk size %s and labels: %+v accessMode: %+v",
@@ -293,7 +295,8 @@ func createPVC(client clientset.Interface, pvcnamespace string, pvclaimlabels ma
 // getPersistentVolumeClaimSpecWithStorageClass return the PersistentVolumeClaim
 // spec with specified storage class.
 func getPersistentVolumeClaimSpecWithStorageClass(namespace string, ds string, storageclass *storagev1.StorageClass,
-	pvclaimlabels map[string]string, accessMode v1.PersistentVolumeAccessMode) *v1.PersistentVolumeClaim {
+	pvclaimlabels map[string]string, accessMode v1.PersistentVolumeAccessMode,
+) *v1.PersistentVolumeClaim {
 	disksize := fmt.Sprintf("%v", testParameters["diskSize"])
 	if ds != "" {
 		disksize = ds

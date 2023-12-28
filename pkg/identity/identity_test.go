@@ -25,33 +25,33 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-powerstore/v2/pkg/common"
 	"github.com/golang/protobuf/ptypes/wrappers"
-	. "github.com/onsi/ginkgo"
+	ginkgo "github.com/onsi/ginkgo"
 	"github.com/onsi/ginkgo/reporters"
-	. "github.com/onsi/gomega"
+	gomega "github.com/onsi/gomega"
 )
 
 var idntySvc *Service
 
 func TestCSIIdentityService(t *testing.T) {
-	RegisterFailHandler(Fail)
+	gomega.RegisterFailHandler(ginkgo.Fail)
 	junitReporter := reporters.NewJUnitReporter("idnty-svc.xml")
-	RunSpecsWithDefaultAndCustomReporters(t, "CSIIdentityService testing suite", []Reporter{junitReporter})
+	ginkgo.RunSpecsWithDefaultAndCustomReporters(t, "CSIIdentityService testing suite", []ginkgo.Reporter{junitReporter})
 }
 
 func setVariables() {
 	idntySvc = NewIdentityService(common.Name, "v1.3.0", common.Manifest)
 }
 
-var _ = Describe("CSIIdentityService", func() {
-	BeforeEach(func() {
+var _ = ginkgo.Describe("CSIIdentityService", func() {
+	ginkgo.BeforeEach(func() {
 		setVariables()
 	})
 
-	Describe("calling GetPluginInfo()", func() {
-		It("should return correct info", func() {
+	ginkgo.Describe("calling GetPluginInfo()", func() {
+		ginkgo.It("should return correct info", func() {
 			res, err := idntySvc.GetPluginInfo(context.Background(), &csi.GetPluginInfoRequest{})
-			Expect(err).To(BeNil())
-			Expect(res).To(Equal(&csi.GetPluginInfoResponse{
+			gomega.Expect(err).To(gomega.BeNil())
+			gomega.Expect(res).To(gomega.Equal(&csi.GetPluginInfoResponse{
 				Name:          idntySvc.name,
 				VendorVersion: idntySvc.version,
 				Manifest:      idntySvc.manifest,
@@ -59,11 +59,11 @@ var _ = Describe("CSIIdentityService", func() {
 		})
 	})
 
-	Describe("calling GetPluginCapabilities()", func() {
-		It("should return correct capabilities", func() {
+	ginkgo.Describe("calling GetPluginCapabilities()", func() {
+		ginkgo.It("should return correct capabilities", func() {
 			res, err := idntySvc.GetPluginCapabilities(context.Background(), &csi.GetPluginCapabilitiesRequest{})
-			Expect(err).To(BeNil())
-			Expect(res).To(Equal(&csi.GetPluginCapabilitiesResponse{
+			gomega.Expect(err).To(gomega.BeNil())
+			gomega.Expect(res).To(gomega.Equal(&csi.GetPluginCapabilitiesResponse{
 				Capabilities: []*csi.PluginCapability{
 					{
 						Type: &csi.PluginCapability_Service_{
@@ -99,11 +99,11 @@ var _ = Describe("CSIIdentityService", func() {
 		})
 	})
 
-	Describe("calling Probe()", func() {
-		It("should return current status'", func() {
+	ginkgo.Describe("calling Probe()", func() {
+		ginkgo.It("should return current status'", func() {
 			res, err := idntySvc.Probe(context.Background(), &csi.ProbeRequest{})
-			Expect(err).To(BeNil())
-			Expect(res).To(Equal(&csi.ProbeResponse{Ready: &wrappers.BoolValue{Value: idntySvc.ready}}))
+			gomega.Expect(err).To(gomega.BeNil())
+			gomega.Expect(res).To(gomega.Equal(&csi.ProbeResponse{Ready: &wrappers.BoolValue{Value: idntySvc.ready}}))
 		})
 	})
 })

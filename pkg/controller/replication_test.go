@@ -25,21 +25,21 @@ import (
 	csiext "github.com/dell/dell-csi-extensions/replication"
 	"github.com/dell/gopowerstore"
 	"github.com/dell/gopowerstore/api"
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	ginkgo "github.com/onsi/ginkgo"
+	gomega "github.com/onsi/gomega"
 	"github.com/stretchr/testify/mock"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
-var _ = Describe("Replication", func() {
-	BeforeEach(func() {
+var _ = ginkgo.Describe("Replication", func() {
+	ginkgo.BeforeEach(func() {
 		setVariables()
 	})
 
-	Describe("calling GetStorageProtectionGroupStatus()", func() {
-		When("getting storage protection group status and state is ok", func() {
-			It("should return synchronized status", func() {
+	ginkgo.Describe("calling GetStorageProtectionGroupStatus()", func() {
+		ginkgo.When("getting storage protection group status and state is ok", func() {
+			ginkgo.It("should return synchronized status", func() {
 				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, mock.Anything).Return(
 					gopowerstore.ReplicationSession{State: gopowerstore.RS_STATE_OK}, nil)
 
@@ -49,15 +49,15 @@ var _ = Describe("Replication", func() {
 				req.ProtectionGroupAttributes = params
 				res, err := ctrlSvc.GetStorageProtectionGroupStatus(context.Background(), req)
 
-				Expect(err).To(BeNil())
-				Expect(res.Status.State).To(Equal(
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res.Status.State).To(gomega.Equal(
 					csiext.StorageProtectionGroupStatus_SYNCHRONIZED,
 				))
 			})
 		})
 
-		When("getting storage protection group status and state is failed over", func() {
-			It("should return failed over status", func() {
+		ginkgo.When("getting storage protection group status and state is failed over", func() {
+			ginkgo.It("should return failed over status", func() {
 				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, mock.Anything).Return(
 					gopowerstore.ReplicationSession{State: gopowerstore.RS_STATE_FAILED_OVER}, nil)
 
@@ -67,15 +67,15 @@ var _ = Describe("Replication", func() {
 				req.ProtectionGroupAttributes = params
 				res, err := ctrlSvc.GetStorageProtectionGroupStatus(context.Background(), req)
 
-				Expect(err).To(BeNil())
-				Expect(res.Status.State).To(Equal(
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res.Status.State).To(gomega.Equal(
 					csiext.StorageProtectionGroupStatus_FAILEDOVER,
 				))
 			})
 		})
 
-		When("getting storage protection group status and state is paused (for several reasons)", func() {
-			It("should return suspended status (if paused)", func() {
+		ginkgo.When("getting storage protection group status and state is paused (for several reasons)", func() {
+			ginkgo.It("should return suspended status (if paused)", func() {
 				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, mock.Anything).Return(
 					gopowerstore.ReplicationSession{State: gopowerstore.RS_STATE_PAUSED}, nil)
 
@@ -85,12 +85,12 @@ var _ = Describe("Replication", func() {
 				req.ProtectionGroupAttributes = params
 				res, err := ctrlSvc.GetStorageProtectionGroupStatus(context.Background(), req)
 
-				Expect(err).To(BeNil())
-				Expect(res.Status.State).To(Equal(
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res.Status.State).To(gomega.Equal(
 					csiext.StorageProtectionGroupStatus_SUSPENDED,
 				))
 			})
-			It("should return suspended status (if paused for migration)", func() {
+			ginkgo.It("should return suspended status (if paused for migration)", func() {
 				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, mock.Anything).Return(
 					gopowerstore.ReplicationSession{State: gopowerstore.RS_STATE_PAUSED_FOR_MIGRATION}, nil)
 
@@ -100,12 +100,12 @@ var _ = Describe("Replication", func() {
 				req.ProtectionGroupAttributes = params
 				res, err := ctrlSvc.GetStorageProtectionGroupStatus(context.Background(), req)
 
-				Expect(err).To(BeNil())
-				Expect(res.Status.State).To(Equal(
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res.Status.State).To(gomega.Equal(
 					csiext.StorageProtectionGroupStatus_SUSPENDED,
 				))
 			})
-			It("should return suspended status (if paused for NDU)", func() {
+			ginkgo.It("should return suspended status (if paused for NDU)", func() {
 				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, mock.Anything).Return(
 					gopowerstore.ReplicationSession{State: gopowerstore.RS_STATE_PAUSED_FOR_NDU}, nil)
 
@@ -115,12 +115,12 @@ var _ = Describe("Replication", func() {
 				req.ProtectionGroupAttributes = params
 				res, err := ctrlSvc.GetStorageProtectionGroupStatus(context.Background(), req)
 
-				Expect(err).To(BeNil())
-				Expect(res.Status.State).To(Equal(
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res.Status.State).To(gomega.Equal(
 					csiext.StorageProtectionGroupStatus_SUSPENDED,
 				))
 			})
-			It("should return suspended status (if system paused)", func() {
+			ginkgo.It("should return suspended status (if system paused)", func() {
 				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, mock.Anything).Return(
 					gopowerstore.ReplicationSession{State: gopowerstore.RS_STATE_SYSTEM_PAUSED}, nil)
 
@@ -130,15 +130,15 @@ var _ = Describe("Replication", func() {
 				req.ProtectionGroupAttributes = params
 				res, err := ctrlSvc.GetStorageProtectionGroupStatus(context.Background(), req)
 
-				Expect(err).To(BeNil())
-				Expect(res.Status.State).To(Equal(
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res.Status.State).To(gomega.Equal(
 					csiext.StorageProtectionGroupStatus_SUSPENDED,
 				))
 			})
 		})
 
-		When("getting storage protection group status and state is updating (in progress)", func() {
-			It("should return 'sync in progress' status (if failing over)", func() {
+		ginkgo.When("getting storage protection group status and state is updating (in progress)", func() {
+			ginkgo.It("should return 'sync in progress' status (if failing over)", func() {
 				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, mock.Anything).Return(
 					gopowerstore.ReplicationSession{State: gopowerstore.RS_STATE_FAILING_OVER}, nil)
 
@@ -148,12 +148,12 @@ var _ = Describe("Replication", func() {
 				req.ProtectionGroupAttributes = params
 				res, err := ctrlSvc.GetStorageProtectionGroupStatus(context.Background(), req)
 
-				Expect(err).To(BeNil())
-				Expect(res.Status.State).To(Equal(
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res.Status.State).To(gomega.Equal(
 					csiext.StorageProtectionGroupStatus_SYNC_IN_PROGRESS,
 				))
 			})
-			It("should return 'sync in progress' status (if failing over for DR)", func() {
+			ginkgo.It("should return 'sync in progress' status (if failing over for DR)", func() {
 				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, mock.Anything).Return(
 					gopowerstore.ReplicationSession{State: gopowerstore.RS_STATE_FAILING_OVER_FOR_DR}, nil)
 
@@ -163,12 +163,12 @@ var _ = Describe("Replication", func() {
 				req.ProtectionGroupAttributes = params
 				res, err := ctrlSvc.GetStorageProtectionGroupStatus(context.Background(), req)
 
-				Expect(err).To(BeNil())
-				Expect(res.Status.State).To(Equal(
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res.Status.State).To(gomega.Equal(
 					csiext.StorageProtectionGroupStatus_SYNC_IN_PROGRESS,
 				))
 			})
-			It("should return 'sync in progress' status (if resuming)", func() {
+			ginkgo.It("should return 'sync in progress' status (if resuming)", func() {
 				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, mock.Anything).Return(
 					gopowerstore.ReplicationSession{State: gopowerstore.RS_STATE_RESUMING}, nil)
 
@@ -178,12 +178,12 @@ var _ = Describe("Replication", func() {
 				req.ProtectionGroupAttributes = params
 				res, err := ctrlSvc.GetStorageProtectionGroupStatus(context.Background(), req)
 
-				Expect(err).To(BeNil())
-				Expect(res.Status.State).To(Equal(
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res.Status.State).To(gomega.Equal(
 					csiext.StorageProtectionGroupStatus_SYNC_IN_PROGRESS,
 				))
 			})
-			It("should return 'sync in progress' status (if reprotecting)", func() {
+			ginkgo.It("should return 'sync in progress' status (if reprotecting)", func() {
 				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, mock.Anything).Return(
 					gopowerstore.ReplicationSession{State: gopowerstore.RS_STATE_REPROTECTING}, nil)
 
@@ -193,12 +193,12 @@ var _ = Describe("Replication", func() {
 				req.ProtectionGroupAttributes = params
 				res, err := ctrlSvc.GetStorageProtectionGroupStatus(context.Background(), req)
 
-				Expect(err).To(BeNil())
-				Expect(res.Status.State).To(Equal(
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res.Status.State).To(gomega.Equal(
 					csiext.StorageProtectionGroupStatus_SYNC_IN_PROGRESS,
 				))
 			})
-			It("should return 'sync in progress' status (if cutover for migration)", func() {
+			ginkgo.It("should return 'sync in progress' status (if cutover for migration)", func() {
 				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, mock.Anything).Return(
 					gopowerstore.ReplicationSession{State: gopowerstore.RS_STATE_PARTIAL_CUTOVER_FOR_MIGRATION}, nil)
 
@@ -208,12 +208,12 @@ var _ = Describe("Replication", func() {
 				req.ProtectionGroupAttributes = params
 				res, err := ctrlSvc.GetStorageProtectionGroupStatus(context.Background(), req)
 
-				Expect(err).To(BeNil())
-				Expect(res.Status.State).To(Equal(
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res.Status.State).To(gomega.Equal(
 					csiext.StorageProtectionGroupStatus_SYNC_IN_PROGRESS,
 				))
 			})
-			It("should return 'sync in progress' status (if synchronizing)", func() {
+			ginkgo.It("should return 'sync in progress' status (if synchronizing)", func() {
 				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, mock.Anything).Return(
 					gopowerstore.ReplicationSession{State: gopowerstore.RS_STATE_SYNCHRONIZING}, nil)
 
@@ -223,12 +223,12 @@ var _ = Describe("Replication", func() {
 				req.ProtectionGroupAttributes = params
 				res, err := ctrlSvc.GetStorageProtectionGroupStatus(context.Background(), req)
 
-				Expect(err).To(BeNil())
-				Expect(res.Status.State).To(Equal(
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res.Status.State).To(gomega.Equal(
 					csiext.StorageProtectionGroupStatus_SYNC_IN_PROGRESS,
 				))
 			})
-			It("should return 'sync in progress' status (if initializing)", func() {
+			ginkgo.It("should return 'sync in progress' status (if initializing)", func() {
 				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, mock.Anything).Return(
 					gopowerstore.ReplicationSession{State: gopowerstore.RS_STATE_INITIALIZING}, nil)
 
@@ -238,15 +238,15 @@ var _ = Describe("Replication", func() {
 				req.ProtectionGroupAttributes = params
 				res, err := ctrlSvc.GetStorageProtectionGroupStatus(context.Background(), req)
 
-				Expect(err).To(BeNil())
-				Expect(res.Status.State).To(Equal(
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res.Status.State).To(gomega.Equal(
 					csiext.StorageProtectionGroupStatus_SYNC_IN_PROGRESS,
 				))
 			})
 		})
 
-		When("getting storage protection group status and state is error", func() {
-			It("should return invalid status", func() {
+		ginkgo.When("getting storage protection group status and state is error", func() {
+			ginkgo.It("should return invalid status", func() {
 				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, mock.Anything).Return(
 					gopowerstore.ReplicationSession{State: gopowerstore.RS_STATE_ERROR}, nil)
 
@@ -256,15 +256,15 @@ var _ = Describe("Replication", func() {
 				req.ProtectionGroupAttributes = params
 				res, err := ctrlSvc.GetStorageProtectionGroupStatus(context.Background(), req)
 
-				Expect(err).To(BeNil())
-				Expect(res.Status.State).To(Equal(
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res.Status.State).To(gomega.Equal(
 					csiext.StorageProtectionGroupStatus_INVALID,
 				))
 			})
 		})
 
-		When("getting storage protection group status and state does not match with known protection group states", func() {
-			It("should return unknown status", func() {
+		ginkgo.When("getting storage protection group status and state does not match with known protection group states", func() {
+			ginkgo.It("should return unknown status", func() {
 				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, mock.Anything).Return(
 					gopowerstore.ReplicationSession{}, nil)
 
@@ -274,46 +274,44 @@ var _ = Describe("Replication", func() {
 				req.ProtectionGroupAttributes = params
 				res, err := ctrlSvc.GetStorageProtectionGroupStatus(context.Background(), req)
 
-				Expect(err).To(BeNil())
-				Expect(res.Status.State).To(Equal(
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res.Status.State).To(gomega.Equal(
 					csiext.StorageProtectionGroupStatus_UNKNOWN,
 				))
 			})
 		})
 
-		When("GlobalID is missing", func() {
-			It("should fail", func() {
-
+		ginkgo.When("GlobalID is missing", func() {
+			ginkgo.It("should fail", func() {
 				req := new(csiext.GetStorageProtectionGroupStatusRequest)
 				res, err := ctrlSvc.GetStorageProtectionGroupStatus(context.Background(), req)
 
-				Expect(res).To(BeNil())
-				Expect(err).ToNot(BeNil())
-				Expect(err.Error()).To(
-					ContainSubstring("missing globalID in protection group attributes"),
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(err.Error()).To(
+					gomega.ContainSubstring("missing globalID in protection group attributes"),
 				)
 			})
 		})
 
-		When("Array with specified globalID couldn't be found", func() {
-			It("should fail", func() {
-
+		ginkgo.When("Array with specified globalID couldn't be found", func() {
+			ginkgo.It("should fail", func() {
 				req := new(csiext.GetStorageProtectionGroupStatusRequest)
 				params := make(map[string]string)
 				params["globalID"] = "SOMETHING WRONG"
 				req.ProtectionGroupAttributes = params
 				res, err := ctrlSvc.GetStorageProtectionGroupStatus(context.Background(), req)
 
-				Expect(res).To(BeNil())
-				Expect(err).ToNot(BeNil())
-				Expect(err.Error()).To(
-					ContainSubstring("can't find array with global id"),
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(err.Error()).To(
+					gomega.ContainSubstring("can't find array with global id"),
 				)
 			})
 		})
 
-		When("Invalid client response", func() {
-			It("should fail", func() {
+		ginkgo.When("Invalid client response", func() {
+			ginkgo.It("should fail", func() {
 				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, mock.Anything).Return(
 					gopowerstore.ReplicationSession{}, status.Errorf(codes.InvalidArgument, "Invalid client response"))
 
@@ -323,110 +321,104 @@ var _ = Describe("Replication", func() {
 				req.ProtectionGroupAttributes = params
 				res, err := ctrlSvc.GetStorageProtectionGroupStatus(context.Background(), req)
 
-				Expect(res).To(BeNil())
-				Expect(err).ToNot(BeNil())
-				Expect(err.Error()).To(
-					ContainSubstring("Invalid client response"),
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(err.Error()).To(
+					gomega.ContainSubstring("Invalid client response"),
 				)
 			})
 		})
 	})
-	Describe("calling ExecuteAction()", func() {
-		When("action is RS_ACTION_RESUME and state is OK", func() {
-			It("return nil", func() {
+	ginkgo.Describe("calling ExecuteAction()", func() {
+		ginkgo.When("action is RS_ACTION_RESUME and state is OK", func() {
+			ginkgo.It("return nil", func() {
 				clientMock.On("ExecuteActionOnReplicationSession", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
 				session := gopowerstore.ReplicationSession{ID: "test", State: "OK"}
 				action := gopowerstore.RS_ACTION_RESUME
 				failoverParams := gopowerstore.FailoverParams{}
 				err := controller.ExecuteAction(&session, clientMock, action, &failoverParams)
 
-				Expect(err).To(BeNil())
+				gomega.Expect(err).To(gomega.BeNil())
 			})
 		})
 
-		When("action is RS_ACTION_REPROTECT and state is not OK", func() {
-			It("return nil", func() {
+		ginkgo.When("action is RS_ACTION_REPROTECT and state is not OK", func() {
+			ginkgo.It("return nil", func() {
 				clientMock.On("ExecuteActionOnReplicationSession", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
 				session := gopowerstore.ReplicationSession{ID: "test", State: "OK"}
 				action := gopowerstore.RS_ACTION_REPROTECT
 				failoverParams := gopowerstore.FailoverParams{}
 				err := controller.ExecuteAction(&session, clientMock, action, &failoverParams)
 
-				Expect(err).To(BeNil())
-
+				gomega.Expect(err).To(gomega.BeNil())
 			})
 		})
 
-		When("action is RS_ACTION_PAUSE and state is Paused", func() {
-			It("return nil", func() {
+		ginkgo.When("action is RS_ACTION_PAUSE and state is Paused", func() {
+			ginkgo.It("return nil", func() {
 				clientMock.On("ExecuteActionOnReplicationSession", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
 				session := gopowerstore.ReplicationSession{ID: "test", State: "Paused"}
 				action := gopowerstore.RS_ACTION_PAUSE
 				failoverParams := gopowerstore.FailoverParams{}
 				err := controller.ExecuteAction(&session, clientMock, action, &failoverParams)
 
-				Expect(err).To(BeNil())
+				gomega.Expect(err).To(gomega.BeNil())
 			})
 		})
 
-		When("action is RS_ACTION_FAILOVER and state is Failing_Over", func() {
-			It("return nil", func() {
+		ginkgo.When("action is RS_ACTION_FAILOVER and state is Failing_Over", func() {
+			ginkgo.It("return nil", func() {
 				clientMock.On("ExecuteActionOnReplicationSession", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
 				session := gopowerstore.ReplicationSession{ID: "test", State: "Failing_Over"}
 				action := gopowerstore.RS_ACTION_FAILOVER
 				failoverParams := gopowerstore.FailoverParams{}
 				err := controller.ExecuteAction(&session, clientMock, action, &failoverParams)
 
-				Expect(err).ToNot(BeNil())
-				Expect(err.Error()).To(
-					ContainSubstring("Execute action: RS (test) is still executing previous action"))
-
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(err.Error()).To(
+					gomega.ContainSubstring("Execute action: RS (test) is still executing previous action"))
 			})
 		})
 
-		When("action is RS_ACTION_FAILOVER and state is Failed_Over", func() {
-			It("return nil", func() {
+		ginkgo.When("action is RS_ACTION_FAILOVER and state is Failed_Over", func() {
+			ginkgo.It("return nil", func() {
 				clientMock.On("ExecuteActionOnReplicationSession", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
 				session := gopowerstore.ReplicationSession{ID: "test", State: "Failed_Over"}
 				action := gopowerstore.RS_ACTION_FAILOVER
 				failoverParams := gopowerstore.FailoverParams{}
 				err := controller.ExecuteAction(&session, clientMock, action, &failoverParams)
 
-				Expect(err).To(BeNil())
-
+				gomega.Expect(err).To(gomega.BeNil())
 			})
-
 		})
 
-		Describe("calling DeleteLocalVolume()", func() {
-			When("Volume ID is missing", func() {
-				It("should fail", func() {
+		ginkgo.Describe("calling DeleteLocalVolume()", func() {
+			ginkgo.When("Volume ID is missing", func() {
+				ginkgo.It("should fail", func() {
 					req := new(csiext.DeleteLocalVolumeRequest)
 					res, err := ctrlSvc.DeleteLocalVolume(context.Background(), req)
 
-					Expect(res).To(BeNil())
-					Expect(err).ToNot(BeNil())
-					Expect(err.Error()).To(
-						ContainSubstring("can't delete volume of improper handle format"))
+					gomega.Expect(res).To(gomega.BeNil())
+					gomega.Expect(err).ToNot(gomega.BeNil())
+					gomega.Expect(err.Error()).To(
+						gomega.ContainSubstring("can't delete volume of improper handle format"))
 				})
 			})
-			When("Array with specified globalID couldn't be found", func() {
-				It("should fail", func() {
-
+			ginkgo.When("Array with specified globalID couldn't be found", func() {
+				ginkgo.It("should fail", func() {
 					req := new(csiext.DeleteLocalVolumeRequest)
 					handle := "valid-id/SOMETHING-WRONG/iscsi"
 					req.VolumeHandle = handle
 					res, err := ctrlSvc.DeleteLocalVolume(context.Background(), req)
 
-					Expect(res).To(BeNil())
-					Expect(err).ToNot(BeNil())
-					Expect(err.Error()).To(
-						ContainSubstring("can't find array with global ID"))
+					gomega.Expect(res).To(gomega.BeNil())
+					gomega.Expect(err).ToNot(gomega.BeNil())
+					gomega.Expect(err.Error()).To(
+						gomega.ContainSubstring("can't find array with global ID"))
 				})
 			})
-			When("the volume cannot be found on the powerstore array", func() {
-				It("should fail with 'not found'", func() {
-
+			ginkgo.When("the volume cannot be found on the powerstore array", func() {
+				ginkgo.It("should fail with 'not found'", func() {
 					// GetVolume should return a NotFound error.
 					clientMock.On("GetVolume", mock.Anything, validBaseVolID).Return(
 						gopowerstore.Volume{}, gopowerstore.WrapErr(gopowerstore.NewNotFoundError()),
@@ -437,12 +429,12 @@ var _ = Describe("Replication", func() {
 					}
 					res, err := ctrlSvc.DeleteLocalVolume(context.Background(), req)
 
-					Expect(res).To(Equal(
+					gomega.Expect(res).To(gomega.Equal(
 						&csiext.DeleteLocalVolumeResponse{},
 					))
-					Expect(err).To(BeNil())
+					gomega.Expect(err).To(gomega.BeNil())
 				})
-				It("should fail to get the volume", func() {
+				ginkgo.It("should fail to get the volume", func() {
 					// GetVolume should return a non-nil error, and not be a NotFoundError
 					clientMock.On("GetVolume", mock.Anything, validBaseVolID).Return(
 						gopowerstore.Volume{}, gopowerstore.WrapErr(gopowerstore.NewAPIError()),
@@ -453,43 +445,42 @@ var _ = Describe("Replication", func() {
 					}
 					res, err := ctrlSvc.DeleteLocalVolume(context.Background(), req)
 
-					Expect(res).To(BeNil())
-					Expect(err).ToNot(BeNil())
-					Expect(err.Error()).To(ContainSubstring(
+					gomega.Expect(res).To(gomega.BeNil())
+					gomega.Expect(err).ToNot(gomega.BeNil())
+					gomega.Expect(err.Error()).To(gomega.ContainSubstring(
 						"Unable to get volume for deletion",
 					))
 				})
 			})
 		})
-		Describe("calling DeleteStorageProtectionGroup()", func() {
-			When("GlobalID is missing", func() {
-				It("should fail", func() {
+		ginkgo.Describe("calling DeleteStorageProtectionGroup()", func() {
+			ginkgo.When("GlobalID is missing", func() {
+				ginkgo.It("should fail", func() {
 					req := new(csiext.DeleteStorageProtectionGroupRequest)
 					res, err := ctrlSvc.DeleteStorageProtectionGroup(context.Background(), req)
 
-					Expect(res).To(BeNil())
-					Expect(err).ToNot(BeNil())
-					Expect(err.Error()).To(
-						ContainSubstring("missing globalID in protection group attributes"))
+					gomega.Expect(res).To(gomega.BeNil())
+					gomega.Expect(err).ToNot(gomega.BeNil())
+					gomega.Expect(err.Error()).To(
+						gomega.ContainSubstring("missing globalID in protection group attributes"))
 				})
 			})
-			When("Array with specified globalID couldn't be found", func() {
-				It("should fail", func() {
-
+			ginkgo.When("Array with specified globalID couldn't be found", func() {
+				ginkgo.It("should fail", func() {
 					req := new(csiext.DeleteStorageProtectionGroupRequest)
 					params := make(map[string]string)
 					params["globalID"] = "SOMETHING WRONG"
 					req.ProtectionGroupAttributes = params
 					res, err := ctrlSvc.DeleteStorageProtectionGroup(context.Background(), req)
 
-					Expect(res).To(BeNil())
-					Expect(err).ToNot(BeNil())
-					Expect(err.Error()).To(
-						ContainSubstring("can't find array with global id"))
+					gomega.Expect(res).To(gomega.BeNil())
+					gomega.Expect(err).ToNot(gomega.BeNil())
+					gomega.Expect(err.Error()).To(
+						gomega.ContainSubstring("can't find array with global id"))
 				})
 			})
-			When("can't get volume group", func() {
-				It("should fail", func() {
+			ginkgo.When("can't get volume group", func() {
+				ginkgo.It("should fail", func() {
 					clientMock.On("GetVolumeGroup", mock.Anything, mock.Anything).Return(
 
 						gopowerstore.VolumeGroup{}, gopowerstore.APIError{ErrorMsg: &api.ErrorMsg{StatusCode: http.StatusBadRequest}})
@@ -502,14 +493,14 @@ var _ = Describe("Replication", func() {
 
 					res, err := ctrlSvc.DeleteStorageProtectionGroup(context.Background(), req)
 
-					Expect(res).To(BeNil())
-					Expect(err).ToNot(BeNil())
-					Expect(err.Error()).To(
-						ContainSubstring("Error: Unable to get Volume Group"))
+					gomega.Expect(res).To(gomega.BeNil())
+					gomega.Expect(err).ToNot(gomega.BeNil())
+					gomega.Expect(err.Error()).To(
+						gomega.ContainSubstring("Error: Unable to get Volume Group"))
 				})
 			})
-			When("can't get volume group name", func() {
-				It("should fail", func() {
+			ginkgo.When("can't get volume group name", func() {
+				ginkgo.It("should fail", func() {
 					clientMock.On("GetVolumeGroup", mock.Anything, mock.Anything).Return(
 						gopowerstore.VolumeGroup{}, gopowerstore.APIError{ErrorMsg: &api.ErrorMsg{StatusCode: http.StatusNotFound}})
 					req := new(csiext.DeleteStorageProtectionGroupRequest)
@@ -521,14 +512,14 @@ var _ = Describe("Replication", func() {
 
 					res, err := ctrlSvc.DeleteStorageProtectionGroup(context.Background(), req)
 
-					Expect(res).To(BeNil())
-					Expect(err).ToNot(BeNil())
-					Expect(err.Error()).To(
-						ContainSubstring("Error: Unable to get volume group name"))
+					gomega.Expect(res).To(gomega.BeNil())
+					gomega.Expect(err).ToNot(gomega.BeNil())
+					gomega.Expect(err.Error()).To(
+						gomega.ContainSubstring("Error: Unable to get volume group name"))
 				})
 			})
-			When("Can't unassign the protection policy from volume group", func() {
-				It("should fail", func() {
+			ginkgo.When("Can't unassign the protection policy from volume group", func() {
+				ginkgo.It("should fail", func() {
 					vg := gopowerstore.VolumeGroup{}
 					vg.ProtectionPolicyID = validPolicyID
 					vg.ID = validGroupID
@@ -546,14 +537,14 @@ var _ = Describe("Replication", func() {
 
 					res, err := ctrlSvc.DeleteStorageProtectionGroup(context.Background(), req)
 
-					Expect(res).To(BeNil())
-					Expect(err).ToNot(BeNil())
-					Expect(err.Error()).To(
-						ContainSubstring("Error: Unable to un-assign PP from Volume Group"))
+					gomega.Expect(res).To(gomega.BeNil())
+					gomega.Expect(err).ToNot(gomega.BeNil())
+					gomega.Expect(err.Error()).To(
+						gomega.ContainSubstring("Error: Unable to un-assign PP from Volume Group"))
 				})
 			})
-			When("Can't delete volume group", func() {
-				It("should fail", func() {
+			ginkgo.When("Can't delete volume group", func() {
+				ginkgo.It("should fail", func() {
 					vg := gopowerstore.VolumeGroup{}
 					vg.ProtectionPolicyID = ""
 					vg.ID = validGroupID
@@ -570,14 +561,14 @@ var _ = Describe("Replication", func() {
 					req.ProtectionGroupAttributes = params
 					res, err := ctrlSvc.DeleteStorageProtectionGroup(context.Background(), req)
 
-					Expect(res).To(BeNil())
-					Expect(err).ToNot(BeNil())
-					Expect(err.Error()).To(
-						ContainSubstring("Error: : Unable to delete Volume Group"))
+					gomega.Expect(res).To(gomega.BeNil())
+					gomega.Expect(err).ToNot(gomega.BeNil())
+					gomega.Expect(err.Error()).To(
+						gomega.ContainSubstring("Error: : Unable to delete Volume Group"))
 				})
 			})
-			When("Can't get the protection policy", func() {
-				It("should fail", func() {
+			ginkgo.When("Can't get the protection policy", func() {
+				ginkgo.It("should fail", func() {
 					vg := gopowerstore.VolumeGroup{}
 					vg.ProtectionPolicyID = validPolicyID
 					vg.ID = validGroupID
@@ -605,15 +596,15 @@ var _ = Describe("Replication", func() {
 					req.ProtectionGroupAttributes = params
 					res, err := ctrlSvc.DeleteStorageProtectionGroup(context.Background(), req)
 
-					Expect(res).To(BeNil())
-					Expect(err).ToNot(BeNil())
-					Expect(err.Error()).To(
-						ContainSubstring("Error: Unable to get the PP"))
+					gomega.Expect(res).To(gomega.BeNil())
+					gomega.Expect(err).ToNot(gomega.BeNil())
+					gomega.Expect(err.Error()).To(
+						gomega.ContainSubstring("Error: Unable to get the PP"))
 				})
 			})
 
-			When("The replication rule couldn't be found", func() {
-				It("should fail", func() {
+			ginkgo.When("The replication rule couldn't be found", func() {
+				ginkgo.It("should fail", func() {
 					vg := gopowerstore.VolumeGroup{}
 					vg.ProtectionPolicyID = validPolicyID
 					vg.ID = validGroupID
@@ -643,14 +634,14 @@ var _ = Describe("Replication", func() {
 					req.ProtectionGroupAttributes = params
 					res, err := ctrlSvc.DeleteStorageProtectionGroup(context.Background(), req)
 
-					Expect(res).To(BeNil())
-					Expect(err).ToNot(BeNil())
-					Expect(err.Error()).To(
-						ContainSubstring("Error: RR not found"))
+					gomega.Expect(res).To(gomega.BeNil())
+					gomega.Expect(err).ToNot(gomega.BeNil())
+					gomega.Expect(err.Error()).To(
+						gomega.ContainSubstring("Error: RR not found"))
 				})
 			})
-			When("The replication rule can't be deleted", func() {
-				It("should fail", func() {
+			ginkgo.When("The replication rule can't be deleted", func() {
+				ginkgo.It("should fail", func() {
 					vg := gopowerstore.VolumeGroup{}
 					vg.ProtectionPolicyID = validPolicyID
 					vg.ID = validGroupID
@@ -684,19 +675,19 @@ var _ = Describe("Replication", func() {
 
 					res, err := ctrlSvc.DeleteStorageProtectionGroup(context.Background(), req)
 
-					Expect(res).To(BeNil())
-					Expect(err).ToNot(BeNil())
-					Expect(err.Error()).To(
-						ContainSubstring("Error: Unable to delete replication rule"))
+					gomega.Expect(res).To(gomega.BeNil())
+					gomega.Expect(err).ToNot(gomega.BeNil())
+					gomega.Expect(err.Error()).To(
+						gomega.ContainSubstring("Error: Unable to delete replication rule"))
 				})
 			})
 		})
-		Describe("calling GetReplicationCapabilities()", func() {
-			When("basic parameters are declared", func() {
-				It("should pass", func() {
+		ginkgo.Describe("calling GetReplicationCapabilities()", func() {
+			ginkgo.When("basic parameters are declared", func() {
+				ginkgo.It("should pass", func() {
 					context := context.Background()
 					req := new(csiext.GetReplicationCapabilityRequest)
-					var rep = new(csiext.GetReplicationCapabilityResponse)
+					rep := new(csiext.GetReplicationCapabilityResponse)
 					rep.Capabilities = []*csiext.ReplicationCapability{
 						{
 							Type: &csiext.ReplicationCapability_Rpc{
@@ -767,17 +758,15 @@ var _ = Describe("Replication", func() {
 						},
 					}
 					res, err := ctrlSvc.GetReplicationCapabilities(context, req)
-					Expect(err).To(BeNil())
-					Expect(res).To(Equal(rep))
-
+					gomega.Expect(err).To(gomega.BeNil())
+					gomega.Expect(res).To(gomega.Equal(rep))
 				})
 			})
 		})
 
-		Describe("calling ExecuteAction()", func() {
-			When("action is unknown", func() {
-				It("should fail", func() {
-
+		ginkgo.Describe("calling ExecuteAction()", func() {
+			ginkgo.When("action is unknown", func() {
+				ginkgo.It("should fail", func() {
 					action := &csiext.Action{
 						ActionTypes: csiext.ActionTypes_UNKNOWN_ACTION,
 					}
@@ -792,13 +781,11 @@ var _ = Describe("Replication", func() {
 						RemoteProtectionGroupAttributes: nil,
 					}
 					_, err := ctrlSvc.ExecuteAction(context.Background(), req)
-					Expect(err).NotTo(BeNil())
-
+					gomega.Expect(err).NotTo(gomega.BeNil())
 				})
 			})
-			When("Array can't be found", func() {
-				It("should fail", func() {
-
+			ginkgo.When("Array can't be found", func() {
+				ginkgo.It("should fail", func() {
 					action := &csiext.Action{
 						ActionTypes: csiext.ActionTypes_FAILOVER_REMOTE,
 					}
@@ -818,15 +805,13 @@ var _ = Describe("Replication", func() {
 					}
 					_, err := ctrlSvc.ExecuteAction(context.Background(), req)
 
-					Expect(err).NotTo(BeNil())
-					Expect(err.Error()).To(
-						ContainSubstring("can't find array with global id "))
-
+					gomega.Expect(err).NotTo(gomega.BeNil())
+					gomega.Expect(err.Error()).To(
+						gomega.ContainSubstring("can't find array with global id "))
 				})
 			})
-			When("the action is not supported", func() {
-				It("should fail", func() {
-
+			ginkgo.When("the action is not supported", func() {
+				ginkgo.It("should fail", func() {
 					action := &csiext.Action{
 						ActionTypes: csiext.ActionTypes_UNKNOWN_ACTION,
 					}
@@ -845,16 +830,14 @@ var _ = Describe("Replication", func() {
 						RemoteProtectionGroupAttributes: nil,
 					}
 					_, err := ctrlSvc.ExecuteAction(context.Background(), req)
-					Expect(err).NotTo(BeNil())
-					Expect(err.Error()).To(
-						ContainSubstring("The requested action does not match with supported actions"))
-
+					gomega.Expect(err).NotTo(gomega.BeNil())
+					gomega.Expect(err.Error()).To(
+						gomega.ContainSubstring("The requested action does not match with supported actions"))
 				})
 			})
 
-			When("the replication session is executing previous action. the action type is unplanned failover local", func() {
-				It("should fail", func() {
-
+			ginkgo.When("the replication session is executing previous action. the action type is unplanned failover local", func() {
+				ginkgo.It("should fail", func() {
 					action := &csiext.Action{
 						ActionTypes: csiext.ActionTypes_UNPLANNED_FAILOVER_LOCAL,
 					}
@@ -876,15 +859,13 @@ var _ = Describe("Replication", func() {
 					}
 					_, err := ctrlSvc.ExecuteAction(context.Background(), req)
 
-					Expect(err).NotTo(BeNil())
-					Expect(err.Error()).To(
-						ContainSubstring("Execute action: RS (test) is still executing previous action"))
-
+					gomega.Expect(err).NotTo(gomega.BeNil())
+					gomega.Expect(err.Error()).To(
+						gomega.ContainSubstring("Execute action: RS (test) is still executing previous action"))
 				})
 			})
-			When("the action type is suspend", func() {
-				It("pass", func() {
-
+			ginkgo.When("the action type is suspend", func() {
+				ginkgo.It("pass", func() {
 					action := &csiext.Action{
 						ActionTypes: csiext.ActionTypes_SUSPEND,
 					}
@@ -906,13 +887,11 @@ var _ = Describe("Replication", func() {
 					}
 					_, err := ctrlSvc.ExecuteAction(context.Background(), req)
 
-					Expect(err).To(BeNil())
-
+					gomega.Expect(err).To(gomega.BeNil())
 				})
 			})
-			When("the replication session is executing previous action. the action type is failover remote.", func() {
-				It("should fail", func() {
-
+			ginkgo.When("the replication session is executing previous action. the action type is failover remote.", func() {
+				ginkgo.It("should fail", func() {
 					action := &csiext.Action{
 						ActionTypes: csiext.ActionTypes_FAILOVER_REMOTE,
 					}
@@ -934,15 +913,13 @@ var _ = Describe("Replication", func() {
 					}
 					_, err := ctrlSvc.ExecuteAction(context.Background(), req)
 
-					Expect(err).NotTo(BeNil())
-					Expect(err.Error()).To(
-						ContainSubstring("Execute action: RS (test) is still executing previous action"))
-
+					gomega.Expect(err).NotTo(gomega.BeNil())
+					gomega.Expect(err.Error()).To(
+						gomega.ContainSubstring("Execute action: RS (test) is still executing previous action"))
 				})
 			})
-			When("the replication session can't be modified due to sync action type.", func() {
-				It("should fail", func() {
-
+			ginkgo.When("the replication session can't be modified due to sync action type.", func() {
+				ginkgo.It("should fail", func() {
 					action := &csiext.Action{
 						ActionTypes: csiext.ActionTypes_SYNC,
 					}
@@ -964,15 +941,13 @@ var _ = Describe("Replication", func() {
 					}
 					_, err := ctrlSvc.ExecuteAction(context.Background(), req)
 
-					Expect(err).NotTo(BeNil())
-					Expect(err.Error()).To(
-						ContainSubstring("Execute action: Failed to modify RS (test) - Error ()"))
-
+					gomega.Expect(err).NotTo(gomega.BeNil())
+					gomega.Expect(err.Error()).To(
+						gomega.ContainSubstring("Execute action: Failed to modify RS (test) - Error ()"))
 				})
 			})
-			When("the action type is resume", func() {
-				It("should pass", func() {
-
+			ginkgo.When("the action type is resume", func() {
+				ginkgo.It("should pass", func() {
 					action := &csiext.Action{
 						ActionTypes: csiext.ActionTypes_RESUME,
 					}
@@ -994,13 +969,11 @@ var _ = Describe("Replication", func() {
 					}
 					_, err := ctrlSvc.ExecuteAction(context.Background(), req)
 
-					Expect(err).To(BeNil())
-
+					gomega.Expect(err).To(gomega.BeNil())
 				})
 			})
-			When("the action type is sync", func() {
-				It("should pass", func() {
-
+			ginkgo.When("the action type is sync", func() {
+				ginkgo.It("should pass", func() {
 					action := &csiext.Action{
 						ActionTypes: csiext.ActionTypes_SYNC,
 					}
@@ -1022,13 +995,11 @@ var _ = Describe("Replication", func() {
 					}
 					_, err := ctrlSvc.ExecuteAction(context.Background(), req)
 
-					Expect(err).To(BeNil())
-
+					gomega.Expect(err).To(gomega.BeNil())
 				})
 			})
-			When("the action type is reprotect local", func() {
-				It("should pass", func() {
-
+			ginkgo.When("the action type is reprotect local", func() {
+				ginkgo.It("should pass", func() {
 					action := &csiext.Action{
 						ActionTypes: csiext.ActionTypes_REPROTECT_LOCAL,
 					}
@@ -1050,12 +1021,9 @@ var _ = Describe("Replication", func() {
 					}
 					_, err := ctrlSvc.ExecuteAction(context.Background(), req)
 
-					Expect(err).To(BeNil())
-
+					gomega.Expect(err).To(gomega.BeNil())
 				})
 			})
-
 		})
-
 	})
 })

@@ -31,80 +31,78 @@ import (
 	"github.com/dell/gopowerstore"
 	"github.com/dell/gopowerstore/api"
 	"github.com/go-openapi/strfmt"
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	ginkgo "github.com/onsi/ginkgo"
+	gomega "github.com/onsi/gomega"
 	"github.com/stretchr/testify/mock"
 )
 
 const stateReady = "Ready"
 
-var _ = Describe("csi-extension-server", func() {
-	BeforeEach(func() {
+var _ = ginkgo.Describe("csi-extension-server", func() {
+	ginkgo.BeforeEach(func() {
 		setVariables()
 	})
-	Describe("calling ValidateVolumeHostConnectivity()", func() {
-		When("checking if ValidateVolumeHostConnectivity is implemented ", func() {
-			It("should return a message that ValidateVolumeHostConnectivity is implemented", func() {
+	ginkgo.Describe("calling ValidateVolumeHostConnectivity()", func() {
+		ginkgo.When("checking if ValidateVolumeHostConnectivity is implemented ", func() {
+			ginkgo.It("should return a message that ValidateVolumeHostConnectivity is implemented", func() {
 				req := &podmon.ValidateVolumeHostConnectivityRequest{}
 				res, err := ctrlSvc.ValidateVolumeHostConnectivity(context.Background(), req)
-				Expect(err).To(BeNil())
-				Expect(res.Messages[0]).To(Equal("ValidateVolumeHostConnectivity is implemented"))
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res.Messages[0]).To(gomega.Equal("ValidateVolumeHostConnectivity is implemented"))
 			})
 		})
 
-		When("nodeId is not provided ", func() {
-			It("should return error", func() {
-				volId := []string{validBaseVolID}
+		ginkgo.When("nodeId is not provided ", func() {
+			ginkgo.It("should return error", func() {
+				volID := []string{validBaseVolID}
 				req := &podmon.ValidateVolumeHostConnectivityRequest{
 					ArrayId:   "default",
-					VolumeIds: volId,
+					VolumeIds: volID,
 					NodeId:    "",
 				}
 				_, err := ctrlSvc.ValidateVolumeHostConnectivity(context.Background(), req)
-				Expect(err).ToNot(BeNil())
+				gomega.Expect(err).ToNot(gomega.BeNil())
 			})
 		})
 
-		When("array status is not fetched so server will not respond ", func() {
-			It("should return error", func() {
-				volId := []string{validBaseVolID}
+		ginkgo.When("array status is not fetched so server will not respond ", func() {
+			ginkgo.It("should return error", func() {
+				volID := []string{validBaseVolID}
 				req := &podmon.ValidateVolumeHostConnectivityRequest{
 					ArrayId:   "default",
-					VolumeIds: volId,
+					VolumeIds: volID,
 					NodeId:    "csi-node-003c684ccb0c4ca0a9c99423563dfd2c-127.0.0.1",
 				}
 				clientMock.On("GetVolume", context.Background(), mock.Anything).Return(gopowerstore.Volume{ApplianceID: validApplianceID}, nil)
 				_, err := ctrlSvc.ValidateVolumeHostConnectivity(context.Background(), req)
-				Expect(err).ToNot(BeNil())
+				gomega.Expect(err).ToNot(gomega.BeNil())
 			})
 		})
 
-		When("neither arrayId nor volId is present in the request body ", func() {
-			It("should not return error", func() {
-
+		ginkgo.When("neither arrayId nor volId is present in the request body ", func() {
+			ginkgo.It("should not return error", func() {
 				req := &podmon.ValidateVolumeHostConnectivityRequest{
 					NodeId: "csi-node-003c684ccb0c4ca0a9c99423563dfd2c-127.0.0.1",
 				}
 				clientMock.On("GetVolume", context.Background(), mock.Anything).Return(gopowerstore.Volume{ApplianceID: validApplianceID}, nil)
 				_, err := ctrlSvc.ValidateVolumeHostConnectivity(context.Background(), req)
-				Expect(err).To(BeNil())
+				gomega.Expect(err).To(gomega.BeNil())
 			})
 		})
 
-		When("Invalid nodeID is sent in the request body ", func() {
-			It("should return error", func() {
-
+		ginkgo.When("Invalid nodeID is sent in the request body ", func() {
+			ginkgo.It("should return error", func() {
 				req := &podmon.ValidateVolumeHostConnectivityRequest{
 					NodeId: "csi-node-003c684ccb0c4ca0a9c99423563dfd2c-@@@",
 				}
 				clientMock.On("GetVolume", context.Background(), mock.Anything).Return(gopowerstore.Volume{ApplianceID: validApplianceID}, nil)
 				_, err := ctrlSvc.ValidateVolumeHostConnectivity(context.Background(), req)
-				Expect(err).ToNot(BeNil())
+				gomega.Expect(err).ToNot(gomega.BeNil())
 			})
 		})
 
-		When("not sending arrayId in request body ", func() {
-			It("should not return error but IO in response should be false", func() {
+		ginkgo.When("not sending arrayId in request body ", func() {
+			ginkgo.It("should not return error but IO in response should be false", func() {
 				clientMock.On("GetVolume", context.Background(), mock.Anything).Return(gopowerstore.Volume{ApplianceID: validApplianceID}, nil)
 				var resp []gopowerstore.PerformanceMetricsByVolumeResponse
 				clientMock.On("PerformanceMetricsByVolume", context.Background(), mock.Anything, mock.Anything).
@@ -113,9 +111,9 @@ var _ = Describe("csi-extension-server", func() {
 							StatusCode: http.StatusInternalServerError,
 						},
 					})
-				volId := []string{validBaseVolID}
+				volID := []string{validBaseVolID}
 				req := &podmon.ValidateVolumeHostConnectivityRequest{
-					VolumeIds: volId,
+					VolumeIds: volID,
 					NodeId:    "csi-node-003c684ccb0c4ca0a9c99423563dfd2c-127.0.0.1",
 				}
 				common.APIPort = ":9028"
@@ -129,16 +127,16 @@ var _ = Describe("csi-extension-server", func() {
 				})
 
 				fmt.Printf("Starting server at port 9028\n")
-				go http.ListenAndServe(":9028", nil)
+				go http.ListenAndServe(":9028", nil) // #nosec G114
 
 				response, err := ctrlSvc.ValidateVolumeHostConnectivity(context.Background(), req)
-				Expect(err).To(BeNil())
-				Expect(response.IosInProgress).To(BeFalse())
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(response.IosInProgress).To(gomega.BeFalse())
 			})
 		})
 
-		When("not sending arrayId in request body and default array is connected well and IO operation is also there ", func() {
-			It("should not return error", func() {
+		ginkgo.When("not sending arrayId in request body and default array is connected well and IO operation is also there ", func() {
+			ginkgo.It("should not return error", func() {
 				clientMock.On("GetVolume", context.Background(), mock.Anything).Return(gopowerstore.Volume{ApplianceID: validApplianceID}, nil)
 				resp2 := make([]gopowerstore.PerformanceMetricsByVolumeResponse, 6)
 				freshTime, _ := strfmt.ParseDateTime(fmt.Sprint(time.Now().UTC().Format("2006-01-02T15:04:05Z")))
@@ -159,22 +157,22 @@ var _ = Describe("csi-extension-server", func() {
 				resp2[5].TotalIops = 0.0
 				clientMock.On("PerformanceMetricsByVolume", context.Background(), mock.Anything, mock.Anything).
 					Return(resp2, nil)
-				volId2 := []string{validBaseVolID}
+				volID2 := []string{validBaseVolID}
 				req2 := &podmon.ValidateVolumeHostConnectivityRequest{
-					VolumeIds: volId2,
+					VolumeIds: volID2,
 					NodeId:    "csi-node-003c684ccb0c4ca0a9c99423563dfd2c-127.0.0.1",
 				}
 
 				response, err := ctrlSvc.ValidateVolumeHostConnectivity(context.Background(), req2)
-				Expect(err).To(BeNil())
-				Expect(response.IosInProgress).To(BeTrue())
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(response.IosInProgress).To(gomega.BeTrue())
 			})
 		})
 	})
 
-	Describe("calling IsIOInProgress and QueryArrayStatus", func() {
-		When("IOConnectivity for scsi type volume on array", func() {
-			It("should not fail", func() {
+	ginkgo.Describe("calling IsIOInProgress and QueryArrayStatus", func() {
+		ginkgo.When("IOConnectivity for scsi type volume on array", func() {
+			ginkgo.It("should not fail", func() {
 				var resp []gopowerstore.PerformanceMetricsByVolumeResponse
 				clientMock.On("PerformanceMetricsByVolume", context.Background(), mock.Anything, mock.Anything).
 					Return(resp, gopowerstore.APIError{
@@ -183,12 +181,12 @@ var _ = Describe("csi-extension-server", func() {
 						},
 					})
 				err := ctrlSvc.IsIOInProgress(context.Background(), validBlockVolumeID, ctrlSvc.DefaultArray(), "scsi")
-				Expect(err).ToNot(BeNil())
+				gomega.Expect(err).ToNot(gomega.BeNil())
 			})
 		})
 
-		When("IOConnectivity for nfs type volume on array", func() {
-			It("should not fail", func() {
+		ginkgo.When("IOConnectivity for nfs type volume on array", func() {
+			ginkgo.It("should not fail", func() {
 				var resp []gopowerstore.PerformanceMetricsByFileSystemResponse
 				clientMock.On("PerformanceMetricsByFileSystem", context.Background(), mock.Anything, mock.Anything).
 					Return(resp, gopowerstore.APIError{
@@ -197,12 +195,12 @@ var _ = Describe("csi-extension-server", func() {
 						},
 					})
 				err := ctrlSvc.IsIOInProgress(context.Background(), validBlockVolumeID, ctrlSvc.DefaultArray(), "nfs")
-				Expect(err).ToNot(BeNil())
+				gomega.Expect(err).ToNot(gomega.BeNil())
 			})
 		})
 
-		When("IOConnectivity for scsi type volume on array when IO operation is not there", func() {
-			It("should not fail", func() {
+		ginkgo.When("IOConnectivity for scsi type volume on array when IO operation is not there", func() {
+			ginkgo.It("should not fail", func() {
 				resp := make([]gopowerstore.PerformanceMetricsByVolumeResponse, 6)
 				resp[0].TotalIops = 0.0
 				resp[1].TotalIops = 0.0
@@ -213,12 +211,12 @@ var _ = Describe("csi-extension-server", func() {
 				clientMock.On("PerformanceMetricsByVolume", context.Background(), mock.Anything, mock.Anything).
 					Return(resp, nil)
 				err := ctrlSvc.IsIOInProgress(context.Background(), validBlockVolumeID, ctrlSvc.DefaultArray(), "scsi")
-				Expect(err).ToNot(BeNil())
+				gomega.Expect(err).ToNot(gomega.BeNil())
 			})
 		})
 
-		When("IOConnectivity for scsi type volume on array when IO operation is there", func() {
-			It("should not fail", func() {
+		ginkgo.When("IOConnectivity for scsi type volume on array when IO operation is there", func() {
+			ginkgo.It("should not fail", func() {
 				resp := make([]gopowerstore.PerformanceMetricsByVolumeResponse, 6)
 				freshTime, _ := strfmt.ParseDateTime(fmt.Sprint(time.Now().UTC().Format("2006-01-02T15:04:05Z")))
 				resp[0].TotalIops = 0.0
@@ -232,12 +230,12 @@ var _ = Describe("csi-extension-server", func() {
 				clientMock.On("PerformanceMetricsByVolume", context.Background(), mock.Anything, mock.Anything).
 					Return(resp, nil)
 				err := ctrlSvc.IsIOInProgress(context.Background(), validBlockVolumeID, ctrlSvc.DefaultArray(), "scsi")
-				Expect(err).To(BeNil())
+				gomega.Expect(err).To(gomega.BeNil())
 			})
 		})
 
-		When("IOConnectivity for scsi type volume on array when IO operation is there but entry is not fresh", func() {
-			It("should fail", func() {
+		ginkgo.When("IOConnectivity for scsi type volume on array when IO operation is there but entry is not fresh", func() {
+			ginkgo.It("should fail", func() {
 				resp := make([]gopowerstore.PerformanceMetricsByVolumeResponse, 6)
 				// stale time
 				staleTime, _ := strfmt.ParseDateTime(fmt.Sprint(time.Now().Add(time.Duration(-600) * time.Minute).Format("2006-01-02T15:04:05Z")))
@@ -252,12 +250,12 @@ var _ = Describe("csi-extension-server", func() {
 				clientMock.On("PerformanceMetricsByVolume", context.Background(), mock.Anything, mock.Anything).
 					Return(resp, nil)
 				err := ctrlSvc.IsIOInProgress(context.Background(), validBlockVolumeID, ctrlSvc.DefaultArray(), "scsi")
-				Expect(err).ToNot(BeNil())
+				gomega.Expect(err).ToNot(gomega.BeNil())
 			})
 		})
 
-		When("IOConnectivity for nfs type volume on array when IO operation is not there", func() {
-			It("should not fail", func() {
+		ginkgo.When("IOConnectivity for nfs type volume on array when IO operation is not there", func() {
+			ginkgo.It("should not fail", func() {
 				resp := make([]gopowerstore.PerformanceMetricsByFileSystemResponse, 6)
 				resp[0].TotalIops = 0.0
 				resp[1].TotalIops = 0.0
@@ -268,12 +266,12 @@ var _ = Describe("csi-extension-server", func() {
 				clientMock.On("PerformanceMetricsByFileSystem", context.Background(), mock.Anything, mock.Anything).
 					Return(resp, nil)
 				err := ctrlSvc.IsIOInProgress(context.Background(), validBlockVolumeID, ctrlSvc.DefaultArray(), "nfs")
-				Expect(err).ToNot(BeNil())
+				gomega.Expect(err).ToNot(gomega.BeNil())
 			})
 		})
 
-		When("IOConnectivity for nfs type volume on array when IO operation is there", func() {
-			It("should not fail", func() {
+		ginkgo.When("IOConnectivity for nfs type volume on array when IO operation is there", func() {
+			ginkgo.It("should not fail", func() {
 				resp := make([]gopowerstore.PerformanceMetricsByFileSystemResponse, 6)
 				freshTime, _ := strfmt.ParseDateTime(fmt.Sprint(time.Now().UTC().Format("2006-01-02T15:04:05Z")))
 				resp[0].TotalIops = 0.0
@@ -287,12 +285,12 @@ var _ = Describe("csi-extension-server", func() {
 				clientMock.On("PerformanceMetricsByFileSystem", context.Background(), mock.Anything, mock.Anything).
 					Return(resp, nil)
 				err := ctrlSvc.IsIOInProgress(context.Background(), validBlockVolumeID, ctrlSvc.DefaultArray(), "nfs")
-				Expect(err).To(BeNil())
+				gomega.Expect(err).To(gomega.BeNil())
 			})
 		})
 
-		When("API call to the specified url to retrieve connection status for the array that is connected", func() {
-			It("should not fail", func() {
+		ginkgo.When("API call to the specified url to retrieve connection status for the array that is connected", func() {
+			ginkgo.It("should not fail", func() {
 				common.SetAPIPort(context.Background())
 				var status common.ArrayConnectivityStatus
 				status.LastAttempt = time.Now().Unix()
@@ -303,7 +301,7 @@ var _ = Describe("csi-extension-server", func() {
 					w.Write(input)
 				})
 
-				server := &http.Server{Addr: ":49154"}
+				server := &http.Server{Addr: ":49154"} // #nosec G112
 				fmt.Printf("Starting server at port 49154 \n")
 				go func() {
 					err := server.ListenAndServe()
@@ -312,14 +310,14 @@ var _ = Describe("csi-extension-server", func() {
 					}
 				}()
 				check, err := ctrlSvc.QueryArrayStatus(context.Background(), "http://localhost:49154/array/id1")
-				Expect(err).To(BeNil())
-				Expect(check).ToNot(BeFalse())
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(check).ToNot(gomega.BeFalse())
 				server.Shutdown(context.Background())
 			})
 		})
 
-		When("API call to the specified url to retrieve connection status for the array that is not connected", func() {
-			It("should not fail", func() {
+		ginkgo.When("API call to the specified url to retrieve connection status for the array that is not connected", func() {
+			ginkgo.It("should not fail", func() {
 				common.SetAPIPort(context.Background())
 				var status common.ArrayConnectivityStatus
 				status.LastAttempt = time.Now().Unix()
@@ -330,7 +328,7 @@ var _ = Describe("csi-extension-server", func() {
 					w.Write(input)
 				})
 
-				server := &http.Server{Addr: ":49153"}
+				server := &http.Server{Addr: ":49153"} // #nosec G112
 				fmt.Printf("Starting server at port 49153 \n")
 				go func() {
 					err := server.ListenAndServe()
@@ -339,14 +337,14 @@ var _ = Describe("csi-extension-server", func() {
 					}
 				}()
 				check, err := ctrlSvc.QueryArrayStatus(context.Background(), "http://localhost:49153/array/id2")
-				Expect(err).To(BeNil())
-				Expect(check).ToNot(BeTrue())
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(check).ToNot(gomega.BeTrue())
 				server.Shutdown(context.Background())
 			})
 		})
 
-		When("API call to the specified url to retrieve connection status for the array with diff diff error conditions", func() {
-			It("should not fail", func() {
+		ginkgo.When("API call to the specified url to retrieve connection status for the array with diff diff error conditions", func() {
+			ginkgo.It("should not fail", func() {
 				common.SetAPIPort(context.Background())
 				var status common.ArrayConnectivityStatus
 				status.LastAttempt = time.Now().Unix() - 200
@@ -360,7 +358,7 @@ var _ = Describe("csi-extension-server", func() {
 				http.HandleFunc("/array/id4", func(w http.ResponseWriter, r *http.Request) {
 					w.Write([]byte("invalid type response"))
 				})
-				server := &http.Server{Addr: ":49152"}
+				server := &http.Server{Addr: ":49152"} // #nosec G112
 				fmt.Printf("Starting server at port 49152 \n")
 				go func() {
 					err := server.ListenAndServe()
@@ -369,24 +367,24 @@ var _ = Describe("csi-extension-server", func() {
 					}
 				}()
 				check, err := ctrlSvc.QueryArrayStatus(context.Background(), "http://localhost:49152/array/id3")
-				Expect(err).To(BeNil())
-				Expect(check).ToNot(BeTrue())
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(check).ToNot(gomega.BeTrue())
 
 				check, err = ctrlSvc.QueryArrayStatus(context.Background(), "http://localhost:49152/array/id4")
-				Expect(err).ToNot(BeNil())
-				Expect(check).ToNot(BeTrue())
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(check).ToNot(gomega.BeTrue())
 
 				check, err = ctrlSvc.QueryArrayStatus(context.Background(), "http://localhost:49152/array/id5")
-				Expect(err).ToNot(BeNil())
-				Expect(check).ToNot(BeTrue())
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(check).ToNot(gomega.BeTrue())
 				server.Shutdown(context.Background())
 			})
 		})
 	})
 
-	Describe("calling CreateVolumeGroupSnapshot()", func() {
-		When("valid member volumes are present", func() {
-			It("should create volume group snapshot successfully", func() {
+	ginkgo.Describe("calling CreateVolumeGroupSnapshot()", func() {
+		ginkgo.When("valid member volumes are present", func() {
+			ginkgo.It("should create volume group snapshot successfully", func() {
 				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).
 					Return(gopowerstore.VolumeGroups{VolumeGroup: []gopowerstore.VolumeGroup{{ID: validGroupID, ProtectionPolicyID: validPolicyID}}}, nil)
 				clientMock.On("CreateVolumeGroupSnapshot", mock.Anything, validGroupID, mock.Anything).
@@ -413,13 +411,13 @@ var _ = Describe("csi-extension-server", func() {
 				}
 				res, err := ctrlSvc.CreateVolumeGroupSnapshot(context.Background(), &req)
 
-				Expect(err).To(BeNil())
-				Expect(res.SnapshotGroupID).To(Equal(validGroupID))
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res.SnapshotGroupID).To(gomega.Equal(validGroupID))
 			})
 		})
 
-		When("there is no existing volume group created", func() {
-			It("should create volume group and snapshot successfully", func() {
+		ginkgo.When("there is no existing volume group created", func() {
+			ginkgo.It("should create volume group and snapshot successfully", func() {
 				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).
 					Return(gopowerstore.VolumeGroups{}, nil)
 				clientMock.On("GetVolumeGroupByName", mock.Anything, validGroupName).
@@ -453,13 +451,13 @@ var _ = Describe("csi-extension-server", func() {
 				}
 				res, err := ctrlSvc.CreateVolumeGroupSnapshot(context.Background(), &req)
 
-				Expect(err).To(BeNil())
-				Expect(res.SnapshotGroupID).To(Equal(validGroupID))
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res.SnapshotGroupID).To(gomega.Equal(validGroupID))
 			})
 		})
 
-		When("member volumes are not present", func() {
-			It("should not create volume group snapshot successfully", func() {
+		ginkgo.When("member volumes are not present", func() {
+			ginkgo.It("should not create volume group snapshot successfully", func() {
 				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).
 					Return(gopowerstore.VolumeGroups{VolumeGroup: []gopowerstore.VolumeGroup{{ID: validGroupID, ProtectionPolicyID: validPolicyID}}}, nil)
 				clientMock.On("CreateVolumeGroupSnapshot", mock.Anything, validGroupID, mock.Anything).
@@ -485,13 +483,13 @@ var _ = Describe("csi-extension-server", func() {
 				}
 				res, err := ctrlSvc.CreateVolumeGroupSnapshot(context.Background(), &req)
 
-				Expect(err).Error()
-				Expect(res).To(BeNil())
+				gomega.Expect(err).Error()
+				gomega.Expect(res).To(gomega.BeNil())
 			})
 		})
 
-		When("volume group name is empty", func() {
-			It("should not create volume group snapshot successfully", func() {
+		ginkgo.When("volume group name is empty", func() {
+			ginkgo.It("should not create volume group snapshot successfully", func() {
 				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).
 					Return(gopowerstore.VolumeGroups{VolumeGroup: []gopowerstore.VolumeGroup{{ID: validGroupID, ProtectionPolicyID: validPolicyID}}}, nil)
 				clientMock.On("CreateVolumeGroupSnapshot", mock.Anything, validGroupID, mock.Anything).
@@ -512,13 +510,13 @@ var _ = Describe("csi-extension-server", func() {
 				sourceVols = append(sourceVols, validBaseVolID+"/"+firstValidID+"/scsi")
 				res, err := ctrlSvc.CreateVolumeGroupSnapshot(context.Background(), &vgsext.CreateVolumeGroupSnapshotRequest{})
 
-				Expect(err).Error()
-				Expect(res).To(BeNil())
+				gomega.Expect(err).Error()
+				gomega.Expect(res).To(gomega.BeNil())
 			})
 		})
 
-		When("volume group name length is greater than 27", func() {
-			It("should not create volume group snapshot successfully", func() {
+		ginkgo.When("volume group name length is greater than 27", func() {
+			ginkgo.It("should not create volume group snapshot successfully", func() {
 				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).
 					Return(gopowerstore.VolumeGroups{VolumeGroup: []gopowerstore.VolumeGroup{{ID: validGroupID, ProtectionPolicyID: validPolicyID}}}, nil)
 				clientMock.On("CreateVolumeGroupSnapshot", mock.Anything, validGroupID, mock.Anything).
@@ -541,13 +539,13 @@ var _ = Describe("csi-extension-server", func() {
 					Name: "1234561111111111111111111112",
 				})
 
-				Expect(err).Error()
-				Expect(res).To(BeNil())
+				gomega.Expect(err).Error()
+				gomega.Expect(res).To(gomega.BeNil())
 			})
 		})
 
-		When("get volume group fails", func() {
-			It("should not create volume group snapshot successfully", func() {
+		ginkgo.When("get volume group fails", func() {
+			ginkgo.It("should not create volume group snapshot successfully", func() {
 				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).
 					Return(gopowerstore.VolumeGroups{VolumeGroup: []gopowerstore.VolumeGroup{{ID: validGroupID, ProtectionPolicyID: validPolicyID}}}, nil)
 				clientMock.On("CreateVolumeGroupSnapshot", mock.Anything, validGroupID, mock.Anything).
@@ -570,8 +568,8 @@ var _ = Describe("csi-extension-server", func() {
 				}
 				res, err := ctrlSvc.CreateVolumeGroupSnapshot(context.Background(), &req)
 
-				Expect(err).Error()
-				Expect(res).To(BeNil())
+				gomega.Expect(err).Error()
+				gomega.Expect(res).To(gomega.BeNil())
 			})
 		})
 	})

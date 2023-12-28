@@ -160,7 +160,7 @@ func validateCreateVGSreq(request *vgsext.CreateVolumeGroupSnapshotRequest) erro
 		return err
 	}
 
-	//name must be less than 28 chars, because we name snapshots with -<index>, and index can at most be 3 chars
+	// name must be less than 28 chars, because we name snapshots with -<index>, and index can at most be 3 chars
 	if len(request.Name) > 27 {
 		err := status.Errorf(codes.InvalidArgument, "Requested name %s longer than 27 character max", request.Name)
 		log.Errorf("Error from validateCreateVGSreq: %v ", err)
@@ -253,7 +253,6 @@ func (s *Service) ValidateVolumeHostConnectivity(ctx context.Context, req *podmo
 // checkIfNodeIsConnected looks at the 'nodeId' to determine if there is connectivity to the 'arrayId' array.
 // The 'rep' object will be filled with the results of the check.
 func (s *Service) checkIfNodeIsConnected(ctx context.Context, arrayID string, nodeID string, rep *podmon.ValidateVolumeHostConnectivityResponse) error {
-
 	log.Infof("Checking if array %s is connected to node %s", arrayID, nodeID)
 	var message string
 	rep.Connected = false

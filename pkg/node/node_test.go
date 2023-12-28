@@ -42,9 +42,9 @@ import (
 	"github.com/dell/gopowerstore"
 	"github.com/dell/gopowerstore/api"
 	gopowerstoremock "github.com/dell/gopowerstore/mocks"
-	. "github.com/onsi/ginkgo"
+	ginkgo "github.com/onsi/ginkgo"
 	"github.com/onsi/ginkgo/reporters"
-	. "github.com/onsi/gomega"
+	gomega "github.com/onsi/gomega"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -97,59 +97,86 @@ var (
 	validFCTargetWWNNVMe         = []string{"58ccf090496008aa", "58ccf090496008aa"}
 	validFCTargetWWNNode         = []string{"58ccf090c96008aa", "58ccf090c96008aa"}
 	validFCTargetsWWPNPowerstore = []string{"58:cc:f0:93:48:a0:03:a3", "58:cc:f0:93:48:a0:02:a3"}
-	validFCTargetsInfo           = []gobrick.FCTargetInfo{{WWPN: validFCTargetsWWPN[0]},
-		{WWPN: validFCTargetsWWPN[1]}}
+	validFCTargetsInfo           = []gobrick.FCTargetInfo{
+		{WWPN: validFCTargetsWWPN[0]},
+		{WWPN: validFCTargetsWWPN[1]},
+	}
 	validISCSIInitiators = []string{"iqn.1994-05.com.redhat:4db86abbe3c", "iqn.1994-05.com.redhat:2950c9ca441b"}
 	validISCSIPortals    = []string{"192.168.1.1:3260", "192.168.1.2:3260"}
-	validISCSITargets    = []string{"iqn.2015-10.com.dell:dellemc-powerstore-fnm00180700173-a-39f17e0e",
-		"iqn.2015-10.com.dell:dellemc-powerstore-fnm00180700173-b-10de15a5"}
-	validNVMEInitiators = []string{"nqn.2014-08.org.nvmexpress:uuid:02a08600-57d6-4089-8736-bf1f7326990e",
-		"nqn.2014-08.org.nvmexpress:uuid:fa363a22-1c74-44f3-9932-1c35d5cf5c4d"}
+	validISCSITargets    = []string{
+		"iqn.2015-10.com.dell:dellemc-powerstore-fnm00180700173-a-39f17e0e",
+		"iqn.2015-10.com.dell:dellemc-powerstore-fnm00180700173-b-10de15a5",
+	}
+	validNVMEInitiators = []string{
+		"nqn.2014-08.org.nvmexpress:uuid:02a08600-57d6-4089-8736-bf1f7326990e",
+		"nqn.2014-08.org.nvmexpress:uuid:fa363a22-1c74-44f3-9932-1c35d5cf5c4d",
+	}
 	validNVMETCPPortals = []string{"192.168.1.1:4420", "192.168.1.2:4420"}
-	validNVMETCPTargets = []string{"nqn.1988-11.com.dell:powerstore:00:e6e2d5b871f1403E169D",
-		"nqn.1988-11.com.dell:powerstore:00:e6e2d5b871f1403E169D"}
+	validNVMETCPTargets = []string{
+		"nqn.1988-11.com.dell:powerstore:00:e6e2d5b871f1403E169D",
+		"nqn.1988-11.com.dell:powerstore:00:e6e2d5b871f1403E169D",
+	}
 	validNVMEFCPortals = []string{"nn-0x11ccf090c9200b1a:pn-0x11ccf09149280b1a", "nn-0x11ccf090c9200b1a:pn-0x11ccf09149280b1a"}
-	validNVMEFCTargets = []string{"nqn.1988-11.com.dell:powerstore:00:e6e2d5b871f1403E169D",
-		"nqn.1988-11.com.dell:powerstore:00:e6e2d5b871f1403E169D"}
+	validNVMEFCTargets = []string{
+		"nqn.1988-11.com.dell:powerstore:00:e6e2d5b871f1403E169D",
+		"nqn.1988-11.com.dell:powerstore:00:e6e2d5b871f1403E169D",
+	}
 	validISCSITargetInfo = []gobrick.ISCSITargetInfo{
 		{Portal: validISCSIPortals[0], Target: validISCSITargets[0]},
-		{Portal: validISCSIPortals[1], Target: validISCSITargets[1]}}
+		{Portal: validISCSIPortals[1], Target: validISCSITargets[1]},
+	}
 	validGobrickISCSIVolumeINFO = gobrick.ISCSIVolumeInfo{
 		Targets: []gobrick.ISCSITargetInfo{
-			{Portal: validISCSITargetInfo[0].Portal,
-				Target: validISCSITargetInfo[0].Target},
-			{Portal: validISCSITargetInfo[1].Portal, Target: validISCSITargetInfo[1].Target}},
-		Lun: validLUNIDINT}
+			{
+				Portal: validISCSITargetInfo[0].Portal,
+				Target: validISCSITargetInfo[0].Target,
+			},
+			{Portal: validISCSITargetInfo[1].Portal, Target: validISCSITargetInfo[1].Target},
+		},
+		Lun: validLUNIDINT,
+	}
 	validNVMETCPTargetInfo = []gobrick.NVMeTargetInfo{
 		{Portal: validNVMETCPPortals[0], Target: validNVMETCPTargets[0]},
-		{Portal: validNVMETCPPortals[1], Target: validNVMETCPTargets[1]}}
+		{Portal: validNVMETCPPortals[1], Target: validNVMETCPTargets[1]},
+	}
 	validGobrickNVMETCPVolumeINFO = gobrick.NVMeVolumeInfo{
 		Targets: []gobrick.NVMeTargetInfo{
-			{Portal: validNVMETCPTargetInfo[0].Portal,
-				Target: validNVMETCPTargetInfo[0].Target},
-			{Portal: validNVMETCPTargetInfo[1].Portal, Target: validNVMETCPTargetInfo[1].Target}},
-		WWN: validDeviceWWN}
+			{
+				Portal: validNVMETCPTargetInfo[0].Portal,
+				Target: validNVMETCPTargetInfo[0].Target,
+			},
+			{Portal: validNVMETCPTargetInfo[1].Portal, Target: validNVMETCPTargetInfo[1].Target},
+		},
+		WWN: validDeviceWWN,
+	}
 	validNVMEFCTargetInfo = []gobrick.NVMeTargetInfo{
 		{Portal: validNVMEFCPortals[0], Target: validNVMEFCTargets[0]},
-		{Portal: validNVMEFCPortals[1], Target: validNVMEFCTargets[1]}}
+		{Portal: validNVMEFCPortals[1], Target: validNVMEFCTargets[1]},
+	}
 	validGobrickNVMEFCVolumeINFO = gobrick.NVMeVolumeInfo{
 		Targets: []gobrick.NVMeTargetInfo{
-			{Portal: validNVMEFCTargetInfo[0].Portal,
-				Target: validNVMEFCTargetInfo[0].Target},
-			{Portal: validNVMEFCTargetInfo[1].Portal, Target: validNVMEFCTargetInfo[1].Target}},
-		WWN: validDeviceWWN}
+			{
+				Portal: validNVMEFCTargetInfo[0].Portal,
+				Target: validNVMEFCTargetInfo[0].Target,
+			},
+			{Portal: validNVMEFCTargetInfo[1].Portal, Target: validNVMEFCTargetInfo[1].Target},
+		},
+		WWN: validDeviceWWN,
+	}
 	validGobrickFCVolumeINFO = gobrick.FCVolumeInfo{
 		Targets: []gobrick.FCTargetInfo{
 			{WWPN: validFCTargetsWWPN[0]},
-			{WWPN: validFCTargetsWWPN[1]}},
-		Lun: validLUNIDINT}
+			{WWPN: validFCTargetsWWPN[1]},
+		},
+		Lun: validLUNIDINT,
+	}
 	validGobrickDevice = gobrick.Device{Name: validDevName, WWN: validDeviceWWN, MultipathID: validDeviceWWN}
 )
 
 func TestCSINodeService(t *testing.T) {
-	RegisterFailHandler(Fail)
+	gomega.RegisterFailHandler(ginkgo.Fail)
 	junitReporter := reporters.NewJUnitReporter("node-svc.xml")
-	RunSpecsWithDefaultAndCustomReporters(t, "CSINodeService testing suite", []Reporter{junitReporter})
+	ginkgo.RunSpecsWithDefaultAndCustomReporters(t, "CSINodeService testing suite", []ginkgo.Reporter{junitReporter})
 }
 
 func getTestArrays() map[string]*array.PowerStoreArray {
@@ -232,14 +259,14 @@ func setDefaultNodeLabelsRetrieverMock() {
 	nodeLabelsRetrieverMock.On("NewForConfig", mock.Anything).Return(nil, nil)
 }
 
-var _ = Describe("CSINodeService", func() {
-	BeforeEach(func() {
+var _ = ginkgo.Describe("CSINodeService", func() {
+	ginkgo.BeforeEach(func() {
 		setVariables()
 	})
 
-	Describe("calling Init()", func() {
-		When("there is no suitable host", func() {
-			It("should create this host", func() {
+	ginkgo.Describe("calling Init()", func() {
+		ginkgo.When("there is no suitable host", func() {
+			ginkgo.It("should create this host", func() {
 				nodeSvc.nodeID = ""
 
 				fsMock.On("ReadFile", mock.Anything).Return([]byte("my-host-id"), nil)
@@ -277,22 +304,22 @@ var _ = Describe("CSINodeService", func() {
 					Return(gopowerstore.CreateResponse{ID: validHostID}, nil)
 				nodeSvc.opts.NodeNamePrefix = ""
 				err := nodeSvc.Init()
-				Expect(err).To(BeNil())
+				gomega.Expect(err).To(gomega.BeNil())
 			})
 		})
 
-		When("failed to read nodeID file", func() {
-			It("should fail", func() {
+		ginkgo.When("failed to read nodeID file", func() {
+			ginkgo.It("should fail", func() {
 				nodeSvc.nodeID = ""
 
 				fsMock.On("ReadFile", mock.Anything).Return([]byte("my-host-id"), errors.New("no such file"))
 
 				err := nodeSvc.Init()
-				Expect(err.Error()).To(ContainSubstring("no such file"))
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("no such file"))
 			})
 		})
-		When("failed to get outbound ip", func() {
-			It("should fail", func() {
+		ginkgo.When("failed to get outbound ip", func() {
+			ginkgo.It("should fail", func() {
 				nodeSvc.nodeID = ""
 
 				fsMock.On("ReadFile", mock.Anything).Return([]byte("my-host-id"), nil)
@@ -327,11 +354,11 @@ var _ = Describe("CSINodeService", func() {
 					Return(gopowerstore.CreateResponse{ID: validHostID}, nil)
 				nodeSvc.opts.NodeNamePrefix = ""
 				err := nodeSvc.Init()
-				Expect(err.Error()).To(ContainSubstring("Could not connect to PowerStore array"))
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("Could not connect to PowerStore array"))
 			})
 		})
-		When("failed to get node id", func() {
-			It("should fail", func() {
+		ginkgo.When("failed to get node id", func() {
+			ginkgo.It("should fail", func() {
 				nodeSvc.nodeID = ""
 
 				fsMock.On("ReadFile", mock.Anything).Return([]byte("toooooooooooooooooooooo-looooooooooooooooooooooooooooooooooooooooong"), nil)
@@ -366,13 +393,13 @@ var _ = Describe("CSINodeService", func() {
 					Return(gopowerstore.CreateResponse{ID: validHostID}, nil)
 				nodeSvc.opts.NodeNamePrefix = ""
 				err := nodeSvc.Init()
-				Expect(err.Error()).To(ContainSubstring("node name prefix is too long"))
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("node name prefix is too long"))
 			})
 		})
 
-		When("there IS a suitable host", func() {
-			When("nodeID == hostName", func() {
-				It("should reuse host [no initiator updates]", func() {
+		ginkgo.When("there IS a suitable host", func() {
+			ginkgo.When("nodeID == hostName", func() {
+				ginkgo.It("should reuse host [no initiator updates]", func() {
 					iscsiConnectorMock.On("GetInitiatorName", mock.Anything).
 						Return(validISCSIInitiators, nil)
 					nvmeConnectorMock.On("GetInitiatorName", mock.Anything).
@@ -383,21 +410,23 @@ var _ = Describe("CSINodeService", func() {
 					clientMock.On("GetHostByName", mock.Anything, mock.AnythingOfType("string")).
 						Return(gopowerstore.Host{
 							ID: "host-id",
-							Initiators: []gopowerstore.InitiatorInstance{{
-								PortName: validISCSIInitiators[0],
-								PortType: gopowerstore.InitiatorProtocolTypeEnumISCSI,
-							},
+							Initiators: []gopowerstore.InitiatorInstance{
+								{
+									PortName: validISCSIInitiators[0],
+									PortType: gopowerstore.InitiatorProtocolTypeEnumISCSI,
+								},
 								{
 									PortName: validISCSIInitiators[1],
 									PortType: gopowerstore.InitiatorProtocolTypeEnumISCSI,
-								}},
+								},
+							},
 							Name: "host-name",
 						}, nil)
 					err := nodeSvc.Init()
-					Expect(err).To(BeNil())
+					gomega.Expect(err).To(gomega.BeNil())
 				})
 
-				It("should modify host [update initiators]", func() {
+				ginkgo.It("should modify host [update initiators]", func() {
 					iscsiConnectorMock.On("GetInitiatorName", mock.Anything).
 						Return(validISCSIInitiators, nil)
 					nvmeConnectorMock.On("GetInitiatorName", mock.Anything).
@@ -419,12 +448,12 @@ var _ = Describe("CSINodeService", func() {
 						Return(gopowerstore.CreateResponse{}, nil)
 
 					err := nodeSvc.Init()
-					Expect(err).To(BeNil())
+					gomega.Expect(err).To(gomega.BeNil())
 				})
 			})
 
-			When("nodeID != hostName", func() {
-				It("should reuse host", func() {
+			ginkgo.When("nodeID != hostName", func() {
+				ginkgo.It("should reuse host", func() {
 					nodeSvc.nodeID = ""
 					fsMock.On("ReadFile", mock.Anything).Return([]byte("my-host-id"), nil)
 					conn, _ := net.Dial("udp", "127.0.0.1:80")
@@ -456,10 +485,10 @@ var _ = Describe("CSINodeService", func() {
 						}}, nil)
 
 					err := nodeSvc.Init()
-					Expect(err).To(BeNil())
+					gomega.Expect(err).To(gomega.BeNil())
 				})
 
-				It("should reuse host [CHAP]", func() {
+				ginkgo.It("should reuse host [CHAP]", func() {
 					nodeSvc.nodeID = ""
 					_ = csictx.Setenv(context.Background(), common.EnvEnableCHAP, "true")
 					conn, _ := net.Dial("udp", "127.0.0.1:80")
@@ -495,13 +524,13 @@ var _ = Describe("CSINodeService", func() {
 						Return(gopowerstore.CreateResponse{ID: "host-id"}, nil)
 
 					err := nodeSvc.Init()
-					Expect(err).To(BeNil())
+					gomega.Expect(err).To(gomega.BeNil())
 				})
 			})
 		})
 
-		When("using FC", func() {
-			It("should create FC host", func() {
+		ginkgo.When("using FC", func() {
+			ginkgo.It("should create FC host", func() {
 				nodeSvc.Arrays()[firstValidIP].BlockProtocol = common.FcTransport
 				nodeSvc.nodeID = ""
 				nodeSvc.useFC = true
@@ -545,12 +574,12 @@ var _ = Describe("CSINodeService", func() {
 					Return(gopowerstore.CreateResponse{ID: validHostID}, nil)
 
 				err := nodeSvc.Init()
-				Expect(err).To(BeNil())
+				gomega.Expect(err).To(gomega.BeNil())
 			})
 		})
 
-		When("using NVMe", func() {
-			It("should create NVMe host", func() {
+		ginkgo.When("using NVMe", func() {
+			ginkgo.It("should create NVMe host", func() {
 				nodeSvc.Arrays()[firstValidIP].BlockProtocol = common.NVMEFCTransport
 				nodeSvc.nodeID = ""
 				nodeSvc.useNVME = true
@@ -590,15 +619,14 @@ var _ = Describe("CSINodeService", func() {
 					Return(gopowerstore.CreateResponse{ID: validHostID}, nil)
 
 				err := nodeSvc.Init()
-				Expect(err).To(BeNil())
+				gomega.Expect(err).To(gomega.BeNil())
 			})
 		})
 	})
 
-	Describe("calling nodeProbe", func() {
-
-		When("failed to get host on array", func() {
-			It("should fail", func() {
+	ginkgo.Describe("calling nodeProbe", func() {
+		ginkgo.When("failed to get host on array", func() {
+			ginkgo.It("should fail", func() {
 				nodeSvc.nodeID = "some-random-text"
 
 				clientMock.On("GetHostByName", mock.Anything, mock.AnythingOfType("string")).
@@ -610,12 +638,12 @@ var _ = Describe("CSINodeService", func() {
 					})
 				arrays := getTestArrays()
 				err := nodeSvc.nodeProbe(context.Background(), arrays["gid1"])
-				Expect(err.Error()).To(ContainSubstring("not found"))
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("not found"))
 			})
 		})
 
-		When("failed to get host on array but it's NFS only", func() {
-			It("should not fail", func() {
+		ginkgo.When("failed to get host on array but it's NFS only", func() {
+			ginkgo.It("should not fail", func() {
 				nodeSvc.nodeID = "some-random-text"
 
 				clientMock.On("GetHostByName", mock.Anything, mock.AnythingOfType("string")).
@@ -628,13 +656,13 @@ var _ = Describe("CSINodeService", func() {
 				nodeSvc.useNFS = true
 				arrays := getTestArrays()
 				err := nodeSvc.nodeProbe(context.Background(), arrays["gid1"])
-				Expect(err).To(BeNil())
+				gomega.Expect(err).To(gomega.BeNil())
 				nodeSvc.useNFS = false
 			})
 		})
 
-		When("got host on array but iscsi initiators are not present", func() {
-			It("should fail", func() {
+		ginkgo.When("got host on array but iscsi initiators are not present", func() {
+			ginkgo.It("should fail", func() {
 				nodeSvc.nodeID = "some-random-text"
 
 				clientMock.On("GetHostByName", mock.Anything, mock.AnythingOfType("string")).Return(
@@ -649,12 +677,12 @@ var _ = Describe("CSINodeService", func() {
 					Return([]gopowerstore.IPPoolAddress{}, nil)
 				err := nodeSvc.nodeProbe(context.Background(), arrays["gid1"])
 
-				Expect(err.Error()).To(ContainSubstring("no active iscsi sessions"))
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("no active iscsi sessions"))
 			})
 		})
 
-		When("got host on array but nvme initiators are not present", func() {
-			It("should fail", func() {
+		ginkgo.When("got host on array but nvme initiators are not present", func() {
+			ginkgo.It("should fail", func() {
 				nodeSvc.nodeID = "some-random-text"
 
 				clientMock.On("GetHostByName", mock.Anything, mock.AnythingOfType("string")).Return(
@@ -670,12 +698,12 @@ var _ = Describe("CSINodeService", func() {
 					Return([]gopowerstore.IPPoolAddress{}, nil)
 				err := nodeSvc.nodeProbe(context.Background(), arrays["gid1"])
 				nodeSvc.useNVME = false
-				Expect(err.Error()).To(ContainSubstring("no active nvme sessions"))
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("no active nvme sessions"))
 			})
 		})
 
-		When("got host on array but iscsi initiators are not present and UseNFS is true at the beginning", func() {
-			It("should not fail", func() {
+		ginkgo.When("got host on array but iscsi initiators are not present and UseNFS is true at the beginning", func() {
+			ginkgo.It("should not fail", func() {
 				nodeSvc.nodeID = "some-random-text"
 
 				clientMock.On("GetHostByName", mock.Anything, mock.AnythingOfType("string")).Return(
@@ -685,7 +713,8 @@ var _ = Describe("CSINodeService", func() {
 							{
 								PortName: validISCSIPortals[0],
 								PortType: gopowerstore.InitiatorProtocolTypeEnumISCSI,
-							}},
+							},
+						},
 						Name: "host-name",
 					}, nil)
 				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
@@ -694,12 +723,12 @@ var _ = Describe("CSINodeService", func() {
 				arrays := getTestArrays()
 				err := nodeSvc.nodeProbe(context.Background(), arrays["gid1"])
 				nodeSvc.useNFS = false
-				Expect(err).To(BeNil())
+				gomega.Expect(err).To(gomega.BeNil())
 			})
 		})
 
-		When("got host on array but nvme initiators are not present and UseNFS is true at the beginning", func() {
-			It("should not fail", func() {
+		ginkgo.When("got host on array but nvme initiators are not present and UseNFS is true at the beginning", func() {
+			ginkgo.It("should not fail", func() {
 				nodeSvc.nodeID = "some-random-text"
 
 				clientMock.On("GetHostByName", mock.Anything, mock.AnythingOfType("string")).Return(
@@ -709,7 +738,8 @@ var _ = Describe("CSINodeService", func() {
 							{
 								PortName: validISCSIPortals[0],
 								PortType: gopowerstore.InitiatorProtocolTypeEnumISCSI,
-							}},
+							},
+						},
 						Name: "host-name",
 					}, nil)
 				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
@@ -720,12 +750,12 @@ var _ = Describe("CSINodeService", func() {
 				err := nodeSvc.nodeProbe(context.Background(), arrays["gid1"])
 				nodeSvc.useNFS = false
 				nodeSvc.useNVME = false
-				Expect(err).To(BeNil())
+				gomega.Expect(err).To(gomega.BeNil())
 			})
 		})
 
-		When("got host on array but it's NFS type at the beginning but later found iscsi active sessions", func() {
-			It("should not fail", func() {
+		ginkgo.When("got host on array but it's NFS type at the beginning but later found iscsi active sessions", func() {
+			ginkgo.It("should not fail", func() {
 				nodeSvc.nodeID = "some-random-text"
 
 				clientMock.On("GetHostByName", mock.Anything, mock.AnythingOfType("string")).Return(
@@ -749,7 +779,8 @@ var _ = Describe("CSINodeService", func() {
 								},
 								PortName: validISCSIPortals[1],
 								PortType: gopowerstore.InitiatorProtocolTypeEnumISCSI,
-							}},
+							},
+						},
 						Name: "host-name",
 					}, nil)
 				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
@@ -759,13 +790,13 @@ var _ = Describe("CSINodeService", func() {
 				nodeSvc.iscsiTargets["unique"] = []string{"iqn.2015-10.com.dell:dellemc-foobar-123-a-7ceb34a0"}
 				err := nodeSvc.nodeProbe(context.Background(), arrays["gid1"])
 
-				Expect(err).To(BeNil())
-				Expect(nodeSvc.useNFS).To(BeFalse())
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(nodeSvc.useNFS).To(gomega.BeFalse())
 			})
 		})
 
-		When("got host on array but it's NFS type at the beginning but later found nvme active sessions", func() {
-			It("should not fail", func() {
+		ginkgo.When("got host on array but it's NFS type at the beginning but later found nvme active sessions", func() {
+			ginkgo.It("should not fail", func() {
 				nodeSvc.nodeID = "some-random-text"
 
 				clientMock.On("GetHostByName", mock.Anything, mock.AnythingOfType("string")).Return(
@@ -789,7 +820,8 @@ var _ = Describe("CSINodeService", func() {
 								},
 								PortName: validNVMETCPPortals[1],
 								PortType: gopowerstore.InitiatorProtocolTypeEnumNVME,
-							}},
+							},
+						},
 						Name: "host-name",
 					}, nil)
 				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
@@ -800,51 +832,55 @@ var _ = Describe("CSINodeService", func() {
 				nodeSvc.nvmeTargets["unique"] = []string{"nqn.1988-11.com.dell.mock:00:e6e2d5b871f1403E169D0"}
 				err := nodeSvc.nodeProbe(context.Background(), arrays["gid1"])
 				nodeSvc.useNVME = false
-				Expect(err).To(BeNil())
-				Expect(nodeSvc.useNFS).To(BeFalse())
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(nodeSvc.useNFS).To(gomega.BeFalse())
 			})
 		})
 
-		When("host as well as initiators are present but active sessions are not present on node", func() {
-			It("should fail", func() {
+		ginkgo.When("host as well as initiators are present but active sessions are not present on node", func() {
+			ginkgo.It("should fail", func() {
 				nodeSvc.nodeID = "some-random-text"
 
 				clientMock.On("GetHostByName", mock.Anything, mock.AnythingOfType("string")).Return(
 					gopowerstore.Host{
 						ID: "host-id",
-						Initiators: []gopowerstore.InitiatorInstance{{
-							PortName: validISCSIInitiators[0],
-							PortType: gopowerstore.InitiatorProtocolTypeEnumISCSI,
-						},
+						Initiators: []gopowerstore.InitiatorInstance{
+							{
+								PortName: validISCSIInitiators[0],
+								PortType: gopowerstore.InitiatorProtocolTypeEnumISCSI,
+							},
 							{
 								PortName: validISCSIInitiators[1],
 								PortType: gopowerstore.InitiatorProtocolTypeEnumISCSI,
-							}},
+							},
+						},
 						Name: "host-name",
 					}, nil)
 				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
 					Return([]gopowerstore.IPPoolAddress{}, nil)
 				arrays := getTestArrays()
 				err := nodeSvc.nodeProbe(context.Background(), arrays["gid1"])
-				Expect(err.Error()).To(ContainSubstring("no active iscsi sessions"))
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("no active iscsi sessions"))
 			})
 		})
 
-		When("host as well as iscsi active sessions are present on array", func() {
-			It("should not fail", func() {
+		ginkgo.When("host as well as iscsi active sessions are present on array", func() {
+			ginkgo.It("should not fail", func() {
 				nodeSvc.nodeID = "some-random-text"
 
 				clientMock.On("GetHostByName", mock.Anything, mock.AnythingOfType("string")).Return(
 					gopowerstore.Host{
 						ID: "host-id",
-						Initiators: []gopowerstore.InitiatorInstance{{
-							PortName: validISCSIInitiators[0],
-							PortType: gopowerstore.InitiatorProtocolTypeEnumISCSI,
-						},
+						Initiators: []gopowerstore.InitiatorInstance{
+							{
+								PortName: validISCSIInitiators[0],
+								PortType: gopowerstore.InitiatorProtocolTypeEnumISCSI,
+							},
 							{
 								PortName: validISCSIInitiators[1],
 								PortType: gopowerstore.InitiatorProtocolTypeEnumISCSI,
-							}},
+							},
+						},
 						Name: "host-name",
 					}, nil)
 
@@ -853,12 +889,12 @@ var _ = Describe("CSINodeService", func() {
 				nodeSvc.iscsiTargets["unique"] = []string{"iqn.2015-10.com.dell:dellemc-foobar-123-a-7ceb34a0"}
 
 				err := nodeSvc.nodeProbe(context.Background(), arrays["gid1"])
-				Expect(err).To(BeNil())
+				gomega.Expect(err).To(gomega.BeNil())
 			})
 		})
 
-		When("host as well as active sessions are present on array for FC protocol", func() {
-			It("should not fail", func() {
+		ginkgo.When("host as well as active sessions are present on array for FC protocol", func() {
+			ginkgo.It("should not fail", func() {
 				nodeSvc.nodeID = "some-random-text"
 
 				clientMock.On("GetHostByName", mock.Anything, mock.AnythingOfType("string")).Return(
@@ -882,7 +918,8 @@ var _ = Describe("CSINodeService", func() {
 								},
 								PortName: validFCTargetsWWPN[1],
 								PortType: gopowerstore.InitiatorProtocolTypeEnumFC,
-							}},
+							},
+						},
 						Name: "host-name",
 					}, nil)
 
@@ -895,12 +932,12 @@ var _ = Describe("CSINodeService", func() {
 				}
 
 				err := nodeSvc.nodeProbe(context.Background(), arrays["gid1"])
-				Expect(err).To(BeNil())
+				gomega.Expect(err).To(gomega.BeNil())
 			})
 		})
 
-		When("host entry is found but no Active session on array for FC protocol", func() {
-			It("should not fail", func() {
+		ginkgo.When("host entry is found but no Active session on array for FC protocol", func() {
+			ginkgo.It("should not fail", func() {
 				nodeSvc.nodeID = "some-random-text"
 
 				clientMock.On("GetHostByName", mock.Anything, mock.AnythingOfType("string")).Return(
@@ -917,7 +954,7 @@ var _ = Describe("CSINodeService", func() {
 				nodeSvc.useFC = true
 
 				err := nodeSvc.nodeProbe(context.Background(), arrays["gid1"])
-				Expect(err).ToNot(BeNil())
+				gomega.Expect(err).ToNot(gomega.BeNil())
 				if nodeSvc.useFC {
 					nodeSvc.useFC = false
 				}
@@ -925,11 +962,11 @@ var _ = Describe("CSINodeService", func() {
 		})
 	})
 
-	Describe("calling NodeStage()", func() {
+	ginkgo.Describe("calling NodeStage()", func() {
 		stagingPath := filepath.Join(nodeStagePrivateDir, validBaseVolumeID)
 
-		When("using iSCSI", func() {
-			It("should successfully stage iSCSI volume", func() {
+		ginkgo.When("using iSCSI", func() {
+			ginkgo.It("should successfully stage iSCSI volume", func() {
 				iscsiConnectorMock.On("ConnectVolume", mock.Anything, gobrick.ISCSIVolumeInfo{
 					Targets: validISCSITargetInfo,
 					Lun:     validLUNIDINT,
@@ -943,13 +980,13 @@ var _ = Describe("CSINodeService", func() {
 					VolumeCapability: getCapabilityWithVoltypeAccessFstype(
 						"mount", "single-writer", "ext4"),
 				})
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.NodeStageVolumeResponse{}))
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.NodeStageVolumeResponse{}))
 			})
 		})
 
-		When("using NVMeFC", func() {
-			It("should successfully stage NVMeFC volume", func() {
+		ginkgo.When("using NVMeFC", func() {
+			ginkgo.It("should successfully stage NVMeFC volume", func() {
 				nodeSvc.useNVME = true
 				nodeSvc.useFC = true
 				nvmeConnectorMock.On("ConnectVolume", mock.Anything, gobrick.NVMeVolumeInfo{
@@ -965,13 +1002,13 @@ var _ = Describe("CSINodeService", func() {
 					VolumeCapability: getCapabilityWithVoltypeAccessFstype(
 						"mount", "single-writer", "ext4"),
 				})
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.NodeStageVolumeResponse{}))
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.NodeStageVolumeResponse{}))
 			})
 		})
 
-		When("using FC", func() {
-			It("should successfully stage FC volume", func() {
+		ginkgo.When("using FC", func() {
+			ginkgo.It("should successfully stage FC volume", func() {
 				nodeSvc.useFC = true
 				fcConnectorMock.On("ConnectVolume", mock.Anything, gobrick.FCVolumeInfo{
 					Targets: validFCTargetsInfo,
@@ -986,13 +1023,13 @@ var _ = Describe("CSINodeService", func() {
 					VolumeCapability: getCapabilityWithVoltypeAccessFstype(
 						"mount", "single-writer", "ext4"),
 				})
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.NodeStageVolumeResponse{}))
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.NodeStageVolumeResponse{}))
 			})
 		})
 
-		When("using NFS", func() {
-			It("should successfully stage NFS volume", func() {
+		ginkgo.When("using NFS", func() {
+			ginkgo.It("should successfully stage NFS volume", func() {
 				stagingPath := filepath.Join(nodeStagePrivateDir, validBaseVolumeID)
 				utilMock.On("Mount", mock.Anything, validNfsExportPath, stagingPath, "").Return(nil)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
@@ -1013,13 +1050,13 @@ var _ = Describe("CSINodeService", func() {
 						"mount", "multi-writer", "nfs"),
 				})
 
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.NodeStageVolumeResponse{}))
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.NodeStageVolumeResponse{}))
 			})
 		})
 
-		When("using NFS with posix acls", func() {
-			It("should successfully stage NFS volume", func() {
+		ginkgo.When("using NFS with posix acls", func() {
+			ginkgo.It("should successfully stage NFS volume", func() {
 				nfsv4ACLsMock := new(mocks.NFSv4ACLsInterface)
 
 				stagingPath := filepath.Join(nodeStagePrivateDir, validBaseVolumeID)
@@ -1055,13 +1092,13 @@ var _ = Describe("CSINodeService", func() {
 						"mount", "multi-writer", "nfs"),
 				})
 
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.NodeStageVolumeResponse{}))
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.NodeStageVolumeResponse{}))
 			})
 		})
 
-		When("using NFS with NFSv4 acls", func() {
-			It("should successfully stage NFS volume", func() {
+		ginkgo.When("using NFS with NFSv4 acls", func() {
+			ginkgo.It("should successfully stage NFS volume", func() {
 				nfsv4ACLsMock := new(mocks.NFSv4ACLsInterface)
 
 				stagingPath := filepath.Join(nodeStagePrivateDir, validBaseVolumeID)
@@ -1098,8 +1135,8 @@ var _ = Describe("CSINodeService", func() {
 			})
 		})
 
-		When("volume is already staged", func() {
-			It("should return that stage is successful [SCSI]", func() {
+		ginkgo.When("volume is already staged", func() {
+			ginkgo.It("should return that stage is successful [SCSI]", func() {
 				iscsiConnectorMock.On("ConnectVolume", mock.Anything, gobrick.ISCSIVolumeInfo{
 					Targets: validISCSITargetInfo,
 					Lun:     validLUNIDINT,
@@ -1123,11 +1160,11 @@ var _ = Describe("CSINodeService", func() {
 					VolumeCapability: getCapabilityWithVoltypeAccessFstype(
 						"mount", "single-writer", "ext4"),
 				})
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.NodeStageVolumeResponse{}))
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.NodeStageVolumeResponse{}))
 			})
 
-			It("should return that stage is successful [NFS]", func() {
+			ginkgo.It("should return that stage is successful [NFS]", func() {
 				publishContext := getValidPublishContext()
 				publishContext["NfsExportPath"] = validNfsExportPath
 
@@ -1149,52 +1186,52 @@ var _ = Describe("CSINodeService", func() {
 					VolumeCapability: getCapabilityWithVoltypeAccessFstype(
 						"mount", "multi-writer", "nfs"),
 				})
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.NodeStageVolumeResponse{}))
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.NodeStageVolumeResponse{}))
 			})
 		})
 
-		When("missing volume capabilities", func() {
-			It("should fail", func() {
+		ginkgo.When("missing volume capabilities", func() {
+			ginkgo.It("should fail", func() {
 				req := &csi.NodeStageVolumeRequest{}
 
 				res, err := nodeSvc.NodeStageVolume(context.Background(), req)
-				Expect(res).To(BeNil())
-				Expect(err).NotTo(BeNil())
-				Expect(err.Error()).To(ContainSubstring("volume capability is required"))
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err).NotTo(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("volume capability is required"))
 			})
 		})
 
-		When("missing volume VolumeId", func() {
-			It("should fail", func() {
+		ginkgo.When("missing volume VolumeId", func() {
+			ginkgo.It("should fail", func() {
 				req := &csi.NodeStageVolumeRequest{
 					VolumeCapability:  getCapabilityWithVoltypeAccessFstype("mount", "single-writer", "ext4"),
 					StagingTargetPath: nodeStagePrivateDir,
 				}
 
 				res, err := nodeSvc.NodeStageVolume(context.Background(), req)
-				Expect(res).To(BeNil())
-				Expect(err).NotTo(BeNil())
-				Expect(err.Error()).To(ContainSubstring("volume ID is required"))
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err).NotTo(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("volume ID is required"))
 			})
 		})
 
-		When("missing volume stage path", func() {
-			It("should fail", func() {
+		ginkgo.When("missing volume stage path", func() {
+			ginkgo.It("should fail", func() {
 				req := &csi.NodeStageVolumeRequest{
 					VolumeCapability: getCapabilityWithVoltypeAccessFstype("mount", "single-writer", "ext4"),
 					VolumeId:         validBlockVolumeID,
 				}
 
 				res, err := nodeSvc.NodeStageVolume(context.Background(), req)
-				Expect(res).To(BeNil())
-				Expect(err).NotTo(BeNil())
-				Expect(err.Error()).To(ContainSubstring("staging target path is required"))
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err).NotTo(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("staging target path is required"))
 			})
 		})
 
-		When("device is found but not ready", func() {
-			BeforeEach(func() {
+		ginkgo.When("device is found but not ready", func() {
+			ginkgo.BeforeEach(func() {
 				mountInfo := []gofsutil.Info{
 					{
 						Device: validDevName,
@@ -1223,7 +1260,7 @@ var _ = Describe("CSINodeService", func() {
 				utilMock.On("Unmount", mock.Anything, stagingPath).Return(nil).Once()
 			})
 
-			It("should unstage and stage again", func() {
+			ginkgo.It("should unstage and stage again", func() {
 				fsMock.On("Remove", stagingPath).Return(nil).Once()
 
 				res, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
@@ -1233,12 +1270,12 @@ var _ = Describe("CSINodeService", func() {
 					VolumeCapability: getCapabilityWithVoltypeAccessFstype(
 						"mount", "single-writer", "ext4"),
 				})
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.NodeStageVolumeResponse{}))
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.NodeStageVolumeResponse{}))
 			})
 
-			When("unstaging fails", func() {
-				It("should fail", func() {
+			ginkgo.When("unstaging fails", func() {
+				ginkgo.It("should fail", func() {
 					e := errors.New("os-error")
 					fsMock.On("Remove", stagingPath).Return(e).Once()
 					fsMock.On("IsNotExist", e).Return(false)
@@ -1251,15 +1288,15 @@ var _ = Describe("CSINodeService", func() {
 						VolumeCapability: getCapabilityWithVoltypeAccessFstype(
 							"mount", "single-writer", "ext4"),
 					})
-					Expect(err).ToNot(BeNil())
-					Expect(res).To(BeNil())
-					Expect(err.Error()).To(ContainSubstring("failed to unmount volume"))
+					gomega.Expect(err).ToNot(gomega.BeNil())
+					gomega.Expect(res).To(gomega.BeNil())
+					gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to unmount volume"))
 				})
 			})
 		})
 
-		When("publish context is incorrect", func() {
-			It("should fail [deviceWWN]", func() {
+		ginkgo.When("publish context is incorrect", func() {
+			ginkgo.It("should fail [deviceWWN]", func() {
 				res, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
 					VolumeId:          validBlockVolumeID,
 					PublishContext:    map[string]string{},
@@ -1267,12 +1304,12 @@ var _ = Describe("CSINodeService", func() {
 					VolumeCapability: getCapabilityWithVoltypeAccessFstype(
 						"mount", "single-writer", "ext4"),
 				})
-				Expect(err).ToNot(BeNil())
-				Expect(res).To(BeNil())
-				Expect(err.Error()).To(ContainSubstring("deviceWWN must be in publish context"))
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("deviceWWN must be in publish context"))
 			})
 
-			It("should fail [volumeLUNAddress]", func() {
+			ginkgo.It("should fail [volumeLUNAddress]", func() {
 				res, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
 					VolumeId: validBlockVolumeID,
 					PublishContext: map[string]string{
@@ -1282,12 +1319,12 @@ var _ = Describe("CSINodeService", func() {
 					VolumeCapability: getCapabilityWithVoltypeAccessFstype(
 						"mount", "single-writer", "ext4"),
 				})
-				Expect(err).ToNot(BeNil())
-				Expect(res).To(BeNil())
-				Expect(err.Error()).To(ContainSubstring("volumeLUNAddress must be in publish context"))
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("volumeLUNAddress must be in publish context"))
 			})
 
-			It("should fail [iscsiTargets]", func() {
+			ginkgo.It("should fail [iscsiTargets]", func() {
 				res, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
 					VolumeId: validBlockVolumeID,
 					PublishContext: map[string]string{
@@ -1298,12 +1335,12 @@ var _ = Describe("CSINodeService", func() {
 					VolumeCapability: getCapabilityWithVoltypeAccessFstype(
 						"mount", "single-writer", "ext4"),
 				})
-				Expect(err).ToNot(BeNil())
-				Expect(res).To(BeNil())
-				Expect(err.Error()).To(ContainSubstring("iscsiTargets data must be in publish context"))
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("iscsiTargets data must be in publish context"))
 			})
 
-			It("should fail [nvmefcTargets]", func() {
+			ginkgo.It("should fail [nvmefcTargets]", func() {
 				nodeSvc.useNVME = true
 				nodeSvc.useFC = true
 				res, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
@@ -1316,12 +1353,12 @@ var _ = Describe("CSINodeService", func() {
 					VolumeCapability: getCapabilityWithVoltypeAccessFstype(
 						"mount", "single-writer", "ext4"),
 				})
-				Expect(err).ToNot(BeNil())
-				Expect(res).To(BeNil())
-				Expect(err.Error()).To(ContainSubstring("NVMeFC Targets data must be in publish context"))
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("NVMeFC Targets data must be in publish context"))
 			})
 
-			It("should fail [fcTargets]", func() {
+			ginkgo.It("should fail [fcTargets]", func() {
 				nodeSvc.useFC = true
 				res, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
 					VolumeId: validBlockVolumeID,
@@ -1333,14 +1370,14 @@ var _ = Describe("CSINodeService", func() {
 					VolumeCapability: getCapabilityWithVoltypeAccessFstype(
 						"mount", "single-writer", "ext4"),
 				})
-				Expect(err).ToNot(BeNil())
-				Expect(res).To(BeNil())
-				Expect(err.Error()).To(ContainSubstring("fcTargets data must be in publish context"))
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("fcTargets data must be in publish context"))
 			})
 		})
 
-		When("can not connect device", func() {
-			It("should fail", func() {
+		ginkgo.When("can not connect device", func() {
+			ginkgo.It("should fail", func() {
 				e := errors.New("connection-error")
 				iscsiConnectorMock.On("ConnectVolume", mock.Anything, gobrick.ISCSIVolumeInfo{
 					Targets: validISCSITargetInfo,
@@ -1355,14 +1392,14 @@ var _ = Describe("CSINodeService", func() {
 					VolumeCapability: getCapabilityWithVoltypeAccessFstype(
 						"mount", "single-writer", "ext4"),
 				})
-				Expect(err).ToNot(BeNil())
-				Expect(res).To(BeNil())
-				Expect(err.Error()).To(ContainSubstring("unable to find device after multiple discovery attempts"))
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("unable to find device after multiple discovery attempts"))
 			})
 		})
 
-		When("mount fails", func() {
-			It("should fail", func() {
+		ginkgo.When("mount fails", func() {
+			ginkgo.It("should fail", func() {
 				e := errors.New("mount-error")
 				iscsiConnectorMock.On("ConnectVolume", mock.Anything, gobrick.ISCSIVolumeInfo{
 					Targets: validISCSITargetInfo,
@@ -1382,18 +1419,18 @@ var _ = Describe("CSINodeService", func() {
 					VolumeCapability: getCapabilityWithVoltypeAccessFstype(
 						"mount", "single-writer", "ext4"),
 				})
-				Expect(err).ToNot(BeNil())
-				Expect(res).To(BeNil())
-				Expect(err.Error()).To(ContainSubstring("error bind disk"))
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("error bind disk"))
 			})
 		})
 	})
 
-	Describe("calling NodeUnstage()", func() {
+	ginkgo.Describe("calling NodeUnstage()", func() {
 		stagingPath := filepath.Join(nodeStagePrivateDir, validBaseVolumeID)
 
-		When("unstaging block volume", func() {
-			It("should succeed [iSCSI]", func() {
+		ginkgo.When("unstaging block volume", func() {
+			ginkgo.It("should succeed [iSCSI]", func() {
 				mountInfo := []gofsutil.Info{
 					{
 						Device: validDevName,
@@ -1408,7 +1445,7 @@ var _ = Describe("CSINodeService", func() {
 				utilMock.On("Unmount", mock.Anything, stagingPath).Return(nil)
 
 				fsMock.On("Remove", stagingPath).Return(nil)
-				fsMock.On("WriteFile", path.Join(nodeSvc.opts.TmpDir, validBaseVolumeID), []byte(validDevName), os.FileMode(0640)).Return(nil)
+				fsMock.On("WriteFile", path.Join(nodeSvc.opts.TmpDir, validBaseVolumeID), []byte(validDevName), os.FileMode(0o640)).Return(nil)
 
 				iscsiConnectorMock.On("DisconnectVolumeByDeviceName", mock.Anything, validDevName).Return(nil)
 
@@ -1419,10 +1456,10 @@ var _ = Describe("CSINodeService", func() {
 					VolumeId:          validBlockVolumeID,
 					StagingTargetPath: nodeStagePrivateDir,
 				})
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.NodeUnstageVolumeResponse{}))
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.NodeUnstageVolumeResponse{}))
 			})
-			It("should fail, no targetPath [iSCSI]", func() {
+			ginkgo.It("should fail, no targetPath [iSCSI]", func() {
 				mountInfo := []gofsutil.Info{
 					{
 						Device: validDevName,
@@ -1437,7 +1474,7 @@ var _ = Describe("CSINodeService", func() {
 				utilMock.On("Unmount", mock.Anything, stagingPath).Return(nil)
 
 				fsMock.On("Remove", stagingPath).Return(nil)
-				fsMock.On("WriteFile", path.Join(nodeSvc.opts.TmpDir, validBaseVolumeID), []byte(validDevName), os.FileMode(0640)).Return(nil)
+				fsMock.On("WriteFile", path.Join(nodeSvc.opts.TmpDir, validBaseVolumeID), []byte(validDevName), os.FileMode(0o640)).Return(nil)
 
 				iscsiConnectorMock.On("DisconnectVolumeByDeviceName", mock.Anything, validDevName).Return(nil)
 
@@ -1448,9 +1485,9 @@ var _ = Describe("CSINodeService", func() {
 					VolumeId:          validBlockVolumeID,
 					StagingTargetPath: "",
 				})
-				Expect(err.Error()).To(ContainSubstring("staging target path is required"))
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("staging target path is required"))
 			})
-			It("should fail, because no mounts [iSCSI]", func() {
+			ginkgo.It("should fail, because no mounts [iSCSI]", func() {
 				mountInfo := []gofsutil.Info{
 					{
 						Device: validDevName,
@@ -1465,7 +1502,7 @@ var _ = Describe("CSINodeService", func() {
 				utilMock.On("Unmount", mock.Anything, stagingPath).Return(nil)
 
 				fsMock.On("Remove", stagingPath).Return(nil)
-				fsMock.On("WriteFile", path.Join(nodeSvc.opts.TmpDir, validBaseVolumeID), []byte(validDevName), os.FileMode(0640)).Return(nil)
+				fsMock.On("WriteFile", path.Join(nodeSvc.opts.TmpDir, validBaseVolumeID), []byte(validDevName), os.FileMode(0o640)).Return(nil)
 
 				iscsiConnectorMock.On("DisconnectVolumeByDeviceName", mock.Anything, validDevName).Return(nil)
 
@@ -1476,9 +1513,9 @@ var _ = Describe("CSINodeService", func() {
 					VolumeId:          validBlockVolumeID,
 					StagingTargetPath: nodeStagePrivateDir,
 				})
-				Expect(err.Error()).To(ContainSubstring("could not reliably determine existing mount for path"))
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("could not reliably determine existing mount for path"))
 			})
-			It("should fail, failed to unmount [iSCSI]", func() {
+			ginkgo.It("should fail, failed to unmount [iSCSI]", func() {
 				mountInfo := []gofsutil.Info{
 					{
 						Device: validDevName,
@@ -1493,7 +1530,7 @@ var _ = Describe("CSINodeService", func() {
 				utilMock.On("Unmount", mock.Anything, stagingPath).Return(errors.New("failed unmount"))
 
 				fsMock.On("Remove", stagingPath).Return(nil)
-				fsMock.On("WriteFile", path.Join(nodeSvc.opts.TmpDir, validBaseVolumeID), []byte(validDevName), os.FileMode(0640)).Return(nil)
+				fsMock.On("WriteFile", path.Join(nodeSvc.opts.TmpDir, validBaseVolumeID), []byte(validDevName), os.FileMode(0o640)).Return(nil)
 
 				iscsiConnectorMock.On("DisconnectVolumeByDeviceName", mock.Anything, validDevName).Return(nil)
 
@@ -1504,9 +1541,9 @@ var _ = Describe("CSINodeService", func() {
 					VolumeId:          validBlockVolumeID,
 					StagingTargetPath: nodeStagePrivateDir,
 				})
-				Expect(err.Error()).To(ContainSubstring("could not unmount de"))
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("could not unmount de"))
 			})
-			It("should succeed, without path in mouninfo [iSCSI]", func() {
+			ginkgo.It("should succeed, without path in mouninfo [iSCSI]", func() {
 				mountInfo := []gofsutil.Info{
 					{
 						Device: validDevName,
@@ -1521,7 +1558,7 @@ var _ = Describe("CSINodeService", func() {
 				utilMock.On("Unmount", mock.Anything, stagingPath).Return(nil)
 
 				fsMock.On("Remove", stagingPath).Return(nil)
-				fsMock.On("WriteFile", path.Join(nodeSvc.opts.TmpDir, validBaseVolumeID), []byte(validDevName), os.FileMode(0640)).Return(nil)
+				fsMock.On("WriteFile", path.Join(nodeSvc.opts.TmpDir, validBaseVolumeID), []byte(validDevName), os.FileMode(0o640)).Return(nil)
 
 				iscsiConnectorMock.On("DisconnectVolumeByDeviceName", mock.Anything, validDevName).Return(nil)
 
@@ -1532,10 +1569,10 @@ var _ = Describe("CSINodeService", func() {
 					VolumeId:          validBlockVolumeID,
 					StagingTargetPath: nodeStagePrivateDir,
 				})
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.NodeUnstageVolumeResponse{}))
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.NodeUnstageVolumeResponse{}))
 			})
-			It("should succeed [FC]", func() {
+			ginkgo.It("should succeed [FC]", func() {
 				nodeSvc.useFC = true
 				mountInfo := []gofsutil.Info{
 					{
@@ -1551,7 +1588,7 @@ var _ = Describe("CSINodeService", func() {
 				utilMock.On("Unmount", mock.Anything, stagingPath).Return(nil)
 
 				fsMock.On("Remove", stagingPath).Return(nil)
-				fsMock.On("WriteFile", path.Join(nodeSvc.opts.TmpDir, validBaseVolumeID), []byte(validDevName), os.FileMode(0640)).Return(nil)
+				fsMock.On("WriteFile", path.Join(nodeSvc.opts.TmpDir, validBaseVolumeID), []byte(validDevName), os.FileMode(0o640)).Return(nil)
 
 				fcConnectorMock.On("DisconnectVolumeByDeviceName", mock.Anything, validDevName).Return(nil)
 
@@ -1562,11 +1599,11 @@ var _ = Describe("CSINodeService", func() {
 					VolumeId:          validBlockVolumeID,
 					StagingTargetPath: nodeStagePrivateDir,
 				})
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.NodeUnstageVolumeResponse{}))
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.NodeUnstageVolumeResponse{}))
 			})
 
-			It("should succeed [NVMe]", func() {
+			ginkgo.It("should succeed [NVMe]", func() {
 				nodeSvc.useNVME = true
 				mountInfo := []gofsutil.Info{
 					{
@@ -1582,7 +1619,7 @@ var _ = Describe("CSINodeService", func() {
 				utilMock.On("Unmount", mock.Anything, stagingPath).Return(nil)
 
 				fsMock.On("Remove", stagingPath).Return(nil)
-				fsMock.On("WriteFile", path.Join(nodeSvc.opts.TmpDir, validBaseVolumeID), []byte(validDevName), os.FileMode(0640)).Return(nil)
+				fsMock.On("WriteFile", path.Join(nodeSvc.opts.TmpDir, validBaseVolumeID), []byte(validDevName), os.FileMode(0o640)).Return(nil)
 
 				nvmeConnectorMock.On("DisconnectVolumeByDeviceName", mock.Anything, validDevName).Return(nil)
 
@@ -1593,10 +1630,10 @@ var _ = Describe("CSINodeService", func() {
 					VolumeId:          validBlockVolumeID,
 					StagingTargetPath: nodeStagePrivateDir,
 				})
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.NodeUnstageVolumeResponse{}))
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.NodeUnstageVolumeResponse{}))
 			})
-			It("should succeed, on device or resource busy error", func() {
+			ginkgo.It("should succeed, on device or resource busy error", func() {
 				remnantStagingPath := "/noderoot/" + stagingPath
 				mountInfo := []gofsutil.Info{
 					{
@@ -1620,7 +1657,7 @@ var _ = Describe("CSINodeService", func() {
 				fsMock.On("Remove", stagingPath).Return(nil).Once()
 				fsMock.On("IsNotExist", mock.Anything).Return(false)
 
-				fsMock.On("WriteFile", path.Join(nodeSvc.opts.TmpDir, validBaseVolumeID), []byte(validDevName), os.FileMode(0640)).Return(nil)
+				fsMock.On("WriteFile", path.Join(nodeSvc.opts.TmpDir, validBaseVolumeID), []byte(validDevName), os.FileMode(0o640)).Return(nil)
 
 				iscsiConnectorMock.On("DisconnectVolumeByDeviceName", mock.Anything, validDevName).Return(nil)
 
@@ -1630,12 +1667,12 @@ var _ = Describe("CSINodeService", func() {
 					VolumeId:          validBlockVolumeID,
 					StagingTargetPath: nodeStagePrivateDir,
 				})
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.NodeUnstageVolumeResponse{}))
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.NodeUnstageVolumeResponse{}))
 			})
 		})
-		When("unstaging nfs volume", func() {
-			It("should succeed", func() {
+		ginkgo.When("unstaging nfs volume", func() {
+			ginkgo.It("should succeed", func() {
 				mountInfo := []gofsutil.Info{
 					{
 						Device: validDevName,
@@ -1655,17 +1692,17 @@ var _ = Describe("CSINodeService", func() {
 					VolumeId:          validNfsVolumeID,
 					StagingTargetPath: nodeStagePrivateDir,
 				})
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.NodeUnstageVolumeResponse{}))
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.NodeUnstageVolumeResponse{}))
 			})
 		})
 	})
 
-	Describe("calling NodePublish()", func() {
+	ginkgo.Describe("calling NodePublish()", func() {
 		stagingPath := filepath.Join(validStagingPath, validBaseVolumeID)
 
-		When("publishing block volume as mount", func() {
-			It("should succeed", func() {
+		ginkgo.When("publishing block volume as mount", func() {
+			ginkgo.It("should succeed", func() {
 				fsMock.On("GetUtil").Return(utilMock)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
 				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
@@ -1683,12 +1720,12 @@ var _ = Describe("CSINodeService", func() {
 					VolumeCapability:  getCapabilityWithVoltypeAccessFstype("mount", "single-writer", ""),
 					Readonly:          false,
 				})
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.NodePublishVolumeResponse{}))
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.NodePublishVolumeResponse{}))
 			})
 		})
-		When("publishing block volume as mount with RO", func() {
-			It("should fail", func() {
+		ginkgo.When("publishing block volume as mount with RO", func() {
+			ginkgo.It("should fail", func() {
 				fsMock.On("GetUtil").Return(utilMock)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
 				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
@@ -1706,11 +1743,11 @@ var _ = Describe("CSINodeService", func() {
 					VolumeCapability:  getCapabilityWithVoltypeAccessFstype("mount", "single-writer", ""),
 					Readonly:          true,
 				})
-				Expect(err.Error()).To(ContainSubstring("RO mount required but no fs detected on staged volume"))
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("RO mount required but no fs detected on staged volume"))
 			})
 		})
-		When("publishing block volume as mount with RO, fs exists", func() {
-			It("should succeed", func() {
+		ginkgo.When("publishing block volume as mount with RO, fs exists", func() {
+			ginkgo.It("should succeed", func() {
 				fsMock.On("GetUtil").Return(utilMock)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
 				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
@@ -1728,11 +1765,11 @@ var _ = Describe("CSINodeService", func() {
 					VolumeCapability:  getCapabilityWithVoltypeAccessFstype("mount", "single-writer", "ext4"),
 					Readonly:          true,
 				})
-				Expect(err).To(BeNil())
+				gomega.Expect(err).To(gomega.BeNil())
 			})
 		})
-		When("publishing block volume as mount and unable to create dirs", func() {
-			It("should fail", func() {
+		ginkgo.When("publishing block volume as mount and unable to create dirs", func() {
+			ginkgo.It("should fail", func() {
 				fsMock.On("GetUtil").Return(utilMock)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
 				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
@@ -1750,11 +1787,11 @@ var _ = Describe("CSINodeService", func() {
 					VolumeCapability:  getCapabilityWithVoltypeAccessFstype("mount", "single-writer", ""),
 					Readonly:          false,
 				})
-				Expect(err.Error()).To(ContainSubstring("can't create target dir"))
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("can't create target dir"))
 			})
 		})
-		When("publishing block volume as mount and getformat fails", func() {
-			It("should fail", func() {
+		ginkgo.When("publishing block volume as mount and getformat fails", func() {
+			ginkgo.It("should fail", func() {
 				fsMock.On("GetUtil").Return(utilMock)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
 				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
@@ -1772,11 +1809,11 @@ var _ = Describe("CSINodeService", func() {
 					VolumeCapability:  getCapabilityWithVoltypeAccessFstype("mount", "single-writer", ""),
 					Readonly:          false,
 				})
-				Expect(err.Error()).To(ContainSubstring("error while trying to detect fs"))
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("error while trying to detect fs"))
 			})
 		})
-		When("publishing block volume as mount and disk preformatted", func() {
-			It("should fail", func() {
+		ginkgo.When("publishing block volume as mount and disk preformatted", func() {
+			ginkgo.It("should fail", func() {
 				fsMock.On("GetUtil").Return(utilMock)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
 				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
@@ -1794,11 +1831,11 @@ var _ = Describe("CSINodeService", func() {
 					VolumeCapability:  getCapabilityWithVoltypeAccessFstype("mount", "single-writer", "xfs"),
 					Readonly:          false,
 				})
-				Expect(err.Error()).To(ContainSubstring("Target device already formatted"))
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("Target device already formatted"))
 			})
 		})
-		When("publishing formatting failed", func() {
-			It("should succeed", func() {
+		ginkgo.When("publishing formatting failed", func() {
+			ginkgo.It("should succeed", func() {
 				fsMock.On("GetUtil").Return(utilMock)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
 				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
@@ -1816,11 +1853,11 @@ var _ = Describe("CSINodeService", func() {
 					VolumeCapability:  getCapabilityWithVoltypeAccessFstype("mount", "single-writer", ""),
 					Readonly:          false,
 				})
-				Expect(err.Error()).To(ContainSubstring("can't format staged device"))
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("can't format staged device"))
 			})
 		})
-		When("publishing block volume as raw block", func() {
-			It("should succeed", func() {
+		ginkgo.When("publishing block volume as raw block", func() {
+			ginkgo.It("should succeed", func() {
 				fsMock.On("GetUtil").Return(utilMock)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
 				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
@@ -1836,12 +1873,12 @@ var _ = Describe("CSINodeService", func() {
 					VolumeCapability:  getCapabilityWithVoltypeAccessFstype("block", "single-writer", "ext4"),
 					Readonly:          false,
 				})
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.NodePublishVolumeResponse{}))
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.NodePublishVolumeResponse{}))
 			})
 		})
-		When("publishing block volume as raw block with RO", func() {
-			It("should fail", func() {
+		ginkgo.When("publishing block volume as raw block with RO", func() {
+			ginkgo.It("should fail", func() {
 				fsMock.On("GetUtil").Return(utilMock)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
 				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
@@ -1857,11 +1894,11 @@ var _ = Describe("CSINodeService", func() {
 					VolumeCapability:  getCapabilityWithVoltypeAccessFstype("block", "single-writer", "ext4"),
 					Readonly:          true,
 				})
-				Expect(err.Error()).To(ContainSubstring("read only not supported for Block Volume"))
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("read only not supported for Block Volume"))
 			})
 		})
-		When("publishing block and unable to create target", func() {
-			It("should fail", func() {
+		ginkgo.When("publishing block and unable to create target", func() {
+			ginkgo.It("should fail", func() {
 				fsMock.On("GetUtil").Return(utilMock)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
 				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
@@ -1877,11 +1914,11 @@ var _ = Describe("CSINodeService", func() {
 					VolumeCapability:  getCapabilityWithVoltypeAccessFstype("block", "single-writer", "ext4"),
 					Readonly:          false,
 				})
-				Expect(err.Error()).To(ContainSubstring("can't create target file"))
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("can't create target file"))
 			})
 		})
-		When("publishing block and unable to bind disk", func() {
-			It("should fail", func() {
+		ginkgo.When("publishing block and unable to bind disk", func() {
+			ginkgo.It("should fail", func() {
 				fsMock.On("GetUtil").Return(utilMock)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
 				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
@@ -1897,11 +1934,11 @@ var _ = Describe("CSINodeService", func() {
 					VolumeCapability:  getCapabilityWithVoltypeAccessFstype("block", "single-writer", "ext4"),
 					Readonly:          false,
 				})
-				Expect(err.Error()).To(ContainSubstring("error bind disk"))
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("error bind disk"))
 			})
 		})
-		When("publishing nfs volume", func() {
-			It("should succeed", func() {
+		ginkgo.When("publishing nfs volume", func() {
+			ginkgo.It("should succeed", func() {
 				fsMock.On("GetUtil").Return(utilMock)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
 				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
@@ -1919,12 +1956,12 @@ var _ = Describe("CSINodeService", func() {
 					VolumeCapability:  getCapabilityWithVoltypeAccessFstype("mount", "multi-writer", "nfs"),
 					Readonly:          false,
 				})
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.NodePublishVolumeResponse{}))
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.NodePublishVolumeResponse{}))
 			})
 		})
-		When("No volume ID specified", func() {
-			It("should fail", func() {
+		ginkgo.When("No volume ID specified", func() {
+			ginkgo.It("should fail", func() {
 				res, err := nodeSvc.NodePublishVolume(context.Background(), &csi.NodePublishVolumeRequest{
 					VolumeId:          "",
 					PublishContext:    getValidPublishContext(),
@@ -1933,12 +1970,12 @@ var _ = Describe("CSINodeService", func() {
 					VolumeCapability:  getCapabilityWithVoltypeAccessFstype("block", "single-writer", "ext4"),
 					Readonly:          false,
 				})
-				Expect(err.Error()).To(ContainSubstring("volume ID is required"))
-				Expect(res).To(BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("volume ID is required"))
+				gomega.Expect(res).To(gomega.BeNil())
 			})
 		})
-		When("No target path specified", func() {
-			It("should fail", func() {
+		ginkgo.When("No target path specified", func() {
+			ginkgo.It("should fail", func() {
 				res, err := nodeSvc.NodePublishVolume(context.Background(), &csi.NodePublishVolumeRequest{
 					VolumeId:          validBlockVolumeID,
 					PublishContext:    getValidPublishContext(),
@@ -1947,12 +1984,12 @@ var _ = Describe("CSINodeService", func() {
 					VolumeCapability:  getCapabilityWithVoltypeAccessFstype("block", "single-writer", "ext4"),
 					Readonly:          false,
 				})
-				Expect(err.Error()).To(ContainSubstring("targetPath is required"))
-				Expect(res).To(BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("targetPath is required"))
+				gomega.Expect(res).To(gomega.BeNil())
 			})
 		})
-		When("Invalid volume capabilities specified", func() {
-			It("should fail", func() {
+		ginkgo.When("Invalid volume capabilities specified", func() {
+			ginkgo.It("should fail", func() {
 				res, err := nodeSvc.NodePublishVolume(context.Background(), &csi.NodePublishVolumeRequest{
 					VolumeId:          validBlockVolumeID,
 					PublishContext:    getValidPublishContext(),
@@ -1961,12 +1998,12 @@ var _ = Describe("CSINodeService", func() {
 					VolumeCapability:  nil,
 					Readonly:          false,
 				})
-				Expect(err.Error()).To(ContainSubstring("VolumeCapability is required"))
-				Expect(res).To(BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("VolumeCapability is required"))
+				gomega.Expect(res).To(gomega.BeNil())
 			})
 		})
-		When("No staging target path specified", func() {
-			It("should fail", func() {
+		ginkgo.When("No staging target path specified", func() {
+			ginkgo.It("should fail", func() {
 				res, err := nodeSvc.NodePublishVolume(context.Background(), &csi.NodePublishVolumeRequest{
 					VolumeId:          validBlockVolumeID,
 					PublishContext:    getValidPublishContext(),
@@ -1975,12 +2012,12 @@ var _ = Describe("CSINodeService", func() {
 					VolumeCapability:  getCapabilityWithVoltypeAccessFstype("block", "single-writer", "ext4"),
 					Readonly:          false,
 				})
-				Expect(err.Error()).To(ContainSubstring("stagingPath is required"))
-				Expect(res).To(BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("stagingPath is required"))
+				gomega.Expect(res).To(gomega.BeNil())
 			})
 		})
-		When("unable to create target dir", func() {
-			It("should fail", func() {
+		ginkgo.When("unable to create target dir", func() {
+			ginkgo.It("should fail", func() {
 				fsMock.On("GetUtil").Return(utilMock)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
 				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
@@ -1998,11 +2035,11 @@ var _ = Describe("CSINodeService", func() {
 					VolumeCapability:  getCapabilityWithVoltypeAccessFstype("mount", "multi-writer", "nfs"),
 					Readonly:          true,
 				})
-				Expect(err.Error()).To(ContainSubstring("can't create target folder"))
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("can't create target folder"))
 			})
 		})
-		When("publishing nfs with ro", func() {
-			It("should succeed", func() {
+		ginkgo.When("publishing nfs with ro", func() {
+			ginkgo.It("should succeed", func() {
 				fsMock.On("GetUtil").Return(utilMock)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
 				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
@@ -2020,12 +2057,12 @@ var _ = Describe("CSINodeService", func() {
 					VolumeCapability:  getCapabilityWithVoltypeAccessFstype("mount", "multi-writer", "nfs"),
 					Readonly:          true,
 				})
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.NodePublishVolumeResponse{}))
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.NodePublishVolumeResponse{}))
 			})
 		})
-		When("unable to bind disk", func() {
-			It("should fail", func() {
+		ginkgo.When("unable to bind disk", func() {
+			ginkgo.It("should fail", func() {
 				fsMock.On("GetUtil").Return(utilMock)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
 				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
@@ -2043,14 +2080,14 @@ var _ = Describe("CSINodeService", func() {
 					VolumeCapability:  getCapabilityWithVoltypeAccessFstype("mount", "multi-writer", "nfs"),
 					Readonly:          true,
 				})
-				Expect(err.Error()).To(ContainSubstring("error bind disk"))
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("error bind disk"))
 			})
 		})
 	})
 
-	Describe("calling NodeUnpublish()", func() {
-		When("unpublishing block volume", func() {
-			It("should succeed", func() {
+	ginkgo.Describe("calling NodeUnpublish()", func() {
+		ginkgo.When("unpublishing block volume", func() {
+			ginkgo.It("should succeed", func() {
 				mountInfo := []gofsutil.Info{
 					{
 						Device: validDevName,
@@ -2069,12 +2106,12 @@ var _ = Describe("CSINodeService", func() {
 					VolumeId:   validBlockVolumeID,
 					TargetPath: validTargetPath,
 				})
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.NodeUnpublishVolumeResponse{}))
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.NodeUnpublishVolumeResponse{}))
 			})
 		})
-		When("unpublishing nfs volume", func() {
-			It("should succeed", func() {
+		ginkgo.When("unpublishing nfs volume", func() {
+			ginkgo.It("should succeed", func() {
 				mountInfo := []gofsutil.Info{
 					{
 						Device: validDevName,
@@ -2093,34 +2130,32 @@ var _ = Describe("CSINodeService", func() {
 					VolumeId:   validNfsVolumeID,
 					TargetPath: validTargetPath,
 				})
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.NodeUnpublishVolumeResponse{}))
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.NodeUnpublishVolumeResponse{}))
 			})
 		})
-		When("No target path specified", func() {
-			It("should fail", func() {
-
+		ginkgo.When("No target path specified", func() {
+			ginkgo.It("should fail", func() {
 				res, err := nodeSvc.NodeUnpublishVolume(context.Background(), &csi.NodeUnpublishVolumeRequest{
 					VolumeId:   validBlockVolumeID,
 					TargetPath: "",
 				})
-				Expect(err.Error()).To(Equal("rpc error: code = InvalidArgument desc = target path required"))
-				Expect(res).To(BeNil())
+				gomega.Expect(err.Error()).To(gomega.Equal("rpc error: code = InvalidArgument desc = target path required"))
+				gomega.Expect(res).To(gomega.BeNil())
 			})
 		})
-		When("Unable to get volID", func() {
-			It("should fail", func() {
-
+		ginkgo.When("Unable to get volID", func() {
+			ginkgo.It("should fail", func() {
 				res, err := nodeSvc.NodeUnpublishVolume(context.Background(), &csi.NodeUnpublishVolumeRequest{
 					VolumeId:   "",
 					TargetPath: validTargetPath,
 				})
-				Expect(err.Error()).To(Equal("rpc error: code = InvalidArgument desc = volume ID is required"))
-				Expect(res).To(BeNil())
+				gomega.Expect(err.Error()).To(gomega.Equal("rpc error: code = InvalidArgument desc = volume ID is required"))
+				gomega.Expect(res).To(gomega.BeNil())
 			})
 		})
-		When("Unable to get TargetMounts", func() {
-			It("should fail", func() {
+		ginkgo.When("Unable to get TargetMounts", func() {
+			ginkgo.It("should fail", func() {
 				fsMock.On("GetUtil").Return(utilMock)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
 				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return(nil, errors.New("error"))
@@ -2129,12 +2164,12 @@ var _ = Describe("CSINodeService", func() {
 					VolumeId:   validBlockVolumeID,
 					TargetPath: validTargetPath,
 				})
-				Expect(err.Error()).To(ContainSubstring("could not reliably determine existing mount status"))
-				Expect(res).To(BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("could not reliably determine existing mount status"))
+				gomega.Expect(res).To(gomega.BeNil())
 			})
 		})
-		When("Unable to perform unmount", func() {
-			It("should fail", func() {
+		ginkgo.When("Unable to perform unmount", func() {
+			ginkgo.It("should fail", func() {
 				mountInfo := []gofsutil.Info{
 					{
 						Device: validDevName,
@@ -2152,17 +2187,16 @@ var _ = Describe("CSINodeService", func() {
 					VolumeId:   validBlockVolumeID,
 					TargetPath: validTargetPath,
 				})
-				Expect(err.Error()).To(ContainSubstring("could not unmount dev"))
-				Expect(res).To(BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("could not unmount dev"))
+				gomega.Expect(res).To(gomega.BeNil())
 			})
 		})
 	})
 
-	Describe("calling NodeExpandVolume() online", func() {
+	ginkgo.Describe("calling NodeExpandVolume() online", func() {
 		stagingPath := filepath.Join(validStagingPath, validBaseVolumeID)
-		When("everything is correct", func() {
-			It("should succeed [ext4]", func() {
-
+		ginkgo.When("everything is correct", func() {
+			ginkgo.It("should succeed [ext4]", func() {
 				fsMock.On("GetUtil").Return(utilMock)
 				clientMock.On("GetVolume", mock.Anything, mock.Anything).Return(gopowerstore.Volume{
 					Description: "",
@@ -2180,11 +2214,10 @@ var _ = Describe("CSINodeService", func() {
 				fsMock.On("ExecCommandOutput", mock.Anything, mock.Anything, mock.Anything).Return([]byte("version 5.0.0"), nil)
 				utilMock.On("ResizeFS", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 				res, err := nodeSvc.NodeExpandVolume(context.Background(), getNodeVolumeExpandValidRequest(validBlockVolumeID, false))
-				Ω(err).To(BeNil())
-				Ω(res).To(Equal(&csi.NodeExpandVolumeResponse{}))
+				gomega.Ω(err).To(gomega.BeNil())
+				gomega.Ω(res).To(gomega.Equal(&csi.NodeExpandVolumeResponse{}))
 			})
-			It("should succeed [xfs]", func() {
-
+			ginkgo.It("should succeed [xfs]", func() {
 				fsMock.On("GetUtil").Return(utilMock)
 				clientMock.On("GetVolume", mock.Anything, mock.Anything).Return(gopowerstore.Volume{
 					Description: "",
@@ -2202,12 +2235,12 @@ var _ = Describe("CSINodeService", func() {
 				fsMock.On("ExecCommandOutput", mock.Anything, mock.Anything, mock.Anything).Return([]byte("version 5.0.0"), nil)
 				utilMock.On("ResizeFS", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 				res, err := nodeSvc.NodeExpandVolume(context.Background(), getNodeVolumeExpandValidRequest(validBlockVolumeID, false))
-				Ω(err).To(BeNil())
-				Ω(res).To(Equal(&csi.NodeExpandVolumeResponse{}))
+				gomega.Ω(err).To(gomega.BeNil())
+				gomega.Ω(res).To(gomega.Equal(&csi.NodeExpandVolumeResponse{}))
 			})
 		})
-		When("it failed to find mount info", func() {
-			It("should fail ResizeFS() [xfs]", func() {
+		ginkgo.When("it failed to find mount info", func() {
+			ginkgo.It("should fail ResizeFS() [xfs]", func() {
 				fsMock.On("GetUtil").Return(utilMock)
 				clientMock.On("GetVolume", mock.Anything, mock.Anything).Return(gopowerstore.Volume{
 					Description: "",
@@ -2225,10 +2258,10 @@ var _ = Describe("CSINodeService", func() {
 				fsMock.On("ExecCommandOutput", mock.Anything, mock.Anything, mock.Anything).Return([]byte("version 5.0.0"), nil)
 				utilMock.On("ResizeFS", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(errors.New("resize Failed ext4"))
 				res, err := nodeSvc.NodeExpandVolume(context.Background(), getNodeVolumeExpandValidRequest(validBlockVolumeID, false))
-				Ω(err.Error()).To(ContainSubstring("resize Failed ext4"))
-				Ω(res).To(BeNil())
+				gomega.Ω(err.Error()).To(gomega.ContainSubstring("resize Failed ext4"))
+				gomega.Ω(res).To(gomega.BeNil())
 			})
-			It("should fail ResizeFS() [ext4]", func() {
+			ginkgo.It("should fail ResizeFS() [ext4]", func() {
 				fsMock.On("GetUtil").Return(utilMock)
 				clientMock.On("GetVolume", mock.Anything, mock.Anything).Return(gopowerstore.Volume{
 					Description: "",
@@ -2247,18 +2280,16 @@ var _ = Describe("CSINodeService", func() {
 				fsMock.On("ExecCommandOutput", mock.Anything, mock.Anything, mock.Anything).Return([]byte("version 5.0.0"), nil)
 				utilMock.On("ResizeFS", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(errors.New("resize Failed xfs"))
 				res, err := nodeSvc.NodeExpandVolume(context.Background(), getNodeVolumeExpandValidRequest(validBlockVolumeID, false))
-				Ω(err.Error()).To(ContainSubstring("resize Failed xfs"))
-				Ω(res).To(BeNil())
+				gomega.Ω(err.Error()).To(gomega.ContainSubstring("resize Failed xfs"))
+				gomega.Ω(res).To(gomega.BeNil())
 			})
 		})
-
 	})
 
-	Describe("calling NodeExpandVolume() offline", func() {
+	ginkgo.Describe("calling NodeExpandVolume() offline", func() {
 		stagingPath := filepath.Join(validStagingPath, validBaseVolumeID)
-		When("everything is correct", func() {
-			It("should succeed [ext4]", func() {
-
+		ginkgo.When("everything is correct", func() {
+			ginkgo.It("should succeed [ext4]", func() {
 				fsMock.On("GetUtil").Return(utilMock)
 				clientMock.On("GetVolume", mock.Anything, mock.Anything).Return(gopowerstore.Volume{
 					Description: "",
@@ -2287,13 +2318,12 @@ var _ = Describe("CSINodeService", func() {
 				fsMock.On("ExecCommandOutput", mock.Anything, mock.Anything, mock.Anything).Return([]byte("version 5.0.0"), nil)
 				utilMock.On("ResizeFS", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 				res, err := nodeSvc.NodeExpandVolume(context.Background(), getNodeVolumeExpandValidRequest(validBlockVolumeID, false))
-				Ω(err).To(BeNil())
-				Ω(res).To(Equal(&csi.NodeExpandVolumeResponse{}))
+				gomega.Ω(err).To(gomega.BeNil())
+				gomega.Ω(res).To(gomega.Equal(&csi.NodeExpandVolumeResponse{}))
 			})
 		})
-		When("using multipath", func() {
-			It("should succeed [ext4]", func() {
-
+		ginkgo.When("using multipath", func() {
+			ginkgo.It("should succeed [ext4]", func() {
 				fsMock.On("GetUtil").Return(utilMock)
 				clientMock.On("GetVolume", mock.Anything, mock.Anything).Return(gopowerstore.Volume{
 					Description: "",
@@ -2323,13 +2353,12 @@ var _ = Describe("CSINodeService", func() {
 				fsMock.On("ExecCommandOutput", mock.Anything, mock.Anything, mock.Anything).Return([]byte("version 5.0.0"), nil)
 				utilMock.On("ResizeFS", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 				res, err := nodeSvc.NodeExpandVolume(context.Background(), getNodeVolumeExpandValidRequest(validBlockVolumeID, false))
-				Ω(err).To(BeNil())
-				Ω(res).To(Equal(&csi.NodeExpandVolumeResponse{}))
+				gomega.Ω(err).To(gomega.BeNil())
+				gomega.Ω(res).To(gomega.Equal(&csi.NodeExpandVolumeResponse{}))
 			})
 		})
-		When("using block mode", func() {
-			It("should succeed [ext4]", func() {
-
+		ginkgo.When("using block mode", func() {
+			ginkgo.It("should succeed [ext4]", func() {
 				fsMock.On("GetUtil").Return(utilMock)
 
 				clientMock.On("GetVolume", mock.Anything, mock.Anything).Return(gopowerstore.Volume{
@@ -2349,12 +2378,12 @@ var _ = Describe("CSINodeService", func() {
 				utilMock.On("GetMpathNameFromDevice", mock.Anything, mock.Anything).Return("mpatha", nil)
 				utilMock.On("ResizeMultipath", mock.Anything, mock.Anything).Return(nil)
 				res, err := nodeSvc.NodeExpandVolume(context.Background(), getNodeVolumeExpandValidRequest(validBlockVolumeID, true))
-				Ω(err).To(BeNil())
-				Ω(res).To(Equal(&csi.NodeExpandVolumeResponse{}))
+				gomega.Ω(err).To(gomega.BeNil())
+				gomega.Ω(res).To(gomega.Equal(&csi.NodeExpandVolumeResponse{}))
 			})
 		})
-		When("Unable to parse volid", func() {
-			It("should fail", func() {
+		ginkgo.When("Unable to parse volid", func() {
+			ginkgo.It("should fail", func() {
 				clientMock.On("GetVolume", mock.Anything, mock.Anything).Return(gopowerstore.Volume{
 					Description: "",
 					ID:          validBlockVolumeID,
@@ -2363,13 +2392,11 @@ var _ = Describe("CSINodeService", func() {
 					Wwn:         "naa.6090a038f0cd4e5bdaa8248e6856d4fe:3",
 				}, nil)
 				_, err := nodeSvc.NodeExpandVolume(context.Background(), getNodeVolumeExpandValidRequest("", true))
-				Ω(err.Error()).To(ContainSubstring("incorrect volume id"))
-
+				gomega.Ω(err.Error()).To(gomega.ContainSubstring("incorrect volume id"))
 			})
 		})
-		When("no target path", func() {
-			It("should fail", func() {
-
+		ginkgo.When("no target path", func() {
+			ginkgo.It("should fail", func() {
 				fsMock.On("GetUtil").Return(utilMock)
 
 				clientMock.On("GetVolume", mock.Anything, mock.Anything).Return(gopowerstore.Volume{
@@ -2388,13 +2415,11 @@ var _ = Describe("CSINodeService", func() {
 						LimitBytes:    controller.MaxVolumeSizeBytes,
 					},
 				})
-				Ω(err.Error()).To(ContainSubstring("targetPath is required"))
-
+				gomega.Ω(err.Error()).To(gomega.ContainSubstring("targetPath is required"))
 			})
 		})
-		When("volume is not found", func() {
-			It("should fail", func() {
-
+		ginkgo.When("volume is not found", func() {
+			ginkgo.It("should fail", func() {
 				fsMock.On("GetUtil").Return(utilMock)
 
 				clientMock.On("GetVolume", mock.Anything, mock.Anything).Return(gopowerstore.Volume{
@@ -2413,13 +2438,11 @@ var _ = Describe("CSINodeService", func() {
 						LimitBytes:    controller.MaxVolumeSizeBytes,
 					},
 				})
-				Ω(err.Error()).To(ContainSubstring("Volume not found"))
-
+				gomega.Ω(err.Error()).To(gomega.ContainSubstring("Volume not found"))
 			})
 		})
-		When("Unable to create mount target", func() {
-			It("should fail", func() {
-
+		ginkgo.When("Unable to create mount target", func() {
+			ginkgo.It("should fail", func() {
 				fsMock.On("GetUtil").Return(utilMock)
 				clientMock.On("GetVolume", mock.Anything, mock.Anything).Return(gopowerstore.Volume{
 					Description: "",
@@ -2434,13 +2457,11 @@ var _ = Describe("CSINodeService", func() {
 				}, errors.New("offline")).Times(1)
 				fsMock.On("MkdirAll", mock.Anything, mock.Anything).Return(errors.New("Unable to create dirs"))
 				_, err := nodeSvc.NodeExpandVolume(context.Background(), getNodeVolumeExpandValidRequest(validBlockVolumeID, false))
-				Ω(err.Error()).To(ContainSubstring("Failed to find mount info for"))
-
+				gomega.Ω(err.Error()).To(gomega.ContainSubstring("Failed to find mount info for"))
 			})
 		})
-		When("Unable to perform mount", func() {
-			It("should fail", func() {
-
+		ginkgo.When("Unable to perform mount", func() {
+			ginkgo.It("should fail", func() {
 				fsMock.On("GetUtil").Return(utilMock)
 				clientMock.On("GetVolume", mock.Anything, mock.Anything).Return(gopowerstore.Volume{
 					Description: "",
@@ -2456,13 +2477,11 @@ var _ = Describe("CSINodeService", func() {
 				fsMock.On("MkdirAll", mock.Anything, mock.Anything).Return(nil)
 				utilMock.On("Mount", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(errors.New("bad mount"))
 				_, err := nodeSvc.NodeExpandVolume(context.Background(), getNodeVolumeExpandValidRequest(validBlockVolumeID, false))
-				Ω(err.Error()).To(ContainSubstring("Failed to find mount info for"))
-
+				gomega.Ω(err.Error()).To(gomega.ContainSubstring("Failed to find mount info for"))
 			})
 		})
-		When("Unable to perform unmount", func() {
-			It("should succeed", func() {
-
+		ginkgo.When("Unable to perform unmount", func() {
+			ginkgo.It("should succeed", func() {
 				fsMock.On("GetUtil").Return(utilMock)
 				clientMock.On("GetVolume", mock.Anything, mock.Anything).Return(gopowerstore.Volume{
 					Description: "",
@@ -2492,14 +2511,12 @@ var _ = Describe("CSINodeService", func() {
 				fsMock.On("ExecCommandOutput", mock.Anything, mock.Anything, mock.Anything).Return([]byte("version 5.0.0"), nil)
 				utilMock.On("ResizeFS", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 				res, err := nodeSvc.NodeExpandVolume(context.Background(), getNodeVolumeExpandValidRequest(validBlockVolumeID, false))
-				Ω(err).To(BeNil())
-				Ω(res).To(Equal(&csi.NodeExpandVolumeResponse{}))
-
+				gomega.Ω(err).To(gomega.BeNil())
+				gomega.Ω(res).To(gomega.Equal(&csi.NodeExpandVolumeResponse{}))
 			})
 		})
-		When("Unable to find mount info", func() {
-			It("should fail", func() {
-
+		ginkgo.When("Unable to find mount info", func() {
+			ginkgo.It("should fail", func() {
 				fsMock.On("GetUtil").Return(utilMock)
 				clientMock.On("GetVolume", mock.Anything, mock.Anything).Return(gopowerstore.Volume{
 					Description: "",
@@ -2524,13 +2541,11 @@ var _ = Describe("CSINodeService", func() {
 				}, errors.New("again")).Times(1)
 
 				_, err := nodeSvc.NodeExpandVolume(context.Background(), getNodeVolumeExpandValidRequest(validBlockVolumeID, false))
-				Ω(err.Error()).To(ContainSubstring("Failed to find mount info for"))
-
+				gomega.Ω(err.Error()).To(gomega.ContainSubstring("Failed to find mount info for"))
 			})
 		})
-		When("Unable to rescan the device", func() {
-			It("should fail", func() {
-
+		ginkgo.When("Unable to rescan the device", func() {
+			ginkgo.It("should fail", func() {
 				fsMock.On("GetUtil").Return(utilMock)
 				clientMock.On("GetVolume", mock.Anything, mock.Anything).Return(gopowerstore.Volume{
 					Description: "",
@@ -2555,13 +2570,11 @@ var _ = Describe("CSINodeService", func() {
 				}, nil).Times(1)
 				utilMock.On("DeviceRescan", mock.Anything, mock.Anything).Return(errors.New("Failed to rescan device"))
 				_, err := nodeSvc.NodeExpandVolume(context.Background(), getNodeVolumeExpandValidRequest(validBlockVolumeID, false))
-				Ω(err.Error()).To(ContainSubstring("Failed to rescan device"))
-
+				gomega.Ω(err.Error()).To(gomega.ContainSubstring("Failed to rescan device"))
 			})
 		})
-		When("Unable to resize mpath", func() {
-			It("should fail", func() {
-
+		ginkgo.When("Unable to resize mpath", func() {
+			ginkgo.It("should fail", func() {
 				fsMock.On("GetUtil").Return(utilMock)
 				clientMock.On("GetVolume", mock.Anything, mock.Anything).Return(gopowerstore.Volume{
 					Description: "",
@@ -2587,15 +2600,14 @@ var _ = Describe("CSINodeService", func() {
 				utilMock.On("DeviceRescan", mock.Anything, mock.Anything).Return(nil)
 				utilMock.On("ResizeMultipath", mock.Anything, mock.Anything).Return(errors.New("mpath resize error"))
 				_, err := nodeSvc.NodeExpandVolume(context.Background(), getNodeVolumeExpandValidRequest(validBlockVolumeID, false))
-				Ω(err.Error()).To(ContainSubstring("mpath resize error"))
-
+				gomega.Ω(err.Error()).To(gomega.ContainSubstring("mpath resize error"))
 			})
 		})
 	})
 
-	Describe("Calling EphemeralNodePublish()", func() {
-		When("everything's correct", func() {
-			It("should succeed", func() {
+	ginkgo.Describe("Calling EphemeralNodePublish()", func() {
+		ginkgo.When("everything's correct", func() {
+			ginkgo.It("should succeed", func() {
 				fsMock.On("Stat", mock.Anything).Return(&mocks.FileInfo{}, nil)
 				fsMock.On("MkdirAll", mock.Anything, mock.Anything).Return(nil).Times(2)
 				fsMock.On("Create", mock.Anything).Return(&os.File{}, nil)
@@ -2647,13 +2659,13 @@ var _ = Describe("CSINodeService", func() {
 						"size":                         "2Gi",
 					},
 				})
-				Ω(err).To(BeNil())
-				Ω(res).To(Equal(&csi.NodePublishVolumeResponse{}))
+				gomega.Ω(err).To(gomega.BeNil())
+				gomega.Ω(res).To(gomega.Equal(&csi.NodePublishVolumeResponse{}))
 			})
 		})
-		When("Child ControllerPublish() is failing", func() {
+		ginkgo.When("Child ControllerPublish() is failing", func() {
 			capabilities := getCapabilityWithVoltypeAccessFstype("mount", "single-writer", "ext4")
-			It("should cleanup and call unpublish", func() {
+			ginkgo.It("should cleanup and call unpublish", func() {
 				fsMock.On("Stat", mock.Anything).Return(&mocks.FileInfo{}, nil)
 				fsMock.On("MkdirAll", mock.Anything, mock.Anything).Return(nil).Times(2)
 				fsMock.On("Create", mock.Anything).Return(&os.File{}, nil)
@@ -2664,7 +2676,8 @@ var _ = Describe("CSINodeService", func() {
 					VolumeCapabilities: []*csi.VolumeCapability{capabilities},
 					Parameters: map[string]string{
 						"csi.storage.k8s.io/ephemeral": "true",
-						"size":                         "2Gi"},
+						"size":                         "2Gi",
+					},
 				}).Return(&csi.CreateVolumeResponse{
 					Volume: &csi.Volume{
 						CapacityBytes: validVolSize,
@@ -2719,11 +2732,11 @@ var _ = Describe("CSINodeService", func() {
 						"size":                         "2Gi",
 					},
 				})
-				Ω(err.Error()).To(ContainSubstring("inline ephemeral controller publish failed"))
+				gomega.Ω(err.Error()).To(gomega.ContainSubstring("inline ephemeral controller publish failed"))
 			})
 		})
-		When("Child NodeStage() is failing", func() {
-			It("should cleanup and call unpublish", func() {
+		ginkgo.When("Child NodeStage() is failing", func() {
+			ginkgo.It("should cleanup and call unpublish", func() {
 				fsMock.On("Stat", mock.Anything).Return(&mocks.FileInfo{}, nil)
 				fsMock.On("MkdirAll", mock.Anything, mock.Anything).Return(nil).Times(2)
 				fsMock.On("Create", mock.Anything).Return(&os.File{}, nil)
@@ -2786,11 +2799,11 @@ var _ = Describe("CSINodeService", func() {
 						"size":                         "2Gi",
 					},
 				})
-				Ω(err.Error()).To(ContainSubstring("inline ephemeral node stage failed"))
+				gomega.Ω(err.Error()).To(gomega.ContainSubstring("inline ephemeral node stage failed"))
 			})
 		})
-		When("Failed to parse size. Bad string", func() {
-			It("should fail", func() {
+		ginkgo.When("Failed to parse size. Bad string", func() {
+			ginkgo.It("should fail", func() {
 				fsMock.On("Stat", mock.Anything).Return(&mocks.FileInfo{}, nil)
 				fsMock.On("MkdirAll", mock.Anything, mock.Anything).Return(nil).Times(2)
 				_, err := nodeSvc.NodePublishVolume(context.Background(), &csi.NodePublishVolumeRequest{
@@ -2805,11 +2818,11 @@ var _ = Describe("CSINodeService", func() {
 						"size":                         "Dear SP please give me enough capacity",
 					},
 				})
-				Ω(err.Error()).To(ContainSubstring("inline ephemeral parse size failed"))
+				gomega.Ω(err.Error()).To(gomega.ContainSubstring("inline ephemeral parse size failed"))
 			})
 		})
-		When("Failed to create mount paths", func() {
-			It("should fail", func() {
+		ginkgo.When("Failed to create mount paths", func() {
+			ginkgo.It("should fail", func() {
 				fsMock.On("Stat", mock.Anything).Return(&mocks.FileInfo{}, os.ErrNotExist)
 				fsMock.On("MkdirAll", mock.Anything, mock.Anything).Return(errors.New("err")).Times(2)
 				_, err := nodeSvc.NodePublishVolume(context.Background(), &csi.NodePublishVolumeRequest{
@@ -2824,11 +2837,11 @@ var _ = Describe("CSINodeService", func() {
 						"size":                         "2 Gi",
 					},
 				})
-				Ω(err.Error()).To(ContainSubstring("Unable to create directory for mounting ephemeral volumes"))
+				gomega.Ω(err.Error()).To(gomega.ContainSubstring("Unable to create directory for mounting ephemeral volumes"))
 			})
 		})
-		When("Inline ephemeral create volume fails", func() {
-			It("should fail", func() {
+		ginkgo.When("Inline ephemeral create volume fails", func() {
+			ginkgo.It("should fail", func() {
 				fsMock.On("Stat", mock.Anything).Return(&mocks.FileInfo{}, nil)
 				fsMock.On("MkdirAll", mock.Anything, mock.Anything).Return(nil).Times(2)
 				fsMock.On("Create", mock.Anything).Return(&os.File{}, nil)
@@ -2854,11 +2867,11 @@ var _ = Describe("CSINodeService", func() {
 						"size":                         "2 Gi",
 					},
 				})
-				Ω(err.Error()).To(ContainSubstring("inline ephemeral create volume failed"))
+				gomega.Ω(err.Error()).To(gomega.ContainSubstring("inline ephemeral create volume failed"))
 			})
 		})
-		When("fs.Create after createVolume fails", func() {
-			It("should fail", func() {
+		ginkgo.When("fs.Create after createVolume fails", func() {
+			ginkgo.It("should fail", func() {
 				fsMock.On("Stat", mock.Anything).Return(&mocks.FileInfo{}, nil)
 				fsMock.On("MkdirAll", mock.Anything, mock.Anything).Return(nil).Times(2)
 				fsMock.On("Create", mock.Anything).Return(&os.File{}, errors.New("Failed to create"))
@@ -2884,11 +2897,11 @@ var _ = Describe("CSINodeService", func() {
 						"size":                         "2 Gi",
 					},
 				})
-				Ω(err.Error()).To(ContainSubstring("Failed to create"))
+				gomega.Ω(err.Error()).To(gomega.ContainSubstring("Failed to create"))
 			})
 		})
-		When("fs.Writestring fails", func() {
-			It("should fail", func() {
+		ginkgo.When("fs.Writestring fails", func() {
+			ginkgo.It("should fail", func() {
 				fsMock.On("Stat", mock.Anything).Return(&mocks.FileInfo{}, nil)
 				fsMock.On("MkdirAll", mock.Anything, mock.Anything).Return(nil).Times(2)
 				fsMock.On("Create", mock.Anything).Return(&os.File{}, nil)
@@ -2914,12 +2927,12 @@ var _ = Describe("CSINodeService", func() {
 						"size":                         "2 Gi",
 					},
 				})
-				Ω(err.Error()).To(ContainSubstring("Failed to write string"))
+				gomega.Ω(err.Error()).To(gomega.ContainSubstring("Failed to write string"))
 			})
 		})
 	})
-	When("everything's correct", func() {
-		It("should succeed", func() {
+	ginkgo.When("everything's correct", func() {
+		ginkgo.It("should succeed", func() {
 			fsMock.On("Stat", mock.Anything).Return(&mocks.FileInfo{}, nil)
 			fsMock.On("MkdirAll", mock.Anything, mock.Anything).Return(nil).Times(2)
 			fsMock.On("Create", mock.Anything).Return(&os.File{}, nil)
@@ -2971,13 +2984,13 @@ var _ = Describe("CSINodeService", func() {
 					"size":                         "2Gi",
 				},
 			})
-			Ω(err.Error()).To(ContainSubstring("inline ephemeral node publish failed"))
+			gomega.Ω(err.Error()).To(gomega.ContainSubstring("inline ephemeral node publish failed"))
 		})
 	})
 
-	Describe("Calling EphemeralNodeUnPublish()", func() {
-		When("everything is correct", func() {
-			It("should succeed", func() {
+	ginkgo.Describe("Calling EphemeralNodeUnPublish()", func() {
+		ginkgo.When("everything is correct", func() {
+			ginkgo.It("should succeed", func() {
 				mountInfo := []gofsutil.Info{
 					{
 						Device: validDevName,
@@ -2994,7 +3007,7 @@ var _ = Describe("CSINodeService", func() {
 				utilMock.On("Unmount", mock.Anything, mock.Anything).Return(nil)
 
 				fsMock.On("Remove", mock.Anything).Return(nil)
-				fsMock.On("WriteFile", mock.Anything, mock.Anything, os.FileMode(0640)).Return(nil)
+				fsMock.On("WriteFile", mock.Anything, mock.Anything, os.FileMode(0o640)).Return(nil)
 
 				iscsiConnectorMock.On("DisconnectVolumeByDeviceName", mock.Anything, mock.Anything).Return(nil)
 
@@ -3012,12 +3025,12 @@ var _ = Describe("CSINodeService", func() {
 					VolumeId:   validBlockVolumeID,
 					TargetPath: validTargetPath,
 				})
-				Ω(err).To(BeNil())
-				Ω(res).To(Equal(&csi.NodeUnpublishVolumeResponse{}))
+				gomega.Ω(err).To(gomega.BeNil())
+				gomega.Ω(res).To(gomega.Equal(&csi.NodeUnpublishVolumeResponse{}))
 			})
 		})
-		When("no vlocak file", func() {
-			It("should fail", func() {
+		ginkgo.When("no vlocak file", func() {
+			ginkgo.It("should fail", func() {
 				mountInfo := []gofsutil.Info{
 					{
 						Device: validDevName,
@@ -3036,11 +3049,11 @@ var _ = Describe("CSINodeService", func() {
 					VolumeId:   validBlockVolumeID,
 					TargetPath: validTargetPath,
 				})
-				Ω(err.Error()).To(ContainSubstring("Was unable to read lockfile"))
+				gomega.Ω(err.Error()).To(gomega.ContainSubstring("Was unable to read lockfile"))
 			})
 		})
-		When("controller unpublish fails", func() {
-			It("should fail", func() {
+		ginkgo.When("controller unpublish fails", func() {
+			ginkgo.It("should fail", func() {
 				mountInfo := []gofsutil.Info{
 					{
 						Device: validDevName,
@@ -3057,7 +3070,7 @@ var _ = Describe("CSINodeService", func() {
 				utilMock.On("Unmount", mock.Anything, mock.Anything).Return(nil)
 
 				fsMock.On("Remove", mock.Anything).Return(nil)
-				fsMock.On("WriteFile", mock.Anything, mock.Anything, os.FileMode(0640)).Return(nil)
+				fsMock.On("WriteFile", mock.Anything, mock.Anything, os.FileMode(0o640)).Return(nil)
 
 				iscsiConnectorMock.On("DisconnectVolumeByDeviceName", mock.Anything, mock.Anything).Return(nil)
 
@@ -3075,11 +3088,11 @@ var _ = Describe("CSINodeService", func() {
 					VolumeId:   validBlockVolumeID,
 					TargetPath: validTargetPath,
 				})
-				Ω(err.Error()).To(ContainSubstring("Inline ephemeral controller unpublish"))
+				gomega.Ω(err.Error()).To(gomega.ContainSubstring("Inline ephemeral controller unpublish"))
 			})
 		})
-		When("controller delete volume fails", func() {
-			It("should fail", func() {
+		ginkgo.When("controller delete volume fails", func() {
+			ginkgo.It("should fail", func() {
 				mountInfo := []gofsutil.Info{
 					{
 						Device: validDevName,
@@ -3096,7 +3109,7 @@ var _ = Describe("CSINodeService", func() {
 				utilMock.On("Unmount", mock.Anything, mock.Anything).Return(nil)
 
 				fsMock.On("Remove", mock.Anything).Return(nil)
-				fsMock.On("WriteFile", mock.Anything, mock.Anything, os.FileMode(0640)).Return(nil)
+				fsMock.On("WriteFile", mock.Anything, mock.Anything, os.FileMode(0o640)).Return(nil)
 
 				iscsiConnectorMock.On("DisconnectVolumeByDeviceName", mock.Anything, mock.Anything).Return(nil)
 
@@ -3114,14 +3127,14 @@ var _ = Describe("CSINodeService", func() {
 					VolumeId:   validBlockVolumeID,
 					TargetPath: validTargetPath,
 				})
-				Ω(err.Error()).To(ContainSubstring("failed"))
+				gomega.Ω(err.Error()).To(gomega.ContainSubstring("failed"))
 			})
 		})
 	})
 
-	Describe("calling NodeGetInfo()", func() {
-		When("managing multiple arrays", func() {
-			It("should return correct topology segments", func() {
+	ginkgo.Describe("calling NodeGetInfo()", func() {
+		ginkgo.When("managing multiple arrays", func() {
+			ginkgo.It("should return correct topology segments", func() {
 				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
 					Return([]gopowerstore.IPPoolAddress{
 						{
@@ -3141,8 +3154,8 @@ var _ = Describe("CSINodeService", func() {
 				setDefaultNodeLabelsRetrieverMock()
 
 				res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.NodeGetInfoResponse{
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.NodeGetInfoResponse{
 					NodeId: nodeSvc.nodeID,
 					AccessibleTopology: &csi.Topology{
 						Segments: map[string]string{
@@ -3156,8 +3169,8 @@ var _ = Describe("CSINodeService", func() {
 			})
 		})
 
-		When("node label max-powerstore-volumes-per-node is set and retrieved successfully", func() {
-			It("should return correct MaxVolumesPerNode in response", func() {
+		ginkgo.When("node label max-powerstore-volumes-per-node is set and retrieved successfully", func() {
+			ginkgo.It("should return correct MaxVolumesPerNode in response", func() {
 				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
 					Return([]gopowerstore.IPPoolAddress{
 						{
@@ -3180,8 +3193,8 @@ var _ = Describe("CSINodeService", func() {
 				nodeLabelsRetrieverMock.On("NewForConfig", mock.Anything).Return(nil, nil)
 
 				res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.NodeGetInfoResponse{
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.NodeGetInfoResponse{
 					NodeId: nodeSvc.nodeID,
 					AccessibleTopology: &csi.Topology{
 						Segments: map[string]string{
@@ -3195,8 +3208,8 @@ var _ = Describe("CSINodeService", func() {
 			})
 		})
 
-		When("there is some issue while retrieving node labels", func() {
-			It("should return proper error", func() {
+		ginkgo.When("there is some issue while retrieving node labels", func() {
+			ginkgo.It("should return proper error", func() {
 				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
 					Return([]gopowerstore.IPPoolAddress{
 						{
@@ -3219,8 +3232,8 @@ var _ = Describe("CSINodeService", func() {
 				nodeLabelsRetrieverMock.On("NewForConfig", mock.Anything).Return(nil, nil)
 
 				res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.NodeGetInfoResponse{
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.NodeGetInfoResponse{
 					NodeId: nodeSvc.nodeID,
 					AccessibleTopology: &csi.Topology{
 						Segments: map[string]string{
@@ -3234,8 +3247,8 @@ var _ = Describe("CSINodeService", func() {
 			})
 		})
 
-		When("MaxVolumesPerNode is set via environment variable at the time of installation", func() {
-			It("should return correct MaxVolumesPerNode in response", func() {
+		ginkgo.When("MaxVolumesPerNode is set via environment variable at the time of installation", func() {
+			ginkgo.It("should return correct MaxVolumesPerNode in response", func() {
 				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
 					Return([]gopowerstore.IPPoolAddress{
 						{
@@ -3256,8 +3269,8 @@ var _ = Describe("CSINodeService", func() {
 				nodeSvc.opts.MaxVolumesPerNode = 2
 
 				res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.NodeGetInfoResponse{
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.NodeGetInfoResponse{
 					NodeId: nodeSvc.nodeID,
 					AccessibleTopology: &csi.Topology{
 						Segments: map[string]string{
@@ -3271,8 +3284,8 @@ var _ = Describe("CSINodeService", func() {
 			})
 		})
 
-		When("Portals are not discoverable", func() {
-			It("should return correct topology segments", func() {
+		ginkgo.When("Portals are not discoverable", func() {
+			ginkgo.It("should return correct topology segments", func() {
 				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
 					Return([]gopowerstore.IPPoolAddress{
 						{
@@ -3292,8 +3305,8 @@ var _ = Describe("CSINodeService", func() {
 				setDefaultNodeLabelsRetrieverMock()
 
 				res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.NodeGetInfoResponse{
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.NodeGetInfoResponse{
 					NodeId: nodeSvc.nodeID,
 					AccessibleTopology: &csi.Topology{
 						Segments: map[string]string{
@@ -3306,8 +3319,8 @@ var _ = Describe("CSINodeService", func() {
 			})
 		})
 
-		When("we can not get targets from array", func() {
-			It("should not return iscsi topology key", func() {
+		ginkgo.When("we can not get targets from array", func() {
+			ginkgo.It("should not return iscsi topology key", func() {
 				e := "internal error"
 				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
 					Return([]gopowerstore.IPPoolAddress{}, errors.New(e))
@@ -3320,8 +3333,8 @@ var _ = Describe("CSINodeService", func() {
 
 				res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
 
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.NodeGetInfoResponse{
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.NodeGetInfoResponse{
 					NodeId: nodeSvc.nodeID,
 					AccessibleTopology: &csi.Topology{
 						Segments: map[string]string{
@@ -3334,8 +3347,8 @@ var _ = Describe("CSINodeService", func() {
 			})
 		})
 
-		When("target can not be discovered", func() {
-			It("should not return iscsi topology key", func() {
+		ginkgo.When("target can not be discovered", func() {
+			ginkgo.It("should not return iscsi topology key", func() {
 				goiscsi.GOISCSIMock.InduceDiscoveryError = true
 				gonvme.GONVMEMock.InduceDiscoveryError = true
 
@@ -3354,8 +3367,8 @@ var _ = Describe("CSINodeService", func() {
 				setDefaultNodeLabelsRetrieverMock()
 
 				res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.NodeGetInfoResponse{
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.NodeGetInfoResponse{
 					NodeId: nodeSvc.nodeID,
 					AccessibleTopology: &csi.Topology{
 						Segments: map[string]string{
@@ -3369,8 +3382,8 @@ var _ = Describe("CSINodeService", func() {
 			})
 		})
 
-		When("using FC", func() {
-			It("should return FC topology segments", func() {
+		ginkgo.When("using FC", func() {
+			ginkgo.It("should return FC topology segments", func() {
 				nodeSvc.useFC = true
 				conn, _ := net.Dial("udp", "127.0.0.1:80")
 				fsMock.On("NetDial", mock.Anything).Return(
@@ -3398,14 +3411,15 @@ var _ = Describe("CSINodeService", func() {
 								},
 								PortName: validFCTargetsWWPN[1],
 								PortType: gopowerstore.InitiatorProtocolTypeEnumFC,
-							}},
+							},
+						},
 						Name: "host-name",
 					}, nil)
 				setDefaultNodeLabelsRetrieverMock()
 
 				res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.NodeGetInfoResponse{
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.NodeGetInfoResponse{
 					NodeId: nodeSvc.nodeID,
 					AccessibleTopology: &csi.Topology{
 						Segments: map[string]string{
@@ -3418,8 +3432,8 @@ var _ = Describe("CSINodeService", func() {
 				}))
 			})
 
-			When("reusing host", func() {
-				It("should properly deal with additional IPs", func() {
+			ginkgo.When("reusing host", func() {
+				ginkgo.It("should properly deal with additional IPs", func() {
 					nodeSvc.useFC = true
 					nodeID := nodeSvc.nodeID
 					nodeSvc.nodeID = nodeID + "-" + "192.168.0.1"
@@ -3450,14 +3464,15 @@ var _ = Describe("CSINodeService", func() {
 									},
 									PortName: validFCTargetsWWPN[1],
 									PortType: gopowerstore.InitiatorProtocolTypeEnumFC,
-								}},
+								},
+							},
 							Name: "host-name",
 						}, nil)
 					setDefaultNodeLabelsRetrieverMock()
 
 					res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
-					Expect(err).To(BeNil())
-					Expect(res).To(Equal(&csi.NodeGetInfoResponse{
+					gomega.Expect(err).To(gomega.BeNil())
+					gomega.Expect(res).To(gomega.Equal(&csi.NodeGetInfoResponse{
 						NodeId: nodeSvc.nodeID,
 						AccessibleTopology: &csi.Topology{
 							Segments: map[string]string{
@@ -3470,8 +3485,8 @@ var _ = Describe("CSINodeService", func() {
 					}))
 				})
 
-				When("there is no ip in nodeID", func() {
-					It("should not return FC topology key", func() {
+				ginkgo.When("there is no ip in nodeID", func() {
+					ginkgo.It("should not return FC topology key", func() {
 						nodeSvc.useFC = true
 						nodeID := nodeSvc.nodeID
 						nodeSvc.nodeID = "nodeid-with-no-ip"
@@ -3502,14 +3517,15 @@ var _ = Describe("CSINodeService", func() {
 										},
 										PortName: validFCTargetsWWPN[1],
 										PortType: gopowerstore.InitiatorProtocolTypeEnumFC,
-									}},
+									},
+								},
 								Name: "host-name",
 							}, nil)
 						setDefaultNodeLabelsRetrieverMock()
 
 						res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
-						Expect(err).To(BeNil())
-						Expect(res).To(Equal(&csi.NodeGetInfoResponse{
+						gomega.Expect(err).To(gomega.BeNil())
+						gomega.Expect(res).To(gomega.Equal(&csi.NodeGetInfoResponse{
 							NodeId: nodeSvc.nodeID,
 							AccessibleTopology: &csi.Topology{
 								Segments: map[string]string{
@@ -3523,8 +3539,8 @@ var _ = Describe("CSINodeService", func() {
 				})
 			})
 
-			When("we can not get info about hosts from array", func() {
-				It("should not return FC topology key", func() {
+			ginkgo.When("we can not get info about hosts from array", func() {
+				ginkgo.It("should not return FC topology key", func() {
 					nodeSvc.useFC = true
 					e := "internal error"
 					clientMock.On("GetHostByName", mock.Anything, nodeSvc.nodeID).
@@ -3537,8 +3553,8 @@ var _ = Describe("CSINodeService", func() {
 					setDefaultNodeLabelsRetrieverMock()
 
 					res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
-					Expect(err).To(BeNil())
-					Expect(res).To(Equal(&csi.NodeGetInfoResponse{
+					gomega.Expect(err).To(gomega.BeNil())
+					gomega.Expect(res).To(gomega.Equal(&csi.NodeGetInfoResponse{
 						NodeId: nodeSvc.nodeID,
 						AccessibleTopology: &csi.Topology{
 							Segments: map[string]string{
@@ -3551,8 +3567,8 @@ var _ = Describe("CSINodeService", func() {
 				})
 			})
 
-			When("host initiators is empty", func() {
-				It("should not return FC topology key", func() {
+			ginkgo.When("host initiators is empty", func() {
+				ginkgo.It("should not return FC topology key", func() {
 					nodeSvc.useFC = true
 					clientMock.On("GetHostByName", mock.Anything, nodeSvc.nodeID).
 						Return(gopowerstore.Host{
@@ -3568,8 +3584,8 @@ var _ = Describe("CSINodeService", func() {
 					setDefaultNodeLabelsRetrieverMock()
 
 					res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
-					Expect(err).To(BeNil())
-					Expect(res).To(Equal(&csi.NodeGetInfoResponse{
+					gomega.Expect(err).To(gomega.BeNil())
+					gomega.Expect(res).To(gomega.Equal(&csi.NodeGetInfoResponse{
 						NodeId: nodeSvc.nodeID,
 						AccessibleTopology: &csi.Topology{
 							Segments: map[string]string{
@@ -3582,8 +3598,8 @@ var _ = Describe("CSINodeService", func() {
 				})
 			})
 
-			When("there is no active sessions", func() {
-				It("should not return FC topology key", func() {
+			ginkgo.When("there is no active sessions", func() {
+				ginkgo.It("should not return FC topology key", func() {
 					nodeSvc.useFC = true
 					conn, _ := net.Dial("udp", "127.0.0.1:80")
 					fsMock.On("NetDial", mock.Anything).Return(
@@ -3601,14 +3617,15 @@ var _ = Describe("CSINodeService", func() {
 								{
 									PortName: validFCTargetsWWPN[1],
 									PortType: gopowerstore.InitiatorProtocolTypeEnumFC,
-								}},
+								},
+							},
 							Name: "host-name",
 						}, nil)
 					setDefaultNodeLabelsRetrieverMock()
 
 					res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
-					Expect(err).To(BeNil())
-					Expect(res).To(Equal(&csi.NodeGetInfoResponse{
+					gomega.Expect(err).To(gomega.BeNil())
+					gomega.Expect(res).To(gomega.Equal(&csi.NodeGetInfoResponse{
 						NodeId: nodeSvc.nodeID,
 						AccessibleTopology: &csi.Topology{
 							Segments: map[string]string{
@@ -3622,8 +3639,8 @@ var _ = Describe("CSINodeService", func() {
 			})
 		})
 
-		When("using NVMeFC", func() {
-			It("should return NVMeFC topology segments", func() {
+		ginkgo.When("using NVMeFC", func() {
+			ginkgo.It("should return NVMeFC topology segments", func() {
 				nodeSvc.useNVME = true
 				nodeSvc.useFC = true
 				clientMock.On("GetCluster", mock.Anything).
@@ -3647,8 +3664,8 @@ var _ = Describe("CSINodeService", func() {
 				setDefaultNodeLabelsRetrieverMock()
 
 				res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.NodeGetInfoResponse{
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.NodeGetInfoResponse{
 					NodeId: nodeSvc.nodeID,
 					AccessibleTopology: &csi.Topology{
 						Segments: map[string]string{
@@ -3661,8 +3678,8 @@ var _ = Describe("CSINodeService", func() {
 				}))
 			})
 
-			When("NVMeFC targets cannot be discovered", func() {
-				It("should not return NVMeFC topology segments", func() {
+			ginkgo.When("NVMeFC targets cannot be discovered", func() {
+				ginkgo.It("should not return NVMeFC topology segments", func() {
 					nodeSvc.useNVME = true
 					nodeSvc.useFC = true
 					clientMock.On("GetCluster", mock.Anything).
@@ -3685,8 +3702,8 @@ var _ = Describe("CSINodeService", func() {
 					setDefaultNodeLabelsRetrieverMock()
 
 					res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
-					Expect(err).To(BeNil())
-					Expect(res).To(Equal(&csi.NodeGetInfoResponse{
+					gomega.Expect(err).To(gomega.BeNil())
+					gomega.Expect(res).To(gomega.Equal(&csi.NodeGetInfoResponse{
 						NodeId: nodeSvc.nodeID,
 						AccessibleTopology: &csi.Topology{
 							Segments: map[string]string{
@@ -3700,8 +3717,8 @@ var _ = Describe("CSINodeService", func() {
 			})
 		})
 
-		When("using NVMeTCP", func() {
-			It("should return NVMeTCP topology segments", func() {
+		ginkgo.When("using NVMeTCP", func() {
+			ginkgo.It("should return NVMeTCP topology segments", func() {
 				nodeSvc.useNVME = true
 				nodeSvc.useFC = false
 				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
@@ -3719,8 +3736,8 @@ var _ = Describe("CSINodeService", func() {
 				setDefaultNodeLabelsRetrieverMock()
 
 				res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
-				Expect(err).To(BeNil())
-				Expect(res).To(Equal(&csi.NodeGetInfoResponse{
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.NodeGetInfoResponse{
 					NodeId: nodeSvc.nodeID,
 					AccessibleTopology: &csi.Topology{
 						Segments: map[string]string{
@@ -3733,8 +3750,8 @@ var _ = Describe("CSINodeService", func() {
 				}))
 			})
 
-			When("target can not be discovered", func() {
-				It("should not return nvme topology key", func() {
+			ginkgo.When("target can not be discovered", func() {
+				ginkgo.It("should not return nvme topology key", func() {
 					goiscsi.GOISCSIMock.InduceDiscoveryError = true
 					gonvme.GONVMEMock.InduceDiscoveryError = true
 					nodeSvc.useNVME = true
@@ -3754,8 +3771,8 @@ var _ = Describe("CSINodeService", func() {
 					setDefaultNodeLabelsRetrieverMock()
 
 					res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
-					Expect(err).To(BeNil())
-					Expect(res).To(Equal(&csi.NodeGetInfoResponse{
+					gomega.Expect(err).To(gomega.BeNil())
+					gomega.Expect(res).To(gomega.Equal(&csi.NodeGetInfoResponse{
 						NodeId: nodeSvc.nodeID,
 						AccessibleTopology: &csi.Topology{
 							Segments: map[string]string{
@@ -3769,8 +3786,8 @@ var _ = Describe("CSINodeService", func() {
 				})
 			})
 
-			When("we cannot get NVMeTCP targets from the array", func() {
-				It("should not return NVMeTCP topology segments", func() {
+			ginkgo.When("we cannot get NVMeTCP targets from the array", func() {
+				ginkgo.It("should not return NVMeTCP topology segments", func() {
 					nodeSvc.useNVME = true
 					nodeSvc.useFC = false
 					e := "internalerror"
@@ -3784,8 +3801,8 @@ var _ = Describe("CSINodeService", func() {
 					setDefaultNodeLabelsRetrieverMock()
 
 					res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
-					Expect(err).To(BeNil())
-					Expect(res).To(Equal(&csi.NodeGetInfoResponse{
+					gomega.Expect(err).To(gomega.BeNil())
+					gomega.Expect(res).To(gomega.Equal(&csi.NodeGetInfoResponse{
 						NodeId: nodeSvc.nodeID,
 						AccessibleTopology: &csi.Topology{
 							Segments: map[string]string{
@@ -3800,8 +3817,8 @@ var _ = Describe("CSINodeService", func() {
 		})
 	})
 
-	Describe("Calling NodeGetCapabilities()", func() {
-		It("should return predefined parameters with health monitor", func() {
+	ginkgo.Describe("Calling NodeGetCapabilities()", func() {
+		ginkgo.It("should return predefined parameters with health monitor", func() {
 			csictx.Setenv(context.Background(), common.EnvIsHealthMonitorEnabled, "true")
 
 			nodeSvc.nodeID = ""
@@ -3843,14 +3860,15 @@ var _ = Describe("CSINodeService", func() {
 			nodeSvc.Init()
 
 			res, err := nodeSvc.NodeGetCapabilities(context.Background(), &csi.NodeGetCapabilitiesRequest{})
-			Ω(err).To(BeNil())
-			Ω(res).To(Equal(&csi.NodeGetCapabilitiesResponse{
+			gomega.Ω(err).To(gomega.BeNil())
+			gomega.Ω(res).To(gomega.Equal(&csi.NodeGetCapabilitiesResponse{
 				Capabilities: []*csi.NodeServiceCapability{
-					{Type: &csi.NodeServiceCapability_Rpc{
-						Rpc: &csi.NodeServiceCapability_RPC{
-							Type: csi.NodeServiceCapability_RPC_STAGE_UNSTAGE_VOLUME,
+					{
+						Type: &csi.NodeServiceCapability_Rpc{
+							Rpc: &csi.NodeServiceCapability_RPC{
+								Type: csi.NodeServiceCapability_RPC_STAGE_UNSTAGE_VOLUME,
+							},
 						},
-					},
 					},
 					{
 						Type: &csi.NodeServiceCapability_Rpc{
@@ -3885,83 +3903,89 @@ var _ = Describe("CSINodeService", func() {
 		})
 	})
 
-	Describe("Calling getInitiators()", func() {
-		When("Only iSCSI initiators are on node", func() {
-			It("should succeed", func() {
+	ginkgo.Describe("Calling getInitiators()", func() {
+		ginkgo.When("Only iSCSI initiators are on node", func() {
+			ginkgo.It("should succeed", func() {
 				iscsiConnectorMock.On("GetInitiatorName", mock.Anything).Return(validISCSIInitiators, nil)
 				nvmeConnectorMock.On("GetInitiatorName", mock.Anything).Return([]string{}, nil)
 				fcConnectorMock.On("GetInitiatorPorts", mock.Anything).Return([]string{}, nil)
 				iinit, fcinit, nvmeinit, err := nodeSvc.getInitiators()
-				Ω(iinit).To(Equal([]string{
+				gomega.Ω(iinit).To(gomega.Equal([]string{
 					"iqn.1994-05.com.redhat:4db86abbe3c",
-					"iqn.1994-05.com.redhat:2950c9ca441b"}))
-				Ω(nvmeinit).To(Equal([]string{}))
-				Ω(fcinit).To(BeNil())
-				Ω(err).To(BeNil())
+					"iqn.1994-05.com.redhat:2950c9ca441b",
+				}))
+				gomega.Ω(nvmeinit).To(gomega.Equal([]string{}))
+				gomega.Ω(fcinit).To(gomega.BeNil())
+				gomega.Ω(err).To(gomega.BeNil())
 			})
 		})
-		When("Only NVMe initiators are on node", func() {
-			It("should succeed", func() {
+		ginkgo.When("Only NVMe initiators are on node", func() {
+			ginkgo.It("should succeed", func() {
 				iscsiConnectorMock.On("GetInitiatorName", mock.Anything).Return([]string{}, nil)
 				nvmeConnectorMock.On("GetInitiatorName", mock.Anything).Return(validNVMEInitiators, nil)
 				fcConnectorMock.On("GetInitiatorPorts", mock.Anything).Return([]string{}, nil)
 				iinit, fcinit, nvmeinit, err := nodeSvc.getInitiators()
-				Ω(nvmeinit).To(Equal([]string{
+				gomega.Ω(nvmeinit).To(gomega.Equal([]string{
 					"nqn.2014-08.org.nvmexpress:uuid:02a08600-57d6-4089-8736-bf1f7326990e",
-					"nqn.2014-08.org.nvmexpress:uuid:fa363a22-1c74-44f3-9932-1c35d5cf5c4d"}))
-				Ω(iinit).To(Equal([]string{}))
-				Ω(fcinit).To(BeNil())
-				Ω(err).To(BeNil())
+					"nqn.2014-08.org.nvmexpress:uuid:fa363a22-1c74-44f3-9932-1c35d5cf5c4d",
+				}))
+				gomega.Ω(iinit).To(gomega.Equal([]string{}))
+				gomega.Ω(fcinit).To(gomega.BeNil())
+				gomega.Ω(err).To(gomega.BeNil())
 			})
 		})
-		When("NVMe, FC and iSCSI initiators are on node", func() {
-			It("should succeed", func() {
+		ginkgo.When("NVMe, FC and iSCSI initiators are on node", func() {
+			ginkgo.It("should succeed", func() {
 				iscsiConnectorMock.On("GetInitiatorName", mock.Anything).Return(validISCSIInitiators, nil)
 				nvmeConnectorMock.On("GetInitiatorName", mock.Anything).Return(validNVMEInitiators, nil)
 				fcConnectorMock.On("GetInitiatorPorts", mock.Anything).Return(validFCTargetsWWPN, nil)
 				iinit, fcinit, nvmeinit, err := nodeSvc.getInitiators()
-				Ω(iinit).To(Equal([]string{
+				gomega.Ω(iinit).To(gomega.Equal([]string{
 					"iqn.1994-05.com.redhat:4db86abbe3c",
-					"iqn.1994-05.com.redhat:2950c9ca441b"}))
-				Ω(nvmeinit).To(Equal([]string{
+					"iqn.1994-05.com.redhat:2950c9ca441b",
+				}))
+				gomega.Ω(nvmeinit).To(gomega.Equal([]string{
 					"nqn.2014-08.org.nvmexpress:uuid:02a08600-57d6-4089-8736-bf1f7326990e",
-					"nqn.2014-08.org.nvmexpress:uuid:fa363a22-1c74-44f3-9932-1c35d5cf5c4d"}))
-				Ω(fcinit).To(Equal([]string{
+					"nqn.2014-08.org.nvmexpress:uuid:fa363a22-1c74-44f3-9932-1c35d5cf5c4d",
+				}))
+				gomega.Ω(fcinit).To(gomega.Equal([]string{
 					"58:cc:f0:93:48:a0:03:a3",
-					"58:cc:f0:93:48:a0:02:a3"}))
-				Ω(err).To(BeNil())
+					"58:cc:f0:93:48:a0:02:a3",
+				}))
+				gomega.Ω(err).To(gomega.BeNil())
 			})
 		})
-		When("Neither NVMe nor FC nor iSCSI initiators are found on node", func() {
-			It("should succeed [NFS only]", func() {
+		ginkgo.When("Neither NVMe nor FC nor iSCSI initiators are found on node", func() {
+			ginkgo.It("should succeed [NFS only]", func() {
 				iscsiConnectorMock.On("GetInitiatorName", mock.Anything).Return([]string{}, nil)
 				nvmeConnectorMock.On("GetInitiatorName", mock.Anything).Return([]string{}, nil)
 				fcConnectorMock.On("GetInitiatorPorts", mock.Anything).Return([]string{}, nil)
 				iinit, fcinit, nvmeinit, err := nodeSvc.getInitiators()
-				Ω(len(iinit)).To(Equal(0))
-				Ω(len(nvmeinit)).To(Equal(0))
-				Ω(len(fcinit)).To(Equal(0))
-				Ω(err).To(BeNil())
+				gomega.Ω(len(iinit)).To(gomega.Equal(0))
+				gomega.Ω(len(nvmeinit)).To(gomega.Equal(0))
+				gomega.Ω(len(fcinit)).To(gomega.Equal(0))
+				gomega.Ω(err).To(gomega.BeNil())
 			})
 		})
-		When("Only FC initiators are on node", func() {
-			It("should succeed", func() {
+		ginkgo.When("Only FC initiators are on node", func() {
+			ginkgo.It("should succeed", func() {
 				iscsiConnectorMock.On("GetInitiatorName", mock.Anything).Return([]string{}, nil)
 				fcConnectorMock.On("GetInitiatorPorts", mock.Anything).Return(validFCTargetsWWPN, nil)
 				nvmeConnectorMock.On("GetInitiatorName", mock.Anything).Return([]string{}, nil)
 				iinit, fcinit, nvmeinit, err := nodeSvc.getInitiators()
-				Ω(iinit).To(Equal([]string{}))
-				Ω(nvmeinit).To(Equal([]string{}))
-				Ω(fcinit).To(Equal([]string{
+				gomega.Ω(iinit).To(gomega.Equal([]string{}))
+				gomega.Ω(nvmeinit).To(gomega.Equal([]string{}))
+				gomega.Ω(fcinit).To(gomega.Equal([]string{
 					"58:cc:f0:93:48:a0:03:a3",
-					"58:cc:f0:93:48:a0:02:a3"}))
-				Ω(err).To(BeNil())
+					"58:cc:f0:93:48:a0:02:a3",
+				}))
+				gomega.Ω(err).To(gomega.BeNil())
 			})
 		})
 	})
-	Describe("calling Node Get Volume Stats", func() {
-		When("volume path missing", func() {
-			It("should fail", func() {
+	ginkgo.Describe("calling Node Get Volume Stats", func() {
+		ginkgo.When("volume path missing", func() {
+			ginkgo.It("should fail", func() {
 				clientMock.On("GetVolume", mock.Anything, validBaseVolumeID).
 					Return(gopowerstore.Volume{ID: validBaseVolumeID, State: gopowerstore.VolumeStateEnumReady}, nil)
 
@@ -3972,10 +3996,10 @@ var _ = Describe("CSINodeService", func() {
 
 				res, err := nodeSvc.NodeGetVolumeStats(context.Background(), req)
 
-				Expect(res).To(BeNil())
-				Expect(err).ToNot(BeNil())
-				Expect(err.Error()).To(
-					ContainSubstring("no volume Path provided"),
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(err.Error()).To(
+					gomega.ContainSubstring("no volume Path provided"),
 				)
 			})
 		})
@@ -4024,7 +4048,6 @@ func TestGetNodeOptions(t *testing.T) {
 		csictx.Setenv(context.Background(), common.EnvFCPortsFilterFilePath, "")
 		csictx.Setenv(context.Background(), common.EnvEnableCHAP, "")
 		getNodeOptions()
-
 	})
 }
 

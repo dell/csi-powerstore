@@ -54,7 +54,7 @@ func (s *Service) startAPIService(ctx context.Context) {
 }
 
 // apiRouter serves http requests
-func (s *Service) apiRouter(ctx context.Context) {
+func (s *Service) apiRouter(_ context.Context) {
 	log.Infof("starting http server on port %s", common.APIPort)
 	// create a new mux router
 	router := mux.NewRouter()
@@ -76,7 +76,7 @@ func (s *Service) apiRouter(ctx context.Context) {
 }
 
 // connectivityStatus handler returns array connectivity status
-func connectivityStatus(w http.ResponseWriter, r *http.Request) {
+func connectivityStatus(w http.ResponseWriter, _ *http.Request) {
 	log.Infof("connectivityStatus called, status is %v \n", probeStatus)
 	// w.Header().Set("Content-Type", "application/json")
 	if probeStatus == nil {
@@ -138,7 +138,7 @@ func getArrayConnectivityStatus(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "array %s not found \n", arrayID)
 		return
 	}
-	//convert status struct to JSON
+	// convert status struct to JSON
 	jsonResponse, err := json.Marshal(status)
 	if err != nil {
 		log.Errorf("error %s during marshaling to json", err)
@@ -147,7 +147,7 @@ func getArrayConnectivityStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	log.Infof("sending response %+v for array %s \n", status, arrayID)
-	//update response
+	// update response
 	_, err = w.Write(jsonResponse)
 	if err != nil {
 		log.Errorf("unable to write response %s", err)
@@ -211,7 +211,7 @@ func (s *Service) testConnectivityAndUpdateStatus(ctx context.Context, array *ar
 }
 
 // nodeProbe function used to store the status of array
-func (s *Service) nodeProbe(timeOutCtx context.Context, array *array.PowerStoreArray) error {
+func (s *Service) nodeProbe(_ context.Context, array *array.PowerStoreArray) error {
 	// try to get the host
 	host, err := array.Client.GetHostByName(context.Background(), s.nodeID)
 	// possibly NFS could be there.
@@ -255,28 +255,27 @@ func (s *Service) nodeProbe(timeOutCtx context.Context, array *array.PowerStoreA
 			}
 		}
 		return fmt.Errorf("no active fc sessions")
-	} else {
-		// check if iscsi sessions are active
-		// if !s.useNVME && !s.useFC {
-		log.Debugf("Checking if iscsi sessions are active on node or not")
-		sessions, _ := s.iscsiLib.GetSessions()
-		for _, target := range s.iscsiTargets[array.GlobalID] {
-			for _, session := range sessions {
-				log.Debugf("matching %v with %v", target, session)
-				if session.Target == target && session.ISCSISessionState == goiscsi.ISCSISessionStateLOGGEDIN {
-					if s.useNFS {
-						s.useNFS = false
-					}
-					return nil
+	}
+	// check if iscsi sessions are active
+	// if !s.useNVME && !s.useFC {
+	log.Debugf("Checking if iscsi sessions are active on node or not")
+	sessions, _ := s.iscsiLib.GetSessions()
+	for _, target := range s.iscsiTargets[array.GlobalID] {
+		for _, session := range sessions {
+			log.Debugf("matching %v with %v", target, session)
+			if session.Target == target && session.ISCSISessionState == goiscsi.ISCSISessionStateLOGGEDIN {
+				if s.useNFS {
+					s.useNFS = false
 				}
+				return nil
 			}
 		}
-		if s.useNFS {
-			log.Infof("Host Entry found but failed to login to iscsi target, seems to be this worker has only NFS")
-			return nil
-		}
-		return fmt.Errorf("no active iscsi sessions")
 	}
+	if s.useNFS {
+		log.Infof("Host Entry found but failed to login to iscsi target, seems to be this worker has only NFS")
+		return nil
+	}
+	return fmt.Errorf("no active iscsi sessions")
 }
 
 // populateTargetsInCache checks if nvmeTargets or iscsiTargets in cache is empty, try to fetch the targets from array and populate the cache
@@ -355,9 +354,8 @@ func (s *Service) populateTargetsInCache(array *array.PowerStoreArray) {
 					s.iscsiTargets[array.GlobalID] = append(otherTargets, target.Target)
 				}
 				break
-			} else {
-				log.Debugf("Portal %s is not rechable from the node", address.Portal)
 			}
+			log.Debugf("Portal %s is not rechable from the node", address.Portal)
 		}
 
 	}
