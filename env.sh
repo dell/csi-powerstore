@@ -25,7 +25,7 @@ export X_CSI_POWERSTORE_USER="smc"
 
 # EnvPassword is the name of the enviroment variable used to set the
 # user's password when authenticating to PowerStore
-export X_CSI_POWERSTORE_PASSWORD="smc"
+export X_CSI_POWERSTORE_PASSWORD="abc"
 
 # EnvInsecure is the name of the enviroment variable used to specify
 # that PowerStore's certificate chain and host name should not
