@@ -14,7 +14,7 @@
 #
 #
 
-FROM golang:1.20.2 as build-env
+FROM golang:1.21.6 as build-env
 
 RUN git clone https://github.com/kubernetes-csi/csi-test.git && \
     cd csi-test/cmd/csi-sanity && \
