@@ -42,10 +42,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-var (
-	// IPToArray - Store Array IPs
-	IPToArray map[string]string
-)
+// IPToArray - Store Array IPs
+var IPToArray map[string]string
 
 // Consumer provides methods for safe management of arrays
 type Consumer interface {
@@ -216,7 +214,8 @@ func GetPowerStoreArrays(fs fs.Interface, filePath string) (map[string]*PowerSto
 				"unable to create PowerStore client: %s", err.Error())
 		}
 		c.SetCustomHTTPHeaders(http.Header{
-			"Application-Type": {fmt.Sprintf("%s/%s", common.VerboseName, core.SemVer)}})
+			"Application-Type": {fmt.Sprintf("%s/%s", common.VerboseName, core.SemVer)},
+		})
 
 		c.SetLogger(&common.CustomLogger{})
 		array.Client = c
@@ -338,7 +337,6 @@ func (s *Locker) RegisterK8sCluster(fs fs.Interface) error {
 				Port:      cluster.Port,
 				Token:     cluster.Token,
 			})
-
 			if err != nil {
 				log.Errorf("cannot register k8s cluster: %s with %s:%d to array: %s err: %s \n",
 					cluster.Name, cluster.IPAddress, cluster.Port, array.Endpoint, err.Error())

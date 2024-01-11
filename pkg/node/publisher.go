@@ -56,7 +56,7 @@ func (sp *SCSIPublisher) Publish(ctx context.Context, logFields log.Fields, fs f
 	return sp.publishMount(ctx, logFields, fs, cap, isRO, targetPath, stagingPath)
 }
 
-func (sp *SCSIPublisher) publishBlock(ctx context.Context, logFields log.Fields, fs fs.Interface, cap *csi.VolumeCapability, isRO bool, targetPath string, stagingPath string) (*csi.NodePublishVolumeResponse, error) {
+func (sp *SCSIPublisher) publishBlock(ctx context.Context, logFields log.Fields, fs fs.Interface, _ *csi.VolumeCapability, isRO bool, targetPath string, stagingPath string) (*csi.NodePublishVolumeResponse, error) {
 	log.WithFields(logFields).Info("start publishing as block device")
 
 	if isRO {
@@ -100,7 +100,7 @@ func (sp *SCSIPublisher) publishMount(ctx context.Context, logFields log.Fields,
 	if targetFS == "xfs" {
 		opts = []string{"-m", "crc=0,finobt=0"}
 	}
-	if err := fs.MkdirAll(targetPath, 0750); err != nil {
+	if err := fs.MkdirAll(targetPath, 0o750); err != nil {
 		return nil, status.Errorf(codes.Internal,
 			"can't create target dir with Mkdirall %s: %s", targetPath, err.Error())
 	}
@@ -146,12 +146,12 @@ func (sp *SCSIPublisher) publishMount(ctx context.Context, logFields log.Fields,
 }
 
 // NFSPublisher implementation of NodeVolumePublisher for NFS volumes
-type NFSPublisher struct {
-}
+type NFSPublisher struct{}
 
 // Publish publishes nfs volume by mounting it to the target path
 func (np *NFSPublisher) Publish(ctx context.Context, logFields log.Fields, fs fs.Interface,
-	cap *csi.VolumeCapability, isRO bool, targetPath string, stagingPath string) (*csi.NodePublishVolumeResponse, error) {
+	cap *csi.VolumeCapability, isRO bool, targetPath string, stagingPath string,
+) (*csi.NodePublishVolumeResponse, error) {
 	published, err := isAlreadyPublished(ctx, targetPath, getRWModeString(isRO), fs)
 	if err != nil {
 		return nil, err
@@ -161,7 +161,7 @@ func (np *NFSPublisher) Publish(ctx context.Context, logFields log.Fields, fs fs
 		return &csi.NodePublishVolumeResponse{}, nil
 	}
 
-	if err := fs.MkdirAll(targetPath, 0750); err != nil {
+	if err := fs.MkdirAll(targetPath, 0o750); err != nil {
 		return nil, status.Errorf(codes.Internal,
 			"can't create target folder %s: %s", stagingPath, err.Error())
 	}

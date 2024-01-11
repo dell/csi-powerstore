@@ -80,7 +80,6 @@ func TestNewCustomSerialLock(t *testing.T) {
 		_, err := serialLock(ctx, req2, nil, h)
 		wg.Wait()
 		return err
-
 	}
 	t.Run("NodeStage for same volume concurrent call", func(t *testing.T) {
 		err := runTest(&csi.NodeStageVolumeRequest{VolumeId: validBlockVolumeID},

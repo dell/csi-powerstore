@@ -30,7 +30,7 @@ const (
 	// node name
 	EnvKubeNodeName = "X_CSI_POWERSTORE_KUBE_NODE_NAME"
 
-	//EnvKubeConfigPath indicates kubernetes configuration path that has to be used by CSI Driver
+	// EnvKubeConfigPath indicates kubernetes configuration path that has to be used by CSI Driver
 	EnvKubeConfigPath = "KUBECONFIG"
 
 	// EnvNodeNamePrefix is the name of the environment variable which stores prefix which will be
@@ -105,12 +105,12 @@ const (
 	// EnvAllowAutoRoundOffFilesystemSize specifies if auto round off minimum filesystem size is enabled
 	EnvAllowAutoRoundOffFilesystemSize = "CSI_AUTO_ROUND_OFF_FILESYSTEM_SIZE"
 
-	//EnvPodmonEnabled indicates that podmon is enabled
+	// EnvPodmonEnabled indicates that podmon is enabled
 	EnvPodmonEnabled = "X_CSI_PODMON_ENABLED"
 
-	//EnvPodmonAPIPORT indicates the port to be used for exposing podmon API health, ToDo: Rename to var EnvPodmonArrayConnectivityAPIPORT
+	// EnvPodmonAPIPORT indicates the port to be used for exposing podmon API health, ToDo: Rename to var EnvPodmonArrayConnectivityAPIPORT
 	EnvPodmonAPIPORT = "X_CSI_PODMON_API_PORT"
 
-	//EnvPodmonArrayConnectivityPollRate indicates the polling frequency to check array connectivity
+	// EnvPodmonArrayConnectivityPollRate indicates the polling frequency to check array connectivity
 	EnvPodmonArrayConnectivityPollRate = "X_CSI_PODMON_ARRAY_CONNECTIVITY_POLL_RATE"
 )

@@ -826,7 +826,7 @@ func (s *Service) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolum
 		log.Infof("DisklLocation: %s", disklocation)
 		targetmount = fmt.Sprintf("tmp/%s/%s", vol.ID, vol.Name)
 		log.Infof("TargetMount: %s", targetmount)
-		err = s.Fs.MkdirAll(targetmount, 0750)
+		err = s.Fs.MkdirAll(targetmount, 0o750)
 		if err != nil {
 			return nil, status.Error(codes.Internal,
 				fmt.Sprintf("Failed to find mount info for (%s) with error (%s)", vol.Name, err.Error()))
@@ -1000,7 +1000,7 @@ func (s *Service) nodeExpandRawBlockVolume(ctx context.Context, volumeWWN string
 }
 
 // NodeGetCapabilities returns supported features by the node service
-func (s *Service) NodeGetCapabilities(context context.Context, request *csi.NodeGetCapabilitiesRequest) (*csi.NodeGetCapabilitiesResponse, error) {
+func (s *Service) NodeGetCapabilities(_ context.Context, _ *csi.NodeGetCapabilitiesRequest) (*csi.NodeGetCapabilitiesResponse, error) {
 	newCap := func(cap csi.NodeServiceCapability_RPC_Type) *csi.NodeServiceCapability {
 		return &csi.NodeServiceCapability{
 			Type: &csi.NodeServiceCapability_Rpc{
@@ -1034,7 +1034,7 @@ func (s *Service) NodeGetCapabilities(context context.Context, request *csi.Node
 }
 
 // NodeGetInfo returns id of the node and topology constraints
-func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
+func (s *Service) NodeGetInfo(ctx context.Context, _ *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
 	// Create the topology keys
 	// <driver name>/<endpoint>-<protocol>: true
 	resp := &csi.NodeGetInfoResponse{
@@ -1066,16 +1066,15 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 						if err != nil {
 							log.Errorf("couldn't discover NVMeFC targets")
 							continue
-						} else {
-							for _, target := range NVMeFCTargets {
-								err = s.nvmeLib.NVMeFCConnect(target, false)
-								if err != nil {
-									log.Errorf("couldn't connect to NVMeFC target")
-								} else {
-									nvmefcConnectCount = nvmefcConnectCount + 1
-									otherTargets := s.nvmeTargets[arr.GlobalID]
-									s.nvmeTargets[arr.GlobalID] = append(otherTargets, target.TargetNqn)
-								}
+						}
+						for _, target := range NVMeFCTargets {
+							err = s.nvmeLib.NVMeFCConnect(target, false)
+							if err != nil {
+								log.Errorf("couldn't connect to NVMeFC target")
+							} else {
+								nvmefcConnectCount = nvmefcConnectCount + 1
+								otherTargets := s.nvmeTargets[arr.GlobalID]
+								s.nvmeTargets[arr.GlobalID] = append(otherTargets, target.TargetNqn)
 							}
 						}
 					}
@@ -1118,7 +1117,6 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 						s.useNFS = true
 					}
 				}
-
 			} else if s.useFC {
 				// Check node initiators connection to array
 				nodeID := s.nodeID
@@ -1174,9 +1172,8 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 							continue
 						}
 						break
-					} else {
-						log.Debugf("Portal %s is not rechable from the node", address.Portal)
 					}
+					log.Debugf("Portal %s is not rechable from the node", address.Portal)
 				}
 				// login is also performed as a part of ConnectVolume by using dynamically created chap credentials, In case if it fails here
 				if len(iscsiTargets) > 0 {
@@ -1213,7 +1210,7 @@ func (s *Service) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) 
 		}
 	}
 
-	var maxVolumesPerNode int64 = 0
+	var maxVolumesPerNode int64
 
 	// Setting maxVolumesPerNode using the value of field maxPowerstoreVolumesPerNode specified in values.yaml
 	if s.opts.MaxVolumesPerNode > 0 {
@@ -1547,18 +1544,24 @@ func (s *Service) createHost(ctx context.Context, initiators []string, client go
 
 		if s.opts.KubeNodeName == "" {
 			log.Warnf("KubeNodeName value is not set")
-			createParams = gopowerstore.HostCreate{Name: &s.nodeID, OsType: &osType, Initiators: &reqInitiators,
-				Description: &description}
+			createParams = gopowerstore.HostCreate{
+				Name: &s.nodeID, OsType: &osType, Initiators: &reqInitiators,
+				Description: &description,
+			}
 		} else {
 			metadata := map[string]string{
 				"k8s_node_name": s.opts.KubeNodeName,
 			}
-			createParams = gopowerstore.HostCreate{Name: &s.nodeID, OsType: &osType, Initiators: &reqInitiators,
-				Description: &description, Metadata: &metadata}
+			createParams = gopowerstore.HostCreate{
+				Name: &s.nodeID, OsType: &osType, Initiators: &reqInitiators,
+				Description: &description, Metadata: &metadata,
+			}
 		}
 	} else {
-		createParams = gopowerstore.HostCreate{Name: &s.nodeID, OsType: &osType, Initiators: &reqInitiators,
-			Description: &description}
+		createParams = gopowerstore.HostCreate{
+			Name: &s.nodeID, OsType: &osType, Initiators: &reqInitiators,
+			Description: &description,
+		}
 	}
 	resp, err := client.CreateHost(ctx, &createParams)
 	// reset custom header
@@ -1572,7 +1575,8 @@ func (s *Service) createHost(ctx context.Context, initiators []string, client go
 
 // add or remove initiators from host
 func (s *Service) modifyHostInitiators(ctx context.Context, hostID string, client gopowerstore.Client,
-	initiatorsToAdd []string, initiatorsToDelete []string, initiatorsToModify []string) error {
+	initiatorsToAdd []string, initiatorsToDelete []string, initiatorsToModify []string,
+) error {
 	if len(initiatorsToDelete) > 0 {
 		modifyParams := gopowerstore.HostModify{}
 		modifyParams.RemoveInitiators = &initiatorsToDelete
