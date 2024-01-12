@@ -1,6 +1,6 @@
 #
 #
-# Copyright © 2020-2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+# Copyright © 2020-2024 Dell Inc. or its subsidiaries. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,12 +14,15 @@
 #
 #
 
-FROM golang:1.13.4 as build-env
+FROM golang:1.21.6 as build-env
 
-RUN go get -u github.com/kubernetes-csi/csi-test/...
+RUN git clone https://github.com/kubernetes-csi/csi-test.git && \
+    cd csi-test/cmd/csi-sanity && \
+    make clean install && \
+    cp ./csi-sanity /csi-sanity
 
 FROM frolvlad/alpine-glibc
 WORKDIR /app/csi-sanity/
-COPY --from=build-env /go/bin/csi-sanity .
+COPY --from=build-env /csi-sanity .
 
 ENTRYPOINT [ "./csi-sanity" ]
