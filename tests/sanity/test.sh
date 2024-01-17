@@ -28,7 +28,7 @@ kubectl run csi-sanity --image=$IMAGE --overrides='
 			"stdinOnce": true,
 			"tty": true,
 			"command": ["/app/csi-sanity/csi-sanity"],
-			"args": ["--ginkgo.v", "--csi.controllerendpoint=/controller.sock", "--csi.endpoint=/node.sock", "--csi.testvolumeparameters=/root/params.yaml", "--ginkgo.junit-report=/report.xml"],
+			"args": ["--ginkgo.v", "--csi.controllerendpoint=/controller.sock", "--csi.endpoint=/node.sock", "--csi.testvolumeparameters=/params.yaml", "--ginkgo.junit-report=/report.xml"],
 			"volumeMounts": [{
 				"name": "controller-socket",
 				"mountPath": "/controller.sock"
