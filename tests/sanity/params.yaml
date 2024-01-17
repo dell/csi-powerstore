@@ -1,0 +1,5 @@
+arrayID: "unique"
+csi.storage.k8s.io/fstype: "nfs"
+nasName: "nas-server"
+allowRoot: "false"
+# nfsAcls: "0777"

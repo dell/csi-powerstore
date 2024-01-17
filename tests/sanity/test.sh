@@ -28,15 +28,25 @@ kubectl run csi-sanity --image=$IMAGE --overrides='
 			"stdinOnce": true,
 			"tty": true,
 			"command": ["/app/csi-sanity/csi-sanity"],
-			"args": ["--ginkgo.v", "--csi.endpoint=/csi.sock", "--csi.mountdir=/dev/mnt", "--csi.stagingdir=/dev/stg"],
+			"args": ["--ginkgo.v", "--csi.controllerendpoint=/controller.sock", "--csi.endpoint=/node.sock", "--csi.testvolumeparameters=/root/params.yaml", "--ginkgo.junit-report=/report.xml"],
 			"volumeMounts": [{
-				"name": "socket",
-				"mountPath": "/csi.sock"
+				"name": "controller-socket",
+				"mountPath": "/controller.sock"
+			},
+			{
+				"name": "node-socket",
+				"mountPath": "/node.sock"
 			}]
 			}
 		],
 		"volumes": [{
-			"name":"socket",
+			"name":"controller-socket",
+			"hostPath":{
+				"path": "/var/run/csi/csi.sock"
+			}
+		},
+		{
+			"name":"node-socket",
 			"hostPath":{
 				"path": "/var/lib/kubelet/plugins/csi-powerstore.dellemc.com/csi_sock"
 			}
