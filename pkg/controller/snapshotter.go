@@ -81,7 +81,7 @@ func (f FilesystemSnapshot) GetID() string {
 
 // GetSourceID returns ID of the volume/fs that snapshot was created from
 func (f FilesystemSnapshot) GetSourceID() string {
-	return f.ParentId
+	return f.ParentID
 }
 
 // GetSize returns current size of the snapshot

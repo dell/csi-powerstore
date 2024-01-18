@@ -746,11 +746,11 @@ func GetServiceTag(ctx context.Context, req *csi.CreateVolumeRequest, arr *array
 				if err != nil {
 					log.Warn("Received error while calling GetNAS ", err.Error())
 				}
-				if nas.CurrentNodeId == "" {
+				if nas.CurrentNodeID == "" {
 					log.Warn("Unable to fetch the CurrentNodeId from the nas server")
 				} else {
 					// Removing "-node-X" from the end of CurrentNodeId to get Appliance Name
-					applianceName = strings.Split(nas.CurrentNodeId, "-node-")[0]
+					applianceName = strings.Split(nas.CurrentNodeID, "-node-")[0]
 					// Fetching appliance information using the appliance name
 					ap, err = arr.Client.GetApplianceByName(ctx, applianceName)
 					if err != nil {
