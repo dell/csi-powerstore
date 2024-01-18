@@ -184,7 +184,6 @@ func (s *SCSIPublisher) addTargetsInfoToPublishContext(
 		publishContext[fmt.Sprintf("%s%d", common.PublishContextFCWWPNPrefix, i)] = t.WWPN
 	}
 
-	// There is no API availble for NVMeTCP and hence targets are added in node staging using goNVMe
 	nvmefcTargetInfo, err := common.GetNVMEFCTargetInfoFromStorage(client, volumeApplianceID)
 	if err != nil {
 		log.Error("error unable to get NVMeFC targets from array", err)
@@ -193,6 +192,16 @@ func (s *SCSIPublisher) addTargetsInfoToPublishContext(
 		publishContext[fmt.Sprintf("%s%d", common.PublishContextNVMEFCPortalsPrefix, i)] = t.Portal
 		publishContext[fmt.Sprintf("%s%d", common.PublishContextNVMEFCTargetsPrefix, i)] = t.Target
 	}
+
+	nvmetcpTargetInfo, err := common.GetNVMETCPTargetsInfoFromStorage(client, volumeApplianceID)
+	if err != nil {
+		log.Error("error unable to get NVMeTCP targets from array", err)
+	}
+	for i, t := range nvmetcpTargetInfo {
+		publishContext[fmt.Sprintf("%s%d", common.PublishContextNVMETCPPortalsPrefix, i)] = t.Portal
+		publishContext[fmt.Sprintf("%s%d", common.PublishContextNVMETCPTargetsPrefix, i)] = t.Target
+	}
+
 	// If the system is not capable of any protocol, then we will through the error
 	if len(iscsiTargetsInfo) == 0 && len(fcTargetsInfo) == 0 && len(nvmefcTargetInfo) == 0 {
 		return errors.New("unable to get targets for any protocol")
@@ -274,12 +283,12 @@ func (n *NfsPublisher) Publish(ctx context.Context, req *csi.ControllerPublishVo
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failure getting nas %s", err.Error())
 	}
-	fileInterface, err := client.GetFileInterface(ctx, nas.CurrentPreferredIPv4InterfaceId)
+	fileInterface, err := client.GetFileInterface(ctx, nas.CurrentPreferredIPv4InterfaceID)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failure getting file interface %s", err.Error())
 	}
 	publishContext[KeyNasName] = nas.Name // we need to pass that to node part of the driver
-	publishContext[common.KeyNfsExportPath] = fileInterface.IpAddress + ":/" + export.Name
+	publishContext[common.KeyNfsExportPath] = fileInterface.IPAddress + ":/" + export.Name
 	publishContext[common.KeyHostIP] = ipWithNat[0]
 	if n.ExternalAccess != "" {
 		parsedExternalAccess, _ := common.GetIPListWithMaskFromString(n.ExternalAccess)

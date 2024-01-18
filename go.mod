@@ -2,6 +2,7 @@ module github.com/dell/csi-powerstore/v2
 
 go 1.21
 
+replace	github.com/dell/gopowerstore => ../gopowerstore
 require (
 	github.com/akutz/gosync v0.1.0
 	github.com/apparentlymart/go-cidr v1.1.0
