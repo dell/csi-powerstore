@@ -203,7 +203,7 @@ func (s *SCSIPublisher) addTargetsInfoToPublishContext(
 	}
 
 	// If the system is not capable of any protocol, then we will through the error
-	if len(iscsiTargetsInfo) == 0 && len(fcTargetsInfo) == 0 && len(nvmefcTargetInfo) == 0 {
+	if len(iscsiTargetsInfo) == 0 && len(fcTargetsInfo) == 0 && len(nvmefcTargetInfo) == 0 && len(nvmetcpTargetInfo) == 0 {
 		return errors.New("unable to get targets for any protocol")
 	}
 	return nil

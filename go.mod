@@ -2,7 +2,6 @@ module github.com/dell/csi-powerstore/v2
 
 go 1.21
 
-replace	github.com/dell/gopowerstore => ../gopowerstore
 require (
 	github.com/akutz/gosync v0.1.0
 	github.com/apparentlymart/go-cidr v1.1.0
@@ -17,7 +16,7 @@ require (
 	github.com/dell/gofsutil v1.14.0
 	github.com/dell/goiscsi v1.8.0
 	github.com/dell/gonvme v1.6.0
-	github.com/dell/gopowerstore v1.14.0
+	github.com/dell/gopowerstore v1.14.1-0.20240123112046-ec40aaf31242
 	github.com/fsnotify/fsnotify v1.7.0
 	github.com/go-openapi/strfmt v0.21.3
 	github.com/golang/mock v1.6.0

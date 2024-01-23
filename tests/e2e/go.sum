@@ -114,6 +114,7 @@ github.com/dell/gonvme v1.6.0 h1:Y/g0Ml8E3oSB+bqGJN1/U+V621h9t0KJeYAF5aQ7NVU=
 github.com/dell/gonvme v1.6.0/go.mod h1:/UgJAlR03LbPSDIK2BfhiYUlzyY7lAMJ6ao8eYab2Eg=
 github.com/dell/gopowerstore v1.14.0 h1:j4wSn25X2AH2t3/ySNPHmNWjqM0zHDkYyDPt+0uE8cc=
 github.com/dell/gopowerstore v1.14.0/go.mod h1:YH3SpMX2dr3ouYWWPhk5lzjip3aaVVksFOSoenRDY5w=
+github.com/dell/gopowerstore v1.14.1-0.20240123112046-ec40aaf31242/go.mod h1:YH3SpMX2dr3ouYWWPhk5lzjip3aaVVksFOSoenRDY5w=
 github.com/dgrijalva/jwt-go v3.2.0+incompatible/go.mod h1:E3ru+11k8xSBh+hMPgOLZmtrrCbhqsmaPHjLKYnJCaQ=
 github.com/dgryski/go-sip13 v0.0.0-20181026042036-e10d5fee7954/go.mod h1:vAd38F8PWV+bWy6jNmig1y/TA+kYO4g3RSRF0IAv0no=
 github.com/distribution/reference v0.5.0 h1:/FUIFXtfc/x2gpa5/VGfiGLuOIdYa1t65IKK2OFGvA0=

@@ -974,7 +974,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 				scsiStageVolumeOK(utilMock, fsMock)
 				res, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
-					VolumeID:          validBlockVolumeID,
+					VolumeId:          validBlockVolumeID,
 					PublishContext:    getValidPublishContext(),
 					StagingTargetPath: nodeStagePrivateDir,
 					VolumeCapability: getCapabilityWithVoltypeAccessFstype(
@@ -996,7 +996,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 				scsiStageVolumeOK(utilMock, fsMock)
 				res, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
-					VolumeID:          validBlockVolumeID,
+					VolumeId:          validBlockVolumeID,
 					PublishContext:    getValidPublishContext(),
 					StagingTargetPath: nodeStagePrivateDir,
 					VolumeCapability: getCapabilityWithVoltypeAccessFstype(
@@ -1017,7 +1017,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 				scsiStageVolumeOK(utilMock, fsMock)
 				res, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
-					VolumeID:          validBlockVolumeID,
+					VolumeId:          validBlockVolumeID,
 					PublishContext:    getValidPublishContext(),
 					StagingTargetPath: nodeStagePrivateDir,
 					VolumeCapability: getCapabilityWithVoltypeAccessFstype(
@@ -1043,7 +1043,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				publishContext["NfsExportPath"] = validNfsExportPath
 
 				res, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
-					VolumeID:          validNfsVolumeID,
+					VolumeId:          validNfsVolumeID,
 					PublishContext:    publishContext,
 					StagingTargetPath: nodeStagePrivateDir,
 					VolumeCapability: getCapabilityWithVoltypeAccessFstype(
@@ -1085,7 +1085,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				nfsv4ACLsMock.On("SetNfsv4Acls", mock.Anything, mock.Anything).Return(nil)
 
 				res, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
-					VolumeID:          validNfsVolumeID,
+					VolumeId:          validNfsVolumeID,
 					PublishContext:    publishContext,
 					StagingTargetPath: nodeStagePrivateDir,
 					VolumeCapability: getCapabilityWithVoltypeAccessFstype(
@@ -1126,7 +1126,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				clientMock.On("GetNfsServer", mock.Anything, mock.Anything).Return(gopowerstore.NFSServerInstance{ID: validNfsServerID, IsNFSv4Enabled: true}, nil)
 
 				nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
-					VolumeID:          validNfsVolumeID,
+					VolumeId:          validNfsVolumeID,
 					PublishContext:    publishContext,
 					StagingTargetPath: nodeStagePrivateDir,
 					VolumeCapability: getCapabilityWithVoltypeAccessFstype(
@@ -1154,7 +1154,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				utilMock.On("GetDiskFormat", mock.Anything, stagingPath).Return("", nil)
 
 				res, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
-					VolumeID:          validBlockVolumeID,
+					VolumeId:          validBlockVolumeID,
 					PublishContext:    getValidPublishContext(),
 					StagingTargetPath: nodeStagePrivateDir,
 					VolumeCapability: getCapabilityWithVoltypeAccessFstype(
@@ -1180,7 +1180,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				utilMock.On("GetDiskFormat", mock.Anything, stagingPath).Return("", nil)
 
 				res, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
-					VolumeID:          validNfsVolumeID,
+					VolumeId:          validNfsVolumeID,
 					PublishContext:    publishContext,
 					StagingTargetPath: nodeStagePrivateDir,
 					VolumeCapability: getCapabilityWithVoltypeAccessFstype(
@@ -1220,7 +1220,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 			ginkgo.It("should fail", func() {
 				req := &csi.NodeStageVolumeRequest{
 					VolumeCapability: getCapabilityWithVoltypeAccessFstype("mount", "single-writer", "ext4"),
-					VolumeID:         validBlockVolumeID,
+					VolumeId:         validBlockVolumeID,
 				}
 
 				res, err := nodeSvc.NodeStageVolume(context.Background(), req)
@@ -1264,7 +1264,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				fsMock.On("Remove", stagingPath).Return(nil).Once()
 
 				res, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
-					VolumeID:          validBlockVolumeID,
+					VolumeId:          validBlockVolumeID,
 					PublishContext:    getValidPublishContext(),
 					StagingTargetPath: nodeStagePrivateDir,
 					VolumeCapability: getCapabilityWithVoltypeAccessFstype(
@@ -1282,7 +1282,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					fsMock.On("IsDeviceOrResourceBusy", e).Return(false)
 
 					res, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
-						VolumeID:          validBlockVolumeID,
+						VolumeId:          validBlockVolumeID,
 						PublishContext:    getValidPublishContext(),
 						StagingTargetPath: nodeStagePrivateDir,
 						VolumeCapability: getCapabilityWithVoltypeAccessFstype(
@@ -1298,7 +1298,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 		ginkgo.When("publish context is incorrect", func() {
 			ginkgo.It("should fail [deviceWWN]", func() {
 				res, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
-					VolumeID:          validBlockVolumeID,
+					VolumeId:          validBlockVolumeID,
 					PublishContext:    map[string]string{},
 					StagingTargetPath: nodeStagePrivateDir,
 					VolumeCapability: getCapabilityWithVoltypeAccessFstype(
@@ -1311,7 +1311,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 			ginkgo.It("should fail [volumeLUNAddress]", func() {
 				res, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
-					VolumeID: validBlockVolumeID,
+					VolumeId: validBlockVolumeID,
 					PublishContext: map[string]string{
 						common.PublishContextDeviceWWN: validDeviceWWN,
 					},
@@ -1326,7 +1326,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 			ginkgo.It("should fail [iscsiTargets]", func() {
 				res, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
-					VolumeID: validBlockVolumeID,
+					VolumeId: validBlockVolumeID,
 					PublishContext: map[string]string{
 						common.PublishContextDeviceWWN:  validDeviceWWN,
 						common.PublishContextLUNAddress: validLUNID,
@@ -1344,7 +1344,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				nodeSvc.useNVME = true
 				nodeSvc.useFC = true
 				res, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
-					VolumeID: validBlockVolumeID,
+					VolumeId: validBlockVolumeID,
 					PublishContext: map[string]string{
 						common.PublishContextDeviceWWN:  validDeviceWWN,
 						common.PublishContextLUNAddress: validLUNID,
@@ -1361,7 +1361,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 			ginkgo.It("should fail [fcTargets]", func() {
 				nodeSvc.useFC = true
 				res, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
-					VolumeID: validBlockVolumeID,
+					VolumeId: validBlockVolumeID,
 					PublishContext: map[string]string{
 						common.PublishContextDeviceWWN:  validDeviceWWN,
 						common.PublishContextLUNAddress: validLUNID,
@@ -1386,7 +1386,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 				scsiStageVolumeOK(utilMock, fsMock)
 				res, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
-					VolumeID:          validBlockVolumeID,
+					VolumeId:          validBlockVolumeID,
 					PublishContext:    getValidPublishContext(),
 					StagingTargetPath: nodeStagePrivateDir,
 					VolumeCapability: getCapabilityWithVoltypeAccessFstype(
@@ -1413,7 +1413,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				utilMock.On("BindMount", mock.Anything, "/dev", filepath.Join(nodeStagePrivateDir, validBaseVolumeID)).Return(e)
 
 				res, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
-					VolumeID:          validBlockVolumeID,
+					VolumeId:          validBlockVolumeID,
 					PublishContext:    getValidPublishContext(),
 					StagingTargetPath: nodeStagePrivateDir,
 					VolumeCapability: getCapabilityWithVoltypeAccessFstype(
@@ -1453,7 +1453,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				fsMock.On("IsNotExist", mock.Anything).Return(false)
 
 				res, err := nodeSvc.NodeUnstageVolume(context.Background(), &csi.NodeUnstageVolumeRequest{
-					VolumeID:          validBlockVolumeID,
+					VolumeId:          validBlockVolumeID,
 					StagingTargetPath: nodeStagePrivateDir,
 				})
 				gomega.Expect(err).To(gomega.BeNil())
@@ -1482,7 +1482,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				fsMock.On("IsNotExist", mock.Anything).Return(false)
 
 				_, err := nodeSvc.NodeUnstageVolume(context.Background(), &csi.NodeUnstageVolumeRequest{
-					VolumeID:          validBlockVolumeID,
+					VolumeId:          validBlockVolumeID,
 					StagingTargetPath: "",
 				})
 				gomega.Expect(err.Error()).To(gomega.ContainSubstring("staging target path is required"))
@@ -1510,7 +1510,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				fsMock.On("IsNotExist", mock.Anything).Return(false)
 
 				_, err := nodeSvc.NodeUnstageVolume(context.Background(), &csi.NodeUnstageVolumeRequest{
-					VolumeID:          validBlockVolumeID,
+					VolumeId:          validBlockVolumeID,
 					StagingTargetPath: nodeStagePrivateDir,
 				})
 				gomega.Expect(err.Error()).To(gomega.ContainSubstring("could not reliably determine existing mount for path"))
@@ -1538,7 +1538,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				fsMock.On("IsNotExist", mock.Anything).Return(false)
 
 				_, err := nodeSvc.NodeUnstageVolume(context.Background(), &csi.NodeUnstageVolumeRequest{
-					VolumeID:          validBlockVolumeID,
+					VolumeId:          validBlockVolumeID,
 					StagingTargetPath: nodeStagePrivateDir,
 				})
 				gomega.Expect(err.Error()).To(gomega.ContainSubstring("could not unmount de"))
@@ -1566,7 +1566,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				fsMock.On("IsNotExist", mock.Anything).Return(false)
 
 				res, err := nodeSvc.NodeUnstageVolume(context.Background(), &csi.NodeUnstageVolumeRequest{
-					VolumeID:          validBlockVolumeID,
+					VolumeId:          validBlockVolumeID,
 					StagingTargetPath: nodeStagePrivateDir,
 				})
 				gomega.Expect(err).To(gomega.BeNil())
@@ -1596,7 +1596,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				fsMock.On("IsNotExist", mock.Anything).Return(false)
 
 				res, err := nodeSvc.NodeUnstageVolume(context.Background(), &csi.NodeUnstageVolumeRequest{
-					VolumeID:          validBlockVolumeID,
+					VolumeId:          validBlockVolumeID,
 					StagingTargetPath: nodeStagePrivateDir,
 				})
 				gomega.Expect(err).To(gomega.BeNil())
@@ -1627,7 +1627,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				fsMock.On("IsNotExist", mock.Anything).Return(false)
 
 				res, err := nodeSvc.NodeUnstageVolume(context.Background(), &csi.NodeUnstageVolumeRequest{
-					VolumeID:          validBlockVolumeID,
+					VolumeId:          validBlockVolumeID,
 					StagingTargetPath: nodeStagePrivateDir,
 				})
 				gomega.Expect(err).To(gomega.BeNil())
@@ -1664,7 +1664,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				fsMock.On("Remove", path.Join(nodeSvc.opts.TmpDir, validBaseVolumeID)).Return(nil)
 
 				res, err := nodeSvc.NodeUnstageVolume(context.Background(), &csi.NodeUnstageVolumeRequest{
-					VolumeID:          validBlockVolumeID,
+					VolumeId:          validBlockVolumeID,
 					StagingTargetPath: nodeStagePrivateDir,
 				})
 				gomega.Expect(err).To(gomega.BeNil())
@@ -1689,7 +1689,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				fsMock.On("Remove", stagingPath).Return(nil)
 
 				res, err := nodeSvc.NodeUnstageVolume(context.Background(), &csi.NodeUnstageVolumeRequest{
-					VolumeID:          validNfsVolumeID,
+					VolumeId:          validNfsVolumeID,
 					StagingTargetPath: nodeStagePrivateDir,
 				})
 				gomega.Expect(err).To(gomega.BeNil())
@@ -1713,7 +1713,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				utilMock.On("Mount", mock.Anything, stagingPath, validTargetPath, "").Return(nil)
 
 				res, err := nodeSvc.NodePublishVolume(context.Background(), &csi.NodePublishVolumeRequest{
-					VolumeID:          validBlockVolumeID,
+					VolumeId:          validBlockVolumeID,
 					PublishContext:    getValidPublishContext(),
 					StagingTargetPath: validStagingPath,
 					TargetPath:        validTargetPath,
@@ -1736,7 +1736,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				utilMock.On("Mount", mock.Anything, stagingPath, validTargetPath, "").Return(nil)
 
 				_, err := nodeSvc.NodePublishVolume(context.Background(), &csi.NodePublishVolumeRequest{
-					VolumeID:          validBlockVolumeID,
+					VolumeId:          validBlockVolumeID,
 					PublishContext:    getValidPublishContext(),
 					StagingTargetPath: validStagingPath,
 					TargetPath:        validTargetPath,
@@ -1758,7 +1758,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				utilMock.On("Mount", mock.Anything, stagingPath, validTargetPath, "ext4", "ro").Return(nil)
 
 				_, err := nodeSvc.NodePublishVolume(context.Background(), &csi.NodePublishVolumeRequest{
-					VolumeID:          validBlockVolumeID,
+					VolumeId:          validBlockVolumeID,
 					PublishContext:    getValidPublishContext(),
 					StagingTargetPath: validStagingPath,
 					TargetPath:        validTargetPath,
@@ -1780,7 +1780,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				utilMock.On("Mount", mock.Anything, stagingPath, validTargetPath, "").Return(nil)
 
 				_, err := nodeSvc.NodePublishVolume(context.Background(), &csi.NodePublishVolumeRequest{
-					VolumeID:          validBlockVolumeID,
+					VolumeId:          validBlockVolumeID,
 					PublishContext:    getValidPublishContext(),
 					StagingTargetPath: validStagingPath,
 					TargetPath:        validTargetPath,
@@ -1802,7 +1802,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				utilMock.On("Mount", mock.Anything, stagingPath, validTargetPath, "").Return(nil)
 
 				_, err := nodeSvc.NodePublishVolume(context.Background(), &csi.NodePublishVolumeRequest{
-					VolumeID:          validBlockVolumeID,
+					VolumeId:          validBlockVolumeID,
 					PublishContext:    getValidPublishContext(),
 					StagingTargetPath: validStagingPath,
 					TargetPath:        validTargetPath,
@@ -1824,7 +1824,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				utilMock.On("Mount", mock.Anything, stagingPath, validTargetPath, "ext4").Return(nil)
 
 				_, err := nodeSvc.NodePublishVolume(context.Background(), &csi.NodePublishVolumeRequest{
-					VolumeID:          validBlockVolumeID,
+					VolumeId:          validBlockVolumeID,
 					PublishContext:    getValidPublishContext(),
 					StagingTargetPath: validStagingPath,
 					TargetPath:        validTargetPath,
@@ -1846,7 +1846,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				utilMock.On("Mount", mock.Anything, stagingPath, validTargetPath, "").Return(nil)
 
 				_, err := nodeSvc.NodePublishVolume(context.Background(), &csi.NodePublishVolumeRequest{
-					VolumeID:          validBlockVolumeID,
+					VolumeId:          validBlockVolumeID,
 					PublishContext:    getValidPublishContext(),
 					StagingTargetPath: validStagingPath,
 					TargetPath:        validTargetPath,
@@ -1866,7 +1866,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				utilMock.On("BindMount", mock.Anything, stagingPath, validTargetPath).Return(nil)
 
 				res, err := nodeSvc.NodePublishVolume(context.Background(), &csi.NodePublishVolumeRequest{
-					VolumeID:          validBlockVolumeID,
+					VolumeId:          validBlockVolumeID,
 					PublishContext:    getValidPublishContext(),
 					StagingTargetPath: validStagingPath,
 					TargetPath:        validTargetPath,
@@ -1887,7 +1887,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				utilMock.On("BindMount", mock.Anything, stagingPath, validTargetPath, "ro").Return(nil)
 
 				_, err := nodeSvc.NodePublishVolume(context.Background(), &csi.NodePublishVolumeRequest{
-					VolumeID:          validBlockVolumeID,
+					VolumeId:          validBlockVolumeID,
 					PublishContext:    getValidPublishContext(),
 					StagingTargetPath: validStagingPath,
 					TargetPath:        validTargetPath,
@@ -1907,7 +1907,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				utilMock.On("BindMount", mock.Anything, stagingPath, validTargetPath).Return(nil)
 
 				_, err := nodeSvc.NodePublishVolume(context.Background(), &csi.NodePublishVolumeRequest{
-					VolumeID:          validBlockVolumeID,
+					VolumeId:          validBlockVolumeID,
 					PublishContext:    getValidPublishContext(),
 					StagingTargetPath: validStagingPath,
 					TargetPath:        validTargetPath,
@@ -1927,7 +1927,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				utilMock.On("BindMount", mock.Anything, stagingPath, validTargetPath).Return(errors.New("failed to bind"))
 
 				_, err := nodeSvc.NodePublishVolume(context.Background(), &csi.NodePublishVolumeRequest{
-					VolumeID:          validBlockVolumeID,
+					VolumeId:          validBlockVolumeID,
 					PublishContext:    getValidPublishContext(),
 					StagingTargetPath: validStagingPath,
 					TargetPath:        validTargetPath,
@@ -1949,7 +1949,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				utilMock.On("BindMount", mock.Anything, stagingPath, validTargetPath).Return(nil)
 
 				res, err := nodeSvc.NodePublishVolume(context.Background(), &csi.NodePublishVolumeRequest{
-					VolumeID:          validNfsVolumeID,
+					VolumeId:          validNfsVolumeID,
 					PublishContext:    getValidPublishContext(),
 					StagingTargetPath: validStagingPath,
 					TargetPath:        validTargetPath,
@@ -1963,7 +1963,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 		ginkgo.When("No volume ID specified", func() {
 			ginkgo.It("should fail", func() {
 				res, err := nodeSvc.NodePublishVolume(context.Background(), &csi.NodePublishVolumeRequest{
-					VolumeID:          "",
+					VolumeId:          "",
 					PublishContext:    getValidPublishContext(),
 					StagingTargetPath: validStagingPath,
 					TargetPath:        validTargetPath,
@@ -1977,7 +1977,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 		ginkgo.When("No target path specified", func() {
 			ginkgo.It("should fail", func() {
 				res, err := nodeSvc.NodePublishVolume(context.Background(), &csi.NodePublishVolumeRequest{
-					VolumeID:          validBlockVolumeID,
+					VolumeId:          validBlockVolumeID,
 					PublishContext:    getValidPublishContext(),
 					StagingTargetPath: validStagingPath,
 					TargetPath:        "",
@@ -1991,7 +1991,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 		ginkgo.When("Invalid volume capabilities specified", func() {
 			ginkgo.It("should fail", func() {
 				res, err := nodeSvc.NodePublishVolume(context.Background(), &csi.NodePublishVolumeRequest{
-					VolumeID:          validBlockVolumeID,
+					VolumeId:          validBlockVolumeID,
 					PublishContext:    getValidPublishContext(),
 					StagingTargetPath: validStagingPath,
 					TargetPath:        validTargetPath,
@@ -2005,7 +2005,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 		ginkgo.When("No staging target path specified", func() {
 			ginkgo.It("should fail", func() {
 				res, err := nodeSvc.NodePublishVolume(context.Background(), &csi.NodePublishVolumeRequest{
-					VolumeID:          validBlockVolumeID,
+					VolumeId:          validBlockVolumeID,
 					PublishContext:    getValidPublishContext(),
 					StagingTargetPath: "",
 					TargetPath:        validTargetPath,
@@ -2028,7 +2028,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				utilMock.On("BindMount", mock.Anything, stagingPath, validTargetPath).Return(nil)
 
 				_, err := nodeSvc.NodePublishVolume(context.Background(), &csi.NodePublishVolumeRequest{
-					VolumeID:          validNfsVolumeID,
+					VolumeId:          validNfsVolumeID,
 					PublishContext:    getValidPublishContext(),
 					StagingTargetPath: validStagingPath,
 					TargetPath:        validTargetPath,
@@ -2050,7 +2050,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				utilMock.On("BindMount", mock.Anything, stagingPath, validTargetPath, "ro").Return(nil)
 
 				res, err := nodeSvc.NodePublishVolume(context.Background(), &csi.NodePublishVolumeRequest{
-					VolumeID:          validNfsVolumeID,
+					VolumeId:          validNfsVolumeID,
 					PublishContext:    getValidPublishContext(),
 					StagingTargetPath: validStagingPath,
 					TargetPath:        validTargetPath,
@@ -2073,7 +2073,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				utilMock.On("BindMount", mock.Anything, stagingPath, validTargetPath, "ro").Return(errors.New("bind failed"))
 
 				_, err := nodeSvc.NodePublishVolume(context.Background(), &csi.NodePublishVolumeRequest{
-					VolumeID:          validNfsVolumeID,
+					VolumeId:          validNfsVolumeID,
 					PublishContext:    getValidPublishContext(),
 					StagingTargetPath: validStagingPath,
 					TargetPath:        validTargetPath,
@@ -2103,7 +2103,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				utilMock.On("Unmount", mock.Anything, validTargetPath).Return(nil)
 
 				res, err := nodeSvc.NodeUnpublishVolume(context.Background(), &csi.NodeUnpublishVolumeRequest{
-					VolumeID:   validBlockVolumeID,
+					VolumeId:   validBlockVolumeID,
 					TargetPath: validTargetPath,
 				})
 				gomega.Expect(err).To(gomega.BeNil())
@@ -2127,7 +2127,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				utilMock.On("Unmount", mock.Anything, validTargetPath).Return(nil)
 
 				res, err := nodeSvc.NodeUnpublishVolume(context.Background(), &csi.NodeUnpublishVolumeRequest{
-					VolumeID:   validNfsVolumeID,
+					VolumeId:   validNfsVolumeID,
 					TargetPath: validTargetPath,
 				})
 				gomega.Expect(err).To(gomega.BeNil())
@@ -2137,7 +2137,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 		ginkgo.When("No target path specified", func() {
 			ginkgo.It("should fail", func() {
 				res, err := nodeSvc.NodeUnpublishVolume(context.Background(), &csi.NodeUnpublishVolumeRequest{
-					VolumeID:   validBlockVolumeID,
+					VolumeId:   validBlockVolumeID,
 					TargetPath: "",
 				})
 				gomega.Expect(err.Error()).To(gomega.Equal("rpc error: code = InvalidArgument desc = target path required"))
@@ -2147,7 +2147,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 		ginkgo.When("Unable to get volID", func() {
 			ginkgo.It("should fail", func() {
 				res, err := nodeSvc.NodeUnpublishVolume(context.Background(), &csi.NodeUnpublishVolumeRequest{
-					VolumeID:   "",
+					VolumeId:   "",
 					TargetPath: validTargetPath,
 				})
 				gomega.Expect(err.Error()).To(gomega.Equal("rpc error: code = InvalidArgument desc = volume ID is required"))
@@ -2161,7 +2161,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return(nil, errors.New("error"))
 				fsMock.On("Stat", mock.Anything).Return(&mocks.FileInfo{}, os.ErrNotExist)
 				res, err := nodeSvc.NodeUnpublishVolume(context.Background(), &csi.NodeUnpublishVolumeRequest{
-					VolumeID:   validBlockVolumeID,
+					VolumeId:   validBlockVolumeID,
 					TargetPath: validTargetPath,
 				})
 				gomega.Expect(err.Error()).To(gomega.ContainSubstring("could not reliably determine existing mount status"))
@@ -2184,7 +2184,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				fsMock.On("Stat", mock.Anything).Return(&mocks.FileInfo{}, os.ErrNotExist)
 				utilMock.On("Unmount", mock.Anything, validTargetPath).Return(errors.New("Unmount failed"))
 				res, err := nodeSvc.NodeUnpublishVolume(context.Background(), &csi.NodeUnpublishVolumeRequest{
-					VolumeID:   validBlockVolumeID,
+					VolumeId:   validBlockVolumeID,
 					TargetPath: validTargetPath,
 				})
 				gomega.Expect(err.Error()).To(gomega.ContainSubstring("could not unmount dev"))
@@ -2408,7 +2408,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				}, nil)
 
 				_, err := nodeSvc.NodeExpandVolume(context.Background(), &csi.NodeExpandVolumeRequest{
-					VolumeID:   validBlockVolumeID,
+					VolumeId:   validBlockVolumeID,
 					VolumePath: "",
 					CapacityRange: &csi.CapacityRange{
 						RequiredBytes: 2234234,
@@ -2431,7 +2431,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				}, errors.New("err")).Times(1)
 
 				_, err := nodeSvc.NodeExpandVolume(context.Background(), &csi.NodeExpandVolumeRequest{
-					VolumeID:   validBlockVolumeID,
+					VolumeId:   validBlockVolumeID,
 					VolumePath: validTargetPath,
 					CapacityRange: &csi.CapacityRange{
 						RequiredBytes: 2234234,
@@ -2615,7 +2615,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				ctrlMock.On("CreateVolume", mock.Anything, mock.Anything).Return(&csi.CreateVolumeResponse{
 					Volume: &csi.Volume{
 						CapacityBytes: validVolSize,
-						VolumeID:      filepath.Join(validBaseVolumeID, firstValidIP, "scsi"),
+						VolumeId:      filepath.Join(validBaseVolumeID, firstValidIP, "scsi"),
 						VolumeContext: map[string]string{
 							common.KeyArrayID: firstValidIP,
 						},
@@ -2648,7 +2648,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				fsMock.On("ExecCommand", "mkfs.ext4", "-E", "nodiscard", "-F", mock.Anything).Return([]byte{}, nil)
 				utilMock.On("Mount", mock.Anything, mock.Anything, mock.Anything, "ext4").Return(nil)
 				res, err := nodeSvc.NodePublishVolume(context.Background(), &csi.NodePublishVolumeRequest{
-					VolumeID:          validBlockVolumeID,
+					VolumeId:          validBlockVolumeID,
 					PublishContext:    getValidPublishContext(),
 					StagingTargetPath: validStagingPath,
 					TargetPath:        validTargetPath,
@@ -2681,15 +2681,15 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				}).Return(&csi.CreateVolumeResponse{
 					Volume: &csi.Volume{
 						CapacityBytes: validVolSize,
-						VolumeID:      filepath.Join(validBaseVolumeID, firstValidIP, "scsi"),
+						VolumeId:      filepath.Join(validBaseVolumeID, firstValidIP, "scsi"),
 						VolumeContext: map[string]string{
 							common.KeyArrayID: firstValidIP,
 						},
 					},
 				}, nil)
 				ctrlMock.On("ControllerPublishVolume", mock.Anything, &csi.ControllerPublishVolumeRequest{
-					VolumeID: validBlockVolumeID,
-					NodeID:   validNodeID,
+					VolumeId: validBlockVolumeID,
+					NodeId:   validNodeID,
 					VolumeContext: map[string]string{
 						common.KeyArrayID: firstValidIP,
 					},
@@ -2721,7 +2721,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				utilMock.On("Unmount", mock.Anything, mock.Anything).Return(nil)
 
 				_, err := nodeSvc.NodePublishVolume(context.Background(), &csi.NodePublishVolumeRequest{
-					VolumeID:          validBlockVolumeID,
+					VolumeId:          validBlockVolumeID,
 					PublishContext:    getValidPublishContext(),
 					StagingTargetPath: validStagingPath,
 					TargetPath:        validTargetPath,
@@ -2744,7 +2744,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				ctrlMock.On("CreateVolume", mock.Anything, mock.Anything).Return(&csi.CreateVolumeResponse{
 					Volume: &csi.Volume{
 						CapacityBytes: validVolSize,
-						VolumeID:      filepath.Join(validBaseVolumeID, firstValidIP, "scsi"),
+						VolumeId:      filepath.Join(validBaseVolumeID, firstValidIP, "scsi"),
 						VolumeContext: map[string]string{
 							common.KeyArrayID: firstValidIP,
 						},
@@ -2788,7 +2788,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				utilMock.On("Unmount", mock.Anything, mock.Anything).Return(nil)
 
 				_, err := nodeSvc.NodePublishVolume(context.Background(), &csi.NodePublishVolumeRequest{
-					VolumeID:          validBlockVolumeID,
+					VolumeId:          validBlockVolumeID,
 					PublishContext:    getValidPublishContext(),
 					StagingTargetPath: validStagingPath,
 					TargetPath:        validTargetPath,
@@ -2807,7 +2807,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				fsMock.On("Stat", mock.Anything).Return(&mocks.FileInfo{}, nil)
 				fsMock.On("MkdirAll", mock.Anything, mock.Anything).Return(nil).Times(2)
 				_, err := nodeSvc.NodePublishVolume(context.Background(), &csi.NodePublishVolumeRequest{
-					VolumeID:          validBlockVolumeID,
+					VolumeId:          validBlockVolumeID,
 					PublishContext:    getValidPublishContext(),
 					StagingTargetPath: validStagingPath,
 					TargetPath:        validTargetPath,
@@ -2826,7 +2826,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				fsMock.On("Stat", mock.Anything).Return(&mocks.FileInfo{}, os.ErrNotExist)
 				fsMock.On("MkdirAll", mock.Anything, mock.Anything).Return(errors.New("err")).Times(2)
 				_, err := nodeSvc.NodePublishVolume(context.Background(), &csi.NodePublishVolumeRequest{
-					VolumeID:          validBlockVolumeID,
+					VolumeId:          validBlockVolumeID,
 					PublishContext:    getValidPublishContext(),
 					StagingTargetPath: validStagingPath,
 					TargetPath:        validTargetPath,
@@ -2849,14 +2849,14 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				ctrlMock.On("CreateVolume", mock.Anything, mock.Anything).Return(&csi.CreateVolumeResponse{
 					Volume: &csi.Volume{
 						CapacityBytes: validVolSize,
-						VolumeID:      filepath.Join(validBaseVolumeID, firstValidIP, "scsi"),
+						VolumeId:      filepath.Join(validBaseVolumeID, firstValidIP, "scsi"),
 						VolumeContext: map[string]string{
 							common.KeyArrayID: firstValidIP,
 						},
 					},
 				}, errors.New("Failed"))
 				_, err := nodeSvc.NodePublishVolume(context.Background(), &csi.NodePublishVolumeRequest{
-					VolumeID:          validBlockVolumeID,
+					VolumeId:          validBlockVolumeID,
 					PublishContext:    getValidPublishContext(),
 					StagingTargetPath: validStagingPath,
 					TargetPath:        validTargetPath,
@@ -2879,14 +2879,14 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				ctrlMock.On("CreateVolume", mock.Anything, mock.Anything).Return(&csi.CreateVolumeResponse{
 					Volume: &csi.Volume{
 						CapacityBytes: validVolSize,
-						VolumeID:      filepath.Join(validBaseVolumeID, firstValidIP, "scsi"),
+						VolumeId:      filepath.Join(validBaseVolumeID, firstValidIP, "scsi"),
 						VolumeContext: map[string]string{
 							common.KeyArrayID: firstValidIP,
 						},
 					},
 				}, nil)
 				_, err := nodeSvc.NodePublishVolume(context.Background(), &csi.NodePublishVolumeRequest{
-					VolumeID:          validBlockVolumeID,
+					VolumeId:          validBlockVolumeID,
 					PublishContext:    getValidPublishContext(),
 					StagingTargetPath: validStagingPath,
 					TargetPath:        validTargetPath,
@@ -2909,14 +2909,14 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				ctrlMock.On("CreateVolume", mock.Anything, mock.Anything).Return(&csi.CreateVolumeResponse{
 					Volume: &csi.Volume{
 						CapacityBytes: validVolSize,
-						VolumeID:      filepath.Join(validBaseVolumeID, firstValidIP, "scsi"),
+						VolumeId:      filepath.Join(validBaseVolumeID, firstValidIP, "scsi"),
 						VolumeContext: map[string]string{
 							common.KeyArrayID: firstValidIP,
 						},
 					},
 				}, nil)
 				_, err := nodeSvc.NodePublishVolume(context.Background(), &csi.NodePublishVolumeRequest{
-					VolumeID:          validBlockVolumeID,
+					VolumeId:          validBlockVolumeID,
 					PublishContext:    getValidPublishContext(),
 					StagingTargetPath: validStagingPath,
 					TargetPath:        validTargetPath,
@@ -2940,7 +2940,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 			ctrlMock.On("CreateVolume", mock.Anything, mock.Anything).Return(&csi.CreateVolumeResponse{
 				Volume: &csi.Volume{
 					CapacityBytes: validVolSize,
-					VolumeID:      filepath.Join(validBaseVolumeID, firstValidIP, "scsi"),
+					VolumeId:      filepath.Join(validBaseVolumeID, firstValidIP, "scsi"),
 					VolumeContext: map[string]string{
 						common.KeyArrayID: firstValidIP,
 					},
@@ -2973,7 +2973,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 			fsMock.On("ExecCommand", "mkfs.xfs", "-K", mock.Anything, "-m", mock.Anything).Return([]byte{}, nil)
 			utilMock.On("Mount", mock.Anything, mock.Anything, mock.Anything, "xfs", mock.Anything).Return(errors.New("err"))
 			_, err := nodeSvc.NodePublishVolume(context.Background(), &csi.NodePublishVolumeRequest{
-				VolumeID:          validBlockVolumeID,
+				VolumeId:          validBlockVolumeID,
 				PublishContext:    getValidPublishContext(),
 				StagingTargetPath: validStagingPath,
 				TargetPath:        validTargetPath,
@@ -3015,14 +3015,14 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				fsMock.On("IsNotExist", mock.Anything).Return(false)
 				fsMock.On("ReadFile", mock.Anything).Return([]byte("Some data"), nil)
 				ctrlMock.On("ControllerUnpublishVolume", mock.Anything, &csi.ControllerUnpublishVolumeRequest{
-					VolumeID: validBlockVolumeID,
-					NodeID:   validNodeID,
+					VolumeId: validBlockVolumeID,
+					NodeId:   validNodeID,
 				}).Return(&csi.ControllerUnpublishVolumeResponse{}, nil)
 				ctrlMock.On("DeleteVolume", mock.Anything, &csi.DeleteVolumeRequest{
-					VolumeID: validBlockVolumeID,
+					VolumeId: validBlockVolumeID,
 				}).Return(&csi.DeleteVolumeResponse{}, nil)
 				res, err := nodeSvc.NodeUnpublishVolume(context.Background(), &csi.NodeUnpublishVolumeRequest{
-					VolumeID:   validBlockVolumeID,
+					VolumeId:   validBlockVolumeID,
 					TargetPath: validTargetPath,
 				})
 				gomega.Ω(err).To(gomega.BeNil())
@@ -3046,7 +3046,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				fsMock.On("GetUtil").Return(utilMock)
 				fsMock.On("ReadFile", ephemerallockfile).Return([]byte(validBlockVolumeID), os.ErrNotExist)
 				_, err := nodeSvc.NodeUnpublishVolume(context.Background(), &csi.NodeUnpublishVolumeRequest{
-					VolumeID:   validBlockVolumeID,
+					VolumeId:   validBlockVolumeID,
 					TargetPath: validTargetPath,
 				})
 				gomega.Ω(err.Error()).To(gomega.ContainSubstring("Was unable to read lockfile"))
@@ -3078,14 +3078,14 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				fsMock.On("IsNotExist", mock.Anything).Return(false)
 				fsMock.On("ReadFile", mock.Anything).Return([]byte("Some data"), nil)
 				ctrlMock.On("ControllerUnpublishVolume", mock.Anything, &csi.ControllerUnpublishVolumeRequest{
-					VolumeID: validBlockVolumeID,
-					NodeID:   validNodeID,
+					VolumeId: validBlockVolumeID,
+					NodeId:   validNodeID,
 				}).Return(&csi.ControllerUnpublishVolumeResponse{}, errors.New("failed"))
 				ctrlMock.On("DeleteVolume", mock.Anything, &csi.DeleteVolumeRequest{
-					VolumeID: validBlockVolumeID,
+					VolumeId: validBlockVolumeID,
 				}).Return(&csi.DeleteVolumeResponse{}, nil)
 				_, err := nodeSvc.NodeUnpublishVolume(context.Background(), &csi.NodeUnpublishVolumeRequest{
-					VolumeID:   validBlockVolumeID,
+					VolumeId:   validBlockVolumeID,
 					TargetPath: validTargetPath,
 				})
 				gomega.Ω(err.Error()).To(gomega.ContainSubstring("Inline ephemeral controller unpublish"))
@@ -3117,14 +3117,14 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				fsMock.On("IsNotExist", mock.Anything).Return(false)
 				fsMock.On("ReadFile", mock.Anything).Return([]byte("Some data"), nil)
 				ctrlMock.On("ControllerUnpublishVolume", mock.Anything, &csi.ControllerUnpublishVolumeRequest{
-					VolumeID: validBlockVolumeID,
-					NodeID:   validNodeID,
+					VolumeId: validBlockVolumeID,
+					NodeId:   validNodeID,
 				}).Return(&csi.ControllerUnpublishVolumeResponse{}, nil)
 				ctrlMock.On("DeleteVolume", mock.Anything, &csi.DeleteVolumeRequest{
-					VolumeID: validBlockVolumeID,
+					VolumeId: validBlockVolumeID,
 				}).Return(&csi.DeleteVolumeResponse{}, errors.New("failed"))
 				_, err := nodeSvc.NodeUnpublishVolume(context.Background(), &csi.NodeUnpublishVolumeRequest{
-					VolumeID:   validBlockVolumeID,
+					VolumeId:   validBlockVolumeID,
 					TargetPath: validTargetPath,
 				})
 				gomega.Ω(err.Error()).To(gomega.ContainSubstring("failed"))
@@ -3156,7 +3156,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
 				gomega.Expect(err).To(gomega.BeNil())
 				gomega.Expect(res).To(gomega.Equal(&csi.NodeGetInfoResponse{
-					NodeID: nodeSvc.nodeID,
+					NodeId: nodeSvc.nodeID,
 					AccessibleTopology: &csi.Topology{
 						Segments: map[string]string{
 							common.Name + "/" + firstValidIP + "-nfs":   "true",
@@ -3195,7 +3195,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
 				gomega.Expect(err).To(gomega.BeNil())
 				gomega.Expect(res).To(gomega.Equal(&csi.NodeGetInfoResponse{
-					NodeID: nodeSvc.nodeID,
+					NodeId: nodeSvc.nodeID,
 					AccessibleTopology: &csi.Topology{
 						Segments: map[string]string{
 							common.Name + "/" + firstValidIP + "-nfs":   "true",
@@ -3234,7 +3234,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
 				gomega.Expect(err).To(gomega.BeNil())
 				gomega.Expect(res).To(gomega.Equal(&csi.NodeGetInfoResponse{
-					NodeID: nodeSvc.nodeID,
+					NodeId: nodeSvc.nodeID,
 					AccessibleTopology: &csi.Topology{
 						Segments: map[string]string{
 							common.Name + "/" + firstValidIP + "-nfs":   "true",
@@ -3271,7 +3271,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
 				gomega.Expect(err).To(gomega.BeNil())
 				gomega.Expect(res).To(gomega.Equal(&csi.NodeGetInfoResponse{
-					NodeID: nodeSvc.nodeID,
+					NodeId: nodeSvc.nodeID,
 					AccessibleTopology: &csi.Topology{
 						Segments: map[string]string{
 							common.Name + "/" + firstValidIP + "-nfs":   "true",
@@ -3307,7 +3307,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
 				gomega.Expect(err).To(gomega.BeNil())
 				gomega.Expect(res).To(gomega.Equal(&csi.NodeGetInfoResponse{
-					NodeID: nodeSvc.nodeID,
+					NodeId: nodeSvc.nodeID,
 					AccessibleTopology: &csi.Topology{
 						Segments: map[string]string{
 							common.Name + "/" + firstValidIP + "-nfs":  "true",
@@ -3335,7 +3335,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 				gomega.Expect(err).To(gomega.BeNil())
 				gomega.Expect(res).To(gomega.Equal(&csi.NodeGetInfoResponse{
-					NodeID: nodeSvc.nodeID,
+					NodeId: nodeSvc.nodeID,
 					AccessibleTopology: &csi.Topology{
 						Segments: map[string]string{
 							common.Name + "/" + firstValidIP + "-nfs":  "true",
@@ -3369,7 +3369,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
 				gomega.Expect(err).To(gomega.BeNil())
 				gomega.Expect(res).To(gomega.Equal(&csi.NodeGetInfoResponse{
-					NodeID: nodeSvc.nodeID,
+					NodeId: nodeSvc.nodeID,
 					AccessibleTopology: &csi.Topology{
 						Segments: map[string]string{
 							common.Name + "/" + firstValidIP + "-nfs":  "true",
@@ -3420,7 +3420,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
 				gomega.Expect(err).To(gomega.BeNil())
 				gomega.Expect(res).To(gomega.Equal(&csi.NodeGetInfoResponse{
-					NodeID: nodeSvc.nodeID,
+					NodeId: nodeSvc.nodeID,
 					AccessibleTopology: &csi.Topology{
 						Segments: map[string]string{
 							common.Name + "/" + firstValidIP + "-nfs":  "true",
@@ -3473,7 +3473,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
 					gomega.Expect(err).To(gomega.BeNil())
 					gomega.Expect(res).To(gomega.Equal(&csi.NodeGetInfoResponse{
-						NodeID: nodeSvc.nodeID,
+						NodeId: nodeSvc.nodeID,
 						AccessibleTopology: &csi.Topology{
 							Segments: map[string]string{
 								common.Name + "/" + firstValidIP + "-nfs":  "true",
@@ -3526,7 +3526,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 						res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
 						gomega.Expect(err).To(gomega.BeNil())
 						gomega.Expect(res).To(gomega.Equal(&csi.NodeGetInfoResponse{
-							NodeID: nodeSvc.nodeID,
+							NodeId: nodeSvc.nodeID,
 							AccessibleTopology: &csi.Topology{
 								Segments: map[string]string{
 									common.Name + "/" + firstValidIP + "-nfs":  "true",
@@ -3555,7 +3555,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
 					gomega.Expect(err).To(gomega.BeNil())
 					gomega.Expect(res).To(gomega.Equal(&csi.NodeGetInfoResponse{
-						NodeID: nodeSvc.nodeID,
+						NodeId: nodeSvc.nodeID,
 						AccessibleTopology: &csi.Topology{
 							Segments: map[string]string{
 								common.Name + "/" + firstValidIP + "-nfs":  "true",
@@ -3586,7 +3586,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
 					gomega.Expect(err).To(gomega.BeNil())
 					gomega.Expect(res).To(gomega.Equal(&csi.NodeGetInfoResponse{
-						NodeID: nodeSvc.nodeID,
+						NodeId: nodeSvc.nodeID,
 						AccessibleTopology: &csi.Topology{
 							Segments: map[string]string{
 								common.Name + "/" + firstValidIP + "-nfs":  "true",
@@ -3626,7 +3626,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
 					gomega.Expect(err).To(gomega.BeNil())
 					gomega.Expect(res).To(gomega.Equal(&csi.NodeGetInfoResponse{
-						NodeID: nodeSvc.nodeID,
+						NodeId: nodeSvc.nodeID,
 						AccessibleTopology: &csi.Topology{
 							Segments: map[string]string{
 								common.Name + "/" + firstValidIP + "-nfs":  "true",
@@ -3666,7 +3666,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
 				gomega.Expect(err).To(gomega.BeNil())
 				gomega.Expect(res).To(gomega.Equal(&csi.NodeGetInfoResponse{
-					NodeID: nodeSvc.nodeID,
+					NodeId: nodeSvc.nodeID,
 					AccessibleTopology: &csi.Topology{
 						Segments: map[string]string{
 							common.Name + "/" + firstValidIP + "-nfs":    "true",
@@ -3704,7 +3704,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
 					gomega.Expect(err).To(gomega.BeNil())
 					gomega.Expect(res).To(gomega.Equal(&csi.NodeGetInfoResponse{
-						NodeID: nodeSvc.nodeID,
+						NodeId: nodeSvc.nodeID,
 						AccessibleTopology: &csi.Topology{
 							Segments: map[string]string{
 								common.Name + "/" + firstValidIP + "-nfs":  "true",
@@ -3738,7 +3738,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
 				gomega.Expect(err).To(gomega.BeNil())
 				gomega.Expect(res).To(gomega.Equal(&csi.NodeGetInfoResponse{
-					NodeID: nodeSvc.nodeID,
+					NodeId: nodeSvc.nodeID,
 					AccessibleTopology: &csi.Topology{
 						Segments: map[string]string{
 							common.Name + "/" + firstValidIP + "-nfs":     "true",
@@ -3773,7 +3773,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
 					gomega.Expect(err).To(gomega.BeNil())
 					gomega.Expect(res).To(gomega.Equal(&csi.NodeGetInfoResponse{
-						NodeID: nodeSvc.nodeID,
+						NodeId: nodeSvc.nodeID,
 						AccessibleTopology: &csi.Topology{
 							Segments: map[string]string{
 								common.Name + "/" + firstValidIP + "-nfs":  "true",
@@ -3803,7 +3803,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
 					gomega.Expect(err).To(gomega.BeNil())
 					gomega.Expect(res).To(gomega.Equal(&csi.NodeGetInfoResponse{
-						NodeID: nodeSvc.nodeID,
+						NodeId: nodeSvc.nodeID,
 						AccessibleTopology: &csi.Topology{
 							Segments: map[string]string{
 								common.Name + "/" + firstValidIP + "-nfs":  "true",
@@ -3992,7 +3992,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				clientMock.On("GetFS", mock.Anything, validBaseVolumeID).
 					Return(gopowerstore.FileSystem{ID: validBaseVolumeID}, nil)
 
-				req := &csi.NodeGetVolumeStatsRequest{VolumeID: validBlockVolumeID, VolumePath: ""}
+				req := &csi.NodeGetVolumeStatsRequest{VolumeId: validBlockVolumeID, VolumePath: ""}
 
 				res, err := nodeSvc.NodeGetVolumeStats(context.Background(), req)
 
@@ -4055,7 +4055,7 @@ func getNodeVolumeExpandValidRequest(volid string, isBlock bool) *csi.NodeExpand
 	var size int64 = controller.MaxVolumeSizeBytes / 100
 	if !isBlock {
 		req := csi.NodeExpandVolumeRequest{
-			VolumeID:   volid,
+			VolumeId:   volid,
 			VolumePath: validTargetPath,
 			CapacityRange: &csi.CapacityRange{
 				RequiredBytes: size,
@@ -4065,7 +4065,7 @@ func getNodeVolumeExpandValidRequest(volid string, isBlock bool) *csi.NodeExpand
 		return &req
 	}
 	req := csi.NodeExpandVolumeRequest{
-		VolumeID:   volid,
+		VolumeId:   volid,
 		VolumePath: validTargetPath + "/csi/volumeDevices/publish/",
 		CapacityRange: &csi.CapacityRange{
 			RequiredBytes: size,
