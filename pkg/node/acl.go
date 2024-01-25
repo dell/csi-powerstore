@@ -92,7 +92,7 @@ func isNfsv4Enabled(ctx context.Context, client gopowerstore.Client, nasName str
 	nfsv4Enabled := false
 	nas, err := gopowerstore.Client.GetNASByName(client, ctx, nasName)
 	if err == nil {
-		nfsServer, err := gopowerstore.Client.GetNfsServer(client, ctx, nas.NfsServers[0].Id)
+		nfsServer, err := gopowerstore.Client.GetNfsServer(client, ctx, nas.NfsServers[0].ID)
 		if err == nil {
 			if nfsServer.IsNFSv4Enabled {
 				nfsv4Enabled = true
@@ -100,7 +100,7 @@ func isNfsv4Enabled(ctx context.Context, client gopowerstore.Client, nasName str
 				log.Error(fmt.Sprintf("NFS v4 not enabled on NAS server: %s\n", nasName))
 			}
 		} else {
-			log.Error(fmt.Sprintf("can't fetch nfs server with id %s: %s", nas.NfsServers[0].Id, err.Error()))
+			log.Error(fmt.Sprintf("can't fetch nfs server with id %s: %s", nas.NfsServers[0].ID, err.Error()))
 		}
 	} else {
 		log.Error(fmt.Sprintf("can't determine nfsv4 enabled: %s", err.Error()))
