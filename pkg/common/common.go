@@ -298,7 +298,7 @@ func GetLogFields(ctx context.Context) log.Fields {
 	return fields
 }
 
-// GetISCSITargetsInfoFromStorage returns list of gobrick compatible iscsi tragets by querying PowerStore array
+// GetISCSITargetsInfoFromStorage returns list of gobrick compatible iscsi targets by querying PowerStore array
 func GetISCSITargetsInfoFromStorage(client gopowerstore.Client, volumeApplianceID string) ([]gobrick.ISCSITargetInfo, error) {
 	addrInfo, err := client.GetStorageISCSITargetAddresses(context.Background())
 	if err != nil {
@@ -319,7 +319,31 @@ func GetISCSITargetsInfoFromStorage(client gopowerstore.Client, volumeApplianceI
 	return result, nil
 }
 
-// GetFCTargetsInfoFromStorage returns list of gobrick compatible FC tragets by querying PowerStore array
+// GetNVMETCPTargetsInfoFromStorage returns list of gobrick compatible NVME TCP targets by querying PowerStore array
+func GetNVMETCPTargetsInfoFromStorage(client gopowerstore.Client, volumeApplianceID string) ([]gobrick.NVMeTargetInfo, error) {
+	clusterInfo, err := client.GetCluster(context.Background())
+	nvmeNQN := clusterInfo.NVMeNQN
+
+	addrInfo, err := client.GetStorageNVMETCPTargetAddresses(context.Background())
+	if err != nil {
+		log.Error(err.Error())
+		return []gobrick.NVMeTargetInfo{}, err
+	}
+	// sort data by id
+	sort.Slice(addrInfo, func(i, j int) bool {
+		return addrInfo[i].ID < addrInfo[j].ID
+	})
+	var result []gobrick.NVMeTargetInfo
+	for _, t := range addrInfo {
+		// volumeApplianceID will be empty in case the call is from NodeGetInfo
+		if t.ApplianceID == volumeApplianceID || volumeApplianceID == "" {
+			result = append(result, gobrick.NVMeTargetInfo{Target: nvmeNQN, Portal: fmt.Sprintf("%s:4420", t.Address)})
+		}
+	}
+	return result, nil
+}
+
+// GetFCTargetsInfoFromStorage returns list of gobrick compatible FC targets by querying PowerStore array
 func GetFCTargetsInfoFromStorage(client gopowerstore.Client, volumeApplianceID string) ([]gobrick.FCTargetInfo, error) {
 	fcPorts, err := client.GetFCPorts(context.Background())
 	if err != nil {

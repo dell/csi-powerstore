@@ -169,7 +169,7 @@ func setNFSCreateAttributes(reqParams map[string]string, createParams *gopowerst
 		}
 	}
 	if protectionPolicyID, ok := reqParams[common.KeyProtectionPolicyID]; ok {
-		createParams.ProtectionPolicyId = protectionPolicyID
+		createParams.ProtectionPolicyID = protectionPolicyID
 	}
 	if fileEventsPublishingMode, ok := reqParams[common.KeyFileEventsPublishingMode]; ok {
 		createParams.FileEventsPublishingMode = fileEventsPublishingMode

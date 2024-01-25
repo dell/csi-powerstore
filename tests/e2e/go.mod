@@ -11,8 +11,8 @@ require (
 
 require (
 	github.com/dell/csi-powerstore/v2 v2.8.0
-	github.com/dell/gopowerstore v1.13.1-0.20231027052515-dfba84581c26
-	github.com/onsi/ginkgo/v2 v2.9.4
+	github.com/dell/gopowerstore v1.14.1-0.20240123112046-ec40aaf31242
+	github.com/onsi/ginkgo/v2 v2.13.0
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.26.3
 	k8s.io/apimachinery v0.26.3
@@ -123,7 +123,7 @@ require (
 	go.opentelemetry.io/otel/sdk v1.18.0 // indirect
 	go.opentelemetry.io/otel/trace v1.20.0 // indirect
 	go.opentelemetry.io/proto/otlp v0.19.0 // indirect
-	golang.org/x/crypto v0.14.0 // indirect
+	golang.org/x/crypto v0.17.0 // indirect
 	golang.org/x/net v0.17.0 // indirect
 	golang.org/x/oauth2 v0.11.0 // indirect
 	golang.org/x/sync v0.3.0 // indirect
