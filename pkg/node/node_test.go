@@ -28,6 +28,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/onsi/ginkgo/reporters"
+
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-powerstore/v2/mocks"
 	"github.com/dell/csi-powerstore/v2/pkg/array"
@@ -43,7 +45,6 @@ import (
 	"github.com/dell/gopowerstore/api"
 	gopowerstoremock "github.com/dell/gopowerstore/mocks"
 	ginkgo "github.com/onsi/ginkgo"
-	"github.com/onsi/ginkgo/reporters"
 	gomega "github.com/onsi/gomega"
 	"github.com/stretchr/testify/mock"
 )
@@ -675,8 +676,14 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				arrays := getTestArrays()
 				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
 					Return([]gopowerstore.IPPoolAddress{}, nil)
+				clientMock.On("GetStorageNVMETCPTargetAddresses", mock.Anything).
+					Return([]gopowerstore.IPPoolAddress{}, nil)
+				clientMock.On("GetCluster", mock.Anything).
+					Return(gopowerstore.Cluster{
+						Name:    validClusterName,
+						NVMeNQN: validNVMEInitiators[0],
+					}, nil)
 				err := nodeSvc.nodeProbe(context.Background(), arrays["gid1"])
-
 				gomega.Expect(err.Error()).To(gomega.ContainSubstring("no active iscsi sessions"))
 			})
 		})
@@ -696,6 +703,13 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				nodeSvc.useNVME = true
 				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
 					Return([]gopowerstore.IPPoolAddress{}, nil)
+				clientMock.On("GetStorageNVMETCPTargetAddresses", mock.Anything).
+					Return([]gopowerstore.IPPoolAddress{}, nil)
+				clientMock.On("GetCluster", mock.Anything).
+					Return(gopowerstore.Cluster{
+						Name:    validClusterName,
+						NVMeNQN: validNVMEInitiators[0],
+					}, nil)
 				err := nodeSvc.nodeProbe(context.Background(), arrays["gid1"])
 				nodeSvc.useNVME = false
 				gomega.Expect(err.Error()).To(gomega.ContainSubstring("no active nvme sessions"))
@@ -719,6 +733,13 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					}, nil)
 				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
 					Return([]gopowerstore.IPPoolAddress{}, nil)
+				clientMock.On("GetStorageNVMETCPTargetAddresses", mock.Anything).
+					Return([]gopowerstore.IPPoolAddress{}, nil)
+				clientMock.On("GetCluster", mock.Anything).
+					Return(gopowerstore.Cluster{
+						Name:    validClusterName,
+						NVMeNQN: validNVMEInitiators[0],
+					}, nil)
 				nodeSvc.useNFS = true
 				arrays := getTestArrays()
 				err := nodeSvc.nodeProbe(context.Background(), arrays["gid1"])
@@ -744,6 +765,13 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					}, nil)
 				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
 					Return([]gopowerstore.IPPoolAddress{}, nil)
+				clientMock.On("GetStorageNVMETCPTargetAddresses", mock.Anything).
+					Return([]gopowerstore.IPPoolAddress{}, nil)
+				clientMock.On("GetCluster", mock.Anything).
+					Return(gopowerstore.Cluster{
+						Name:    validClusterName,
+						NVMeNQN: validNVMEInitiators[0],
+					}, nil)
 				nodeSvc.useNFS = true
 				nodeSvc.useNVME = true
 				arrays := getTestArrays()
@@ -885,8 +913,8 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					}, nil)
 
 				arrays := getTestArrays()
-				nodeSvc.startNodeToArrayConnectivityCheck(context.Background())
 				nodeSvc.iscsiTargets["unique"] = []string{"iqn.2015-10.com.dell:dellemc-foobar-123-a-7ceb34a0"}
+				nodeSvc.startNodeToArrayConnectivityCheck(context.Background())
 
 				err := nodeSvc.nodeProbe(context.Background(), arrays["gid1"])
 				gomega.Expect(err).To(gomega.BeNil())
@@ -1251,7 +1279,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(4)
 				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).
 					Return(mountInfo, nil).Twice()
-				fsMock.On("MkFileIDempotent", filepath.Join(nodeStagePrivateDir, validBaseVolumeID)).
+				fsMock.On("MkFileIdempotent", filepath.Join(nodeStagePrivateDir, validBaseVolumeID)).
 					Return(true, nil).Once()
 				fsMock.On("GetUtil").Return(utilMock)
 
@@ -1407,7 +1435,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				}).Return(gobrick.Device{}, nil)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
 				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
-				fsMock.On("MkFileIDempotent", filepath.Join(nodeStagePrivateDir, validBaseVolumeID)).Return(true, nil)
+				fsMock.On("MkFileIdempotent", filepath.Join(nodeStagePrivateDir, validBaseVolumeID)).Return(true, nil)
 				fsMock.On("GetUtil").Return(utilMock)
 
 				utilMock.On("BindMount", mock.Anything, "/dev", filepath.Join(nodeStagePrivateDir, validBaseVolumeID)).Return(e)
@@ -1862,7 +1890,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
 				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
 
-				fsMock.On("MkFileIDempotent", validTargetPath).Return(true, nil)
+				fsMock.On("MkFileIdempotent", validTargetPath).Return(true, nil)
 				utilMock.On("BindMount", mock.Anything, stagingPath, validTargetPath).Return(nil)
 
 				res, err := nodeSvc.NodePublishVolume(context.Background(), &csi.NodePublishVolumeRequest{
@@ -1883,7 +1911,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
 				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
 
-				fsMock.On("MkFileIDempotent", validTargetPath).Return(true, nil)
+				fsMock.On("MkFileIdempotent", validTargetPath).Return(true, nil)
 				utilMock.On("BindMount", mock.Anything, stagingPath, validTargetPath, "ro").Return(nil)
 
 				_, err := nodeSvc.NodePublishVolume(context.Background(), &csi.NodePublishVolumeRequest{
@@ -1903,7 +1931,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
 				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
 
-				fsMock.On("MkFileIDempotent", validTargetPath).Return(false, errors.New("failed"))
+				fsMock.On("MkFileIdempotent", validTargetPath).Return(false, errors.New("failed"))
 				utilMock.On("BindMount", mock.Anything, stagingPath, validTargetPath).Return(nil)
 
 				_, err := nodeSvc.NodePublishVolume(context.Background(), &csi.NodePublishVolumeRequest{
@@ -1923,7 +1951,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
 				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
 
-				fsMock.On("MkFileIDempotent", validTargetPath).Return(true, nil)
+				fsMock.On("MkFileIdempotent", validTargetPath).Return(true, nil)
 				utilMock.On("BindMount", mock.Anything, stagingPath, validTargetPath).Return(errors.New("failed to bind"))
 
 				_, err := nodeSvc.NodePublishVolume(context.Background(), &csi.NodePublishVolumeRequest{
@@ -2641,7 +2669,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				utilMock.On("BindMount", mock.Anything, "/dev", mock.Anything).Return(nil)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil)
 				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
-				fsMock.On("MkFileIDempotent", mock.Anything).Return(true, nil)
+				fsMock.On("MkFileIdempotent", mock.Anything).Return(true, nil)
 				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
 				fsMock.On("MkdirAll", mock.Anything, mock.Anything).Return(nil)
 				utilMock.On("GetDiskFormat", mock.Anything, mock.Anything).Return("", nil)
@@ -2770,7 +2798,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				utilMock.On("BindMount", mock.Anything, "/dev", mock.Anything).Return(nil)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
 				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
-				fsMock.On("MkFileIDempotent", mock.Anything).Return(true, errors.New("error"))
+				fsMock.On("MkFileIdempotent", mock.Anything).Return(true, errors.New("error"))
 				fsMock.On("GetUtil").Return(utilMock)
 
 				mountInfo := []gofsutil.Info{
@@ -2966,7 +2994,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 			utilMock.On("BindMount", mock.Anything, "/dev", mock.Anything).Return(nil)
 			fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil)
 			fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
-			fsMock.On("MkFileIDempotent", mock.Anything).Return(true, nil)
+			fsMock.On("MkFileIdempotent", mock.Anything).Return(true, nil)
 			fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
 			fsMock.On("MkdirAll", mock.Anything, mock.Anything).Return(nil)
 			utilMock.On("GetDiskFormat", mock.Anything, mock.Anything).Return("", nil)
@@ -3721,12 +3749,23 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 			ginkgo.It("should return NVMeTCP topology segments", func() {
 				nodeSvc.useNVME = true
 				nodeSvc.useFC = false
-				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
+				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).Return([]gopowerstore.IPPoolAddress{
+					{
+						Address: "192.168.1.1",
+						IPPort:  gopowerstore.IPPortInstance{TargetIqn: "iqn"},
+					},
+				}, nil)
+				clientMock.On("GetStorageNVMETCPTargetAddresses", mock.Anything).
 					Return([]gopowerstore.IPPoolAddress{
 						{
 							Address: "192.168.1.1",
 							IPPort:  gopowerstore.IPPortInstance{TargetIqn: "iqn"},
 						},
+					}, nil)
+				clientMock.On("GetCluster", mock.Anything).
+					Return(gopowerstore.Cluster{
+						Name:    validClusterName,
+						NVMeNQN: validNVMEInitiators[0],
 					}, nil)
 				conn, _ := net.Dial("udp", "127.0.0.1:80")
 				fsMock.On("NetDial", mock.Anything).Return(
@@ -3756,12 +3795,23 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					gonvme.GONVMEMock.InduceDiscoveryError = true
 					nodeSvc.useNVME = true
 					nodeSvc.useFC = false
-					clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
+					clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).Return([]gopowerstore.IPPoolAddress{
+						{
+							Address: "192.168.1.1",
+							IPPort:  gopowerstore.IPPortInstance{TargetIqn: "iqn"},
+						},
+					}, nil)
+					clientMock.On("GetStorageNVMETCPTargetAddresses", mock.Anything).
 						Return([]gopowerstore.IPPoolAddress{
 							{
 								Address: "192.168.1.1",
 								IPPort:  gopowerstore.IPPortInstance{TargetIqn: "iqn"},
 							},
+						}, nil)
+					clientMock.On("GetCluster", mock.Anything).
+						Return(gopowerstore.Cluster{
+							Name:    validClusterName,
+							NVMeNQN: validNVMEInitiators[0],
 						}, nil)
 					conn, _ := net.Dial("udp", "127.0.0.1:80")
 					fsMock.On("NetDial", mock.Anything).Return(
@@ -3791,8 +3841,19 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					nodeSvc.useNVME = true
 					nodeSvc.useFC = false
 					e := "internalerror"
-					clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
+					clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).Return([]gopowerstore.IPPoolAddress{
+						{
+							Address: "192.168.1.1",
+							IPPort:  gopowerstore.IPPortInstance{TargetIqn: "iqn"},
+						},
+					}, nil)
+					clientMock.On("GetStorageNVMETCPTargetAddresses", mock.Anything).
 						Return([]gopowerstore.IPPoolAddress{}, errors.New(e))
+					clientMock.On("GetCluster", mock.Anything).
+						Return(gopowerstore.Cluster{
+							Name:    validClusterName,
+							NVMeNQN: validNVMEInitiators[0],
+						}, nil)
 					conn, _ := net.Dial("udp", "127.0.0.1:80")
 					fsMock.On("NetDial", mock.Anything).Return(
 						conn,

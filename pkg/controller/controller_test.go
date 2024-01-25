@@ -1880,7 +1880,13 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 							IPPort:  gopowerstore.IPPortInstance{TargetIqn: "iqn"},
 						},
 					}, nil)
-
+				clientMock.On("GetStorageNVMETCPTargetAddresses", mock.Anything).
+					Return([]gopowerstore.IPPoolAddress{
+						{
+							Address: "192.168.1.1",
+							IPPort:  gopowerstore.IPPortInstance{TargetIqn: "iqn"},
+						},
+					}, nil)
 				clientMock.On("GetFCPorts", mock.Anything).
 					Return([]gopowerstore.FcPort{
 						{
@@ -1902,13 +1908,15 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				gomega.Expect(err).To(gomega.BeNil())
 				gomega.Expect(res).To(gomega.Equal(&csi.ControllerPublishVolumeResponse{
 					PublishContext: map[string]string{
-						"PORTAL0":       "192.168.1.1:3260",
-						"TARGET0":       "iqn",
-						"NVMEFCPORTAL0": "nn-0x58ccf090c9200c22:pn-0x58ccf091492b0c22",
-						"NVMEFCTARGET0": "nqn",
-						"DEVICE_WWN":    "68ccf098003ceb5e4577a20be6d11bf9",
-						"LUN_ADDRESS":   "1",
-						"FCWWPN0":       "58ccf09348a003a3",
+						"PORTAL0":        "192.168.1.1:3260",
+						"TARGET0":        "iqn",
+						"NVMEFCPORTAL0":  "nn-0x58ccf090c9200c22:pn-0x58ccf091492b0c22",
+						"NVMEFCTARGET0":  "nqn",
+						"DEVICE_WWN":     "68ccf098003ceb5e4577a20be6d11bf9",
+						"LUN_ADDRESS":    "1",
+						"FCWWPN0":        "58ccf09348a003a3",
+						"NVMETCPTARGET0": "nqn",
+						"NVMETCPPORTAL0": "192.168.1.1:4420",
 					},
 				}))
 			})
@@ -2073,7 +2081,13 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 							IPPort:  gopowerstore.IPPortInstance{TargetIqn: "iqn"},
 						},
 					}, nil)
-
+				clientMock.On("GetStorageNVMETCPTargetAddresses", mock.Anything).
+					Return([]gopowerstore.IPPoolAddress{
+						{
+							Address: "192.168.1.1",
+							IPPort:  gopowerstore.IPPortInstance{TargetIqn: "iqn"},
+						},
+					}, nil)
 				clientMock.On("GetFCPorts", mock.Anything).
 					Return([]gopowerstore.FcPort{
 						{
@@ -2092,10 +2106,12 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				gomega.Expect(err).To(gomega.BeNil())
 				gomega.Expect(res).To(gomega.Equal(&csi.ControllerPublishVolumeResponse{
 					PublishContext: map[string]string{
-						"PORTAL0":     "192.168.1.1:3260",
-						"TARGET0":     "iqn",
-						"DEVICE_WWN":  "68ccf098003ceb5e4577a20be6d11bf9",
-						"LUN_ADDRESS": "1",
+						"PORTAL0":        "192.168.1.1:3260",
+						"TARGET0":        "iqn",
+						"DEVICE_WWN":     "68ccf098003ceb5e4577a20be6d11bf9",
+						"LUN_ADDRESS":    "1",
+						"NVMETCPPORTAL0": "192.168.1.1:4420",
+						"NVMETCPTARGET0": "",
 					},
 				}))
 			})
@@ -2183,7 +2199,13 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 								IPPort:  gopowerstore.IPPortInstance{TargetIqn: "iqn"},
 							},
 						}, nil)
-
+					clientMock.On("GetStorageNVMETCPTargetAddresses", mock.Anything).
+						Return([]gopowerstore.IPPoolAddress{
+							{
+								Address: "192.168.1.1",
+								IPPort:  gopowerstore.IPPortInstance{TargetIqn: "iqn"},
+							},
+						}, nil)
 					clientMock.On("GetFCPorts", mock.Anything).
 						Return([]gopowerstore.FcPort{
 							{
@@ -2202,10 +2224,12 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 					gomega.Expect(err).To(gomega.BeNil())
 					gomega.Expect(res).To(gomega.Equal(&csi.ControllerPublishVolumeResponse{
 						PublishContext: map[string]string{
-							"PORTAL0":     "192.168.1.1:3260",
-							"TARGET0":     "iqn",
-							"DEVICE_WWN":  "68ccf098003ceb5e4577a20be6d11bf9",
-							"LUN_ADDRESS": "1",
+							"PORTAL0":        "192.168.1.1:3260",
+							"TARGET0":        "iqn",
+							"DEVICE_WWN":     "68ccf098003ceb5e4577a20be6d11bf9",
+							"LUN_ADDRESS":    "1",
+							"NVMETCPPORTAL0": "192.168.1.1:4420",
+							"NVMETCPTARGET0": "",
 						},
 					}))
 				})
@@ -2229,7 +2253,13 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 								IPPort:  gopowerstore.IPPortInstance{TargetIqn: "iqn"},
 							},
 						}, nil)
-
+					clientMock.On("GetStorageNVMETCPTargetAddresses", mock.Anything).
+						Return([]gopowerstore.IPPoolAddress{
+							{
+								Address: "192.168.1.1",
+								IPPort:  gopowerstore.IPPortInstance{TargetIqn: "iqn"},
+							},
+						}, nil)
 					clientMock.On("GetFCPorts", mock.Anything).
 						Return([]gopowerstore.FcPort{
 							{
@@ -2276,7 +2306,13 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 								IPPort:  gopowerstore.IPPortInstance{TargetIqn: "iqn"},
 							},
 						}, nil)
-
+					clientMock.On("GetStorageNVMETCPTargetAddresses", mock.Anything).
+						Return([]gopowerstore.IPPoolAddress{
+							{
+								Address: "192.168.1.1",
+								IPPort:  gopowerstore.IPPortInstance{TargetIqn: "iqn"},
+							},
+						}, nil)
 					clientMock.On("GetFCPorts", mock.Anything).
 						Return([]gopowerstore.FcPort{
 							{
@@ -2295,10 +2331,12 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 					gomega.Expect(err).To(gomega.BeNil())
 					gomega.Expect(res).To(gomega.Equal(&csi.ControllerPublishVolumeResponse{
 						PublishContext: map[string]string{
-							"PORTAL0":     "192.168.1.1:3260",
-							"TARGET0":     "iqn",
-							"DEVICE_WWN":  "68ccf098003ceb5e4577a20be6d11bf9",
-							"LUN_ADDRESS": "2",
+							"PORTAL0":        "192.168.1.1:3260",
+							"TARGET0":        "iqn",
+							"DEVICE_WWN":     "68ccf098003ceb5e4577a20be6d11bf9",
+							"LUN_ADDRESS":    "2",
+							"NVMETCPPORTAL0": "192.168.1.1:4420",
+							"NVMETCPTARGET0": "",
 						},
 					}))
 				})

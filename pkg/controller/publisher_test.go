@@ -129,6 +129,8 @@ func TestVolumePublisher_Publish(t *testing.T) {
 				Return([]gopowerstore.HostVolumeMapping{}, nil).Once()
 			clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
 				Return([]gopowerstore.IPPoolAddress{}, e)
+			clientMock.On("GetStorageNVMETCPTargetAddresses", mock.Anything).
+				Return([]gopowerstore.IPPoolAddress{}, e)
 			clientMock.On("GetFCPorts", mock.Anything).
 				Return([]gopowerstore.FcPort{}, nil)
 			clientMock.On("GetCluster", mock.Anything).
