@@ -393,7 +393,7 @@ func ExecuteAction(session *gopowerstore.ReplicationSession, pstoreClient gopowe
 			failoverParams)
 
 		if err != nil {
-			if apiError, ok := err.(gopowerstore.APIError); ok && !apiError.UnableToFailoverFromDestination() {
+			if apiError, ok := err.(gopowerstore.APIError); ok && apiError.UnableToFailoverFromDestination() {
 				log.Error(fmt.Sprintf("Fail over: Failed to modify RS (%s) - Error (%s)", session.ID, err.Error()))
 				return status.Errorf(codes.Internal, "Execute action: Failed to modify RS (%s) - Error (%s)", session.ID, err.Error())
 			}
