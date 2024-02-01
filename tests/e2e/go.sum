@@ -112,9 +112,8 @@ github.com/dell/goiscsi v1.8.1-0.20230925132356-9ad6f6b58261 h1:e2mI+r84uMdUkdya
 github.com/dell/goiscsi v1.8.1-0.20230925132356-9ad6f6b58261/go.mod h1:PTlQGJaGKYgia95mGwwHSBgvfOr3BfLIjGNh1HT6p+s=
 github.com/dell/gonvme v1.6.0 h1:Y/g0Ml8E3oSB+bqGJN1/U+V621h9t0KJeYAF5aQ7NVU=
 github.com/dell/gonvme v1.6.0/go.mod h1:/UgJAlR03LbPSDIK2BfhiYUlzyY7lAMJ6ao8eYab2Eg=
-github.com/dell/gopowerstore v1.14.0 h1:j4wSn25X2AH2t3/ySNPHmNWjqM0zHDkYyDPt+0uE8cc=
-github.com/dell/gopowerstore v1.14.0/go.mod h1:YH3SpMX2dr3ouYWWPhk5lzjip3aaVVksFOSoenRDY5w=
-github.com/dell/gopowerstore v1.14.1-0.20240123112046-ec40aaf31242/go.mod h1:YH3SpMX2dr3ouYWWPhk5lzjip3aaVVksFOSoenRDY5w=
+github.com/dell/gopowerstore v1.14.1 h1:xn9FFMLDRg42+L9OR8wOnIQfG+YGNauX9qT0vPeEfyw=
+github.com/dell/gopowerstore v1.14.1/go.mod h1:YH3SpMX2dr3ouYWWPhk5lzjip3aaVVksFOSoenRDY5w=
 github.com/dgrijalva/jwt-go v3.2.0+incompatible/go.mod h1:E3ru+11k8xSBh+hMPgOLZmtrrCbhqsmaPHjLKYnJCaQ=
 github.com/dgryski/go-sip13 v0.0.0-20181026042036-e10d5fee7954/go.mod h1:vAd38F8PWV+bWy6jNmig1y/TA+kYO4g3RSRF0IAv0no=
 github.com/distribution/reference v0.5.0 h1:/FUIFXtfc/x2gpa5/VGfiGLuOIdYa1t65IKK2OFGvA0=
@@ -336,8 +335,8 @@ github.com/opencontainers/go-digest v1.0.0 h1:apOUWs51W5PlhuyGyz9FCeeBIOUDA/6nW8
 github.com/opencontainers/go-digest v1.0.0/go.mod h1:0JzlMkj0TRzQZfJkVvzbP0HBR3IKzErnv2BNG4W4MAM=
 github.com/opencontainers/image-spec v1.0.2 h1:9yCKha/T5XdGtO0q9Q9a6T5NUCsTn/DrBg0D7ufOcFM=
 github.com/opencontainers/image-spec v1.0.2/go.mod h1:BtxoFyWECRxE4U/7sNtV5W15zMzWCbyJoFRP3s7yZA0=
-github.com/opencontainers/runc v1.1.10 h1:EaL5WeO9lv9wmS6SASjszOeQdSctvpbu0DdBQBizE40=
-github.com/opencontainers/runc v1.1.10/go.mod h1:+/R6+KmDlh+hOO8NkjmgkG9Qzvypzk0yXxAPYYR65+M=
+github.com/opencontainers/runc v1.1.12 h1:BOIssBaW1La0/qbNZHXOOa71dZfZEQOzW7dqQf3phss=
+github.com/opencontainers/runc v1.1.12/go.mod h1:S+lQwSfncpBha7XTy/5lBwWgm5+y5Ma/O44Ekby9FK8=
 github.com/opencontainers/runtime-spec v1.0.2/go.mod h1:jwyrGlmzljRJv/Fgzds9SsS/C5hL+LL3ko9hs6T5lQ0=
 github.com/opencontainers/runtime-spec v1.0.3-0.20200929063507-e6143ca7d51d/go.mod h1:jwyrGlmzljRJv/Fgzds9SsS/C5hL+LL3ko9hs6T5lQ0=
 github.com/opencontainers/runtime-spec v1.0.3-0.20220909204839-494a5a6aca78 h1:R5M2qXZiK/mWPMT4VldCOiSL9HIAMuxQZWdG0CSM5+4=
