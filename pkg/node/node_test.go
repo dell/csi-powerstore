@@ -28,6 +28,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/onsi/ginkgo/reporters"
+
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-powerstore/v2/mocks"
 	"github.com/dell/csi-powerstore/v2/pkg/array"
@@ -43,7 +45,6 @@ import (
 	"github.com/dell/gopowerstore/api"
 	gopowerstoremock "github.com/dell/gopowerstore/mocks"
 	ginkgo "github.com/onsi/ginkgo"
-	"github.com/onsi/ginkgo/reporters"
 	gomega "github.com/onsi/gomega"
 	"github.com/stretchr/testify/mock"
 )
@@ -675,8 +676,14 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				arrays := getTestArrays()
 				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
 					Return([]gopowerstore.IPPoolAddress{}, nil)
+				clientMock.On("GetStorageNVMETCPTargetAddresses", mock.Anything).
+					Return([]gopowerstore.IPPoolAddress{}, nil)
+				clientMock.On("GetCluster", mock.Anything).
+					Return(gopowerstore.Cluster{
+						Name:    validClusterName,
+						NVMeNQN: validNVMEInitiators[0],
+					}, nil)
 				err := nodeSvc.nodeProbe(context.Background(), arrays["gid1"])
-
 				gomega.Expect(err.Error()).To(gomega.ContainSubstring("no active iscsi sessions"))
 			})
 		})
@@ -696,6 +703,13 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				nodeSvc.useNVME = true
 				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
 					Return([]gopowerstore.IPPoolAddress{}, nil)
+				clientMock.On("GetStorageNVMETCPTargetAddresses", mock.Anything).
+					Return([]gopowerstore.IPPoolAddress{}, nil)
+				clientMock.On("GetCluster", mock.Anything).
+					Return(gopowerstore.Cluster{
+						Name:    validClusterName,
+						NVMeNQN: validNVMEInitiators[0],
+					}, nil)
 				err := nodeSvc.nodeProbe(context.Background(), arrays["gid1"])
 				nodeSvc.useNVME = false
 				gomega.Expect(err.Error()).To(gomega.ContainSubstring("no active nvme sessions"))
@@ -719,6 +733,13 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					}, nil)
 				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
 					Return([]gopowerstore.IPPoolAddress{}, nil)
+				clientMock.On("GetStorageNVMETCPTargetAddresses", mock.Anything).
+					Return([]gopowerstore.IPPoolAddress{}, nil)
+				clientMock.On("GetCluster", mock.Anything).
+					Return(gopowerstore.Cluster{
+						Name:    validClusterName,
+						NVMeNQN: validNVMEInitiators[0],
+					}, nil)
 				nodeSvc.useNFS = true
 				arrays := getTestArrays()
 				err := nodeSvc.nodeProbe(context.Background(), arrays["gid1"])
@@ -744,6 +765,13 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					}, nil)
 				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
 					Return([]gopowerstore.IPPoolAddress{}, nil)
+				clientMock.On("GetStorageNVMETCPTargetAddresses", mock.Anything).
+					Return([]gopowerstore.IPPoolAddress{}, nil)
+				clientMock.On("GetCluster", mock.Anything).
+					Return(gopowerstore.Cluster{
+						Name:    validClusterName,
+						NVMeNQN: validNVMEInitiators[0],
+					}, nil)
 				nodeSvc.useNFS = true
 				nodeSvc.useNVME = true
 				arrays := getTestArrays()
@@ -885,8 +913,8 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					}, nil)
 
 				arrays := getTestArrays()
-				nodeSvc.startNodeToArrayConnectivityCheck(context.Background())
 				nodeSvc.iscsiTargets["unique"] = []string{"iqn.2015-10.com.dell:dellemc-foobar-123-a-7ceb34a0"}
+				nodeSvc.startNodeToArrayConnectivityCheck(context.Background())
 
 				err := nodeSvc.nodeProbe(context.Background(), arrays["gid1"])
 				gomega.Expect(err).To(gomega.BeNil())
@@ -1075,12 +1103,12 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 				nfsServers := []gopowerstore.NFSServerInstance{
 					{
-						Id:             validNfsServerID,
+						ID:             validNfsServerID,
 						IsNFSv4Enabled: true,
 					},
 				}
 
-				clientMock.On("GetNfsServer", mock.Anything, validNasName).Return(gopowerstore.NFSServerInstance{Id: validNfsServerID, IsNFSv4Enabled: true}, nil)
+				clientMock.On("GetNfsServer", mock.Anything, validNasName).Return(gopowerstore.NFSServerInstance{ID: validNfsServerID, IsNFSv4Enabled: true}, nil)
 				clientMock.On("GetNASByName", mock.Anything, validNasName).Return(gopowerstore.NAS{ID: validNasID, NfsServers: nfsServers}, nil)
 				nfsv4ACLsMock.On("SetNfsv4Acls", mock.Anything, mock.Anything).Return(nil)
 
@@ -1116,14 +1144,14 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 				nfsServers := []gopowerstore.NFSServerInstance{
 					{
-						Id:             validNfsServerID,
+						ID:             validNfsServerID,
 						IsNFSv4Enabled: true,
 					},
 				}
 
 				nfsv4ACLsMock.On("SetNfsv4Acls", mock.Anything, mock.Anything).Return(nil)
 				clientMock.On("GetNASByName", mock.Anything, "").Return(gopowerstore.NAS{ID: validNasID, NfsServers: nfsServers}, nil)
-				clientMock.On("GetNfsServer", mock.Anything, mock.Anything).Return(gopowerstore.NFSServerInstance{Id: validNfsServerID, IsNFSv4Enabled: true}, nil)
+				clientMock.On("GetNfsServer", mock.Anything, mock.Anything).Return(gopowerstore.NFSServerInstance{ID: validNfsServerID, IsNFSv4Enabled: true}, nil)
 
 				nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
 					VolumeId:          validNfsVolumeID,
@@ -1202,7 +1230,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 			})
 		})
 
-		ginkgo.When("missing volume VolumeId", func() {
+		ginkgo.When("missing volume VolumeID", func() {
 			ginkgo.It("should fail", func() {
 				req := &csi.NodeStageVolumeRequest{
 					VolumeCapability:  getCapabilityWithVoltypeAccessFstype("mount", "single-writer", "ext4"),
@@ -3721,12 +3749,23 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 			ginkgo.It("should return NVMeTCP topology segments", func() {
 				nodeSvc.useNVME = true
 				nodeSvc.useFC = false
-				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
+				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).Return([]gopowerstore.IPPoolAddress{
+					{
+						Address: "192.168.1.1",
+						IPPort:  gopowerstore.IPPortInstance{TargetIqn: "iqn"},
+					},
+				}, nil)
+				clientMock.On("GetStorageNVMETCPTargetAddresses", mock.Anything).
 					Return([]gopowerstore.IPPoolAddress{
 						{
 							Address: "192.168.1.1",
 							IPPort:  gopowerstore.IPPortInstance{TargetIqn: "iqn"},
 						},
+					}, nil)
+				clientMock.On("GetCluster", mock.Anything).
+					Return(gopowerstore.Cluster{
+						Name:    validClusterName,
+						NVMeNQN: validNVMEInitiators[0],
 					}, nil)
 				conn, _ := net.Dial("udp", "127.0.0.1:80")
 				fsMock.On("NetDial", mock.Anything).Return(
@@ -3756,12 +3795,23 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					gonvme.GONVMEMock.InduceDiscoveryError = true
 					nodeSvc.useNVME = true
 					nodeSvc.useFC = false
-					clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
+					clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).Return([]gopowerstore.IPPoolAddress{
+						{
+							Address: "192.168.1.1",
+							IPPort:  gopowerstore.IPPortInstance{TargetIqn: "iqn"},
+						},
+					}, nil)
+					clientMock.On("GetStorageNVMETCPTargetAddresses", mock.Anything).
 						Return([]gopowerstore.IPPoolAddress{
 							{
 								Address: "192.168.1.1",
 								IPPort:  gopowerstore.IPPortInstance{TargetIqn: "iqn"},
 							},
+						}, nil)
+					clientMock.On("GetCluster", mock.Anything).
+						Return(gopowerstore.Cluster{
+							Name:    validClusterName,
+							NVMeNQN: validNVMEInitiators[0],
 						}, nil)
 					conn, _ := net.Dial("udp", "127.0.0.1:80")
 					fsMock.On("NetDial", mock.Anything).Return(
@@ -3791,8 +3841,19 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					nodeSvc.useNVME = true
 					nodeSvc.useFC = false
 					e := "internalerror"
-					clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
+					clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).Return([]gopowerstore.IPPoolAddress{
+						{
+							Address: "192.168.1.1",
+							IPPort:  gopowerstore.IPPortInstance{TargetIqn: "iqn"},
+						},
+					}, nil)
+					clientMock.On("GetStorageNVMETCPTargetAddresses", mock.Anything).
 						Return([]gopowerstore.IPPoolAddress{}, errors.New(e))
+					clientMock.On("GetCluster", mock.Anything).
+						Return(gopowerstore.Cluster{
+							Name:    validClusterName,
+							NVMeNQN: validNVMEInitiators[0],
+						}, nil)
 					conn, _ := net.Dial("udp", "127.0.0.1:80")
 					fsMock.On("NetDial", mock.Anything).Return(
 						conn,

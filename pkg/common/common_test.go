@@ -118,6 +118,17 @@ func TestGetISCSITargetsInfoFromStorage(t *testing.T) {
 	})
 }
 
+func TestGetNVMETCPTargetsInfoFromStorage(t *testing.T) {
+	t.Run("api error", func(t *testing.T) {
+		e := errors.New("some error")
+		clientMock := new(gopowerstoremock.Client)
+		clientMock.On("GetCluster", context.Background()).Return(gopowerstore.Cluster{}, e)
+		clientMock.On("GetStorageNVMETCPTargetAddresses", context.Background()).Return([]gopowerstore.IPPoolAddress{}, e)
+		_, err := common.GetNVMETCPTargetsInfoFromStorage(clientMock, "A1")
+		assert.EqualError(t, err, e.Error())
+	})
+}
+
 func TestGetFCTargetsInfoFromStorage(t *testing.T) {
 	t.Run("api error", func(t *testing.T) {
 		e := errors.New("some error")

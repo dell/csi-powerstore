@@ -306,7 +306,8 @@ func (s *Service) populateTargetsInCache(array *array.PowerStoreArray) {
 				break
 			}
 		} else {
-			infoList, err := common.GetISCSITargetsInfoFromStorage(array.GetClient(), "")
+			// for NVMeTCP
+			infoList, err := common.GetNVMETCPTargetsInfoFromStorage(array.GetClient(), "")
 			if err != nil {
 				log.Errorf("couldn't get targets from array: %s", err.Error())
 				return

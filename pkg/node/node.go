@@ -253,13 +253,6 @@ func (s *Service) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeR
 		return nil, status.Error(codes.InvalidArgument, "staging target path is required")
 	}
 
-	nvmeIP := strings.Split(req.PublishContext["PORTAL0"], ":")
-	nvmeTargets, _ := s.nvmeLib.DiscoverNVMeTCPTargets(nvmeIP[0], false)
-	for i, t := range nvmeTargets {
-		req.PublishContext[fmt.Sprintf("%s%d", common.PublishContextNVMETCPTargetsPrefix, i)] = t.TargetNqn
-		req.PublishContext[fmt.Sprintf("%s%d", common.PublishContextNVMETCPPortalsPrefix, i)] = t.Portal + ":4420"
-	}
-
 	id, arrayID, protocol, _ := array.ParseVolumeID(ctx, id, s.DefaultArray(), req.VolumeCapability)
 
 	var stager VolumeStager
@@ -1082,7 +1075,8 @@ func (s *Service) NodeGetInfo(ctx context.Context, _ *csi.NodeGetInfoRequest) (*
 						resp.AccessibleTopology.Segments[common.Name+"/"+arr.GetIP()+"-nvmefc"] = "true"
 					}
 				} else {
-					infoList, err := common.GetISCSITargetsInfoFromStorage(arr.GetClient(), "")
+					// useNVME/TCP
+					infoList, err := common.GetNVMETCPTargetsInfoFromStorage(arr.GetClient(), "")
 					if err != nil {
 						log.Errorf("couldn't get targets from array: %s", err.Error())
 						continue

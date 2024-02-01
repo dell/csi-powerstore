@@ -13,7 +13,7 @@ require (
 
 require (
 	github.com/dell/csi-powerstore/v2 v2.8.0
-	github.com/dell/gopowerstore v1.14.0
+	github.com/dell/gopowerstore v1.14.1
 	github.com/onsi/ginkgo/v2 v2.13.0
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.29.0
@@ -99,7 +99,7 @@ require (
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
-	github.com/opencontainers/runc v1.1.10 // indirect
+	github.com/opencontainers/runc v1.1.12 // indirect
 	github.com/opencontainers/runtime-spec v1.0.3-0.20220909204839-494a5a6aca78 // indirect
 	github.com/opencontainers/selinux v1.11.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
