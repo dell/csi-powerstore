@@ -925,7 +925,7 @@ var _ = ginkgo.Describe("Replication", func() {
 					}
 					session := gopowerstore.ReplicationSession{ID: "test", State: "Failed_Over"}
 
-					clientMock.On("ExecuteActionOnReplicationSession", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(gopowerstore.EmptyResponse(""), gopowerstore.APIError{ErrorMsg: &api.ErrorMsg{StatusCode: http.StatusNotFound}})
+					clientMock.On("ExecuteActionOnReplicationSession", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(gopowerstore.EmptyResponse(""), gopowerstore.APIError{ErrorMsg: &api.ErrorMsg{StatusCode: http.StatusBadRequest}})
 					clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, mock.Anything).Return(session, nil)
 
 					params := make(map[string]string)
