@@ -10,7 +10,7 @@ To run these tests you need to build an image by yourself and upload it to any a
 
 #### Prerequisites
 Copy the `values.yaml` from `sanity-csi-powerstore` folder to folder with `install-sanity.sh` script and rename it to myvalues.
-In `myvalues.yaml` point to your PowerStore array. 
+In `myvalues.yaml` ,`/helm/secret.yaml`, `params.yaml` point to your PowerStore array.
 Install to kubernetes cluster by running install-sanity.sh. 
 > It will install bare version of driver without any sidecar containers
 

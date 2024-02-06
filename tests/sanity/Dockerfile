@@ -24,5 +24,6 @@ RUN git clone https://github.com/kubernetes-csi/csi-test.git && \
 FROM frolvlad/alpine-glibc
 WORKDIR /app/csi-sanity/
 COPY --from=build-env /csi-sanity .
+COPY params.yaml /params.yaml
 
 ENTRYPOINT [ "./csi-sanity" ]

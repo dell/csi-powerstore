@@ -448,7 +448,9 @@ spec:
               mountPath: /powerstore-config-params
       volumes:
         - name: socket-dir
-          emptyDir:
+          hostPath:
+            path: /var/run/csi
+            type: DirectoryOrCreate
         - name: powerstore-config-params
           configMap:
             name: {{ .Release.Name }}-config-params
