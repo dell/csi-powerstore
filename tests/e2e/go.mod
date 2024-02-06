@@ -13,7 +13,7 @@ require (
 
 require (
 	github.com/dell/csi-powerstore/v2 v2.8.0
-	github.com/dell/gopowerstore v1.14.1
+	github.com/dell/gopowerstore v1.14.2
 	github.com/onsi/ginkgo/v2 v2.13.0
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.29.0
