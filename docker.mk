@@ -33,6 +33,9 @@ ifndef DOCKER_IMAGE_NAME
     DOCKER_IMAGE_NAME=csi-powerstore
 endif
 
+# set the GOVERSION
+export GOVERSION="1.21"
+
 # Add 'build-base-image' as a dependency if UBI Micro is used as the base image.
 # This is required to load all the depedent packages into UBI Miro image.
 ifeq ($(DOCKER_FILE), docker-files/Dockerfile.ubi.micro)
@@ -49,13 +52,13 @@ endif
 docker: $(DEPENDENCIES)
 	@echo "MAJOR $(MAJOR) MINOR $(MINOR) PATCH $(PATCH) RELNOTE $(RELNOTE) SEMVER $(SEMVER)"
 	@echo "$(DOCKER_FILE)"
-	$(BUILDER) build -f $(DOCKER_FILE) -t "$(DOCKER_REGISTRY)/$(DOCKER_IMAGE_NAME):v$(MAJOR).$(MINOR).$(PATCH)$(RELNOTE)" --build-arg BASEIMAGE=$(BASEIMAGE) .
+	$(BUILDER) build -f $(DOCKER_FILE) -t "$(DOCKER_REGISTRY)/$(DOCKER_IMAGE_NAME):v$(MAJOR).$(MINOR).$(PATCH)$(RELNOTE)" --build-arg BASEIMAGE=$(BASEIMAGE) --build-arg GOVERSION=$(GOVERSION) .
 
 
 docker-no-cache: $(DEPENDENCIES)
 	@echo "MAJOR $(MAJOR) MINOR $(MINOR) PATCH $(PATCH) RELNOTE $(RELNOTE) SEMVER $(SEMVER)"
 	@echo "$(DOCKER_FILE) --no-cache"
-	$(BUILDER) build --no-cache -f $(DOCKER_FILE) -t "$(DOCKER_REGISTRY)/$(DOCKER_IMAGE_NAME):v$(MAJOR).$(MINOR).$(PATCH)$(RELNOTE)" --build-arg BASEIMAGE=$(BASEIMAGE) .
+	$(BUILDER) build --no-cache -f $(DOCKER_FILE) -t "$(DOCKER_REGISTRY)/$(DOCKER_IMAGE_NAME):v$(MAJOR).$(MINOR).$(PATCH)$(RELNOTE)" --build-arg BASEIMAGE=$(BASEIMAGE) --build-arg GOVERSION=$(GOVERSION) .
 
 push:   
 	echo "MAJOR $(MAJOR) MINOR $(MINOR) PATCH $(PATCH) RELNOTE $(RELNOTE) SEMVER $(SEMVER)"
