@@ -62,14 +62,10 @@ tag:
 
 # Generates the docker container (but does not push)
 docker:
-	go generate ./cmd/csi-powerstore
-	go run core/semver/semver.go -f mk >semver.mk
 	make -f docker.mk DOCKER_FILE=docker-files/$(DOCKER_FILE) docker
 
 # Same as `docker` but without cached layers and will pull latest version of base image
 docker-no-cache:
-	go generate ./cmd/csi-powerstore
-	go run core/semver/semver.go -f mk >semver.mk
 	make -f docker.mk DOCKER_FILE=docker-files/$(DOCKER_FILE) docker-no-cache
 
 # Pushes container to the repository
