@@ -18,17 +18,16 @@
 # based on UBI-micro image
 # Requires: RHEL host with subscription
 
-ARG GOVERSION
+ARG GOIMAGE
 ARG BASEIMAGE
 
 # Stage to build the driver
-FROM golang:${GOVERSION} as builder
+FROM $GOIMAGE as builder
 
 WORKDIR /workspace
 COPY . .
 
 RUN go generate ./cmd/csi-powerstore
-RUN go run core/semver/semver.go -f mk >semver.mk
 RUN GOOS=linux CGO_ENABLED=0 go build -o csi-powerstore ./cmd/csi-powerstore
 
 # Stage to build the driver image
