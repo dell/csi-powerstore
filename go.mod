@@ -6,17 +6,17 @@ require (
 	github.com/akutz/gosync v0.1.0
 	github.com/apparentlymart/go-cidr v1.1.0
 	github.com/container-storage-interface/spec v1.6.0
-	github.com/dell/csi-metadata-retriever v1.6.0
-	github.com/dell/dell-csi-extensions/common v1.3.0
-	github.com/dell/dell-csi-extensions/podmon v1.3.0
-	github.com/dell/dell-csi-extensions/replication v1.6.0
-	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.4.0
-	github.com/dell/gobrick v1.9.0
-	github.com/dell/gocsi v1.9.0
-	github.com/dell/gofsutil v1.14.0
-	github.com/dell/goiscsi v1.8.0
-	github.com/dell/gonvme v1.6.0
-	github.com/dell/gopowerstore v1.14.2
+	github.com/dell/csi-metadata-retriever v1.6.1-0.20240223090612-746e99f12a06
+	github.com/dell/dell-csi-extensions/common v1.3.1-0.20240222170059-da63843c4267
+	github.com/dell/dell-csi-extensions/podmon v1.3.1-0.20240222170059-da63843c4267
+	github.com/dell/dell-csi-extensions/replication v1.6.1-0.20240222170059-da63843c4267
+	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.4.1-0.20240222170059-da63843c4267
+	github.com/dell/gobrick v1.9.1-0.20240222141837-aceadfa1e314
+	github.com/dell/gocsi v1.9.1-0.20240222141900-bbe1412cfdb4
+	github.com/dell/gofsutil v1.14.1-0.20240222142128-155ffcafc3ed
+	github.com/dell/goiscsi v1.8.1-0.20240222142227-6f79b2a9d272
+	github.com/dell/gonvme v1.6.1-0.20240222142325-f8927796de30
+	github.com/dell/gopowerstore v1.14.3-0.20240223090924-94bfb99085f7
 	github.com/fsnotify/fsnotify v1.7.0
 	github.com/go-openapi/strfmt v0.21.3
 	github.com/golang/mock v1.6.0
@@ -32,8 +32,8 @@ require (
 	github.com/stretchr/testify v1.8.4
 	github.com/uber/jaeger-client-go v2.30.0+incompatible
 	github.com/uber/jaeger-lib v2.4.1+incompatible
-	golang.org/x/net v0.19.0
-	google.golang.org/grpc v1.59.0
+	golang.org/x/net v0.20.0
+	google.golang.org/grpc v1.60.1
 	google.golang.org/protobuf v1.31.0
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/apimachinery v0.29.0
@@ -98,11 +98,11 @@ require (
 	golang.org/x/exp v0.0.0-20230905200255-921286631fa9 // indirect
 	golang.org/x/oauth2 v0.15.0 // indirect
 	golang.org/x/sync v0.5.0 // indirect
-	golang.org/x/sys v0.15.0 // indirect
-	golang.org/x/term v0.15.0 // indirect
+	golang.org/x/sys v0.16.0 // indirect
+	golang.org/x/term v0.16.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
-	google.golang.org/appengine v1.6.7 // indirect
+	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/genproto v0.0.0-20231106174013-bbf56f31fb17 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20231106174013-bbf56f31fb17 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20231120223509-83a465c0220f // indirect

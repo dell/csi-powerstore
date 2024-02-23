@@ -1,8 +1,8 @@
 module github.com/dell/csi-powerstore/v2/tests/e2e
 
-go 1.21
+go 1.22
 
-toolchain go1.21.0
+toolchain go1.22.0
 
 require (
 	github.com/onsi/gomega v1.29.0
@@ -13,7 +13,7 @@ require (
 
 require (
 	github.com/dell/csi-powerstore/v2 v2.8.0
-	github.com/dell/gopowerstore v1.14.2
+	github.com/dell/gopowerstore v1.14.3-0.20240223090924-94bfb99085f7
 	github.com/onsi/ginkgo/v2 v2.13.0
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.29.0
