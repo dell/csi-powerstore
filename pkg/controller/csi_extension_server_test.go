@@ -122,7 +122,7 @@ var _ = ginkgo.Describe("csi-extension-server", func() {
 				status.LastSuccess = time.Now().Unix()
 				input, _ := json.Marshal(status)
 				// responding with some dummy response that is for the case when array is connected and LastSuccess check was just finished
-				http.HandleFunc("/array-status/globalvolid1", func(w http.ResponseWriter, r *http.Request) {
+				http.HandleFunc("/array-status/globalvolid1", func(w http.ResponseWriter, _ *http.Request) {
 					w.Write(input)
 				})
 
@@ -297,7 +297,7 @@ var _ = ginkgo.Describe("csi-extension-server", func() {
 				status.LastSuccess = time.Now().Unix()
 				input, _ := json.Marshal(status)
 				// responding with some dummy response that is for the case when array is connected and LastSuccess check was just finished
-				http.HandleFunc("/array/id1", func(w http.ResponseWriter, r *http.Request) {
+				http.HandleFunc("/array/id1", func(w http.ResponseWriter, _ *http.Request) {
 					w.Write(input)
 				})
 
@@ -324,7 +324,7 @@ var _ = ginkgo.Describe("csi-extension-server", func() {
 				status.LastSuccess = time.Now().Unix() - 100
 				input, _ := json.Marshal(status)
 				// responding with some dummy response that is for the case when array is connected and LastSuccess check was just finished
-				http.HandleFunc("/array/id2", func(w http.ResponseWriter, r *http.Request) {
+				http.HandleFunc("/array/id2", func(w http.ResponseWriter, _ *http.Request) {
 					w.Write(input)
 				})
 
@@ -351,7 +351,7 @@ var _ = ginkgo.Describe("csi-extension-server", func() {
 				status.LastSuccess = time.Now().Unix() - 200
 				input, _ := json.Marshal(status)
 				// Responding with a dummy response for the case when the array check was done a while ago
-				http.HandleFunc("/array/id3", func(w http.ResponseWriter, r *http.Request) {
+				http.HandleFunc("/array/id3", func(w http.ResponseWriter, _ *http.Request) {
 					w.Write(input)
 				})
 
