@@ -51,7 +51,7 @@ func TestRmSockFile(t *testing.T) {
 	trimmedSockPath := "/var/run/csi/csi.sock"
 	_ = os.Setenv(utils.CSIEndpoint, sockPath)
 
-	t.Run("removed socket", func(t *testing.T) {
+	t.Run("removed socket", func(_ *testing.T) {
 		fsMock := new(mocks.FsInterface)
 		fsMock.On("Stat", trimmedSockPath).Return(&mocks.FileInfo{}, nil)
 		fsMock.On("RemoveAll", trimmedSockPath).Return(nil)
@@ -59,7 +59,7 @@ func TestRmSockFile(t *testing.T) {
 		common.RmSockFile(fsMock)
 	})
 
-	t.Run("failed to remove socket", func(t *testing.T) {
+	t.Run("failed to remove socket", func(_ *testing.T) {
 		fsMock := new(mocks.FsInterface)
 		fsMock.On("Stat", trimmedSockPath).Return(&mocks.FileInfo{}, nil)
 		fsMock.On("RemoveAll", trimmedSockPath).Return(fmt.Errorf("some error"))
@@ -67,21 +67,21 @@ func TestRmSockFile(t *testing.T) {
 		common.RmSockFile(fsMock)
 	})
 
-	t.Run("not found", func(t *testing.T) {
+	t.Run("not found", func(_ *testing.T) {
 		fsMock := new(mocks.FsInterface)
 		fsMock.On("Stat", trimmedSockPath).Return(&mocks.FileInfo{}, os.ErrNotExist)
 
 		common.RmSockFile(fsMock)
 	})
 
-	t.Run("may or may not exist", func(t *testing.T) {
+	t.Run("may or may not exist", func(_ *testing.T) {
 		fsMock := new(mocks.FsInterface)
 		fsMock.On("Stat", trimmedSockPath).Return(&mocks.FileInfo{}, fmt.Errorf("some other error"))
 
 		common.RmSockFile(fsMock)
 	})
 
-	t.Run("no endpoint set", func(t *testing.T) {
+	t.Run("no endpoint set", func(_ *testing.T) {
 		fsMock := new(mocks.FsInterface)
 		_ = os.Setenv(utils.CSIEndpoint, "")
 
@@ -90,7 +90,7 @@ func TestRmSockFile(t *testing.T) {
 }
 
 func TestSetLogFields(t *testing.T) {
-	t.Run("empty context", func(t *testing.T) {
+	t.Run("empty context", func(_ *testing.T) {
 		common.SetLogFields(nil, log.Fields{})
 	})
 }
