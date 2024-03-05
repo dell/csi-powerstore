@@ -355,7 +355,7 @@ var _ = ginkgo.Describe("csi-extension-server", func() {
 					w.Write(input)
 				})
 
-				http.HandleFunc("/array/id4", func(w http.ResponseWriter, r *http.Request) {
+				http.HandleFunc("/array/id4", func(w http.ResponseWriter, _ *http.Request) {
 					w.Write([]byte("invalid type response"))
 				})
 				server := &http.Server{Addr: ":49152"} // #nosec G112

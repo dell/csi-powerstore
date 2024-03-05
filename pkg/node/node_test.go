@@ -4081,7 +4081,7 @@ func TestInitConnectors(t *testing.T) {
 	}
 	nodeSvc.SetArrays(arrays)
 	nodeSvc.SetDefaultArray(arrays[firstValidIP])
-	t.Run("success test", func(t *testing.T) {
+	t.Run("success test", func(_ *testing.T) {
 		nodeSvc.initConnectors()
 	})
 }
@@ -4100,7 +4100,7 @@ func TestGetNodeOptions(t *testing.T) {
 	}
 	nodeSvc.SetArrays(arrays)
 	nodeSvc.SetDefaultArray(arrays[firstValidIP])
-	t.Run("success test", func(t *testing.T) {
+	t.Run("success test", func(_ *testing.T) {
 		csictx.Setenv(context.Background(), common.EnvNodeIDFilePath, "")
 		csictx.Setenv(context.Background(), common.EnvNodeNamePrefix, "")
 		csictx.Setenv(context.Background(), common.EnvKubeNodeName, "")
