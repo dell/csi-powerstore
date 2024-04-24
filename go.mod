@@ -20,7 +20,7 @@ require (
 	github.com/fsnotify/fsnotify v1.7.0
 	github.com/go-openapi/strfmt v0.21.3
 	github.com/golang/mock v1.6.0
-	github.com/golang/protobuf v1.5.3
+	github.com/golang/protobuf v1.5.4
 	github.com/gorilla/mux v1.8.0
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0
 	github.com/kubernetes-csi/csi-lib-utils v0.11.0
@@ -34,7 +34,7 @@ require (
 	github.com/uber/jaeger-lib v2.4.1+incompatible
 	golang.org/x/net v0.23.0
 	google.golang.org/grpc v1.62.0
-	google.golang.org/protobuf v1.32.0
+	google.golang.org/protobuf v1.33.0
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/apimachinery v0.29.2
 	k8s.io/client-go v0.29.2
