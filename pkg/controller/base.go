@@ -26,9 +26,9 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-powerstore/v2/pkg/common"
 	"github.com/dell/gopowerstore"
-	"github.com/golang/protobuf/ptypes"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 const (
@@ -117,7 +117,7 @@ func getCSISnapshot(snapshotID string, sourceVolumeID string, sizeInBytes int64)
 		SizeBytes:      sizeInBytes,
 		SnapshotId:     snapshotID,
 		SourceVolumeId: sourceVolumeID,
-		CreationTime:   ptypes.TimestampNow(),
+		CreationTime:   timestamppb.Now(),
 		ReadyToUse:     true,
 	}
 	return snap
