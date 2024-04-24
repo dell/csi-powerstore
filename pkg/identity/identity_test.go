@@ -24,10 +24,10 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-powerstore/v2/pkg/common"
-	"github.com/golang/protobuf/ptypes/wrappers"
 	ginkgo "github.com/onsi/ginkgo"
 	"github.com/onsi/ginkgo/reporters"
 	gomega "github.com/onsi/gomega"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 )
 
 var idntySvc *Service
@@ -103,7 +103,7 @@ var _ = ginkgo.Describe("CSIIdentityService", func() {
 		ginkgo.It("should return current status'", func() {
 			res, err := idntySvc.Probe(context.Background(), &csi.ProbeRequest{})
 			gomega.Expect(err).To(gomega.BeNil())
-			gomega.Expect(res).To(gomega.Equal(&csi.ProbeResponse{Ready: &wrappers.BoolValue{Value: idntySvc.ready}}))
+			gomega.Expect(res).To(gomega.Equal(&csi.ProbeResponse{Ready: &wrapperspb.BoolValue{Value: idntySvc.ready}}))
 		})
 	})
 })
