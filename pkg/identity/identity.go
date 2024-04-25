@@ -23,7 +23,7 @@ import (
 	"context"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/golang/protobuf/ptypes/wrappers"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 )
 
 // NewIdentityService creates new identity service
@@ -92,5 +92,5 @@ func (s Service) GetPluginCapabilities(_ context.Context, _ *csi.GetPluginCapabi
 
 // Probe returns current state of the driver and if it is ready to receive requests
 func (s Service) Probe(_ context.Context, _ *csi.ProbeRequest) (*csi.ProbeResponse, error) {
-	return &csi.ProbeResponse{Ready: &wrappers.BoolValue{Value: s.ready}}, nil
+	return &csi.ProbeResponse{Ready: &wrapperspb.BoolValue{Value: s.ready}}, nil
 }

@@ -40,7 +40,6 @@ import (
 	vgsext "github.com/dell/dell-csi-extensions/volumeGroupSnapshot"
 	csictx "github.com/dell/gocsi/context"
 	"github.com/dell/gopowerstore"
-	"github.com/golang/protobuf/ptypes/wrappers"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -1328,7 +1327,7 @@ func (s *Service) RegisterAdditionalServers(server *grpc.Server) {
 
 // ProbeController probes the controller service
 func (s *Service) ProbeController(_ context.Context, _ *commonext.ProbeControllerRequest) (*commonext.ProbeControllerResponse, error) {
-	ready := new(wrappers.BoolValue)
+	ready := new(wrapperspb.BoolValue)
 	ready.Value = true
 	rep := new(commonext.ProbeControllerResponse)
 	rep.Ready = ready
