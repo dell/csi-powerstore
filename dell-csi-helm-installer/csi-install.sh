@@ -10,14 +10,14 @@
 
 SCRIPTDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 DRIVERDIR="${SCRIPTDIR}/../"
-HELMCHARTVERSION="csi-powerstore-2.10.2"
+HELMCHARTVERSION="csi-powerstore-2.10.1"
 DRIVER="csi-powerstore"
 VERIFYSCRIPT="${SCRIPTDIR}/verify.sh"
 PROG="${0}"
 NODE_VERIFY=1
 VERIFY=1
 MODE="install"
-DEFAULT_DRIVER_VERSION="v2.10.2"
+DEFAULT_DRIVER_VERSION="v2.10.1"
 WATCHLIST=""
 
 # export the name of the debug log, so child processes will see it
