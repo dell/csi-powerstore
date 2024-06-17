@@ -20,6 +20,7 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"unicode/utf8"
 
@@ -68,6 +69,8 @@ const (
 	KeyCSIPVCNamespace = "csi.storage.k8s.io/pvc/namespace"
 	// KeyCSIPVCName represents key for csi pvc name
 	KeyCSIPVCName = "csi.storage.k8s.io/pvc/name"
+	// DelVolumePrefix is used to mark volumes for deletion which have associated snapshots
+	DelVolumePrefix = "_DEL"
 )
 
 func volumeNameValidation(volumeName string) error {
@@ -179,4 +182,61 @@ func getDescription(params map[string]string) string {
 		return description
 	}
 	return params[KeyCSIPVCName] + "-" + params[KeyCSIPVCNamespace]
+}
+
+func markVolumeForDeletion(ctx context.Context, id string, client gopowerstore.Client) error {
+	vol, err := client.GetVolume(ctx, id)
+	if err != nil {
+		return status.Errorf(codes.Internal, "failed to get volume '%s' from host: %s", id, err.Error())
+	}
+	newVolName := fmt.Sprintf("%s%s", DelVolumePrefix, vol.Name)
+	if len(newVolName) > MaxVolumeNameLength {
+		newVolName = newVolName[:MaxVolumeNameLength]
+	}
+	modifyParam := gopowerstore.HostModify{Name: &newVolName}
+	_, err = client.ModifyHost(ctx, &modifyParam, id)
+	if err != nil {
+		return status.Errorf(codes.Internal, "api error when pathing volume name: %s", err.Error())
+	}
+	return nil
+}
+
+func checkIfSourceVolNeedDeletion(ctx context.Context, id string, client gopowerstore.Client) error {
+	// Check if the source volume is marker for deletion and it has 0 snap session
+	vol, err := client.GetVolume(ctx, id)
+	if err != nil {
+		if apiError, ok := err.(gopowerstore.APIError); ok {
+			if apiError.NotFound() {
+				// Source volume is already deleted
+				return nil
+			}
+			return status.Errorf(codes.Internal, "err fetching source vol %s, err: %s", id, err.Error())
+		}
+	}
+	// source volume exist, check for snapshots
+	snapSessions, err := client.GetSnapshotsByVolumeID(ctx, vol.ID)
+	if err != nil {
+		return status.Errorf(codes.Internal, "err fetching snapshot sessions on source vol %s, err: %s", id, err.Error())
+	}
+	if len(snapSessions) == 0 && strings.Contains(vol.Name, DelVolumePrefix) {
+		return deleteVolume(ctx, vol.ID, client)
+	}
+	return err
+}
+
+func deleteVolume(ctx context.Context, id string, client gopowerstore.Client) error {
+	_, err := client.DeleteVolume(ctx, nil, id)
+	if err == nil {
+		return nil
+	}
+	if apiError, ok := err.(gopowerstore.APIError); ok {
+		if apiError.NotFound() {
+			return nil
+		}
+		if apiError.VolumeAttachedToHost() {
+			return status.Errorf(codes.Internal,
+				"volume with ID '%s' is still attached to host: %s", id, apiError.Error())
+		}
+	}
+	return err
 }

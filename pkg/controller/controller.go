@@ -498,29 +498,21 @@ func (s *Service) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest
 			}
 		}
 		// TODO: if len(vgs.VolumeGroup == 1) && it is the last volume : delete volume group
-		// TODO: What to do with RPO snaps?
-		// listSnaps, err := arr.GetClient().GetSnapshotsByVolumeID(ctx, id)
-		// if err != nil {
-		// 	return nil, status.Errorf(codes.Unknown, "failure getting snapshot: %s", err.Error())
-		// }
-		// if len(listSnaps) > 0 {
-		// 	return nil, status.Errorf(codes.FailedPrecondition,
-		// 		"unable to delete volume -- snapshots based on this volume still exist: %v",
-		// 		listSnaps)
-		// }
-
-		_, err = arr.GetClient().DeleteVolume(ctx, nil, id)
-		if err == nil {
+		listSnaps, err := arr.GetClient().GetSnapshotsByVolumeID(ctx, id)
+		if err != nil {
+			return nil, status.Errorf(codes.Unknown, "failure getting snapshot: %s", err.Error())
+		}
+		if len(listSnaps) > 0 {
+			// has snapshots, soft delete for now, delete volume with snapshot deletion
+			err := markVolumeForDeletion(ctx, id, arr.GetClient())
+			if err != nil {
+				return nil, status.Errorf(codes.Internal, "failure soft delete snapshot volume: %s", err.Error())
+			}
 			return &csi.DeleteVolumeResponse{}, nil
 		}
-		if apiError, ok := err.(gopowerstore.APIError); ok {
-			if apiError.NotFound() {
-				return &csi.DeleteVolumeResponse{}, nil
-			}
-			if apiError.VolumeAttachedToHost() {
-				return nil, status.Errorf(codes.Internal,
-					"volume with ID '%s' is still attached to host: %s", id, apiError.Error())
-			}
+		err = deleteVolume(ctx, id, arr.GetClient())
+		if err == nil {
+			return &csi.DeleteVolumeResponse{}, nil
 		}
 		return nil, err
 	}
@@ -1085,6 +1077,9 @@ func (s *Service) CreateSnapshot(ctx context.Context, req *csi.CreateSnapshotReq
 // DeleteSnapshot deletes a snapshot of the Volume or FileSystem.
 func (s *Service) DeleteSnapshot(ctx context.Context, req *csi.DeleteSnapshotRequest) (*csi.DeleteSnapshotResponse, error) {
 	snapID := req.GetSnapshotId()
+	var err error
+	var snap gopowerstore.Volume
+
 	if snapID == "" {
 		return nil, status.Errorf(codes.InvalidArgument, "snapshot ID to be deleted is required")
 	}
@@ -1117,7 +1112,7 @@ func (s *Service) DeleteSnapshot(ctx context.Context, req *csi.DeleteSnapshotReq
 			return nil, err
 		}
 	} else {
-		snap, err := arr.GetClient().GetSnapshot(ctx, id)
+		snap, err = arr.GetClient().GetSnapshot(ctx, id)
 		if err == nil {
 			// we will check whether this snapshot is a part of volume group snapshot, if yes then we will delete the volume group snapshot
 			vgs, err := arr.GetClient().GetVolumeGroupsByVolumeID(ctx, snap.ID)
@@ -1129,6 +1124,10 @@ func (s *Service) DeleteSnapshot(ctx context.Context, req *csi.DeleteSnapshotReq
 			}
 			_, err = arr.GetClient().DeleteSnapshot(ctx, nil, id)
 			if err == nil {
+				err = checkIfSourceVolNeedDeletion(ctx, snap.ProtectionData.SourceID, arr.GetClient())
+				if err != nil {
+					return nil, status.Errorf(codes.Internal, "failed to do checkIfSourceVolNeedDeletion for snap %s, err: %s", id, err.Error())
+				}
 				return &csi.DeleteSnapshotResponse{}, nil
 			}
 			if apiError, ok := err.(gopowerstore.APIError); ok {
@@ -1142,6 +1141,10 @@ func (s *Service) DeleteSnapshot(ctx context.Context, req *csi.DeleteSnapshotReq
 
 	if apiError, ok := err.(gopowerstore.APIError); ok {
 		if apiError.NotFound() {
+			err = checkIfSourceVolNeedDeletion(ctx, snap.ProtectionData.SourceID, arr.GetClient())
+			if err != nil {
+				return nil, status.Errorf(codes.Internal, "failed to do checkIfSourceVolNeedDeletion for snap %s, err: %s", id, err.Error())
+			}
 			return &csi.DeleteSnapshotResponse{}, nil
 		}
 	}
