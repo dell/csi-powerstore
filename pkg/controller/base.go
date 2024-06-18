@@ -193,8 +193,8 @@ func markVolumeForDeletion(ctx context.Context, id string, client gopowerstore.C
 	if len(newVolName) > MaxVolumeNameLength {
 		newVolName = newVolName[:MaxVolumeNameLength]
 	}
-	modifyParam := gopowerstore.HostModify{Name: &newVolName}
-	_, err = client.ModifyHost(ctx, &modifyParam, id)
+	modifyParam := gopowerstore.VolumeModify{Name: newVolName}
+	_, err = client.ModifyVolume(ctx, &modifyParam, id)
 	if err != nil {
 		return status.Errorf(codes.Internal, "api error when pathing volume name: %s", err.Error())
 	}
