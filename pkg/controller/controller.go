@@ -499,15 +499,14 @@ func (s *Service) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest
 		}
 		// TODO: if len(vgs.VolumeGroup == 1) && it is the last volume : delete volume group
 		// TODO: What to do with RPO snaps?
-		// listSnaps, err := arr.GetClient().GetSnapshotsByVolumeID(ctx, id)
-		// if err != nil {
-		// 	return nil, status.Errorf(codes.Unknown, "failure getting snapshot: %s", err.Error())
-		// }
-		// if len(listSnaps) > 0 {
-		// 	return nil, status.Errorf(codes.FailedPrecondition,
-		// 		"unable to delete volume -- snapshots based on this volume still exist: %v",
-		// 		listSnaps)
-		// }
+		listSnaps, err := arr.GetClient().GetSnapshotsByVolumeID(ctx, id)
+		if err != nil {
+			return nil, status.Errorf(codes.Unknown, "failure getting snapshot: %s", err.Error())
+		}
+		if len(listSnaps) > 0 {
+			return nil, status.Errorf(codes.FailedPrecondition,
+				"unable to delete volume -- %d snapshots based on this volume still exist.", len(listSnaps))
+		}
 
 		_, err = arr.GetClient().DeleteVolume(ctx, nil, id)
 		if err == nil {
