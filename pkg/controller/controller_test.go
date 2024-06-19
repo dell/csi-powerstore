@@ -1238,7 +1238,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			ginkgo.It("should successful delete block volume and remove it from group and unassigned policy", func() {
 				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).
 					Return(gopowerstore.VolumeGroups{VolumeGroup: []gopowerstore.VolumeGroup{{ID: validGroupID, ProtectionPolicyID: validPolicyID}}}, nil)
-
+				clientMock.On("GetSnapshotsByVolumeID", mock.Anything, validBaseVolID).Return([]gopowerstore.Volume{}, nil)
 				clientMock.On("RemoveMembersFromVolumeGroup",
 					mock.Anything,
 					mock.AnythingOfType("*gopowerstore.VolumeGroupMembers"),
@@ -1335,9 +1335,6 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 		})
 
 		ginkgo.When("when trying delete volume with existing snapshots", func() {
-			// TODO: add test after explicitly define deletion behavior
-			// It("should fail [Block]", func() {})
-
 			ginkgo.It("should fail [NFS]", func() {
 				clientMock.On("GetFsSnapshotsByVolumeID", mock.Anything, validBaseVolID).
 					Return([]gopowerstore.FileSystem{
@@ -1356,7 +1353,23 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				gomega.Expect(err.Error()).To(gomega.ContainSubstring("snapshots based on this volume still exist"))
 			})
 		})
-
+		ginkgo.When("when trying delete volume with existing snapshots", func() {
+			ginkgo.It("should fail [scsi]", func() {
+				clientMock.On("GetVolume", mock.Anything, validBaseVolID).Return(
+					gopowerstore.Volume{
+						ID:   validBaseVolID,
+						Name: "name",
+						Size: validVolSize,
+					}, nil)
+				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).Return(gopowerstore.VolumeGroups{}, nil)
+				clientMock.On("GetSnapshotsByVolumeID", mock.Anything, validBaseVolID).Return([]gopowerstore.Volume{{ID: "snap-id-1"}, {ID: "snap-id-2"}}, nil)
+				req := &csi.DeleteVolumeRequest{VolumeId: validBaseVolID}
+				res, err := ctrlSvc.DeleteVolume(context.Background(), req)
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("snapshots based on this volume still exist"))
+			})
+		})
 		ginkgo.When("volume does not exist", func() {
 			ginkgo.It("should succeed [Block]", func() {
 				clientMock.On("GetSnapshotsByVolumeID", mock.Anything, validBaseVolID).Return([]gopowerstore.Volume{}, nil)
