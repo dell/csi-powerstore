@@ -69,6 +69,7 @@ type Service struct {
 	replicationContextPrefix    string
 	replicationPrefix           string
 	isHealthMonitorEnabled      bool
+	isTopologyControlEnabled    bool // used to filter topology keys based on user config
 	isAutoRoundOffFsSizeEnabled bool
 
 	K8sVisibilityAutoRegistration bool
@@ -96,6 +97,10 @@ func (s *Service) Init() error {
 
 	if isHealthMonitorEnabled, ok := csictx.LookupEnv(ctx, common.EnvIsHealthMonitorEnabled); ok {
 		s.isHealthMonitorEnabled, _ = strconv.ParseBool(isHealthMonitorEnabled)
+	}
+
+	if isTopologyControlEnabled, ok := csictx.LookupEnv(ctx, common.EnvTopologyFilterEnabled); ok {
+		s.isTopologyControlEnabled, _ = strconv.ParseBool(isTopologyControlEnabled)
 	}
 
 	s.nfsAcls = ""

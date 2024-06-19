@@ -23,6 +23,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/spf13/viper"
 	"net/http"
 	"os"
 	"path"
@@ -65,28 +66,44 @@ type Opts struct {
 	EnableCHAP            bool
 }
 
+// NodeConfig defines rules for given node
+type NodeConfig struct {
+	NodeName string   `yaml:"nodeName, omitempty"`
+	Rules    []string `yaml:"rules, omitempty"`
+}
+
+// TopologyConfig defines set of allow and deny rules for multiple nodes
+type TopologyConfig struct {
+	AllowedConnections []NodeConfig `yaml:"allowedConnections, omitempty" mapstructure:"allowedConnections"`
+	DeniedConnections  []NodeConfig `yaml:"deniedConnections, omitempty" mapstructure:"deniedConnections"`
+}
+
 // Service is a controller service that contains scsi connectors and implements NodeServer API
 type Service struct {
 	Fs fs.Interface
 
-	ctrlSvc        controller.Interface
-	iscsiConnector ISCSIConnector
-	fcConnector    FcConnector
-	nvmeConnector  NVMEConnector
-	iscsiLib       goiscsi.ISCSIinterface
-	nvmeLib        gonvme.NVMEinterface
-	iscsiTargets   map[string][]string
-	nvmeTargets    map[string][]string
-	opts           Opts
-	nodeID         string
+	ctrlSvc             controller.Interface
+	topologyConfig      *TopologyConfig
+	allowedTopologyKeys map[string][]string // map of nodes to allowed topology keys
+	deniedTopologyKeys  map[string][]string // map of nodes to denied topology keys
+	iscsiConnector      ISCSIConnector
+	fcConnector         FcConnector
+	nvmeConnector       NVMEConnector
+	iscsiLib            goiscsi.ISCSIinterface
+	nvmeLib             gonvme.NVMEinterface
+	iscsiTargets        map[string][]string
+	nvmeTargets         map[string][]string
+	opts                Opts
+	nodeID              string
 
-	useFC                  bool
-	useNVME                bool
-	useNFS                 bool
-	initialized            bool
-	reusedHost             bool
-	isHealthMonitorEnabled bool
-	isPodmonEnabled        bool
+	useFC                    bool
+	useNVME                  bool
+	useNFS                   bool
+	initialized              bool
+	reusedHost               bool
+	isHealthMonitorEnabled   bool
+	isTopologyControlEnabled bool
+	isPodmonEnabled          bool
 
 	array.Locker
 }
@@ -187,8 +204,86 @@ func (s *Service) Init() error {
 		s.isHealthMonitorEnabled, _ = strconv.ParseBool(isHealthMonitorEnabled)
 	}
 
+	//--Start:Topology Changes
+	if isTopologyControlEnabled, ok := csictx.LookupEnv(ctx, common.EnvTopologyFilterEnabled); ok {
+		s.isTopologyControlEnabled, _ = strconv.ParseBool(isTopologyControlEnabled)
+	}
+
+	// Reading Topology filters from the config file
+	topoConfigFilePath, ok := csictx.LookupEnv(ctx, common.EnvTopoConfigFilePath)
+	if !ok {
+		log.Warningf("Unable to read X_CSI_POWERSTORE_TOPOLOGY_CONFIG_PATH from env. Continuing with default topology keys")
+	} else {
+		s.topologyConfig, err = ReadConfig(topoConfigFilePath)
+		if err != nil {
+			log.Warningf("continuing with default topology keys")
+		} else {
+			log.Debug("processing topology config map")
+			s.ParseConfig()
+		}
+	}
+	//-- End: Topology Changes
+
 	go s.startAPIService(ctx)
 	return nil
+}
+
+func (s *Service) ParseConfig() {
+	// make allowed list
+	s.allowedTopologyKeys = readNodesRules(s.topologyConfig.AllowedConnections)
+	// make denied list
+	s.deniedTopologyKeys = readNodesRules(s.topologyConfig.DeniedConnections)
+
+	log.Infof("proccessed allowed list: (%+v)", s.allowedTopologyKeys)
+	log.Infof("proccessed denied list: (%+v)", s.deniedTopologyKeys)
+}
+
+func readNodesRules(connections []NodeConfig) map[string][]string {
+	keys := map[string][]string{}
+	for _, nodeConfig := range connections {
+		nodeName := nodeConfig.NodeName
+		var arrayToConTyp []string
+		for _, rule := range nodeConfig.Rules {
+			arrayHW := strings.Split(rule, ":")
+			array := arrayHW[0]
+			if array == "*" {
+				array = ""
+			}
+			if len(arrayHW) < 2 {
+				log.Warningf("incorrect config for %s skipping rule (%s)", nodeName, rule)
+				continue
+			}
+			hws := strings.Split(arrayHW[1], "/")
+			for _, typ := range hws {
+				if typ == "*" {
+					typ = ""
+				}
+				arrayToConTyp = append(arrayToConTyp, array+"-"+strings.ToLower(typ))
+			}
+			keys[nodeName] = arrayToConTyp
+		}
+	}
+	return keys
+}
+
+func ReadConfig(configPath string) (*TopologyConfig, error) {
+	topoViper := viper.New()
+	topoViper.SetConfigFile(configPath)
+	topoViper.SetConfigType("yaml")
+
+	err := topoViper.ReadInConfig()
+	// if unable to read configuration file, set defaults
+	if err != nil {
+		log.WithError(err).Error("unable to read topology config file")
+		return nil, err
+	}
+	var config TopologyConfig
+	err = topoViper.Unmarshal(&config)
+	if err != nil {
+		log.WithError(err).Error("unable to unmarshal topology config")
+		return nil, err
+	}
+	return &config, nil
 }
 
 func (s *Service) initConnectors() {
@@ -1026,6 +1121,55 @@ func (s *Service) NodeGetCapabilities(_ context.Context, _ *csi.NodeGetCapabilit
 	}, nil
 }
 
+// checkIfArrayProtocolValid returns true if the  pair (array and protocol) is applicable for the given node based on config
+// if the pair is present in allow rules, it is applied in the topology keys map
+// if the pair is present in deny rules, it is skipped in the topology keys map
+func (s *Service) checkIfArrayProtocolValid(nodeName string, array string, protocol string) bool {
+	if !s.isTopologyControlEnabled {
+		return true
+	}
+
+	key := fmt.Sprintf("%s-%s", array, protocol)
+	log.Debugf("Checking topology config for allow rules for key (%s)", key)
+	// Check topo key pair as per rules in allow list
+	if allowedList, ok := s.allowedTopologyKeys[nodeName]; ok {
+		if !checkIfKeyIsIncludedOrNot(allowedList, key) {
+			return false
+		}
+	} else if allowedList, ok := s.allowedTopologyKeys["*"]; ok {
+		if !checkIfKeyIsIncludedOrNot(allowedList, key) {
+			return false
+		}
+	}
+
+	log.Debugf("Checking topology config for deny rules for key (%s)", key)
+	// Check topo keys as per rules in denied list
+	if deniedList, ok := s.deniedTopologyKeys[nodeName]; ok {
+		if checkIfKeyIsIncludedOrNot(deniedList, key) {
+			return false
+		}
+	} else if deniedList, ok := s.deniedTopologyKeys["*"]; ok {
+		if checkIfKeyIsIncludedOrNot(deniedList, key) {
+			return false
+		}
+	}
+	log.Debugf("applied topo key for node %s : %+v", nodeName, key)
+	return true
+}
+
+// checkIfKeyIsIncludedOrNot will crosscheck the key with the applied rules in the config.
+// returns true if it founds the key in the rules.
+func checkIfKeyIsIncludedOrNot(rulesList []string, key string) bool {
+	found := false
+	for _, rule := range rulesList {
+		if strings.Contains(key, rule) {
+			found = true
+			break
+		}
+	}
+	return found
+}
+
 // NodeGetInfo returns id of the node and topology constraints
 func (s *Service) NodeGetInfo(ctx context.Context, _ *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
 	// Create the topology keys
@@ -1045,7 +1189,7 @@ func (s *Service) NodeGetInfo(ctx context.Context, _ *csi.NodeGetInfoRequest) (*
 
 		if arr.BlockProtocol != common.NoneTransport {
 			if s.useNVME {
-				if s.useFC {
+				if s.useFC && s.checkIfArrayProtocolValid(s.nodeID, arr.IP, strings.ToLower(string(common.NVMEFCTransport))) {
 					nvmefcInfo, err := common.GetNVMEFCTargetInfoFromStorage(arr.GetClient(), "")
 					if err != nil {
 						log.Errorf("couldn't get targets from the array: %s", err.Error())
@@ -1074,7 +1218,7 @@ func (s *Service) NodeGetInfo(ctx context.Context, _ *csi.NodeGetInfoRequest) (*
 					if nvmefcConnectCount != 0 {
 						resp.AccessibleTopology.Segments[common.Name+"/"+arr.GetIP()+"-nvmefc"] = "true"
 					}
-				} else {
+				} else if s.checkIfArrayProtocolValid(s.nodeID, arr.IP, strings.ToLower(string(common.NVMETCPTransport))) {
 					// useNVME/TCP
 					infoList, err := common.GetNVMETCPTargetsInfoFromStorage(arr.GetClient(), "")
 					if err != nil {
@@ -1111,7 +1255,7 @@ func (s *Service) NodeGetInfo(ctx context.Context, _ *csi.NodeGetInfoRequest) (*
 						s.useNFS = true
 					}
 				}
-			} else if s.useFC {
+			} else if s.useFC && s.checkIfArrayProtocolValid(s.nodeID, arr.IP, strings.ToLower(string(common.FcTransport))) {
 				// Check node initiators connection to array
 				nodeID := s.nodeID
 				if s.reusedHost {
@@ -1147,7 +1291,7 @@ func (s *Service) NodeGetInfo(ctx context.Context, _ *csi.NodeGetInfoRequest) (*
 					}).Error("there is no active FC sessions")
 					continue
 				}
-			} else {
+			} else if s.checkIfArrayProtocolValid(s.nodeID, arr.IP, strings.ToLower(string(common.ISCSITransport))) {
 				infoList, err := common.GetISCSITargetsInfoFromStorage(arr.GetClient(), "")
 				if err != nil {
 					log.Errorf("couldn't get targets from array: %s", err.Error())
