@@ -20,20 +20,23 @@ allowedConnections:
     #   - ISCSI : iSCSI protocol
     #   - NVMe : NVMe protocol
     #   - "*" - for all the possible Transport Protocol
-    # Examples: "000000000001:FC", "000000000002:*", "*:FC", "*:*"
+    # Examples: "000000000001-FC", "000000000002-*", "*-FC", "*-*"
     rules:
-      - "000000000001:FC"
-      - "000000000002:FC"
+      - "000000000001-FC"
+      - "000000000002-FC"
   - nodeName: "*"
     rules:
-      - "000000000002:FC"
+      - "000000000002-FC"
+  - nodeName: "Node2"
+    rules:
+      - "000000000002-ISCSI"
 # deniedConnections contains a list of (node, array and protocol) info for denied configurations by user
 # For any given storage array ID and protocol on a Node, topology keys will be created for every other configuration but
 # not these input pairs
 deniedConnections:
   - nodeName: "node2"
     rules:
-      - "000000000002:*"
+      - "000000000002-*"
   - nodeName: "node3"
     rules:
-      - "*:*"
+      - "*-*"

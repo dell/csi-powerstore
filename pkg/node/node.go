@@ -244,7 +244,7 @@ func readNodesRules(connections []NodeConfig) map[string][]string {
 		nodeName := nodeConfig.NodeName
 		var arrayToConTyp []string
 		for _, rule := range nodeConfig.Rules {
-			arrayHW := strings.Split(rule, ":")
+			arrayHW := strings.Split(rule, "-")
 			array := arrayHW[0]
 			if array == "*" {
 				array = ""
@@ -1125,9 +1125,15 @@ func (s *Service) NodeGetCapabilities(_ context.Context, _ *csi.NodeGetCapabilit
 // if the pair is present in allow rules, it is applied in the topology keys map
 // if the pair is present in deny rules, it is skipped in the topology keys map
 func (s *Service) checkIfArrayProtocolValid(nodeName string, array string, protocol string) bool {
+
+	log.Debugf("CheckIfArrayProtocolValid for Node Name: (%s) Array: (%s) Protocol: (%s)", nodeName, array, protocol)
+
 	if !s.isTopologyControlEnabled {
+		log.Debugf("Custom Topology is Disabled.")
 		return true
 	}
+
+	log.Debugf("Validating Topology for Node Name: (%s) Array: (%s) Protocol: (%s)", nodeName, array, protocol)
 
 	key := fmt.Sprintf("%s-%s", array, protocol)
 	log.Debugf("Checking topology config for allow rules for key (%s)", key)
