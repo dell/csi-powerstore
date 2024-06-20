@@ -44,10 +44,6 @@ const (
 	// to execute iSCSI commands
 	EnvNodeChrootPath = "X_CSI_POWERSTORE_NODE_CHROOT_PATH"
 
-	// EnvCtrlRootPath is the name of the environment variable which store path to directory where
-	// the host root is mounted
-	EnvCtrlRootPath = "X_CSI_POWERSTORE_CTRL_ROOT_PATH"
-
 	// EnvTmpDir is the name of the environment variable which store path to the folder which will be used
 	// for csi-powerstore temporary files
 	EnvTmpDir = "X_CSI_POWERSTORE_TMP_DIR" // #nosec G101
@@ -95,9 +91,6 @@ const (
 
 	// EnvNfsAcls specifies acls to be set on NFS mount directory
 	EnvNfsAcls = "X_CSI_NFS_ACLS"
-
-	// EnvK8sVisibilityAutoRegistration specifies if k8s cluster should be automatically registered to PowerStore Array
-	EnvK8sVisibilityAutoRegistration = "X_CSI_K8S_VISIBILITY_AUTO_REGISTRATION"
 
 	// EnvMetadataRetrieverEndpoint specifies the endpoint address for csi-metadata-retriever sidecar
 	EnvMetadataRetrieverEndpoint = "CSI_RETRIEVER_ENDPOINT"

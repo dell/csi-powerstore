@@ -70,8 +70,6 @@ type Service struct {
 	replicationPrefix           string
 	isHealthMonitorEnabled      bool
 	isAutoRoundOffFsSizeEnabled bool
-
-	K8sVisibilityAutoRegistration bool
 }
 
 // maxVolumesSizeForArray -  store the maxVolumesSizeForArray
@@ -108,10 +106,6 @@ func (s *Service) Init() error {
 	if isAutoRoundOffFsSizeEnabled, ok := csictx.LookupEnv(ctx, common.EnvAllowAutoRoundOffFilesystemSize); ok {
 		log.Warn("Auto round off Filesystem size has been enabled! This will round off NFS PVC size to 3Gi when the requested size is less than 3Gi.")
 		s.isAutoRoundOffFsSizeEnabled, _ = strconv.ParseBool(isAutoRoundOffFsSizeEnabled)
-	}
-
-	if isk8sVisibilityAutoRegistrationEnabled, ok := csictx.LookupEnv(ctx, common.EnvK8sVisibilityAutoRegistration); ok {
-		s.K8sVisibilityAutoRegistration, _ = strconv.ParseBool(isk8sVisibilityAutoRegistrationEnabled)
 	}
 
 	return nil
