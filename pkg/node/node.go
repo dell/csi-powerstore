@@ -1139,11 +1139,15 @@ func (s *Service) checkIfArrayProtocolValid(nodeName string, array string, proto
 	log.Debugf("Checking topology config for allow rules for key (%s)", key)
 	// Check topo key pair as per rules in allow list
 	if allowedList, ok := s.allowedTopologyKeys[nodeName]; ok {
+		log.Debugf("Node (%s) is present in allowedTopologyKeys", nodeName)
 		if !checkIfKeyIsIncludedOrNot(allowedList, key) {
+			log.Debugf("But Key (%s) is not present in allowedList for Node Name: (%s)", key, nodeName)
 			return false
 		}
 	} else if allowedList, ok := s.allowedTopologyKeys["*"]; ok {
+		log.Debugf("Node (%s) is present in allowedTopologyKeys", "*")
 		if !checkIfKeyIsIncludedOrNot(allowedList, key) {
+			log.Debugf("But Key (%s) is not present in allowedList for Node Name: (%s)", key, "*")
 			return false
 		}
 	}
@@ -1151,14 +1155,19 @@ func (s *Service) checkIfArrayProtocolValid(nodeName string, array string, proto
 	log.Debugf("Checking topology config for deny rules for key (%s)", key)
 	// Check topo keys as per rules in denied list
 	if deniedList, ok := s.deniedTopologyKeys[nodeName]; ok {
+		log.Debugf("Node (%s) is present in deniedTopologyKeys", nodeName)
 		if checkIfKeyIsIncludedOrNot(deniedList, key) {
+			log.Debugf("Key (%s) is present in deniedList for Node Name: (%s)", key, nodeName)
 			return false
 		}
 	} else if deniedList, ok := s.deniedTopologyKeys["*"]; ok {
+		log.Debugf("Node (%s) is present in deniedTopologyKeys", "*")
 		if checkIfKeyIsIncludedOrNot(deniedList, key) {
+			log.Debugf("Key (%s) is present in deniedList for Node Name: (%s)", key, "*")
 			return false
 		}
 	}
+
 	log.Debugf("applied topo key for node %s : %+v", nodeName, key)
 	return true
 }
@@ -1168,7 +1177,9 @@ func (s *Service) checkIfArrayProtocolValid(nodeName string, array string, proto
 func checkIfKeyIsIncludedOrNot(rulesList []string, key string) bool {
 	found := false
 	for _, rule := range rulesList {
+		log.Debugf("*** Rule Name (%s) ***", rule)
 		if strings.Contains(key, rule) {
+			log.Debugf("*** Rule Name (%s) is Found ***", rule)
 			found = true
 			break
 		}
