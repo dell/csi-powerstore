@@ -438,7 +438,7 @@ var _ = ginkgo.Describe("csi-extension-server", func() {
 
 				createGroupRequest := &gopowerstore.VolumeGroupCreate{
 					Name:      validGroupName,
-					VolumeIds: []string{validBaseVolID},
+					VolumeIDs: []string{validBaseVolID},
 				}
 				clientMock.On("CreateVolumeGroup", mock.Anything, createGroupRequest).
 					Return(gopowerstore.CreateResponse{ID: validGroupID}, nil)

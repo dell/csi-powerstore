@@ -67,7 +67,7 @@ func (s *Service) CreateVolumeGroupSnapshot(ctx context.Context, request *vgsext
 	vgParams := gopowerstore.VolumeGroupCreate{
 		Name:        request.GetName(),
 		Description: request.GetDescription(),
-		VolumeIds:   sourceVols,
+		VolumeIDs:   sourceVols,
 	}
 
 	gotVg, err := s.Arrays()[arr].GetClient().GetVolumeGroupByName(ctx, request.GetName())
@@ -82,14 +82,14 @@ func (s *Service) CreateVolumeGroupSnapshot(ctx context.Context, request *vgsext
 		// taking the existing volume group to re-create
 		existingVgID = gotVg.ID
 		// add members to existing volume group before taking snapshot
-		_, err := s.Arrays()[arr].GetClient().AddMembersToVolumeGroup(ctx, &gopowerstore.VolumeGroupMembers{VolumeIds: sourceVols}, existingVgID)
+		_, err := s.Arrays()[arr].GetClient().AddMembersToVolumeGroup(ctx, &gopowerstore.VolumeGroupMembers{VolumeIDs: sourceVols}, existingVgID)
 		if err != nil {
 			if apiError, ok := err.(gopowerstore.APIError); !(ok && apiError.VolumeNameIsAlreadyUse()) {
 				return nil, status.Errorf(codes.Internal, "Error adding volume group members: %s", err.Error())
 			}
 		}
 	} else {
-		r, err := s.Arrays()[arr].GetClient().GetVolumeGroupsByVolumeID(ctx, vgParams.VolumeIds[0])
+		r, err := s.Arrays()[arr].GetClient().GetVolumeGroupsByVolumeID(ctx, vgParams.VolumeIDs[0])
 		if err != nil {
 			if apiError, ok := err.(gopowerstore.APIError); !(ok && apiError.NotFound()) {
 				return nil, status.Errorf(codes.Internal, "Error getting volume group by volume ID: %s", err.Error())

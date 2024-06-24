@@ -4014,7 +4014,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				clientMock.On("CreateProtectionPolicy", mock.Anything,
 					&gopowerstore.ProtectionPolicyCreate{
 						Name:               validPolicyName,
-						ReplicationRuleIds: []string{validRuleID},
+						ReplicationRuleIDs: []string{validRuleID},
 					}).Return(gopowerstore.CreateResponse{ID: validPolicyID}, nil)
 				res, err := controller.EnsureProtectionPolicyExists(context.Background(), ctrlSvc.DefaultArray(),
 					validGroupName, validRemoteSystemName, validRPO)

@@ -200,7 +200,7 @@ func EnsureProtectionPolicyExists(ctx context.Context, arr *array.PowerStoreArra
 
 	newPp, err := arr.Client.CreateProtectionPolicy(ctx, &gopowerstore.ProtectionPolicyCreate{
 		Name:               ppName,
-		ReplicationRuleIds: []string{rrID},
+		ReplicationRuleIDs: []string{rrID},
 	})
 	if err != nil {
 		return "", status.Errorf(codes.Internal, "can't create protection policy: %s", err.Error())

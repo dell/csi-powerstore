@@ -479,7 +479,7 @@ func (s *Service) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest
 			// Remove volume from volume group
 			// TODO: If volume has multiple volume group then how we should find ours?
 			// TODO: Maybe adding volumegroup id/name to volume id can help?
-			_, err := arr.GetClient().RemoveMembersFromVolumeGroup(ctx, &gopowerstore.VolumeGroupMembers{VolumeIds: []string{id}}, vgs.VolumeGroup[0].ID)
+			_, err := arr.GetClient().RemoveMembersFromVolumeGroup(ctx, &gopowerstore.VolumeGroupMembers{VolumeIDs: []string{id}}, vgs.VolumeGroup[0].ID)
 			if err != nil {
 				// TODO: check for idempotency cases
 				return nil, err
