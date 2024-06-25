@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2021-2024 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -120,12 +120,6 @@ func main() {
 			log.Fatalf("couldn't create controller service: %s", err.Error())
 		}
 
-		if cs.K8sVisibilityAutoRegistration {
-			err = cs.RegisterK8sCluster(f)
-			if err != nil {
-				log.Errorf("couldn't register to arrays in controller service: %s", err.Error())
-			}
-		}
 		controllerService = cs
 	} else if strings.EqualFold(mode, "node") {
 		ns := &node.Service{
@@ -154,12 +148,6 @@ func main() {
 			err := controllerService.UpdateArrays(configPath, f)
 			if err != nil {
 				log.Fatalf("couldn't initialize arrays in controller service: %s", err.Error())
-			}
-			if controllerService.K8sVisibilityAutoRegistration {
-				err = controllerService.RegisterK8sCluster(f)
-				if err != nil {
-					log.Errorf("couldn't register to arrays in controller service: %s", err.Error())
-				}
 			}
 		} else if strings.EqualFold(mode, "node") {
 			err := nodeService.UpdateArrays(configPath, f)

@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2021-2024 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -70,8 +70,6 @@ type Service struct {
 	replicationPrefix           string
 	isHealthMonitorEnabled      bool
 	isAutoRoundOffFsSizeEnabled bool
-
-	K8sVisibilityAutoRegistration bool
 }
 
 // maxVolumesSizeForArray -  store the maxVolumesSizeForArray
@@ -108,10 +106,6 @@ func (s *Service) Init() error {
 	if isAutoRoundOffFsSizeEnabled, ok := csictx.LookupEnv(ctx, common.EnvAllowAutoRoundOffFilesystemSize); ok {
 		log.Warn("Auto round off Filesystem size has been enabled! This will round off NFS PVC size to 3Gi when the requested size is less than 3Gi.")
 		s.isAutoRoundOffFsSizeEnabled, _ = strconv.ParseBool(isAutoRoundOffFsSizeEnabled)
-	}
-
-	if isk8sVisibilityAutoRegistrationEnabled, ok := csictx.LookupEnv(ctx, common.EnvK8sVisibilityAutoRegistration); ok {
-		s.K8sVisibilityAutoRegistration, _ = strconv.ParseBool(isk8sVisibilityAutoRegistrationEnabled)
 	}
 
 	return nil
@@ -485,7 +479,7 @@ func (s *Service) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest
 			// Remove volume from volume group
 			// TODO: If volume has multiple volume group then how we should find ours?
 			// TODO: Maybe adding volumegroup id/name to volume id can help?
-			_, err := arr.GetClient().RemoveMembersFromVolumeGroup(ctx, &gopowerstore.VolumeGroupMembers{VolumeIds: []string{id}}, vgs.VolumeGroup[0].ID)
+			_, err := arr.GetClient().RemoveMembersFromVolumeGroup(ctx, &gopowerstore.VolumeGroupMembers{VolumeIDs: []string{id}}, vgs.VolumeGroup[0].ID)
 			if err != nil {
 				// TODO: check for idempotency cases
 				return nil, err

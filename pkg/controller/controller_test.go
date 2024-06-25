@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2021-2024 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -4014,7 +4014,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				clientMock.On("CreateProtectionPolicy", mock.Anything,
 					&gopowerstore.ProtectionPolicyCreate{
 						Name:               validPolicyName,
-						ReplicationRuleIds: []string{validRuleID},
+						ReplicationRuleIDs: []string{validRuleID},
 					}).Return(gopowerstore.CreateResponse{ID: validPolicyID}, nil)
 				res, err := controller.EnsureProtectionPolicyExists(context.Background(), ctrlSvc.DefaultArray(),
 					validGroupName, validRemoteSystemName, validRPO)

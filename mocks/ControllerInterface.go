@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2021-2024 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -157,20 +157,6 @@ func (_m *ControllerInterface) DeleteVolume(ctx context.Context, req *csi.Delete
 	}
 
 	return r0, r1
-}
-
-// RegisterK8sCluster provides a mock function with given fields: _a0
-func (_m *ControllerInterface) RegisterK8sCluster(_a0 fs.Interface) error {
-	ret := _m.Called(_a0)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(fs.Interface) error); ok {
-		r0 = rf(_a0)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
 }
 
 // SetArrays provides a mock function with given fields: _a0

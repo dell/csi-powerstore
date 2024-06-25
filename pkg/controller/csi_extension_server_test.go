@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2022-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2022-2024 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -438,7 +438,7 @@ var _ = ginkgo.Describe("csi-extension-server", func() {
 
 				createGroupRequest := &gopowerstore.VolumeGroupCreate{
 					Name:      validGroupName,
-					VolumeIds: []string{validBaseVolID},
+					VolumeIDs: []string{validBaseVolID},
 				}
 				clientMock.On("CreateVolumeGroup", mock.Anything, createGroupRequest).
 					Return(gopowerstore.CreateResponse{ID: validGroupID}, nil)

@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2021-2024 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -200,7 +200,7 @@ func EnsureProtectionPolicyExists(ctx context.Context, arr *array.PowerStoreArra
 
 	newPp, err := arr.Client.CreateProtectionPolicy(ctx, &gopowerstore.ProtectionPolicyCreate{
 		Name:               ppName,
-		ReplicationRuleIds: []string{rrID},
+		ReplicationRuleIDs: []string{rrID},
 	})
 	if err != nil {
 		return "", status.Errorf(codes.Internal, "can't create protection policy: %s", err.Error())
