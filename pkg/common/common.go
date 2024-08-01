@@ -156,6 +156,8 @@ const (
 	NVMETCPTransport TransportType = "NVMETCP"
 	// NVMEFCTransport indicates that NVMe/FC is chosen as the transport protocol
 	NVMEFCTransport TransportType = "NVMEFC"
+	// NFS indicates that NFS is chosen as the transport protocol
+	NFSTransport TransportType = "NFS"
 	// PublishContextFCWWPNPrefix indicates publish context FC WWPN prefix
 	PublishContextFCWWPNPrefix = "FCWWPN"
 	// WWNPrefix indicates WWN prefix

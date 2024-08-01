@@ -89,6 +89,12 @@ const (
 	// EnvIsHealthMonitorEnabled specifies if health monitor is enabled.
 	EnvIsHealthMonitorEnabled = "X_CSI_HEALTH_MONITOR_ENABLED"
 
+	// EnvTopoConfigFilePath is an env variable which contains the full path for topology config file
+	EnvTopoConfigFilePath = "X_CSI_POWERSTORE_TOPOLOGY_CONFIG_PATH"
+
+	// EnvTopologyFilterEnabled is an env variable which indicated if volume health monitor is enabled
+	EnvTopologyFilterEnabled = "X_CSI_TOPOLOGY_CONTROL_ENABLED"
+
 	// EnvNfsAcls specifies acls to be set on NFS mount directory
 	EnvNfsAcls = "X_CSI_NFS_ACLS"
 

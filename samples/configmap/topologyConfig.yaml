@@ -1,0 +1,35 @@
+# allowedConnections contains a list of (node, array and protocol) info for user allowed configuration
+# For any given storage array ID and protocol on a Node, topology keys will be created for just those pair and
+# every other configuration is ignored
+# Please refer to the doc website about a detailed explanation of each configuration parameter
+# and the various possible inputs
+allowedConnections:
+  # nodeName: Name of the node on which user wants to apply given rules
+  # Allowed values:
+  # nodeName - name of a specific node
+  # * -  all the nodes
+  # Examples: "node1", "*"
+  - nodeName: "Node1"
+    # rules is a list of 'StorageArrayID:TransportProtocol' pair. ':' is required between both value
+    # Allowed values:
+    # StorageArrayID:
+    #   - SymmetrixID : for specific storage array
+    #   - "*" :- for all the arrays connected to the node
+    # TransportProtocol:
+    #   - FC : Fibre Channel protocol
+    #   - ISCSI : iSCSI protocol
+    #   - NVMe : NVMe protocol
+    #   - "*" - for all the possible Transport Protocol
+    # Examples: "000000000001-FC", "000000000002-*", "*-FC", "*-*"
+    rules:
+      - "10.10.10.10-nvmefc"
+# deniedConnections contains a list of (node, array and protocol) info for denied configurations by user
+# For any given storage array ID and protocol on a Node, topology keys will be created for every other configuration but
+# not these input pairs
+deniedConnections:
+  - nodeName: "Node3"
+    rules:
+      - "10.10.10.10-nfs"
+  - nodeName: "node3"
+    rules:
+      - "*-*"

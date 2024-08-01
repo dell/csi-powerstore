@@ -21,6 +21,7 @@ package node
 import (
 	"context"
 	"errors"
+	log "github.com/sirupsen/logrus"
 	"net"
 	"net/http"
 	"os"
@@ -3195,6 +3196,172 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					MaxVolumesPerNode: 0,
 				}))
 			})
+
+			// Start: Custom Topology Tests
+			ginkgo.It("should allow all connection protocol(s)", func() {
+				csictx.Setenv(context.Background(), common.EnvTopologyFilterEnabled, "true")
+				csictx.Setenv(context.Background(), common.EnvTopoConfigFilePath, "../../tests/topology/allConnectionsAllowedTopologyConfig.yaml")
+
+				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
+					Return([]gopowerstore.IPPoolAddress{
+						{
+							Address: "192.168.1.1",
+							IPPort:  gopowerstore.IPPortInstance{TargetIqn: "iqn"},
+						},
+						{
+							Address: "192.168.1.2",
+							IPPort:  gopowerstore.IPPortInstance{TargetIqn: "iqn2"},
+						},
+					}, nil)
+				conn, _ := net.Dial("udp", "127.0.0.1:80")
+				fsMock.On("NetDial", mock.Anything).Return(
+					conn,
+					nil,
+				)
+
+				log.Info("Loading Config Values")
+				nodeSvc.CheckAndLoadTopologyConfig(context.Background())
+				log.Info(nodeSvc.nodeID)
+
+				gomega.Expect(nodeSvc.isTopologyControlEnabled).To(gomega.Equal(true))
+
+				setDefaultNodeLabelsRetrieverMock()
+
+				res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.NodeGetInfoResponse{
+					NodeId: nodeSvc.nodeID,
+					AccessibleTopology: &csi.Topology{
+						Segments: map[string]string{
+							common.Name + "/" + firstValidIP + "-nfs":   "true",
+							common.Name + "/" + firstValidIP + "-iscsi": "true",
+							common.Name + "/" + secondValidIP + "-nfs":  "true",
+						},
+					},
+					MaxVolumesPerNode: 0,
+				}))
+			})
+
+			ginkgo.It("should deny all connection protocol(s)", func() {
+				csictx.Setenv(context.Background(), common.EnvTopologyFilterEnabled, "true")
+				csictx.Setenv(context.Background(), common.EnvTopoConfigFilePath, "../../tests/topology/allDenyTopologyConfig.yaml")
+
+				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
+					Return([]gopowerstore.IPPoolAddress{
+						{
+							Address: "192.168.1.1",
+							IPPort:  gopowerstore.IPPortInstance{TargetIqn: "iqn"},
+						},
+						{
+							Address: "192.168.1.2",
+							IPPort:  gopowerstore.IPPortInstance{TargetIqn: "iqn2"},
+						},
+					}, nil)
+				conn, _ := net.Dial("udp", "127.0.0.1:80")
+				fsMock.On("NetDial", mock.Anything).Return(
+					conn,
+					nil,
+				)
+
+				log.Info("Loading Config Values")
+				nodeSvc.CheckAndLoadTopologyConfig(context.Background())
+				log.Info(nodeSvc.nodeID)
+
+				gomega.Expect(nodeSvc.isTopologyControlEnabled).To(gomega.Equal(true))
+
+				setDefaultNodeLabelsRetrieverMock()
+				res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.NodeGetInfoResponse{
+					NodeId: nodeSvc.nodeID,
+					AccessibleTopology: &csi.Topology{
+						Segments: map[string]string{},
+					},
+					MaxVolumesPerNode: 0,
+				}))
+			})
+
+			ginkgo.It("should allow only ISCSI connection protocol(s)", func() {
+				csictx.Setenv(context.Background(), common.EnvTopologyFilterEnabled, "true")
+				csictx.Setenv(context.Background(), common.EnvTopoConfigFilePath, "../../tests/topology/onlyAllowISCSITopologyConfig.yaml")
+
+				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
+					Return([]gopowerstore.IPPoolAddress{
+						{
+							Address: "192.168.1.1",
+							IPPort:  gopowerstore.IPPortInstance{TargetIqn: "iqn"},
+						},
+						{
+							Address: "192.168.1.2",
+							IPPort:  gopowerstore.IPPortInstance{TargetIqn: "iqn2"},
+						},
+					}, nil)
+				conn, _ := net.Dial("udp", "127.0.0.1:80")
+				fsMock.On("NetDial", mock.Anything).Return(
+					conn,
+					nil,
+				)
+
+				log.Info("Loading Config Values")
+				nodeSvc.CheckAndLoadTopologyConfig(context.Background())
+				log.Info(nodeSvc.nodeID)
+
+				gomega.Expect(nodeSvc.isTopologyControlEnabled).To(gomega.Equal(true))
+
+				setDefaultNodeLabelsRetrieverMock()
+				res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.NodeGetInfoResponse{
+					NodeId: nodeSvc.nodeID,
+					AccessibleTopology: &csi.Topology{
+						Segments: map[string]string{
+							common.Name + "/" + firstValidIP + "-iscsi": "true"},
+					},
+					MaxVolumesPerNode: 0,
+				}))
+			})
+
+			ginkgo.It("should allow only NFS connection protocol(s)", func() {
+				csictx.Setenv(context.Background(), common.EnvTopologyFilterEnabled, "true")
+				csictx.Setenv(context.Background(), common.EnvTopoConfigFilePath, "../../tests/topology/onlyAllowNFSConnectivityConfig.yaml")
+
+				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
+					Return([]gopowerstore.IPPoolAddress{
+						{
+							Address: "192.168.1.1",
+							IPPort:  gopowerstore.IPPortInstance{TargetIqn: "iqn"},
+						},
+						{
+							Address: "192.168.1.2",
+							IPPort:  gopowerstore.IPPortInstance{TargetIqn: "iqn2"},
+						},
+					}, nil)
+				conn, _ := net.Dial("udp", "127.0.0.1:80")
+				fsMock.On("NetDial", mock.Anything).Return(
+					conn,
+					nil,
+				)
+
+				log.Info("Loading Config Values")
+				nodeSvc.CheckAndLoadTopologyConfig(context.Background())
+				log.Info(nodeSvc.nodeID)
+
+				gomega.Expect(nodeSvc.isTopologyControlEnabled).To(gomega.Equal(true))
+
+				setDefaultNodeLabelsRetrieverMock()
+				res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.NodeGetInfoResponse{
+					NodeId: nodeSvc.nodeID,
+					AccessibleTopology: &csi.Topology{
+						Segments: map[string]string{
+							common.Name + "/" + firstValidIP + "-nfs":  "true",
+							common.Name + "/" + secondValidIP + "-nfs": "true"},
+					},
+					MaxVolumesPerNode: 0,
+				}))
+			})
+			// End: Custom Topology Tests
 		})
 
 		ginkgo.When("node label max-powerstore-volumes-per-node is set and retrieved successfully", func() {
@@ -4062,6 +4229,79 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				gomega.Expect(err.Error()).To(
 					gomega.ContainSubstring("no volume Path provided"),
 				)
+			})
+		})
+	})
+
+	ginkgo.Describe("Calling NodeGetInfo() When Custom Topology is Enabled and all connections are allowed.", func() {
+		ginkgo.When("managing multiple arrays", func() {
+			ginkgo.It("should return appropriate node with applicable topology values-test", func() {
+				csictx.Setenv(context.Background(), common.EnvIsHealthMonitorEnabled, "true")
+				csictx.Setenv(context.Background(), common.EnvTopologyFilterEnabled, "true")
+				csictx.Setenv(context.Background(), common.EnvTopoConfigFilePath, "../../tests/topology/allConnectionsAllowedTopologyConfig.yaml")
+
+				nodeSvc.nodeID = "csi-node-1a47a1b91c444a8a90193d8066669603-127.0.0.1"
+
+				fsMock.On("ReadFile", mock.Anything).Return([]byte("my-host-id"), nil)
+
+				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
+					Return([]gopowerstore.IPPoolAddress{
+						{
+							Address: "192.168.1.1",
+							IPPort:  gopowerstore.IPPortInstance{TargetIqn: "iqn"},
+						},
+						{
+							Address: "192.168.1.2",
+							IPPort:  gopowerstore.IPPortInstance{TargetIqn: "iqn2"},
+						},
+					}, nil)
+
+				conn, _ := net.Dial("udp", "127.0.0.1:80")
+				fsMock.On("NetDial", mock.Anything).Return(
+					conn,
+					nil,
+				)
+
+				iscsiConnectorMock.On("GetInitiatorName", mock.Anything).
+					Return(validISCSIInitiators, nil)
+				nvmeConnectorMock.On("GetInitiatorName", mock.Anything).
+					Return(validNVMEInitiators, nil)
+				fcConnectorMock.On("GetInitiatorPorts", mock.Anything).
+					Return(validFCTargetsWWPN, nil)
+
+				clientMock.On("GetHostByName", mock.Anything, mock.AnythingOfType("string")).
+					Return(gopowerstore.Host{}, gopowerstore.APIError{
+						ErrorMsg: &api.ErrorMsg{
+							StatusCode: http.StatusNotFound,
+						},
+					})
+
+				clientMock.On("GetHosts", mock.Anything).Return(
+					[]gopowerstore.Host{{
+						ID: "host-id",
+						Initiators: []gopowerstore.InitiatorInstance{{
+							PortName: "not-matching-port-name",
+							PortType: gopowerstore.InitiatorProtocolTypeEnumISCSI,
+						}},
+						Name: "host-name",
+					}}, nil)
+
+				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+				clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
+				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
+				clientMock.On("CreateHost", mock.Anything, mock.Anything).
+					Return(gopowerstore.CreateResponse{ID: validHostID}, nil)
+				//nodeSvc.opts.NodeNamePrefix = ""
+				clientMock.On("startNodeToArrayConnectivityCheck", mock.Anything).Return(nil)
+				clientMock.On("apiRouter", mock.Anything).Return(nil)
+				clientMock.On("getInitiators", mock.Anything).Return(nil)
+
+				nodeSvc.Init()
+
+				gomega.Expect(nodeSvc.isTopologyControlEnabled).To(gomega.Equal(true))
+				gomega.Expect(nodeSvc.topologyConfig).ShouldNot(gomega.BeNil())
+				gomega.Expect(nodeSvc.allowedTopologyKeys).ShouldNot(gomega.BeNil())
+				gomega.Expect(nodeSvc.deniedTopologyKeys).ShouldNot(gomega.BeNil())
 			})
 		})
 	})
