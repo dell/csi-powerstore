@@ -6,7 +6,7 @@ toolchain go1.22.3
 
 require (
 	github.com/onsi/gomega v1.33.1
-	k8s.io/kubernetes v1.29.4
+	k8s.io/kubernetes v1.29.7
 	//sigs.k8s.io/vsphere-csi-driver/v2 v2.5.1
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
@@ -22,7 +22,6 @@ require (
 )
 
 require (
-	cloud.google.com/go/compute v1.24.0 // indirect
 	cloud.google.com/go/compute/metadata v0.3.0 // indirect
 	github.com/JeffAshton/win_pdh v0.0.0-20161109143554-76bb4ee9f0ab // indirect
 	github.com/Microsoft/go-winio v0.6.0 // indirect
@@ -46,11 +45,11 @@ require (
 	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
 	github.com/cyphar/filepath-securejoin v0.2.4 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
-	github.com/dell/gobrick v1.11.0 // indirect
+	github.com/dell/gobrick v1.11.3 // indirect
 	github.com/dell/gocsi v1.11.0 // indirect
-	github.com/dell/gofsutil v1.16.0 // indirect
+	github.com/dell/gofsutil v1.16.1 // indirect
 	github.com/dell/goiscsi v1.9.0 // indirect
-	github.com/dell/gonvme v1.8.0 // indirect
+	github.com/dell/gonvme v1.8.1 // indirect
 	github.com/distribution/reference v0.5.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/emicklei/go-restful/v3 v3.12.1 // indirect
@@ -65,7 +64,7 @@ require (
 	github.com/go-openapi/jsonreference v0.21.0 // indirect
 	github.com/go-openapi/strfmt v0.23.0 // indirect
 	github.com/go-openapi/swag v0.23.0 // indirect
-	github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572 // indirect
+	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
@@ -143,7 +142,6 @@ require (
 	golang.org/x/text v0.16.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
 	golang.org/x/tools v0.21.1-0.20240508182429-e35e4ccd0d2d // indirect
-	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/genproto v0.0.0-20240221002015-b0ce06bbee7c // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240711142825-46eb208f015d // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240711142825-46eb208f015d // indirect
