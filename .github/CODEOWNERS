@@ -1,33 +1,17 @@
 # CODEOWNERS
 #
-# documentation for this file can be found at:
+# Documentation for this file can be found at:
 # https://help.github.com/en/articles/about-code-owners
 
 # These are the default owners for the code and will
 # be requested for review when someone opens a pull request.
-# order is alphabetical for easier maintenance.
+# Order is alphabetical for easier maintenance.
 #
 # Adarsh Kumar Yadav (adarsh-dell)
+# Abhilash Muralidhara (abhi16394)
 # Akshay Saini (AkshaySainiDell)
-# Aaron Tye (atye)
-# Boya Murthy (boyamurthy)
-# Bahubali Jain (bpjain2004)
-# Christian Coffield (ChristianAtDell, christian_coffield@dell.com)
-# Utkarsh Dubey (delldubey)
-# Emily Kinuthia (EmilyKatdell)
-# Francis Nijay (francis-nijay)
-# Tarandeep Singh Gill (gilltaran)
-# Harish P (harishp8889)
-# Harshita Pandey (harshitap26)
-# Vinutha Kini (kenivi1)
-# Niranjan N (niranjan-n1)
-# Prasanna Muthukumaraswamy (prablr79)
-# Santhosh Lakshmanan (santhoshatdell, santhosh.lakshmanan@dell.com)
-# Satya Narayana (satyakonduri)
-# Yamunadevi Shanmugam (shanmydell)
-# Shayna Finocchiaro (shaynafinocchiaro)
-# Surya Prakash Gupta (suryagupta4)
-# Sushma T S (tssushma)
+# Don Khan (donatwork)
+# Santhosh Lakshmanan (santhoshatdell)
 
-# for all files:
-* @adarsh-dell @AkshaySainiDell @atye @boyamurthy @bpjain2004 @ChristianAtDell @delldubey @EmilyKatdell @francis-nijay @gilltaran @harishp8889 @harshitap26 @kenivi1 @niranjan-n1 @prablr79 @satyakonduri @santhoshhs10 @shanmydell @shaynafinocchiaro @suryagupta4 @tssushma
+# for all files
+* @adarsh-dell @abhi16394 @AkshaySainiDell @donatwork @santhoshatdell
