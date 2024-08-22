@@ -19,7 +19,6 @@ package node
 import (
 	"context"
 	"errors"
-	"fmt"
 	"testing"
 
 	"github.com/dell/csi-powerstore/v2/mocks"
@@ -34,7 +33,7 @@ func TestPosixMode_Success(t *testing.T) {
 	isPosixMode := posixMode("0755")
 	expected := true
 	if isPosixMode != expected {
-		t.Errorf(fmt.Sprintf("expected: %v, actual: %v", expected, isPosixMode))
+		t.Errorf("expected: %v, actual: %v", expected, isPosixMode)
 	}
 }
 
@@ -42,7 +41,7 @@ func TestPosixMode_Fail(t *testing.T) {
 	isPosixMode := posixMode("abcd")
 	expected := false
 	if isPosixMode != expected {
-		t.Errorf(fmt.Sprintf("expected: %v, actual: %v", expected, isPosixMode))
+		t.Errorf("expected: %v, actual: %v", expected, isPosixMode)
 	}
 }
 
@@ -50,7 +49,7 @@ func TestNfsv4Acl_Success(t *testing.T) {
 	isNfsv4ACLs := nfsv4ACLs("A::OWNER@:RWX")
 	expected := true
 	if isNfsv4ACLs != expected {
-		t.Errorf(fmt.Sprintf("expected: %v, actual: %v", expected, isNfsv4ACLs))
+		t.Errorf("expected: %v, actual: %v", expected, isNfsv4ACLs)
 	}
 }
 
@@ -58,7 +57,7 @@ func TestNfsv4Acl_Fail(t *testing.T) {
 	isNfsv4ACLs := nfsv4ACLs("abcd")
 	expected := false
 	if isNfsv4ACLs != expected {
-		t.Errorf(fmt.Sprintf("expected: %v, actual: %v", expected, isNfsv4ACLs))
+		t.Errorf("expected: %v, actual: %v", expected, isNfsv4ACLs)
 	}
 }
 
@@ -78,7 +77,7 @@ func TestNfsv4NasServer_Success(t *testing.T) {
 	isNFSv4Enabled := isNfsv4Enabled(context.Background(), clientMock, validNasName)
 	expected := true
 	if isNFSv4Enabled != expected {
-		t.Errorf(fmt.Sprintf("expected: %v, actual: %v", expected, isNFSv4Enabled))
+		t.Errorf("expected: %v, actual: %v", expected, isNFSv4Enabled)
 	}
 }
 
@@ -91,7 +90,7 @@ func TestNfsv4NasServer_Err_GetNASByName(t *testing.T) {
 	isNFSv4Enabled := isNfsv4Enabled(context.Background(), clientMock, validNasName)
 	expected := false
 	if isNFSv4Enabled != expected {
-		t.Errorf(fmt.Sprintf("expected: %v, actual: %v", expected, isNFSv4Enabled))
+		t.Errorf("expected: %v, actual: %v", expected, isNFSv4Enabled)
 	}
 }
 
@@ -111,7 +110,7 @@ func TestNfsv4NasServer_Err_GetNfsServer(t *testing.T) {
 	isNFSv4Enabled := isNfsv4Enabled(context.Background(), clientMock, validNasName)
 	expected := false
 	if isNFSv4Enabled != expected {
-		t.Errorf(fmt.Sprintf("expected: %v, actual: %v", expected, isNFSv4Enabled))
+		t.Errorf("expected: %v, actual: %v", expected, isNFSv4Enabled)
 	}
 }
 
@@ -131,7 +130,7 @@ func TestNfsv4NasServer_Fail(t *testing.T) {
 	isNFSv4Enabled := isNfsv4Enabled(context.Background(), clientMock, validNasName)
 	expected := false
 	if isNFSv4Enabled != expected {
-		t.Errorf(fmt.Sprintf("expected: %v, actual: %v", expected, isNFSv4Enabled))
+		t.Errorf("expected: %v, actual: %v", expected, isNFSv4Enabled)
 	}
 }
 
@@ -153,7 +152,7 @@ func TestValidateAndSetNfsACLs_Success_nfsv4Acls(t *testing.T) {
 	aclConfigured, err := validateAndSetACLs(context.Background(), nfsv4ACLsMock, validNasName, clientMock, "A::OWNER@:RWX", "dir2")
 
 	if err != nil || aclConfigured == false {
-		t.Errorf(fmt.Sprintf("expected: true, actual: %v err: %s", aclConfigured, err.Error()))
+		t.Errorf("expected: true, actual: %v err: %s", aclConfigured, err.Error())
 	}
 }
 
@@ -175,7 +174,7 @@ func TestValidateAndSetNfsACLs_Fail_InvalidAcls(t *testing.T) {
 	aclConfigured, err := validateAndSetACLs(context.Background(), nfsv4ACLsMock, validNasName, clientMock, "abcd", "dir1")
 
 	if err == nil || aclConfigured != false {
-		t.Errorf(fmt.Sprintf("expected: false, actual: %v err: %s", aclConfigured, err.Error()))
+		t.Errorf("expected: false, actual: %v err: %s", aclConfigured, err.Error())
 	}
 }
 
@@ -197,6 +196,6 @@ func TestValidateAndSetNfsACLs_Fail_GetNfsServerFail(t *testing.T) {
 	aclConfigured, err := validateAndSetACLs(context.Background(), nfsv4ACLsMock, validNasName, clientMock, "A::OWNER@:RWX", "dir1")
 
 	if err == nil || aclConfigured != false {
-		t.Errorf(fmt.Sprintf("expected: false, actual: %v err: %s", aclConfigured, err.Error()))
+		t.Errorf("expected: false, actual: %v err: %s", aclConfigured, err.Error())
 	}
 }

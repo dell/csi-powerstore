@@ -193,9 +193,9 @@ func (n *NFSStager) Stage(ctx context.Context, req *csi.NodeStageVolumeRequest,
 	aclsConfigured := false
 	if acls != "" {
 		if posixMode(acls) {
-			perm, err := strconv.ParseUint(acls, 8, 64)
+			perm, err := strconv.ParseUint(acls, 8, 32)
 			if err == nil {
-				mode = os.FileMode(perm)
+				mode = os.FileMode(perm) // #nosec: G115 false positive
 			} else {
 				log.WithFields(logFields).Warn("can't parse file mode, invalid mode specified. Default mode permissions will be set.")
 			}
