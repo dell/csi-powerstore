@@ -250,6 +250,7 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 	// Check if replication is enabled
 	replicationEnabled := params[s.WithRP(KeyReplicationEnabled)]
 	isMetroVolume := false
+	isMetroVolumeGroup := false
 
 	if replicationEnabled == "true" && !useNFS {
 		log.Info("Preparing volume replication")
@@ -267,6 +268,7 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 		switch repMode {
 		case "SYNC", "ASYNC":
 			// handle Sync and Async modes
+			log.Infof("%s replication mode requested", repMode)
 			vgPrefix, ok := params[s.WithRP(KeyReplicationVGPrefix)]
 			if !ok {
 				return nil, status.Errorf(codes.InvalidArgument, "replication enabled but no volume group prefix specified in storage class")
@@ -340,12 +342,15 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 			}
 		case "METRO":
 			// handle Metro mode
-			// TODO Verify VolumeGroup exists, if not create one
-			// There shouldn't be any protection policy on it with replication rule
-			// Configure Metro on VG (Check if it can be done on empty group). Otherwise configure after volume is added
-			// Optimize the above sync/async block as needed
+			log.Info("Metro replication mode requested")
 
-			isMetroVolume = true // set to true if volume group metro is not requested
+			// TODO If volumeGroup input is specified in SC - Verify VolumeGroup exists, if not create one
+			// There shouldn't be any protection policy on it with replication rule
+			// Cannot configure Metro on empty VG. Configure after volume is added
+			// Check if the above sync/async block can be optimized w.r.t volume group calls
+			// isMetroVolumeGroup = true
+
+			// isMetroVolume = true // set to true if volume group is not specified
 		default:
 			return nil, status.Errorf(codes.InvalidArgument, "replication enabled but invalid replication mode specified in storage class")
 		}
@@ -370,6 +375,12 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 
 	if isMetroVolume {
 		// TODO configure Metro on volume
+		log.Warn("Configuring Metro on volume, not yet implemented.")
+	} else if isMetroVolumeGroup {
+		// TODO configure Metro on volume group if it is first time
+		// else pause and resume metro session for adding new volumes
+		// Session needs to be paused before the new volume can be added (before creator.Create()) and then resumed later here.
+		log.Warn("Configuring Metro on volume group, not yet implemented.")
 	}
 
 	// Fetch the service tag
