@@ -42,6 +42,8 @@ const (
 	VolumeSizeMultiple = 8192
 	// MaxVolumeNameLength max length for the volume name
 	MaxVolumeNameLength = 128
+	// ReplicationPrefix represents replication prefix
+	ReplicationPrefix = "replication.storage.dell.com"
 	// ErrUnknownAccessType represents error message for unknown access type
 	ErrUnknownAccessType = "unknown access type is not Block or Mount"
 	// ErrUnknownAccessMode represents error message for unknown access mode
