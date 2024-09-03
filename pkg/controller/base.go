@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2021-2024 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -42,6 +42,8 @@ const (
 	VolumeSizeMultiple = 8192
 	// MaxVolumeNameLength max length for the volume name
 	MaxVolumeNameLength = 128
+	// ReplicationPrefix represents replication prefix
+	ReplicationPrefix = "replication.storage.dell.com"
 	// ErrUnknownAccessType represents error message for unknown access type
 	ErrUnknownAccessType = "unknown access type is not Block or Mount"
 	// ErrUnknownAccessMode represents error message for unknown access mode
@@ -54,6 +56,8 @@ const (
 	KeyFsTypeOld = "FsType"
 	// KeyReplicationEnabled represents key for replication enabled
 	KeyReplicationEnabled = "isReplicationEnabled"
+	// KeyReplicationMode represents key for replication mode
+	KeyReplicationMode = "mode"
 	// KeyReplicationRPO represents key for replication RPO
 	KeyReplicationRPO = "rpo"
 	// KeyReplicationRemoteSystem represents key for replication remote system

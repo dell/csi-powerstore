@@ -1,6 +1,6 @@
 #
 #
-# Copyright © 2021-2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+# Copyright © 2021-2024 Dell Inc. or its subsidiaries. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -27,11 +27,19 @@ parameters:
 
   # replication.storage.dell.com/isReplicationEnabled: 
   # Allowed values:
-  #   true: enable replication sidecar
-  #   false: disable replication sidecar 
+  #   true: replication is enabled
+  #   false: replication is disabled 
   # Optional: true
   # Default value: false
   replication.storage.dell.com/isReplicationEnabled: "true"
+
+  # replication.storage.dell.com/mode: replication mode
+  # Allowed values:
+  #   "ASYNC" - Asynchronous mode
+  #   "METRO" - Metro mode
+  # Optional: true
+  # Default value: "ASYNC"
+  replication.storage.dell.com/mode: "ASYNC"
 
   # replication.storage.dell.com/remoteStorageClassName: 
   # Allowed values: string
@@ -76,6 +84,7 @@ parameters:
   # Optional: false
   # Default value: None
   arrayID: "Unique"
+
   # FsType: file system type for mounted volumes
   # Allowed values:
   #   ext3: ext3 filesystem type

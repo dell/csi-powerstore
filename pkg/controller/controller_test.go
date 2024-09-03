@@ -436,7 +436,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			res, err := ctrlSvc.CreateVolume(context.Background(), req)
 			gomega.Expect(res).To(gomega.BeNil())
 			gomega.Expect(err).NotTo(gomega.BeNil())
-			gomega.Expect(err.Error()).To(gomega.ContainSubstring("invalid rpo value"))
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("invalid RPO value"))
 		})
 
 		ginkgo.It("should fail when rpo not declared in parameters", func() {
@@ -455,6 +455,17 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			gomega.Expect(res).To(gomega.BeNil())
 			gomega.Expect(err).NotTo(gomega.BeNil())
 			gomega.Expect(err.Error()).To(gomega.ContainSubstring("replication enabled but no remote system specified in storage class"))
+		})
+
+		ginkgo.It("should fail when mode is incorrect", func() {
+			clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
+
+			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationMode)] = "SYNCMETRO"
+
+			res, err := ctrlSvc.CreateVolume(context.Background(), req)
+			gomega.Expect(res).To(gomega.BeNil())
+			gomega.Expect(err).NotTo(gomega.BeNil())
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("invalid replication mode"))
 		})
 
 		ginkgo.It("should fail when volume group prefix not declared in parameters", func() {

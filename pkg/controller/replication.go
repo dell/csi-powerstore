@@ -635,7 +635,12 @@ func (s *Service) GetStorageProtectionGroupStatus(ctx context.Context,
 
 // WithRP appends Replication Prefix to provided string
 func (s *Service) WithRP(key string) string {
-	return s.replicationPrefix + "/" + key
+	replicationPrefix := s.replicationPrefix
+	if replicationPrefix == "" {
+		replicationPrefix = ReplicationPrefix
+	}
+
+	return replicationPrefix + "/" + key
 }
 
 func getRemoteCSIVolume(volumeID string, size int64) *csiext.Volume {

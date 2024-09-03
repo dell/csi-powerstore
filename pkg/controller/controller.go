@@ -249,84 +249,110 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 
 	// Check if replication is enabled
 	replicationEnabled := params[s.WithRP(KeyReplicationEnabled)]
+	isMetroVolume := false
+	isMetroVolumeGroup := false
 
 	if replicationEnabled == "true" && !useNFS {
 		log.Info("Preparing volume replication")
 
-		vgPrefix, ok := params[s.WithRP(KeyReplicationVGPrefix)]
-		if !ok {
-			return nil, status.Errorf(codes.InvalidArgument, "replication enabled but no volume group prefix specified in storage class")
-		}
-		rpo, ok := params[s.WithRP(KeyReplicationRPO)]
-		if !ok {
-			return nil, status.Errorf(codes.InvalidArgument, "replication enabled but no RPO specified in storage class")
-		}
-		rpoEnum := gopowerstore.RPOEnum(rpo)
-		if err := rpoEnum.IsValid(); err != nil {
-			return nil, status.Errorf(codes.InvalidArgument, "invalid rpo value")
-		}
 		remoteSystemName, ok := params[s.WithRP(KeyReplicationRemoteSystem)]
 		if !ok {
 			return nil, status.Errorf(codes.InvalidArgument, "replication enabled but no remote system specified in storage class")
 		}
+		repMode := params[s.WithRP(KeyReplicationMode)]
+		if repMode == "" {
+			repMode = "ASYNC"
+		}
+		repMode = strings.ToUpper(repMode)
 
-		namespace := ""
-		if ignoreNS, ok := params[s.WithRP(KeyReplicationIgnoreNamespaces)]; ok && ignoreNS == "false" {
-			pvcNS, ok := params[KeyCSIPVCNamespace]
-			if ok {
-				namespace = pvcNS + "-"
+		switch repMode {
+		case "SYNC", "ASYNC":
+			// handle Sync and Async modes
+			log.Infof("%s replication mode requested", repMode)
+			vgPrefix, ok := params[s.WithRP(KeyReplicationVGPrefix)]
+			if !ok {
+				return nil, status.Errorf(codes.InvalidArgument, "replication enabled but no volume group prefix specified in storage class")
 			}
-		}
+			rpo, ok := params[s.WithRP(KeyReplicationRPO)]
+			if !ok {
+				return nil, status.Errorf(codes.InvalidArgument, "replication enabled but no RPO specified in storage class")
+			}
+			rpoEnum := gopowerstore.RPOEnum(rpo)
+			if err := rpoEnum.IsValid(); err != nil {
+				return nil, status.Errorf(codes.InvalidArgument, "invalid RPO value")
+			}
 
-		vgName := vgPrefix + "-" + namespace + remoteSystemName + "-" + rpo
-		if len(vgName) > 128 {
-			vgName = vgName[:128]
-		}
-
-		vg, err = arr.Client.GetVolumeGroupByName(ctx, vgName)
-		if err != nil {
-			if apiError, ok := err.(gopowerstore.APIError); ok && apiError.NotFound() {
-				log.Infof("Volume group with name %s not found, creating it", vgName)
-
-				// ensure protection policy exists
-				pp, err := EnsureProtectionPolicyExists(ctx, arr, vgName, remoteSystemName, rpoEnum)
-				if err != nil {
-					return nil, status.Errorf(codes.Internal, "can't ensure protection policy exists %s", err.Error())
+			namespace := ""
+			if ignoreNS, ok := params[s.WithRP(KeyReplicationIgnoreNamespaces)]; ok && ignoreNS == "false" {
+				pvcNS, ok := params[KeyCSIPVCNamespace]
+				if ok {
+					namespace = pvcNS + "-"
 				}
+			}
 
-				group, err := arr.Client.CreateVolumeGroup(ctx, &gopowerstore.VolumeGroupCreate{
-					Name:               vgName,
-					ProtectionPolicyID: pp,
-				})
-				if err != nil {
-					return nil, status.Errorf(codes.Internal, "can't create volume group: %s", err.Error())
+			vgName := vgPrefix + "-" + namespace + remoteSystemName + "-" + rpo
+			if len(vgName) > 128 {
+				vgName = vgName[:128]
+			}
+
+			vg, err = arr.Client.GetVolumeGroupByName(ctx, vgName)
+			if err != nil {
+				if apiError, ok := err.(gopowerstore.APIError); ok && apiError.NotFound() {
+					log.Infof("Volume group with name %s not found, creating it", vgName)
+
+					// ensure protection policy exists
+					pp, err := EnsureProtectionPolicyExists(ctx, arr, vgName, remoteSystemName, rpoEnum)
+					if err != nil {
+						return nil, status.Errorf(codes.Internal, "can't ensure protection policy exists %s", err.Error())
+					}
+
+					group, err := arr.Client.CreateVolumeGroup(ctx, &gopowerstore.VolumeGroupCreate{
+						Name:               vgName,
+						ProtectionPolicyID: pp,
+					})
+					if err != nil {
+						return nil, status.Errorf(codes.Internal, "can't create volume group: %s", err.Error())
+					}
+
+					vg, err = arr.Client.GetVolumeGroup(ctx, group.ID)
+					if err != nil {
+						return nil, status.Errorf(codes.Internal, "can't query volume group by id %s : %s", group.ID, err.Error())
+					}
+
+				} else {
+					return nil, status.Errorf(codes.Internal, "can't query volume group by name %s : %s", vgName, err.Error())
 				}
-
-				vg, err = arr.Client.GetVolumeGroup(ctx, group.ID)
-				if err != nil {
-					return nil, status.Errorf(codes.Internal, "can't query volume group by id %s : %s", group.ID, err.Error())
-				}
-
 			} else {
-				return nil, status.Errorf(codes.Internal, "can't query volume group by name %s : %s", vgName, err.Error())
-			}
-		} else {
-			// group exists, check that protection policy applied
-			if vg.ProtectionPolicyID == "" {
-				pp, err := EnsureProtectionPolicyExists(ctx, arr, vgName, remoteSystemName, rpoEnum)
-				if err != nil {
-					return nil, status.Errorf(codes.Internal, "can't ensure protection policy exists %s", err.Error())
-				}
-				policyUpdate := gopowerstore.VolumeGroupChangePolicy{ProtectionPolicyID: pp}
-				_, err = arr.Client.UpdateVolumeGroupProtectionPolicy(ctx, vg.ID, &policyUpdate)
-				if err != nil {
-					return nil, status.Errorf(codes.Internal, "can't update volume group policy %s", err.Error())
+				// group exists, check that protection policy applied
+				if vg.ProtectionPolicyID == "" {
+					pp, err := EnsureProtectionPolicyExists(ctx, arr, vgName, remoteSystemName, rpoEnum)
+					if err != nil {
+						return nil, status.Errorf(codes.Internal, "can't ensure protection policy exists %s", err.Error())
+					}
+					policyUpdate := gopowerstore.VolumeGroupChangePolicy{ProtectionPolicyID: pp}
+					_, err = arr.Client.UpdateVolumeGroupProtectionPolicy(ctx, vg.ID, &policyUpdate)
+					if err != nil {
+						return nil, status.Errorf(codes.Internal, "can't update volume group policy %s", err.Error())
+					}
 				}
 			}
-		}
 
-		if c, ok := creator.(*SCSICreator); ok {
-			c.vg = &vg
+			if c, ok := creator.(*SCSICreator); ok {
+				c.vg = &vg
+			}
+		case "METRO":
+			// handle Metro mode
+			log.Info("Metro replication mode requested")
+
+			// TODO If volumeGroup input is specified in SC - Verify VolumeGroup exists, if not create one
+			// There shouldn't be any protection policy on it with replication rule
+			// Cannot configure Metro on empty VG. Configure after volume is added
+			// Check if the above sync/async block can be optimized w.r.t volume group calls
+			// isMetroVolumeGroup = true
+
+			// isMetroVolume = true // set to true if volume group is not specified
+		default:
+			return nil, status.Errorf(codes.InvalidArgument, "replication enabled but invalid replication mode specified in storage class")
 		}
 	}
 
@@ -345,6 +371,16 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 		}
 	} else {
 		volumeResponse = getCSIVolume(resp.ID, sizeInBytes)
+	}
+
+	if isMetroVolume {
+		// TODO configure Metro on volume
+		log.Warn("Configuring Metro on volume, not yet implemented.")
+	} else if isMetroVolumeGroup {
+		// TODO configure Metro on volume group if it is first time
+		// else pause and resume metro session for adding new volumes
+		// Session needs to be paused before the new volume can be added (before creator.Create()) and then resumed later here.
+		log.Warn("Configuring Metro on volume group, not yet implemented.")
 	}
 
 	// Fetch the service tag
