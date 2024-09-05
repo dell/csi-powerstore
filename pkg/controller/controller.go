@@ -267,7 +267,7 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 
 		switch repMode {
 		case "SYNC", "ASYNC":
-			// handle Sync and Async modes
+			// handle Sync and Async modes where protection policy with replication rule is applied on volume group
 			log.Infof("%s replication mode requested", repMode)
 			vgPrefix, ok := params[s.WithRP(KeyReplicationVGPrefix)]
 			if !ok {
@@ -341,7 +341,7 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 				c.vg = &vg
 			}
 		case "METRO":
-			// handle Metro mode
+			// handle Metro mode where metro is configured directly on the volume (or volume group if requested)
 			log.Info("Metro replication mode requested")
 
 			// TODO If volumeGroup input is specified in SC - Verify VolumeGroup exists, if not create one
@@ -350,7 +350,7 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 			// Check if the above sync/async block can be optimized w.r.t volume group calls
 			// isMetroVolumeGroup = true
 
-			// isMetroVolume = true // set to true if volume group is not specified
+			isMetroVolume = true // set to true if volume group is not specified
 		default:
 			return nil, status.Errorf(codes.InvalidArgument, "replication enabled but invalid replication mode specified in storage class")
 		}
@@ -374,8 +374,16 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 	}
 
 	if isMetroVolume {
-		// TODO configure Metro on volume
-		log.Warn("Configuring Metro on volume, not yet implemented.")
+		// Configure Metro on volume
+		volID := resp.ID
+		log.Infof("Configuring Metro on volume %s", volID)
+		metroSession, err := arr.GetClient().ConfigureMetroVolume(ctx, volID, &gopowerstore.MetroConfig{
+			RemoteSystemID: params[s.WithRP(KeyReplicationRemoteSystem)],
+		})
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "can't configure metro on volume %s: %s", volID, err.Error())
+		}
+		log.Debugf("Metro Session ID: %s", metroSession.ID)
 	} else if isMetroVolumeGroup {
 		// TODO configure Metro on volume group if it is first time
 		// else pause and resume metro session for adding new volumes
@@ -538,6 +546,21 @@ func (s *Service) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest
 				"unable to delete volume -- %d snapshots based on this volume still exist.", len(listSnaps))
 		}
 
+		// Check if volume has metro session and end it
+		volume, err := arr.GetClient().GetVolume(ctx, id)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failure getting volume: %s", err.Error())
+		}
+		if volume.MetroReplicationSessionID != "" {
+			_, err = arr.GetClient().EndMetroVolume(ctx, id, &gopowerstore.EndMetroVolumeOptions{
+				DeleteRemoteVolume: true, // delete remote volume when deleting local volume
+			})
+			if err != nil {
+				return nil, status.Errorf(codes.Internal, "failure ending metro session on volume: %s", err.Error())
+			}
+		}
+
+		// Delete volume
 		_, err = arr.GetClient().DeleteVolume(ctx, nil, id)
 		if err == nil {
 			return &csi.DeleteVolumeResponse{}, nil
