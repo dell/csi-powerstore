@@ -1211,6 +1211,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			ginkgo.It("should successfully delete block volume", func() {
 				clientMock.On("GetSnapshotsByVolumeID", mock.Anything, validBaseVolID).Return([]gopowerstore.Volume{}, nil)
 				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).Return(gopowerstore.VolumeGroups{}, nil)
+				clientMock.On("GetVolume", mock.Anything, validBaseVolID).Return(gopowerstore.Volume{ID: validBaseVolID, Size: validVolSize}, nil)
 				clientMock.On("DeleteVolume",
 					mock.Anything,
 					mock.AnythingOfType("*gopowerstore.VolumeDelete"),
@@ -1229,6 +1230,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			ginkgo.It("should successfully delete block volume", func() {
 				clientMock.On("GetSnapshotsByVolumeID", mock.Anything, validBaseVolID).Return([]gopowerstore.Volume{}, nil)
 				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).Return(gopowerstore.VolumeGroups{}, nil)
+				clientMock.On("GetVolume", mock.Anything, validBaseVolID).Return(gopowerstore.Volume{ID: validBaseVolID, Size: validVolSize}, nil)
 				clientMock.On("DeleteVolume",
 					mock.Anything,
 					mock.AnythingOfType("*gopowerstore.VolumeDelete"),
@@ -1260,6 +1262,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 					&gopowerstore.VolumeModify{ProtectionPolicyID: ""},
 					validBaseVolID).
 					Return(gopowerstore.EmptyResponse(""), nil)
+				clientMock.On("GetVolume", mock.Anything, validBaseVolID).Return(gopowerstore.Volume{ID: validBaseVolID, Size: validVolSize}, nil)
 
 				req := &csi.DeleteVolumeRequest{VolumeId: validBlockVolumeID}
 
@@ -1385,6 +1388,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			ginkgo.It("should succeed [Block]", func() {
 				clientMock.On("GetSnapshotsByVolumeID", mock.Anything, validBaseVolID).Return([]gopowerstore.Volume{}, nil)
 				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).Return(gopowerstore.VolumeGroups{}, nil)
+				clientMock.On("GetVolume", mock.Anything, validBaseVolID).Return(gopowerstore.Volume{ID: validBaseVolID}, nil)
 				clientMock.On("DeleteVolume",
 					mock.Anything,
 					mock.AnythingOfType("*gopowerstore.VolumeDelete"),
@@ -1429,6 +1433,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			ginkgo.It("should fail", func() {
 				clientMock.On("GetSnapshotsByVolumeID", mock.Anything, validBaseVolID).Return([]gopowerstore.Volume{}, nil)
 				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).Return(gopowerstore.VolumeGroups{}, nil)
+				clientMock.On("GetVolume", mock.Anything, validBaseVolID).Return(gopowerstore.Volume{ID: validBaseVolID}, nil)
 				clientMock.On("DeleteVolume",
 					mock.Anything,
 					mock.AnythingOfType("*gopowerstore.VolumeDelete"),
