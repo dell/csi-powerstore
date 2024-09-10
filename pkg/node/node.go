@@ -1670,4 +1670,3 @@ func (s *Service) fileExists(filename string) bool {
 	}
 	return false
 }
-
