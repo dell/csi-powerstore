@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2021-2024 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -1466,21 +1466,27 @@ func (s *Service) setupHost(initiators []string, client gopowerstore.Client, arr
 			}
 		}
 
-		ip, err := getOutboundIP(arrayIP, s.Fs)
+		// Modify the host entry with the new node ID having different prefix
+		err := s.modifyHostName(context.Background(), client, s.nodeID, host.ID)
 		if err != nil {
-			log.WithFields(log.Fields{
-				"endpoint": arrayIP,
-				"error":    err,
-			}).Error("Could not connect to PowerStore array")
-			return status.Errorf(codes.FailedPrecondition, "couldn't connect to PowerStore array: %s", err.Error())
+			return fmt.Errorf("cannot update the host name %s", err.Error())
 		}
-
-		s.nodeID = host.Name + "-" + ip.String()
 		s.reusedHost = true
 	}
 
 	s.initialized = true
 
+	return nil
+}
+
+func (s *Service) modifyHostName(ctx context.Context, client gopowerstore.Client, nodeID string, hostID string) error {
+	modifyParams := gopowerstore.HostModify{}
+	modifyParams.Name = &nodeID
+	_, err := client.ModifyHost(ctx, &modifyParams, hostID)
+	if err != nil {
+		return err
+	}
+	log.Info("Updated nodeID ", nodeID)
 	return nil
 }
 
@@ -1664,3 +1670,4 @@ func (s *Service) fileExists(filename string) bool {
 	}
 	return false
 }
+
