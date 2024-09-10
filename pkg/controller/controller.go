@@ -246,6 +246,7 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 	}
 
 	var vg gopowerstore.VolumeGroup
+	var remoteSystem gopowerstore.RemoteSystem
 
 	// Check if replication is enabled
 	replicationEnabled := params[s.WithRP(KeyReplicationEnabled)]
@@ -344,6 +345,12 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 			// handle Metro mode where metro is configured directly on the volume (or volume group if requested)
 			log.Info("Metro replication mode requested")
 
+			// Get specified remote system object for its ID
+			remoteSystem, err = arr.Client.GetRemoteSystemByName(ctx, remoteSystemName)
+			if err != nil {
+				return nil, status.Errorf(codes.Internal, "can't query remote system by name: %s", err.Error())
+			}
+
 			// TODO If volumeGroup input is specified in SC - Verify VolumeGroup exists, if not create one
 			// There shouldn't be any protection policy on it with replication rule
 			// Cannot configure Metro on empty VG. Configure after volume is added
@@ -375,22 +382,21 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 
 	if isMetroVolume {
 		// Configure Metro on volume
-		volID := resp.ID
+		volID := volumeResponse.VolumeId
 		log.Infof("Configuring Metro on volume %s", volID)
-		// Get ID of specified remote system
-		rs, err := arr.Client.GetRemoteSystemByName(ctx, params[s.WithRP(KeyReplicationRemoteSystem)])
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "can't query remote system by name: %s", err.Error())
-		}
-		// TODO should we check for idempotency here? i.e if metro session with specified remote already exists.
+
 		metroSession, err := arr.GetClient().ConfigureMetroVolume(ctx, volID, &gopowerstore.MetroConfig{
-			RemoteSystemID: rs.ID,
+			RemoteSystemID: remoteSystem.ID,
 		})
 		if err != nil {
-			return nil, status.Errorf(codes.Internal, "can't configure metro on volume: %s", err.Error())
+			if apiError, ok := err.(gopowerstore.APIError); ok && apiError.ReplicationSessionAlreadyCreated() { // idempotency check
+				log.Debugf("Metro has already been configured on volume %s", volID)
+			} else {
+				return nil, status.Errorf(codes.Internal, "can't configure metro on volume: %s", err.Error())
+			}
+		} else {
+			log.Infof("Metro Session %s created for volume %s", metroSession.ID, volID)
 		}
-		log.Debugf("Metro Session ID: %s", metroSession.ID)
-		// TODO check if metro session ID needs to be added to response or volume context
 	} else if isMetroVolumeGroup {
 		// TODO configure Metro on volume group if it is first time
 		// else pause and resume metro session for adding new volumes
@@ -399,7 +405,7 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 	}
 
 	// Fetch the service tag
-	serviceTag := GetServiceTag(ctx, req, arr, resp.ID, protocol)
+	serviceTag := GetServiceTag(ctx, req, arr, volumeResponse.VolumeId, protocol)
 
 	volumeResponse.VolumeContext = req.Parameters
 	volumeResponse.VolumeContext[common.KeyArrayID] = arr.GetGlobalID()
@@ -556,11 +562,9 @@ func (s *Service) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest
 		// Check if volume has metro session and end it
 		volume, err := arr.GetClient().GetVolume(ctx, id)
 		if err != nil {
-			if apiError, ok := err.(gopowerstore.APIError); ok {
-				if apiError.NotFound() {
-					log.Infof("Volume %s not found, it may have been deleted.", id)
-					return &csi.DeleteVolumeResponse{}, nil
-				}
+			if apiError, ok := err.(gopowerstore.APIError); ok && apiError.NotFound() {
+				log.Infof("Volume %s not found, it may have been deleted.", id)
+				return &csi.DeleteVolumeResponse{}, nil
 			}
 			return nil, status.Errorf(codes.Internal, "failure getting volume: %s", err.Error())
 		}
