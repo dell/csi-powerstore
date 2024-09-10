@@ -33,6 +33,13 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+const (
+	validBlockVolumeUUID     = "39bb1b5f-5624-490d-9ece-18f7b28a904e"
+	validGlobalID            = "globalvolid1"
+	scsi                     = "scsi"
+	validBlockVolumeNameSCSI = validBlockVolumeUUID + "/" + validGlobalID + "/" + scsi
+)
+
 func TestGetPowerStoreArrays(t *testing.T) {
 	type args struct {
 		fs   fs.Interface
@@ -161,6 +168,14 @@ func TestGetPowerStoreArrays(t *testing.T) {
 }
 
 func TestParseVolumeID(t *testing.T) {
+	t.Run("parse volume id", func(t *testing.T) {
+		id, globalID, protocol, err := array.ParseVolumeID(context.Background(), validBlockVolumeNameSCSI, nil, nil)
+		assert.NoError(t, err)
+		assert.Equal(t, validBlockVolumeUUID, id)
+		assert.Equal(t, validGlobalID, globalID)
+		assert.Equal(t, scsi, protocol)
+	})
+
 	t.Run("incorrect volume id", func(t *testing.T) {
 		_, _, _, err := array.ParseVolumeID(context.Background(), "", nil, nil)
 		assert.Error(t, err)
