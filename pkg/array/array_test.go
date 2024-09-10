@@ -21,6 +21,7 @@ package array_test
 import (
 	"context"
 	"errors"
+	"net/http"
 	"os"
 	"testing"
 
@@ -29,13 +30,23 @@ import (
 	"github.com/dell/csi-powerstore/v2/pkg/array"
 	"github.com/dell/csi-powerstore/v2/pkg/common"
 	"github.com/dell/csi-powerstore/v2/pkg/common/fs"
+	"github.com/dell/gopowerstore"
+
+	"github.com/dell/gopowerstore/api"
+	gopowerstoremock "github.com/dell/gopowerstore/mocks"
+
 	"github.com/dell/gofsutil"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 const (
+	validPowerStoreIP = "127.0.0.1"
+
 	validBlockVolumeUUID       = "39bb1b5f-5624-490d-9ece-18f7b28a904e"
 	validRemoteBlockVolumeUUID = "9f840c56-96e6-4de9-b5a3-27e7c20eaa77"
+
+	validFileSystemUUID = "66d815e3-52c2-126f-e29f-3e95021dcb9b"
 
 	validGlobalID       = "globalvolid1"
 	validRemoteGlobalID = "globalvolid2"
@@ -220,7 +231,7 @@ func TestParseVolumeID(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	t.Run("volume capability", func(t *testing.T) {
+	t.Run("volume capability nfs", func(t *testing.T) {
 		id := "1cd254s"
 		ip := "gid1"
 		getVolCap := func() *csi.VolumeCapability {
@@ -242,6 +253,94 @@ func TestParseVolumeID(t *testing.T) {
 		assert.Equal(t, id, gotID)
 		assert.Equal(t, ip, gotIP)
 		assert.Equal(t, protocol, "nfs")
+	})
+
+	t.Run("volume capability scsi", func(t *testing.T) {
+		id := validBlockVolumeUUID
+		ip := validPowerStoreIP
+		getVolCap := func() *csi.VolumeCapability {
+			accessMode := new(csi.VolumeCapability_AccessMode)
+			accessMode.Mode = csi.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER
+			accessType := new(csi.VolumeCapability_Mount)
+			mountVolume := new(csi.VolumeCapability_MountVolume)
+			mountVolume.FsType = scsi
+			accessType.Mount = mountVolume
+			capability := new(csi.VolumeCapability)
+			capability.AccessMode = accessMode
+			capability.AccessType = accessType
+			return capability
+		}
+
+		volCap := getVolCap()
+		gotID, gotGlobalID, protocol, _, _, err := array.ParseVolumeID(context.Background(), id, &array.PowerStoreArray{IP: ip, GlobalID: validGlobalID}, volCap)
+		assert.NoError(t, err)
+		assert.Equal(t, id, gotID)
+		assert.Equal(t, validGlobalID, gotGlobalID)
+		assert.Equal(t, scsi, protocol)
+	})
+
+	t.Run("legacy missing scsi protocol", func(t *testing.T) {
+		// if GetVolume returns without error, the protocol should be scsi
+		clientMock := new(gopowerstoremock.Client)
+		clientMock.On("GetVolume", mock.Anything, mock.Anything).Return(gopowerstore.Volume{ID: validBlockVolumeUUID}, nil)
+
+		defaultArray := &array.PowerStoreArray{Client: clientMock, IP: validPowerStoreIP, GlobalID: validGlobalID}
+
+		id, globalID, protocol, _, _, err := array.ParseVolumeID(context.Background(), validBlockVolumeUUID, defaultArray, nil)
+		assert.NoError(t, err)
+		assert.Equal(t, validBlockVolumeUUID, id)
+		assert.Equal(t, validGlobalID, globalID)
+		assert.Equal(t, protocol, scsi)
+	})
+
+	t.Run("legacy get nfs protocol from API client", func(t *testing.T) {
+		clientMock := new(gopowerstoremock.Client)
+		clientMock.On("GetVolume", mock.Anything, mock.Anything).Return(gopowerstore.Volume{}, errors.New(""))
+		clientMock.On("GetFS", mock.Anything, mock.Anything).Return(gopowerstore.FileSystem{ID: validFileSystemUUID}, nil)
+
+		defaultArray := &array.PowerStoreArray{Client: clientMock, IP: validPowerStoreIP, GlobalID: validGlobalID}
+
+		id, globalID, protocol, _, _, err := array.ParseVolumeID(context.Background(), validFileSystemUUID, defaultArray, nil)
+		assert.NoError(t, err)
+		assert.Equal(t, validFileSystemUUID, id)
+		assert.Equal(t, validGlobalID, globalID)
+		assert.Equal(t, protocol, nfs)
+	})
+
+	t.Run("legacy volume not found", func(t *testing.T) {
+		clientMock := new(gopowerstoremock.Client)
+		clientMock.On("GetVolume", mock.Anything, mock.Anything).Return(gopowerstore.Volume{}, errors.New(""))
+		apiError := gopowerstore.APIError{
+			ErrorMsg: &api.ErrorMsg{
+				StatusCode: http.StatusNotFound,
+				Message:    "volume not found",
+			},
+		}
+
+		clientMock.On("GetFS", mock.Anything, mock.Anything).Return(gopowerstore.FileSystem{}, error(apiError))
+
+		defaultArray := &array.PowerStoreArray{Client: clientMock, IP: validPowerStoreIP, GlobalID: validGlobalID}
+
+		_, _, _, _, _, err := array.ParseVolumeID(context.Background(), validFileSystemUUID, defaultArray, nil)
+		assert.ErrorIs(t, err, error(apiError))
+	})
+
+	t.Run("legacy volume unknown error", func(t *testing.T) {
+		clientMock := new(gopowerstoremock.Client)
+		clientMock.On("GetVolume", mock.Anything, mock.Anything).Return(gopowerstore.Volume{}, errors.New(""))
+		apiError := gopowerstore.APIError{
+			ErrorMsg: &api.ErrorMsg{
+				StatusCode: http.StatusBadRequest,
+				Message:    "bad request",
+			},
+		}
+
+		clientMock.On("GetFS", mock.Anything, mock.Anything).Return(gopowerstore.FileSystem{}, error(apiError))
+
+		defaultArray := &array.PowerStoreArray{Client: clientMock, IP: validPowerStoreIP, GlobalID: validGlobalID}
+
+		_, _, _, _, _, err := array.ParseVolumeID(context.Background(), validFileSystemUUID, defaultArray, nil)
+		assert.ErrorContains(t, err, apiError.ErrorMsg.Message)
 	})
 }
 
