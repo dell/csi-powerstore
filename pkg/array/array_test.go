@@ -34,11 +34,28 @@ import (
 )
 
 const (
-	validBlockVolumeUUID     = "39bb1b5f-5624-490d-9ece-18f7b28a904e"
-	validGlobalID            = "globalvolid1"
-	scsi                     = "scsi"
-	validBlockVolumeNameSCSI = validBlockVolumeUUID + "/" + validGlobalID + "/" + scsi
+	validBlockVolumeUUID       = "39bb1b5f-5624-490d-9ece-18f7b28a904e"
+	validRemoteBlockVolumeUUID = "9f840c56-96e6-4de9-b5a3-27e7c20eaa77"
+
+	validGlobalID       = "globalvolid1"
+	validRemoteGlobalID = "globalvolid2"
+
+	scsi = "scsi"
+	nfs  = "nfs"
 )
+
+var (
+	validBlockVolumeNameSCSI      = buildVolumeName(validBlockVolumeUUID, validGlobalID, scsi)
+	validMetroBlockVolumeNameSCSI = buildMetroVolumeName(validBlockVolumeUUID, validGlobalID, scsi, validRemoteBlockVolumeUUID, validRemoteGlobalID)
+)
+
+func buildVolumeName(uuid, globalID, transport string) string {
+	return uuid + "/" + globalID + "/" + transport
+}
+
+func buildMetroVolumeName(uuid, globalID, transport, remoteUUID, remoteGlobalID string) string {
+	return buildVolumeName(uuid, globalID, transport) + ":" + remoteUUID + "/" + remoteGlobalID
+}
 
 func TestGetPowerStoreArrays(t *testing.T) {
 	type args struct {
@@ -168,8 +185,8 @@ func TestGetPowerStoreArrays(t *testing.T) {
 }
 
 func TestParseVolumeID(t *testing.T) {
-	t.Run("parse volume id", func(t *testing.T) {
-		id, globalID, protocol, err := array.ParseVolumeID(context.Background(), validBlockVolumeNameSCSI, nil, nil)
+	t.Run("parse volume name", func(t *testing.T) {
+		id, globalID, protocol, _, _, err := array.ParseVolumeID(context.Background(), validBlockVolumeNameSCSI, nil, nil)
 		assert.NoError(t, err)
 		assert.Equal(t, validBlockVolumeUUID, id)
 		assert.Equal(t, validGlobalID, globalID)
@@ -177,7 +194,23 @@ func TestParseVolumeID(t *testing.T) {
 	})
 
 	t.Run("incorrect volume id", func(t *testing.T) {
-		_, _, _, err := array.ParseVolumeID(context.Background(), "", nil, nil)
+		_, _, _, _, _, err := array.ParseVolumeID(context.Background(), "", nil, nil)
+		assert.Error(t, err)
+	})
+
+	t.Run("parse metro volume name", func(t *testing.T) {
+		id, globalID, protocol, remoteID, remoteGlobalID, err := array.ParseVolumeID(context.Background(), validMetroBlockVolumeNameSCSI, nil, nil)
+		assert.NoError(t, err)
+		assert.Equal(t, validBlockVolumeUUID, id)
+		assert.Equal(t, validRemoteBlockVolumeUUID, remoteID)
+		assert.Equal(t, validGlobalID, globalID)
+		assert.Equal(t, validRemoteGlobalID, remoteGlobalID)
+		assert.Equal(t, scsi, protocol)
+	})
+
+	t.Run("parse bad metro volume name", func(t *testing.T) {
+		invalidMetroVolumeName := buildMetroVolumeName(validBlockVolumeUUID, validGlobalID, scsi, "", "")
+		_, _, _, _, _, err := array.ParseVolumeID(context.Background(), invalidMetroVolumeName, nil, nil)
 		assert.Error(t, err)
 	})
 
@@ -198,7 +231,7 @@ func TestParseVolumeID(t *testing.T) {
 		}
 
 		volCap := getVolCap()
-		gotID, gotIP, protocol, err := array.ParseVolumeID(context.Background(), id, &array.PowerStoreArray{IP: ip, GlobalID: "gid1"}, volCap)
+		gotID, gotIP, protocol, _, _, err := array.ParseVolumeID(context.Background(), id, &array.PowerStoreArray{IP: ip, GlobalID: "gid1"}, volCap)
 		assert.NoError(t, err)
 		assert.Equal(t, id, gotID)
 		assert.Equal(t, ip, gotIP)

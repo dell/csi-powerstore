@@ -264,9 +264,12 @@ func GetPowerStoreArrays(fs fs.Interface, filePath string) (map[string]*PowerSto
 //
 // This function is backwards compatible and will try to understand volume protocol even if there is no such information in volume id.
 // It will do that by querying default powerstore array passed as one of the arguments
-func ParseVolumeID(ctx context.Context, volumeID string, defaultArray *PowerStoreArray /*optional*/, cap *csi.VolumeCapability) (id string, arrayID string, protocol string, e error) {
+func ParseVolumeID(ctx context.Context, volumeID string,
+	defaultArray *PowerStoreArray, /*optional*/
+	cap *csi.VolumeCapability,
+) (id, arrayID, protocol, remoteID, remoteArrayID string, e error) {
 	if volumeID == "" {
-		return "", "", "", status.Errorf(codes.FailedPrecondition,
+		return "", "", "", "", "", status.Errorf(codes.FailedPrecondition,
 			"incorrect volume id ")
 	}
 	volID := strings.Split(volumeID, "/")
@@ -285,7 +288,7 @@ func ParseVolumeID(ctx context.Context, volumeID string, defaultArray *PowerStor
 				protocol = "scsi"
 			}
 			arrayID = defaultArray.GetGlobalID()
-			return id, arrayID, protocol, nil
+			return id, arrayID, protocol, "", "", nil
 		}
 
 		// Try to just find out volume type by querying it's id from array
@@ -298,9 +301,9 @@ func ParseVolumeID(ctx context.Context, volumeID string, defaultArray *PowerStor
 				protocol = "nfs"
 			} else {
 				if apiError, ok := err.(gopowerstore.APIError); ok && apiError.NotFound() {
-					return id, arrayID, protocol, apiError
+					return id, arrayID, protocol, "", "", apiError
 				}
-				return id, arrayID, protocol, status.Errorf(codes.Unknown,
+				return id, arrayID, protocol, "", "", status.Errorf(codes.Unknown,
 					"failure checking volume status: %s", err.Error())
 			}
 		}
@@ -314,5 +317,5 @@ func ParseVolumeID(ctx context.Context, volumeID string, defaultArray *PowerStor
 		protocol = volID[2]
 	}
 	log.Infof("id %s arrayID %s proto %s", id, arrayID, protocol)
-	return id, arrayID, protocol, nil
+	return id, arrayID, protocol, "", "", nil
 }

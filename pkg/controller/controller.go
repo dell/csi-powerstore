@@ -207,14 +207,14 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 		volumeSource := contentSource.GetVolume()
 		if volumeSource != nil {
 			log.Printf("volume %s specified as volume content source", volumeSource.VolumeId)
-			parsedID, _, _, _ := array.ParseVolumeID(ctx, volumeSource.VolumeId, s.DefaultArray(), nil)
+			parsedID, _, _, _, _, _ := array.ParseVolumeID(ctx, volumeSource.VolumeId, s.DefaultArray(), nil)
 			volumeSource.VolumeId = parsedID
 			volResp, err = creator.Clone(ctx, volumeSource, req.GetName(), sizeInBytes, req.Parameters, arr.GetClient())
 		}
 		snapshotSource := contentSource.GetSnapshot()
 		if snapshotSource != nil {
 			log.Printf("snapshot %s specified as volume content source", snapshotSource.SnapshotId)
-			parsedID, _, _, _ := array.ParseVolumeID(ctx, snapshotSource.SnapshotId, s.DefaultArray(), nil)
+			parsedID, _, _, _, _, _ := array.ParseVolumeID(ctx, snapshotSource.SnapshotId, s.DefaultArray(), nil)
 			snapshotSource.SnapshotId = parsedID
 			volResp, err = creator.CreateVolumeFromSnapshot(ctx, snapshotSource,
 				req.GetName(), sizeInBytes, req.Parameters, arr.GetClient())
@@ -434,7 +434,7 @@ func (s *Service) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest
 		return nil, status.Error(codes.InvalidArgument, "volume ID is required")
 	}
 
-	id, arrayID, protocol, err := array.ParseVolumeID(ctx, id, s.DefaultArray(), nil)
+	id, arrayID, protocol, _, _, err := array.ParseVolumeID(ctx, id, s.DefaultArray(), nil)
 	if err != nil {
 		if apiError, ok := err.(gopowerstore.APIError); ok && apiError.NotFound() {
 			return &csi.DeleteVolumeResponse{}, nil
@@ -604,7 +604,7 @@ func (s *Service) ControllerPublishVolume(ctx context.Context, req *csi.Controll
 		return nil, status.Error(codes.InvalidArgument, "volume ID is required")
 	}
 
-	id, arrayID, protocol, err := array.ParseVolumeID(ctx, id, s.DefaultArray(), req.VolumeCapability)
+	id, arrayID, protocol, _, _, err := array.ParseVolumeID(ctx, id, s.DefaultArray(), req.VolumeCapability)
 	if err != nil {
 		log.Info(err)
 		return nil, err
@@ -662,7 +662,7 @@ func (s *Service) ControllerUnpublishVolume(ctx context.Context, req *csi.Contro
 		return nil, status.Error(codes.InvalidArgument, "node ID is required")
 	}
 
-	id, arrayID, protocol, err := array.ParseVolumeID(ctx, id, s.DefaultArray(), nil)
+	id, arrayID, protocol, _, _, err := array.ParseVolumeID(ctx, id, s.DefaultArray(), nil)
 	if err != nil {
 		if apiError, ok := err.(gopowerstore.APIError); ok && apiError.NotFound() {
 			return &csi.ControllerUnpublishVolumeResponse{}, nil
@@ -883,7 +883,7 @@ func (s *Service) ValidateVolumeCapabilities(ctx context.Context, req *csi.Valid
 	}
 	// for sanity
 	id := req.GetVolumeId()
-	id, arrayID, proto, err := array.ParseVolumeID(ctx, id, s.DefaultArray(), nil)
+	id, arrayID, proto, _, _, err := array.ParseVolumeID(ctx, id, s.DefaultArray(), nil)
 	if err != nil {
 		return &csi.ValidateVolumeCapabilitiesResponse{}, status.Error(codes.NotFound, "No such volume")
 	}
@@ -1085,7 +1085,7 @@ func (s *Service) CreateSnapshot(ctx context.Context, req *csi.CreateSnapshotReq
 		return nil, status.Errorf(codes.InvalidArgument, "volume ID to be snapped is required")
 	}
 
-	id, arrayID, protocol, err := array.ParseVolumeID(ctx, sourceVolID, s.DefaultArray(), nil)
+	id, arrayID, protocol, _, _, err := array.ParseVolumeID(ctx, sourceVolID, s.DefaultArray(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -1158,7 +1158,7 @@ func (s *Service) DeleteSnapshot(ctx context.Context, req *csi.DeleteSnapshotReq
 		return nil, status.Errorf(codes.InvalidArgument, "snapshot ID to be deleted is required")
 	}
 
-	id, arrayID, protocol, err := array.ParseVolumeID(ctx, snapID, s.DefaultArray(), nil)
+	id, arrayID, protocol, _, _, err := array.ParseVolumeID(ctx, snapID, s.DefaultArray(), nil)
 	if err != nil {
 		if apiError, ok := err.(gopowerstore.APIError); ok && apiError.NotFound() {
 			return &csi.DeleteSnapshotResponse{}, nil
@@ -1271,7 +1271,7 @@ func (s *Service) ListSnapshots(ctx context.Context, req *csi.ListSnapshotsReque
 
 // ControllerExpandVolume resizes Volume or FileSystem by increasing available volume capacity in the storage array.
 func (s *Service) ControllerExpandVolume(ctx context.Context, req *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
-	id, arrayID, protocol, err := array.ParseVolumeID(ctx, req.VolumeId, s.DefaultArray(), nil)
+	id, arrayID, protocol, _, _, err := array.ParseVolumeID(ctx, req.VolumeId, s.DefaultArray(), nil)
 	if err != nil {
 		return nil, status.Errorf(codes.OutOfRange, "unable to parse the volume id")
 	}
@@ -1309,7 +1309,7 @@ func (s *Service) ControllerExpandVolume(ctx context.Context, req *csi.Controlle
 
 // ControllerGetVolume fetch current information about a volume
 func (s *Service) ControllerGetVolume(ctx context.Context, req *csi.ControllerGetVolumeRequest) (*csi.ControllerGetVolumeResponse, error) {
-	id, arrayID, protocol, err := array.ParseVolumeID(ctx, req.VolumeId, s.DefaultArray(), nil)
+	id, arrayID, protocol, _, _, err := array.ParseVolumeID(ctx, req.VolumeId, s.DefaultArray(), nil)
 	if err != nil {
 		return nil, status.Errorf(codes.OutOfRange, "unable to parse the volume id")
 	}
@@ -1476,7 +1476,7 @@ func (s *Service) listPowerStoreSnapshots(ctx context.Context, startToken, maxEn
 		}
 	} else if snapID != "" {
 		log.Infof("Requested snapshot via snapshot id %s", snapID)
-		id, arrayID, protocol, err := array.ParseVolumeID(ctx, snapID, s.DefaultArray(), nil)
+		id, arrayID, protocol, _, _, err := array.ParseVolumeID(ctx, snapID, s.DefaultArray(), nil)
 		if err != nil {
 			log.Error(err)
 			return []GeneralSnapshot{}, "", nil
@@ -1516,7 +1516,7 @@ func (s *Service) listPowerStoreSnapshots(ctx context.Context, startToken, maxEn
 	} else {
 		log.Infof("Requested snapshot via source id %s", srcID)
 		// This works VGS on single default array, But for multiple array scenario this default array should be changed to dynamic array
-		id, arrayID, protocol, err := array.ParseVolumeID(ctx, srcID, s.DefaultArray(), nil)
+		id, arrayID, protocol, _, _, err := array.ParseVolumeID(ctx, srcID, s.DefaultArray(), nil)
 		if err != nil {
 			log.Error(err)
 			return []GeneralSnapshot{}, "", nil
