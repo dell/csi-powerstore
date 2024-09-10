@@ -204,12 +204,18 @@ func TestParseVolumeID(t *testing.T) {
 		assert.Equal(t, validBlockVolumeUUID, id)
 		assert.Equal(t, validRemoteBlockVolumeUUID, remoteID)
 		assert.Equal(t, validGlobalID, globalID)
-		assert.Equal(t, validRemoteGlobalID, remoteGlobalID)
+		assert.Equal(t, remoteGlobalID, validRemoteGlobalID)
 		assert.Equal(t, scsi, protocol)
 	})
 
 	t.Run("parse bad metro volume name", func(t *testing.T) {
 		invalidMetroVolumeName := buildMetroVolumeName(validBlockVolumeUUID, validGlobalID, scsi, "", "")
+		_, _, _, _, _, err := array.ParseVolumeID(context.Background(), invalidMetroVolumeName, nil, nil)
+		assert.Error(t, err)
+	})
+
+	t.Run("parse metro volume with missing source volume", func(t *testing.T) {
+		invalidMetroVolumeName := buildMetroVolumeName("", "", "", validRemoteBlockVolumeUUID, validRemoteGlobalID)
 		_, _, _, _, _, err := array.ParseVolumeID(context.Background(), invalidMetroVolumeName, nil, nil)
 		assert.Error(t, err)
 	})
