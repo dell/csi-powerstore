@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2021-2024 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -484,6 +484,8 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 							}},
 							Name: "host-name",
 						}}, nil)
+					clientMock.On("ModifyHost", mock.Anything, mock.Anything, "host-id").
+						Return(gopowerstore.CreateResponse{ID: "host-id"}, nil)
 
 					err := nodeSvc.Init()
 					gomega.Expect(err).To(gomega.BeNil())
