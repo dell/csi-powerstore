@@ -198,14 +198,17 @@ func TestGetPowerStoreArrays(t *testing.T) {
 
 type LegacyParseVolumeTestSuite struct {
 	suite.Suite
-	clientMock *gopowerstoremock.Client
+
+	// Used to mock gopowerstore
+	mockAPI struct {
+		APIError gopowerstore.APIError
+		Client   *gopowerstoremock.Client
+
+		GetVolume *mock.Call
+		GetFS     *mock.Call
+	}
 
 	psArray *array.PowerStoreArray
-
-	mockGetVolume *mock.Call
-	mockGetFS     *mock.Call
-
-	apiError gopowerstore.APIError
 }
 
 func TestLegacyParseVolumeSuite(t *testing.T) {
@@ -213,20 +216,24 @@ func TestLegacyParseVolumeSuite(t *testing.T) {
 }
 
 func (s *LegacyParseVolumeTestSuite) SetupSuite() {
-	s.clientMock = new(gopowerstoremock.Client)
-	s.psArray = &array.PowerStoreArray{Client: s.clientMock, IP: validPowerStoreIP, GlobalID: validGlobalID}
+	s.mockAPI.Client = new(gopowerstoremock.Client)
+	s.psArray = &array.PowerStoreArray{Client: s.mockAPI.Client, IP: validPowerStoreIP, GlobalID: validGlobalID}
 }
 
 func (s *LegacyParseVolumeTestSuite) SetupTest() {
-	s.mockGetVolume = s.clientMock.On("GetVolume", mock.Anything, mock.Anything)
-	s.mockGetFS = s.clientMock.On("GetFS", mock.Anything, mock.Anything)
+	// A standard setup for mocking these API functions for these tests.
+	// Functions can be modified in the test implementation if needed.
+	s.mockAPI.GetVolume = s.mockAPI.Client.On("GetVolume", mock.Anything, mock.Anything)
+	s.mockAPI.GetFS = s.mockAPI.Client.On("GetFS", mock.Anything, mock.Anything)
 }
 
 func (s *LegacyParseVolumeTestSuite) TearDownTest() {
-	s.mockGetVolume.Unset()
-	s.mockGetFS.Unset()
+	// Unset any mocks that were configured during the test.
+	s.mockAPI.GetVolume.Unset()
+	s.mockAPI.GetFS.Unset()
 
-	s.apiError = *gopowerstore.NewAPIError()
+	// Reset the API error for the next test run.
+	s.mockAPI.APIError = *gopowerstore.NewAPIError()
 }
 
 func (s *LegacyParseVolumeTestSuite) TestVolumeCapabilityNFS() {
@@ -278,8 +285,9 @@ func (s *LegacyParseVolumeTestSuite) TestVolumeCapabilitySCSI() {
 }
 
 func (s *LegacyParseVolumeTestSuite) TestMissingSCSIProtocol() {
-	// if GetVolume returns without error, the protocol should be scsi
-	s.mockGetVolume.Return(gopowerstore.Volume{ID: validBlockVolumeUUID}, nil)
+	// When the  protocol is not included in the volume name,
+	// if GetVolume returns without error, the protocol should be scsi.
+	s.mockAPI.GetVolume.Return(gopowerstore.Volume{ID: validBlockVolumeUUID}, nil)
 
 	id, globalID, protocol, _, _, err := array.ParseVolumeID(context.Background(), validBlockVolumeUUID, s.psArray, nil)
 	assert.NoError(s.T(), err)
@@ -289,8 +297,11 @@ func (s *LegacyParseVolumeTestSuite) TestMissingSCSIProtocol() {
 }
 
 func (s *LegacyParseVolumeTestSuite) TestGetNFSProtocolFromAPIClient() {
-	s.mockGetVolume.Return(gopowerstore.Volume{}, errors.New(""))
-	s.mockGetFS.Return(gopowerstore.FileSystem{ID: validFileSystemUUID}, nil)
+	// When the protocol is not included in the volume name,
+	// if GetVolume returns an error and GetFS returns without error,
+	// the protocol should be nfs.
+	s.mockAPI.GetVolume.Return(gopowerstore.Volume{}, errors.New("error"))
+	s.mockAPI.GetFS.Return(gopowerstore.FileSystem{ID: validFileSystemUUID}, nil)
 
 	id, globalID, protocol, _, _, err := array.ParseVolumeID(context.Background(), validFileSystemUUID, s.psArray, nil)
 	assert.NoError(s.T(), err)
@@ -300,33 +311,58 @@ func (s *LegacyParseVolumeTestSuite) TestGetNFSProtocolFromAPIClient() {
 }
 
 func (s *LegacyParseVolumeTestSuite) TestVolumeNotFound() {
-	s.mockGetVolume.Return(gopowerstore.Volume{}, errors.New(""))
-	s.apiError = gopowerstore.APIError{
+	// When the protocol is not included in the volume name,
+	// and both GetVolume and GetFS return with errors,
+	// and the error returned by GetFS is http.StatusNotFound (404),
+	// then ParseVolumeID should return a related error.
+	s.mockAPI.GetVolume.Return(gopowerstore.Volume{}, errors.New("error"))
+	s.mockAPI.APIError = gopowerstore.APIError{
 		ErrorMsg: &api.ErrorMsg{
 			StatusCode: http.StatusNotFound,
 			Message:    "volume not found",
 		},
 	}
 
-	s.mockGetFS.Return(gopowerstore.FileSystem{}, error(s.apiError))
+	s.mockAPI.GetFS.Return(gopowerstore.FileSystem{}, error(s.mockAPI.APIError))
 
 	_, _, _, _, _, err := array.ParseVolumeID(context.Background(), validFileSystemUUID, s.psArray, nil)
-	assert.ErrorIs(s.T(), err, error(s.apiError))
+	assert.ErrorIs(s.T(), err, error(s.mockAPI.APIError))
 }
 
 func (s *LegacyParseVolumeTestSuite) TestVolumeUnknownError() {
-	s.mockGetVolume.Return(gopowerstore.Volume{}, errors.New(""))
-	s.apiError = gopowerstore.APIError{
+	// When the protocol is not included in the volume name,
+	// and both GetVolume and GetFS return with errors,
+	// and the error returned by GetFS is NOT http.StatusNotFound (404),
+	// then ParseVolumeID should return a related error.
+	s.mockAPI.GetVolume.Return(gopowerstore.Volume{}, errors.New("error"))
+	s.mockAPI.APIError = gopowerstore.APIError{
 		ErrorMsg: &api.ErrorMsg{
 			StatusCode: http.StatusBadRequest,
 			Message:    "bad request",
 		},
 	}
 
-	s.mockGetFS.Return(gopowerstore.FileSystem{}, error(s.apiError))
+	s.mockAPI.GetFS.Return(gopowerstore.FileSystem{}, error(s.mockAPI.APIError))
 
 	_, _, _, _, _, err := array.ParseVolumeID(context.Background(), validFileSystemUUID, s.psArray, nil)
-	assert.ErrorContains(s.T(), err, s.apiError.ErrorMsg.Message)
+	assert.ErrorContains(s.T(), err, s.mockAPI.APIError.ErrorMsg.Message)
+}
+
+func (s *LegacyParseVolumeTestSuite) TestIPAsArrayID() {
+	// When a volume name contains an IP as the second element delimited by a forward slash,
+	// ParseVolumeID should get the PowerStore Global ID from the IP.
+
+	// Map the PowerStore IP to a valid Global ID
+	array.IPToArray = map[string]string{validPowerStoreIP: validGlobalID}
+
+	// Build a volume ID using an IP in place of a PowerStore Global ID
+	volID := buildVolumeName(validBlockVolumeUUID, validPowerStoreIP, scsi)
+
+	id, globalID, protocol, _, _, err := array.ParseVolumeID(context.Background(), volID, nil, nil)
+	assert.NoError(s.T(), err)
+	assert.Equal(s.T(), validBlockVolumeUUID, id)
+	assert.Equal(s.T(), globalID, validGlobalID)
+	assert.Equal(s.T(), protocol, scsi)
 }
 
 func TestParseVolumeID(t *testing.T) {
