@@ -237,6 +237,8 @@ func (s *LegacyParseVolumeTestSuite) TearDownTest() {
 }
 
 func (s *LegacyParseVolumeTestSuite) TestVolumeCapabilityNFS() {
+	// When VolumeCapability (with mountVolume.FsType = "nfs") and default PowerStore array are passed to ParseVolumeID,
+	// use the capability to get the protocol and default array to get the PowerStore Global ID.
 	id := "1cd254s"
 	ip := "gid1"
 	getVolCap := func() *csi.VolumeCapability {
@@ -244,7 +246,7 @@ func (s *LegacyParseVolumeTestSuite) TestVolumeCapabilityNFS() {
 		accessMode.Mode = csi.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER
 		accessType := new(csi.VolumeCapability_Mount)
 		mountVolume := new(csi.VolumeCapability_MountVolume)
-		mountVolume.FsType = "nfs"
+		mountVolume.FsType = nfs
 		accessType.Mount = mountVolume
 		capability := new(csi.VolumeCapability)
 		capability.AccessMode = accessMode
@@ -261,6 +263,8 @@ func (s *LegacyParseVolumeTestSuite) TestVolumeCapabilityNFS() {
 }
 
 func (s *LegacyParseVolumeTestSuite) TestVolumeCapabilitySCSI() {
+	// When VolumeCapability (with mountVolume.FsType = "scsi") and default PowerStore array are passed to ParseVolumeID,
+	// use the capability to get the protocol and default array to get the PowerStore Global ID.
 	id := validBlockVolumeUUID
 	ip := validPowerStoreIP
 	getVolCap := func() *csi.VolumeCapability {
@@ -285,7 +289,7 @@ func (s *LegacyParseVolumeTestSuite) TestVolumeCapabilitySCSI() {
 }
 
 func (s *LegacyParseVolumeTestSuite) TestMissingSCSIProtocol() {
-	// When the  protocol is not included in the volume name,
+	// When the protocol is not included in the volume name,
 	// if GetVolume returns without error, the protocol should be scsi.
 	s.mockAPI.GetVolume.Return(gopowerstore.Volume{ID: validBlockVolumeUUID}, nil)
 
