@@ -2410,7 +2410,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				gomega.Ω(res).To(gomega.Equal(&csi.NodeExpandVolumeResponse{}))
 			})
 		})
-		ginkgo.When("Unable to parse volid", func() {
+		ginkgo.When("the request is missing the Volume ID", func() {
 			ginkgo.It("should fail", func() {
 				clientMock.On("GetVolume", mock.Anything, mock.Anything).Return(gopowerstore.Volume{
 					Description: "",
@@ -2420,7 +2420,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					Wwn:         "naa.6090a038f0cd4e5bdaa8248e6856d4fe:3",
 				}, nil)
 				_, err := nodeSvc.NodeExpandVolume(context.Background(), getNodeVolumeExpandValidRequest("", true))
-				gomega.Ω(err.Error()).To(gomega.ContainSubstring("incorrect volume id"))
+				gomega.Ω(err.Error()).To(gomega.ContainSubstring("unable to parse volume handle. volumeHandle is empty"))
 			})
 		})
 		ginkgo.When("no target path", func() {
