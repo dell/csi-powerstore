@@ -426,8 +426,9 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
 			clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 			clientMock.On("GetRemoteSystemByName", mock.Anything, validRemoteSystemName).Return(gopowerstore.RemoteSystem{
-				Name: validRemoteSystemName,
-				ID:   validRemoteSystemID,
+				Name:         validRemoteSystemName,
+				ID:           validRemoteSystemID,
+				SerialNumber: secondValidID,
 			}, nil)
 			configureMetroRequest := &gopowerstore.MetroConfig{RemoteSystemID: validRemoteSystemID}
 			clientMock.On("ConfigureMetroVolume", mock.Anything, validBaseVolID, configureMetroRequest).
@@ -436,6 +437,11 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			clientMock.On("GetVolume", context.Background(), mock.Anything).
 				Return(gopowerstore.Volume{ApplianceID: validApplianceID, MetroReplicationSessionID: validSessionID}, nil)
 			clientMock.On("GetAppliance", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
+			clientMock.On("GetReplicationSessionByID", mock.Anything, validSessionID).Return(gopowerstore.ReplicationSession{
+				LocalResourceID:  validBaseVolID,
+				RemoteResourceID: validRemoteVolID,
+				ResourceType:     "volume",
+			}, nil)
 
 			res, err := ctrlSvc.CreateVolume(context.Background(), req)
 
@@ -443,7 +449,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			gomega.Expect(res).To(gomega.Equal(&csi.CreateVolumeResponse{
 				Volume: &csi.Volume{
 					CapacityBytes: validVolSize,
-					VolumeId:      filepath.Join(validBaseVolID, firstValidID, "scsi"),
+					VolumeId:      fmt.Sprintf("%s/%s/%s:%s/%s", validBaseVolID, firstValidID, "scsi", validRemoteVolID, secondValidID),
 					VolumeContext: map[string]string{
 						common.KeyArrayVolumeName:                             "my-vol",
 						common.KeyProtocol:                                    "scsi",
