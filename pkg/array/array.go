@@ -311,16 +311,16 @@ func ParseVolumeID(ctx context.Context, volumeHandle string,
 				protocol = "scsi"
 			}
 		} else {
-		// Try to just find out volume type by querying it's id from array
+			// Try to just find out volume type by querying it's id from array
 			_, err := defaultArray.GetClient().GetVolume(ctx, localVolumeID)
-		if err == nil {
-			protocol = "scsi"
-		} else {
-				_, err = defaultArray.GetClient().GetFS(ctx, localVolumeID)
 			if err == nil {
-				protocol = "nfs"
+				protocol = "scsi"
 			} else {
-				if apiError, ok := err.(gopowerstore.APIError); ok && apiError.NotFound() {
+				_, err := defaultArray.GetClient().GetFS(ctx, localVolumeID)
+				if err == nil {
+					protocol = "nfs"
+				} else {
+					if apiError, ok := err.(gopowerstore.APIError); ok && apiError.NotFound() {
 						return localVolumeID, arrayID, protocol, "", "", apiError
 					}
 					return localVolumeID, arrayID, protocol, "", "", status.Errorf(codes.Unknown,
