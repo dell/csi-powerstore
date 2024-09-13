@@ -204,7 +204,7 @@ func GetPowerStoreArrays(fs fs.Interface, filePath string) (map[string]*PowerSto
 			} else if rateLimit < 0 {
 				log.Errorf("throttling rate limit is negative, using default")
 			} else {
-				clientOptions.SetRateLimit(uint64(rateLimit))
+				clientOptions.SetRateLimit(rateLimit)
 			}
 		}
 

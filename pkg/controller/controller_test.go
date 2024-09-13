@@ -65,6 +65,7 @@ const (
 	validRPO                  = "Five_Minutes"
 	validGroupID              = "610adaef-4f0a-4dff-9812-29ffa5daf185"
 	validRemoteGroupID        = "62ed932b-329b-4ba6-b0e0-3f51c34c4701"
+	validSessionID            = "9abd0198-2733-4e46-b5fa-456e9c367184"
 	validNamespaceName        = "default"
 	validGroupName            = "csi-" + validRemoteSystemName + "-" + validRPO
 	validNamespacedGroupName  = "csi-" + validNamespaceName + "-" + validRemoteSystemName + "-" + validRPO
@@ -415,6 +416,73 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			}))
 		})
 
+		ginkgo.It("should configure metro replication on volume", func() {
+			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationMode)] = "METRO"
+			delete(req.Parameters, ctrlSvc.WithRP(controller.KeyReplicationRPO))
+			delete(req.Parameters, ctrlSvc.WithRP(controller.KeyReplicationIgnoreNamespaces))
+			delete(req.Parameters, ctrlSvc.WithRP(controller.KeyReplicationVGPrefix))
+
+			clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+			clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
+			clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
+			clientMock.On("GetRemoteSystemByName", mock.Anything, validRemoteSystemName).Return(gopowerstore.RemoteSystem{
+				Name: validRemoteSystemName,
+				ID:   validRemoteSystemID,
+			}, nil)
+			configureMetroRequest := &gopowerstore.MetroConfig{RemoteSystemID: validRemoteSystemID}
+			clientMock.On("ConfigureMetroVolume", mock.Anything, validBaseVolID, configureMetroRequest).
+				Return(gopowerstore.MetroSessionResponse{ID: validSessionID}, nil)
+			clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
+			clientMock.On("GetVolume", context.Background(), mock.Anything).
+				Return(gopowerstore.Volume{ApplianceID: validApplianceID, MetroReplicationSessionID: validSessionID}, nil)
+			clientMock.On("GetAppliance", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
+
+			res, err := ctrlSvc.CreateVolume(context.Background(), req)
+
+			gomega.Expect(err).To(gomega.BeNil())
+			gomega.Expect(res).To(gomega.Equal(&csi.CreateVolumeResponse{
+				Volume: &csi.Volume{
+					CapacityBytes: validVolSize,
+					VolumeId:      filepath.Join(validBaseVolID, firstValidID, "scsi"),
+					VolumeContext: map[string]string{
+						common.KeyArrayVolumeName:                             "my-vol",
+						common.KeyProtocol:                                    "scsi",
+						common.KeyArrayID:                                     firstValidID,
+						common.KeyVolumeDescription:                           req.Name + "-" + validNamespaceName,
+						common.KeyServiceTag:                                  validServiceTag,
+						controller.KeyCSIPVCName:                              req.Name,
+						controller.KeyCSIPVCNamespace:                         validNamespaceName,
+						ctrlSvc.WithRP(controller.KeyReplicationEnabled):      "true",
+						ctrlSvc.WithRP(controller.KeyReplicationMode):         "METRO",
+						ctrlSvc.WithRP(controller.KeyReplicationRemoteSystem): validRemoteSystemName,
+					},
+				},
+			}))
+		})
+
+		ginkgo.It("should fail to configure metro replication on volume", func() {
+			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationMode)] = "METRO"
+
+			clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+			clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
+			clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
+			clientMock.On("GetRemoteSystemByName", mock.Anything, validRemoteSystemName).Return(gopowerstore.RemoteSystem{
+				Name: validRemoteSystemName,
+				ID:   validRemoteSystemID,
+			}, nil)
+			configureMetroRequest := &gopowerstore.MetroConfig{RemoteSystemID: validRemoteSystemID}
+			clientMock.On("ConfigureMetroVolume", mock.Anything, validBaseVolID, configureMetroRequest).
+				Return(gopowerstore.MetroSessionResponse{}, gopowerstore.NewNotFoundError())
+			clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
+			clientMock.On("GetVolume", context.Background(), mock.Anything).Return(gopowerstore.Volume{ID: validBaseVolID, MetroReplicationSessionID: validSessionID}, nil)
+
+			res, err := ctrlSvc.CreateVolume(context.Background(), req)
+
+			gomega.Expect(res).To(gomega.BeNil())
+			gomega.Expect(err).NotTo(gomega.BeNil())
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("can't configure metro on volume"))
+		})
+
 		ginkgo.It("should fail create volume and update volumeGroup if we can't ensure that policy exists", func() {
 			clientMock.On("GetVolumeGroupByName", mock.Anything, validGroupName).
 				Return(gopowerstore.VolumeGroup{}, gopowerstore.NewNotFoundError())
@@ -475,6 +543,19 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			gomega.Expect(res).To(gomega.BeNil())
 			gomega.Expect(err).NotTo(gomega.BeNil())
 			gomega.Expect(err.Error()).To(gomega.ContainSubstring("replication enabled but no volume group prefix specified in storage class"))
+		})
+
+		ginkgo.It("should fail when invalid remote system is specified in parameters for metro volume", func() {
+			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationMode)] = "METRO"
+			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationRemoteSystem)] = "invalid"
+
+			clientMock.On("GetRemoteSystemByName", mock.Anything, "invalid").Return(gopowerstore.RemoteSystem{}, gopowerstore.NewNotFoundError())
+
+			res, err := ctrlSvc.CreateVolume(context.Background(), req)
+
+			gomega.Expect(res).To(gomega.BeNil())
+			gomega.Expect(err).NotTo(gomega.BeNil())
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("can't query remote system by name"))
 		})
 	})
 
@@ -1211,6 +1292,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			ginkgo.It("should successfully delete block volume", func() {
 				clientMock.On("GetSnapshotsByVolumeID", mock.Anything, validBaseVolID).Return([]gopowerstore.Volume{}, nil)
 				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).Return(gopowerstore.VolumeGroups{}, nil)
+				clientMock.On("GetVolume", mock.Anything, validBaseVolID).Return(gopowerstore.Volume{ID: validBaseVolID, Size: validVolSize}, nil)
 				clientMock.On("DeleteVolume",
 					mock.Anything,
 					mock.AnythingOfType("*gopowerstore.VolumeDelete"),
@@ -1229,6 +1311,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			ginkgo.It("should successfully delete block volume", func() {
 				clientMock.On("GetSnapshotsByVolumeID", mock.Anything, validBaseVolID).Return([]gopowerstore.Volume{}, nil)
 				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).Return(gopowerstore.VolumeGroups{}, nil)
+				clientMock.On("GetVolume", mock.Anything, validBaseVolID).Return(gopowerstore.Volume{ID: validBaseVolID, Size: validVolSize}, nil)
 				clientMock.On("DeleteVolume",
 					mock.Anything,
 					mock.AnythingOfType("*gopowerstore.VolumeDelete"),
@@ -1260,6 +1343,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 					&gopowerstore.VolumeModify{ProtectionPolicyID: ""},
 					validBaseVolID).
 					Return(gopowerstore.EmptyResponse(""), nil)
+				clientMock.On("GetVolume", mock.Anything, validBaseVolID).Return(gopowerstore.Volume{ID: validBaseVolID, Size: validVolSize}, nil)
 
 				req := &csi.DeleteVolumeRequest{VolumeId: validBlockVolumeID}
 
@@ -1273,6 +1357,41 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 
 				gomega.Expect(err).To(gomega.BeNil())
 				gomega.Expect(res).To(gomega.Equal(&csi.DeleteVolumeResponse{}))
+			})
+		})
+
+		ginkgo.When("delete block metro volume with replication props", func() {
+			ginkgo.It("should successfully delete block metro volume", func() {
+				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).Return(gopowerstore.VolumeGroups{}, nil)
+				clientMock.On("GetSnapshotsByVolumeID", mock.Anything, validBaseVolID).Return([]gopowerstore.Volume{}, nil)
+				clientMock.On("GetVolume", mock.Anything, validBaseVolID).
+					Return(gopowerstore.Volume{ID: validBaseVolID, MetroReplicationSessionID: validSessionID}, nil)
+				endMetroRequest := &gopowerstore.EndMetroVolumeOptions{DeleteRemoteVolume: true}
+				clientMock.On("EndMetroVolume", mock.Anything, validBaseVolID, endMetroRequest).Return(gopowerstore.EmptyResponse(""), nil)
+				clientMock.On("DeleteVolume", mock.Anything, mock.AnythingOfType("*gopowerstore.VolumeDelete"), validBaseVolID).
+					Return(gopowerstore.EmptyResponse(""), nil)
+
+				req := &csi.DeleteVolumeRequest{VolumeId: validBlockVolumeID}
+				res, err := ctrlSvc.DeleteVolume(context.Background(), req)
+
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.DeleteVolumeResponse{}))
+			})
+
+			ginkgo.It("should fail to delete block metro volume", func() {
+				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).Return(gopowerstore.VolumeGroups{}, nil)
+				clientMock.On("GetSnapshotsByVolumeID", mock.Anything, validBaseVolID).Return([]gopowerstore.Volume{}, nil)
+				clientMock.On("GetVolume", mock.Anything, validBaseVolID).
+					Return(gopowerstore.Volume{ID: validBaseVolID, MetroReplicationSessionID: validSessionID}, nil)
+				clientMock.On("EndMetroVolume", mock.Anything, validBaseVolID, mock.AnythingOfType("*gopowerstore.EndMetroVolumeOptions")).
+					Return(gopowerstore.EmptyResponse(""), gopowerstore.NewNotFoundError())
+
+				req := &csi.DeleteVolumeRequest{VolumeId: validBlockVolumeID}
+				res, err := ctrlSvc.DeleteVolume(context.Background(), req)
+
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("failure ending metro session on volume"))
 			})
 		})
 
@@ -1385,6 +1504,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			ginkgo.It("should succeed [Block]", func() {
 				clientMock.On("GetSnapshotsByVolumeID", mock.Anything, validBaseVolID).Return([]gopowerstore.Volume{}, nil)
 				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).Return(gopowerstore.VolumeGroups{}, nil)
+				clientMock.On("GetVolume", mock.Anything, validBaseVolID).Return(gopowerstore.Volume{ID: validBaseVolID}, nil)
 				clientMock.On("DeleteVolume",
 					mock.Anything,
 					mock.AnythingOfType("*gopowerstore.VolumeDelete"),
@@ -1429,6 +1549,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			ginkgo.It("should fail", func() {
 				clientMock.On("GetSnapshotsByVolumeID", mock.Anything, validBaseVolID).Return([]gopowerstore.Volume{}, nil)
 				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).Return(gopowerstore.VolumeGroups{}, nil)
+				clientMock.On("GetVolume", mock.Anything, validBaseVolID).Return(gopowerstore.Volume{ID: validBaseVolID}, nil)
 				clientMock.On("DeleteVolume",
 					mock.Anything,
 					mock.AnythingOfType("*gopowerstore.VolumeDelete"),
