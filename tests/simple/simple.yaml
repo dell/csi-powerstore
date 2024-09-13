@@ -1,6 +1,4 @@
-#
-#
-# Copyright © 2020-2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+# Copyright © 2020-2024 Dell Inc. or its subsidiaries. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,11 +10,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-#
 
-# This test creates 2 different PersistentVolumeClaims
-# These PVCs use ext4 and xfs default storage classes
-# PVs are mounted to pod from StatefulSet
+# This test creates three different PersistentVolumeClaims using default
+# ext4, xfs, and nfs storage classes and automatically mounts them to the pod.
+#
+# It assumes that you’ve created the same basic three storage classes from
+# samples/storageclass folder without changing their names.
 #
 # To test the driver just run from root directory of repository
 # > kubectl create -f ./tests/simple/
@@ -47,7 +46,7 @@ spec:
   resources:
     requests:
       storage: 8Gi
-  storageClassName: powerstore
+  storageClassName: powerstore-ext4
 ---
 kind: PersistentVolumeClaim
 apiVersion: v1
