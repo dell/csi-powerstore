@@ -381,14 +381,14 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 		volumeResponse = getCSIVolume(resp.ID, sizeInBytes)
 	}
 
-	var metroSession gopowerstore.MetroSessionResponse
+	metroVolumeIDSuffix := ""
 
 	if isMetroVolume {
 		// Configure Metro on volume
 		volID := volumeResponse.VolumeId
 		log.Infof("Configuring Metro on volume %s", volID)
 
-		metroSession, err = arr.GetClient().ConfigureMetroVolume(ctx, volID, &gopowerstore.MetroConfig{
+		metroSession, err := arr.GetClient().ConfigureMetroVolume(ctx, volID, &gopowerstore.MetroConfig{
 			RemoteSystemID: remoteSystem.ID,
 		})
 		if err != nil {
@@ -400,6 +400,19 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 		} else {
 			log.Infof("Metro Session %s created for volume %s", metroSession.ID, volID)
 		}
+
+		// Get the remote volume ID from the replication session.
+		replicationSession, err := arr.GetClient().GetReplicationSessionByID(ctx, metroSession.ID)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "could not get metro replication session: %s", err.Error())
+		}
+		// Confirm the replication session is of the 'volume' type
+		if strings.ToLower(replicationSession.ResourceType) != "volume" {
+			return nil, status.Errorf(codes.FailedPrecondition, "replication session %s is not of type 'volume'", replicationSession.ID)
+		}
+		// Build the metro volume handle suffix
+		metroVolumeIDSuffix = ":" + replicationSession.RemoteResourceID + "/" + remoteSystem.SerialNumber
+
 	} else if isMetroVolumeGroup {
 		// TODO configure Metro on volume group if it is first time
 		// else pause and resume metro session for adding new volumes
@@ -423,23 +436,10 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 		log.Infof("Modified topology to nfs for %s", req.GetName())
 	}
 
-	volumeResponse.VolumeId = volumeResponse.VolumeId + "/" + arr.GetGlobalID() + "/" + protocol
+	volumeResponse.VolumeId = volumeResponse.VolumeId + "/" + arr.GetGlobalID() + "/" + protocol + metroVolumeIDSuffix
 
 	// Update the volume handle for a Metro volume
 	if isMetroVolume {
-
-		// Get the remote volume ID from the replication session.
-		replicationSession, err := arr.GetClient().GetReplicationSessionByID(ctx, metroSession.ID)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "could not get metro replication session: %s", err.Error())
-		}
-		// Confirm the replication session is of the 'volume' type
-		if strings.ToLower(replicationSession.ResourceType) != "volume" {
-			return nil, status.Errorf(codes.FailedPrecondition, "replication session %s is not of type 'volume'", replicationSession.ID)
-		}
-
-		// Update the volume handle
-		volumeResponse.VolumeId = volumeResponse.VolumeId + ":" + replicationSession.RemoteResourceID + "/" + remoteSystem.SerialNumber
 	}
 
 	volumeResponse.AccessibleTopology = topology
