@@ -397,9 +397,9 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 			} else {
 				return nil, status.Errorf(codes.Internal, "can't configure metro on volume: %s", err.Error())
 			}
-		} else {
-			log.Infof("Metro Session %s created for volume %s", metroSession.ID, volID)
 		}
+
+		log.Infof("Metro Session %s created for volume %s", metroSession.ID, volID)
 
 		// Get the remote volume ID from the replication session.
 		replicationSession, err := arr.GetClient().GetReplicationSessionByID(ctx, metroSession.ID)

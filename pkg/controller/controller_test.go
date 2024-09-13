@@ -229,7 +229,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			}))
 		})
 	})
-	ginkgo.When("createing a block volume with replication properties", func() {
+	ginkgo.When("creating a block volume with replication properties", func() {
 		var req *csi.CreateVolumeRequest
 		ginkgo.BeforeEach(func() {
 			req = getTypicalCreateVolumeRequest("my-vol", validVolSize)

@@ -258,18 +258,19 @@ func GetPowerStoreArrays(fs fs.Interface, filePath string) (map[string]*PowerSto
 //
 // Example:
 //
-//	ParseVolumeID("1cd254s/192.168.0.1/scsi") will return
-//		id = "1cd254s"
-//		ip = "PSabc0123def"
+//	ParseVolumeID("1cd254s/192.168.0.1/scsi") assuming 192.168.0.1 is the IP array PSabc0123def will return
+//		localVolumeID = "1cd254s"
+//		arrayID = "PSabc0123def"
 //		protocol = "scsi"
+//		e = nil
 //
 // Example:
 //
 //	ParseVolumeID("9f840c56-96e6-4de9-b5a3-27e7c20eaa77/PSabcdef0123/scsi:9f840c56-96e6-4de9-b5a3-27e7c20eaa77/PS0123abcdef") returns
-//		id = "9f840c56-96e6-4de9-b5a3-27e7c20eaa77"
-//		ip = "PSabcdef0123"
+//		localVolumeID = "9f840c56-96e6-4de9-b5a3-27e7c20eaa77"
+//		arrayID = "PSabcdef0123"
 //		protocol = "scsi"
-//		remoteID = "9f840c56-96e6-4de9-b5a3-27e7c20eaa77"
+//		remoteVolumeID = "9f840c56-96e6-4de9-b5a3-27e7c20eaa77"
 //		remoteArrayID = "PS0123abcdef"
 //		e = nil
 //
@@ -278,7 +279,7 @@ func GetPowerStoreArrays(fs fs.Interface, filePath string) (map[string]*PowerSto
 func ParseVolumeID(ctx context.Context, volumeHandle string,
 	defaultArray *PowerStoreArray, /*legacy support*/
 	cap *csi.VolumeCapability, /*legacy support*/
-) (localVolumeID, arrayID, protocol, remoteID, remoteArrayID string, e error) {
+) (localVolumeID, arrayID, protocol, remoteVolumeID, remoteArrayID string, e error) {
 	if volumeHandle == "" {
 		return "", "", "", "", "", status.Errorf(codes.FailedPrecondition,
 			"unable to parse volume handle. volumeHandle is empty")
@@ -341,10 +342,10 @@ func ParseVolumeID(ctx context.Context, volumeHandle string,
 	// Parse the second portion of a metro volume handle
 	if len(volumeHandles) > 1 {
 		remoteVolumeHandle := strings.Split(volumeHandles[1], "/")
-		remoteID = remoteVolumeHandle[0]
+		remoteVolumeID = remoteVolumeHandle[0]
 		remoteArrayID = remoteVolumeHandle[1]
 	}
 
 	log.Debugf("id %s arrayID %s proto %s", localVolumeID, arrayID, protocol)
-	return localVolumeID, arrayID, protocol, remoteID, remoteArrayID, nil
+	return localVolumeID, arrayID, protocol, remoteVolumeID, remoteArrayID, nil
 }
