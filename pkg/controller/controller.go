@@ -413,7 +413,6 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 		}
 		// Build the metro volume handle suffix
 		metroVolumeIDSuffix = ":" + replicationSession.RemoteResourceID + "/" + remoteSystem.SerialNumber
-
 	} else if isMetroVolumeGroup {
 		// TODO configure Metro on volume group if it is first time
 		// else pause and resume metro session for adding new volumes

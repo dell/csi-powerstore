@@ -598,6 +598,19 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			gomega.Expect(err).NotTo(gomega.BeNil())
 			gomega.Expect(err.Error()).To(gomega.ContainSubstring("replication enabled but no volume group prefix specified in storage class"))
 		})
+
+		ginkgo.It("should fail when invalid remote system is specified in parameters for metro volume", func() {
+			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationMode)] = "METRO"
+			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationRemoteSystem)] = "invalid"
+
+			clientMock.On("GetRemoteSystemByName", mock.Anything, "invalid").Return(gopowerstore.RemoteSystem{}, gopowerstore.NewNotFoundError())
+
+			res, err := ctrlSvc.CreateVolume(context.Background(), req)
+
+			gomega.Expect(res).To(gomega.BeNil())
+			gomega.Expect(err).NotTo(gomega.BeNil())
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("can't query remote system by name"))
+		})
 	})
 
 	ginkgo.When("creating nfs volume", func() {
