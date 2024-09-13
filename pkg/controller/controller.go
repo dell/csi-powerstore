@@ -438,10 +438,6 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 
 	volumeResponse.VolumeId = volumeResponse.VolumeId + "/" + arr.GetGlobalID() + "/" + protocol + metroVolumeIDSuffix
 
-	// Update the volume handle for a Metro volume
-	if isMetroVolume {
-	}
-
 	volumeResponse.AccessibleTopology = topology
 	return &csi.CreateVolumeResponse{
 		Volume: volumeResponse,
