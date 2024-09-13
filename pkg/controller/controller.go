@@ -397,18 +397,19 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 			} else {
 				return nil, status.Errorf(codes.Internal, "can't configure metro on volume: %s", err.Error())
 			}
+		} else {
+			log.Infof("Metro Session %s created for volume %s", metroSession.ID, volID)
 		}
 
-		log.Infof("Metro Session %s created for volume %s", metroSession.ID, volID)
-
 		// Get the remote volume ID from the replication session.
-		replicationSession, err := arr.GetClient().GetReplicationSessionByID(ctx, metroSession.ID)
+		replicationSession, err := arr.GetClient().GetReplicationSessionByLocalResourceID(ctx, volID)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "could not get metro replication session: %s", err.Error())
 		}
 		// Confirm the replication session is of the 'volume' type
 		if strings.ToLower(replicationSession.ResourceType) != "volume" {
-			return nil, status.Errorf(codes.FailedPrecondition, "replication session %s is not of type 'volume'", replicationSession.ID)
+			return nil, status.Errorf(codes.FailedPrecondition, "replication session %s has a resource type %s, wanted type 'volume'",
+				replicationSession.ID, replicationSession.ResourceType)
 		}
 		// Build the metro volume handle suffix
 		metroVolumeIDSuffix = ":" + replicationSession.RemoteResourceID + "/" + remoteSystem.SerialNumber

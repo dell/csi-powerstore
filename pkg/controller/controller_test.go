@@ -446,7 +446,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				clientMock.On("GetVolume", context.Background(), mock.Anything).
 					Return(gopowerstore.Volume{ApplianceID: validApplianceID, MetroReplicationSessionID: validSessionID}, nil)
 				clientMock.On("GetAppliance", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
-				clientMock.On("GetReplicationSessionByID", mock.Anything, validSessionID).Return(gopowerstore.ReplicationSession{
+				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, validBaseVolID).Return(gopowerstore.ReplicationSession{
 					LocalResourceID:  validBaseVolID,
 					RemoteResourceID: validRemoteVolID,
 					ResourceType:     "volume",
@@ -509,7 +509,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				clientMock.On("GetAppliance", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
 
 				// Return 404 Not Found error when querying for the replication session
-				clientMock.On("GetReplicationSessionByID", mock.Anything, validSessionID).Return(gopowerstore.ReplicationSession{}, gopowerstore.NewNotFoundError())
+				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, validBaseVolID).Return(gopowerstore.ReplicationSession{}, gopowerstore.NewNotFoundError())
 
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
 				gomega.Expect(res).To(gomega.BeNil())
@@ -525,12 +525,15 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				clientMock.On("GetAppliance", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
 
 				// Return a bad resource type for the replication session; "file_system"
-				clientMock.On("GetReplicationSessionByID", mock.Anything, validSessionID).Return(gopowerstore.ReplicationSession{ResourceType: "file_system", ID: validSessionID}, nil)
+				resourceType := "file_system"
+				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, validBaseVolID).
+					Return(gopowerstore.ReplicationSession{ResourceType: resourceType, ID: validSessionID}, nil)
 
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
 				gomega.Expect(res).To(gomega.BeNil())
 				gomega.Expect(err).NotTo(gomega.BeNil())
-				gomega.Expect(err.Error()).To(gomega.ContainSubstring((fmt.Sprintf("replication session %s is not of type 'volume'", validSessionID))))
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring((fmt.Sprintf("replication session %s has a resource type %s, wanted type 'volume'",
+					validSessionID, resourceType))))
 			})
 		})
 
