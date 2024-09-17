@@ -86,7 +86,7 @@ mocks:
 	mockery
 
 test:
-	go clean -cache; cd ./pkg; go test -race -cover -coverprofile=coverage.out -coverpkg ./... ./...
+	go clean -cache; cd ./pkg; go test -race -cover -coverprofile=coverage.out ./...
 
 coverage:
 	cd ./pkg; go tool cover -html=coverage.out -o coverage.html

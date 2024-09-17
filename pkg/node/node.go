@@ -253,7 +253,7 @@ func (s *Service) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeR
 		return nil, status.Error(codes.InvalidArgument, "staging target path is required")
 	}
 
-	id, arrayID, protocol, _ := array.ParseVolumeID(ctx, id, s.DefaultArray(), req.VolumeCapability)
+	id, arrayID, protocol, _, _, _ := array.ParseVolumeID(ctx, id, s.DefaultArray(), req.VolumeCapability)
 
 	var stager VolumeStager
 
@@ -293,7 +293,7 @@ func (s *Service) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVol
 		return nil, status.Error(codes.InvalidArgument, "staging target path is required")
 	}
 
-	id, _, protocol, err := array.ParseVolumeID(ctx, id, s.DefaultArray(), nil)
+	id, _, protocol, _, _, err := array.ParseVolumeID(ctx, id, s.DefaultArray(), nil)
 	if err != nil {
 		if apiError, ok := err.(gopowerstore.APIError); ok && apiError.NotFound() {
 			return &csi.NodeUnstageVolumeResponse{}, nil
@@ -454,7 +454,7 @@ func (s *Service) NodePublishVolume(ctx context.Context, req *csi.NodePublishVol
 		return nil, status.Error(codes.InvalidArgument, "stagingPath is required")
 	}
 
-	id, _, protocol, _ := array.ParseVolumeID(ctx, id, s.DefaultArray(), req.VolumeCapability)
+	id, _, protocol, _, _, _ := array.ParseVolumeID(ctx, id, s.DefaultArray(), req.VolumeCapability)
 
 	// append additional path to be able to do bind mounts
 	stagingPath := getStagingPath(ctx, req.GetStagingTargetPath(), id)
@@ -563,7 +563,7 @@ func (s *Service) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolume
 	}
 
 	// parse volume Id
-	id, arrayID, protocol, err := array.ParseVolumeID(ctx, volumeID, s.DefaultArray(), nil)
+	id, arrayID, protocol, _, _, err := array.ParseVolumeID(ctx, volumeID, s.DefaultArray(), nil)
 	if err != nil {
 		if apiError, ok := err.(gopowerstore.APIError); ok && apiError.NotFound() {
 			return nil, err
@@ -776,7 +776,7 @@ func (s *Service) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolum
 	}
 
 	// Get the VolumeID and validate against the volume
-	id, arrayID, _, err := array.ParseVolumeID(ctx, req.VolumeId, s.DefaultArray(), nil)
+	id, arrayID, _, _, _, err := array.ParseVolumeID(ctx, req.VolumeId, s.DefaultArray(), nil)
 	if err != nil {
 		if apiError, ok := err.(gopowerstore.APIError); ok && apiError.NotFound() {
 			return nil, err

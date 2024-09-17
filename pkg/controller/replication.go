@@ -38,7 +38,7 @@ func (s *Service) CreateRemoteVolume(ctx context.Context,
 		return nil, status.Error(codes.InvalidArgument, "volume ID is required")
 	}
 
-	id, arrayID, protocol, err := array.ParseVolumeID(ctx, volID, s.DefaultArray(), nil)
+	id, arrayID, protocol, _, _, err := array.ParseVolumeID(ctx, volID, s.DefaultArray(), nil)
 	if err != nil {
 		log.Error(err)
 		return nil, err
@@ -109,7 +109,7 @@ func (s *Service) CreateStorageProtectionGroup(ctx context.Context,
 		return nil, status.Error(codes.InvalidArgument, "volume ID is required")
 	}
 
-	id, arrayID, protocol, err := array.ParseVolumeID(ctx, volID, s.DefaultArray(), nil)
+	id, arrayID, protocol, _, _, err := array.ParseVolumeID(ctx, volID, s.DefaultArray(), nil)
 	if err != nil {
 		log.Error(err)
 		return nil, err
