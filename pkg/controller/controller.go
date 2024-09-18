@@ -284,6 +284,15 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 				return nil, status.Errorf(codes.InvalidArgument, "invalid RPO value")
 			}
 
+			// Validating RPO to be non Zero when replication mode is ASYNC
+			if repMode == "ASYNC" && rpo == "Zero" {
+				return nil, status.Errorf(codes.InvalidArgument, "replication mode ASYNC requires RPO value to be non Zero")
+			}
+
+			// Validating RPO to be Zero whe replication mode is SYNC
+			if repMode == "SYNC" && rpo != "Zero" {
+				return nil, status.Errorf(codes.InvalidArgument, "replication mode SYNC requires RPO value to be Zero")
+			}
 			namespace := ""
 			if ignoreNS, ok := params[s.WithRP(KeyReplicationIgnoreNamespaces)]; ok && ignoreNS == "false" {
 				pvcNS, ok := params[KeyCSIPVCNamespace]
@@ -302,15 +311,24 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 				if apiError, ok := err.(gopowerstore.APIError); ok && apiError.NotFound() {
 					log.Infof("Volume group with name %s not found, creating it", vgName)
 
+					// Attribute that indicates whether snapshot sets of the volumegroup will be write-order consistent.
+					isWriteOrderConsistent := false
+
 					// ensure protection policy exists
 					pp, err := EnsureProtectionPolicyExists(ctx, arr, vgName, remoteSystemName, rpoEnum)
 					if err != nil {
 						return nil, status.Errorf(codes.Internal, "can't ensure protection policy exists %s", err.Error())
 					}
 
+					// To apply a  ProtectionPolicy with Sync rule, VolumeGroup must be write-order-consistent
+					if repMode == "SYNC" {
+						isWriteOrderConsistent = true
+					}
+
 					group, err := arr.Client.CreateVolumeGroup(ctx, &gopowerstore.VolumeGroupCreate{
-						Name:               vgName,
-						ProtectionPolicyID: pp,
+						Name:                   vgName,
+						ProtectionPolicyID:     pp,
+						IsWriteOrderConsistent: isWriteOrderConsistent,
 					})
 					if err != nil {
 						return nil, status.Errorf(codes.Internal, "can't create volume group: %s", err.Error())
@@ -325,6 +343,12 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 					return nil, status.Errorf(codes.Internal, "can't query volume group by name %s : %s", vgName, err.Error())
 				}
 			} else {
+				// if Replication mode is SYNC, check if the VolumeGroup is write-order cnsistent
+				if repMode == "SYNC" {
+					if !vg.IsWriteOrderConsistent {
+						return nil, status.Errorf(codes.Internal, "can't apply protection policy with sync rule if volume group is not write-order consistent")
+					}
+				}
 				// group exists, check that protection policy applied
 				if vg.ProtectionPolicyID == "" {
 					pp, err := EnsureProtectionPolicyExists(ctx, arr, vgName, remoteSystemName, rpoEnum)
