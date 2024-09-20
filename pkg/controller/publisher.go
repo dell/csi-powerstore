@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2021-2024 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -38,16 +38,16 @@ type VolumePublisher interface {
 	// CheckIfVolumeExists queries storage array if given volume already exists
 	CheckIfVolumeExists(ctx context.Context, client gopowerstore.Client, volID string) error
 	// Publish does the steps necessary for volume to be available on the node
-	Publish(ctx context.Context, req *csi.ControllerPublishVolumeRequest, client gopowerstore.Client,
-		kubeNodeID string, volumeID string) (*csi.ControllerPublishVolumeResponse, error)
+	Publish(ctx context.Context, publishContext map[string]string, req *csi.ControllerPublishVolumeRequest, client gopowerstore.Client,
+		kubeNodeID string, volumeID string, isLocal bool) (*csi.ControllerPublishVolumeResponse, error)
 }
 
 // SCSIPublisher implementation of VolumePublisher for SCSI based (FC, iSCSI) volumes
 type SCSIPublisher struct{}
 
 // Publish publishes Volume by attaching it to the host
-func (s *SCSIPublisher) Publish(ctx context.Context, req *csi.ControllerPublishVolumeRequest, client gopowerstore.Client,
-	kubeNodeID string, volumeID string,
+func (s *SCSIPublisher) Publish(ctx context.Context, publishContext map[string]string, req *csi.ControllerPublishVolumeRequest,
+	client gopowerstore.Client, kubeNodeID string, volumeID string, isLocal bool,
 ) (*csi.ControllerPublishVolumeResponse, error) {
 	volume, err := client.GetVolume(ctx, volumeID)
 	if err != nil {
@@ -56,8 +56,6 @@ func (s *SCSIPublisher) Publish(ctx context.Context, req *csi.ControllerPublishV
 		}
 		return nil, status.Errorf(codes.Internal, "failure checking volume status for volume publishing: %s", err.Error())
 	}
-
-	publishContext := make(map[string]string)
 
 	var node gopowerstore.Host
 	node, err = client.GetHostByName(ctx, kubeNodeID)
@@ -86,7 +84,7 @@ func (s *SCSIPublisher) Publish(ctx context.Context, req *csi.ControllerPublishV
 			"failed to get mapping for volume with ID '%s': %s", volume.ID, err.Error())
 	}
 
-	err = s.addTargetsInfoToPublishContext(publishContext, volume.ApplianceID, client)
+	err = s.addTargetsInfoToPublishContext(publishContext, volume.ApplianceID, client, isLocal)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "could not get scsi Targets: %s", err.Error())
 	}
@@ -97,7 +95,7 @@ func (s *SCSIPublisher) Publish(ctx context.Context, req *csi.ControllerPublishV
 	for _, m := range mapping {
 		if m.HostID == node.ID {
 			log.Debug("Volume already mapped")
-			s.addLUNIDToPublishContext(publishContext, m, volume)
+			s.addLUNIDToPublishContext(publishContext, m, volume, isLocal)
 			return &csi.ControllerPublishVolumeResponse{
 				PublishContext: publishContext,
 			}, nil
@@ -135,7 +133,7 @@ func (s *SCSIPublisher) Publish(ctx context.Context, req *csi.ControllerPublishV
 	}
 	for _, m := range mapping {
 		if m.HostID == node.ID {
-			s.addLUNIDToPublishContext(publishContext, m, volume)
+			s.addLUNIDToPublishContext(publishContext, m, volume, isLocal)
 			return &csi.ControllerPublishVolumeResponse{PublishContext: publishContext}, nil
 		}
 	}
@@ -160,28 +158,51 @@ func (s *SCSIPublisher) addLUNIDToPublishContext(
 	publishContext map[string]string,
 	mapping gopowerstore.HostVolumeMapping,
 	volume gopowerstore.Volume,
+	isLocal bool,
 ) {
-	publishContext[common.PublishContextDeviceWWN] = strings.TrimPrefix(volume.Wwn, common.WWNPrefix)
-	publishContext[common.PublishContextLUNAddress] = strconv.FormatInt(mapping.LogicalUnitNumber, 10)
+	if isLocal {
+		publishContext[common.PublishContextDeviceWWN] = strings.TrimPrefix(volume.Wwn, common.WWNPrefix)
+		publishContext[common.PublishContextLUNAddress] = strconv.FormatInt(mapping.LogicalUnitNumber, 10)
+	} else {
+		publishContext[common.PublishContextRemoteDeviceWWN] = strings.TrimPrefix(volume.Wwn, common.WWNPrefix)
+		publishContext[common.PublishContextRemoteLUNAddress] = strconv.FormatInt(mapping.LogicalUnitNumber, 10)
+	}
 }
 
 func (s *SCSIPublisher) addTargetsInfoToPublishContext(
-	publishContext map[string]string, volumeApplianceID string, client gopowerstore.Client,
+	publishContext map[string]string, volumeApplianceID string, client gopowerstore.Client, isLocal bool,
 ) error {
+	iscsiPortalsKey := common.PublishContextISCSIPortalsPrefix
+	iscsiTargetsKey := common.PublishContextISCSITargetsPrefix
+	fcWwpnKey := common.PublishContextFCWWPNPrefix
+	nvmeFcPortalsKey := common.PublishContextNVMEFCPortalsPrefix
+	nvmeFcTargetsKey := common.PublishContextNVMEFCTargetsPrefix
+	nvmeTcpPortalsKey := common.PublishContextNVMETCPPortalsPrefix
+	nvmeTcpTargetsKey := common.PublishContextNVMETCPTargetsPrefix
+	if !isLocal {
+		iscsiPortalsKey = common.PublishContextRemoteISCSIPortalsPrefix
+		iscsiTargetsKey = common.PublishContextRemoteISCSITargetsPrefix
+		fcWwpnKey = common.PublishContextRemoteFCWWPNPrefix
+		nvmeFcPortalsKey = common.PublishContextRemoteNVMEFCPortalsPrefix
+		nvmeFcTargetsKey = common.PublishContextRemoteNVMEFCTargetsPrefix
+		nvmeTcpPortalsKey = common.PublishContextRemoteNVMETCPPortalsPrefix
+		nvmeTcpTargetsKey = common.PublishContextRemoteNVMETCPTargetsPrefix
+	}
+
 	iscsiTargetsInfo, err := common.GetISCSITargetsInfoFromStorage(client, volumeApplianceID)
 	if err != nil {
 		log.Error("error unable to get iSCSI targets from array", err)
 	}
 	for i, t := range iscsiTargetsInfo {
-		publishContext[fmt.Sprintf("%s%d", common.PublishContextISCSIPortalsPrefix, i)] = t.Portal
-		publishContext[fmt.Sprintf("%s%d", common.PublishContextISCSITargetsPrefix, i)] = t.Target
+		publishContext[fmt.Sprintf("%s%d", iscsiPortalsKey, i)] = t.Portal
+		publishContext[fmt.Sprintf("%s%d", iscsiTargetsKey, i)] = t.Target
 	}
 	fcTargetsInfo, err := common.GetFCTargetsInfoFromStorage(client, volumeApplianceID)
 	if err != nil {
 		log.Error("error unable to get FC targets from array", err)
 	}
 	for i, t := range fcTargetsInfo {
-		publishContext[fmt.Sprintf("%s%d", common.PublishContextFCWWPNPrefix, i)] = t.WWPN
+		publishContext[fmt.Sprintf("%s%d", fcWwpnKey, i)] = t.WWPN
 	}
 
 	nvmefcTargetInfo, err := common.GetNVMEFCTargetInfoFromStorage(client, volumeApplianceID)
@@ -189,8 +210,8 @@ func (s *SCSIPublisher) addTargetsInfoToPublishContext(
 		log.Error("error unable to get NVMeFC targets from array", err)
 	}
 	for i, t := range nvmefcTargetInfo {
-		publishContext[fmt.Sprintf("%s%d", common.PublishContextNVMEFCPortalsPrefix, i)] = t.Portal
-		publishContext[fmt.Sprintf("%s%d", common.PublishContextNVMEFCTargetsPrefix, i)] = t.Target
+		publishContext[fmt.Sprintf("%s%d", nvmeFcPortalsKey, i)] = t.Portal
+		publishContext[fmt.Sprintf("%s%d", nvmeFcTargetsKey, i)] = t.Target
 	}
 
 	nvmetcpTargetInfo, err := common.GetNVMETCPTargetsInfoFromStorage(client, volumeApplianceID)
@@ -198,8 +219,8 @@ func (s *SCSIPublisher) addTargetsInfoToPublishContext(
 		log.Error("error unable to get NVMeTCP targets from array", err)
 	}
 	for i, t := range nvmetcpTargetInfo {
-		publishContext[fmt.Sprintf("%s%d", common.PublishContextNVMETCPPortalsPrefix, i)] = t.Portal
-		publishContext[fmt.Sprintf("%s%d", common.PublishContextNVMETCPTargetsPrefix, i)] = t.Target
+		publishContext[fmt.Sprintf("%s%d", nvmeTcpPortalsKey, i)] = t.Portal
+		publishContext[fmt.Sprintf("%s%d", nvmeTcpTargetsKey, i)] = t.Target
 	}
 
 	// If the system is not capable of any protocol, then we will through the error
@@ -216,8 +237,8 @@ type NfsPublisher struct {
 }
 
 // Publish publishes FileSystem by adding host (node) to the NFS Export 'hosts' list
-func (n *NfsPublisher) Publish(ctx context.Context, req *csi.ControllerPublishVolumeRequest, client gopowerstore.Client,
-	kubeNodeID string, volumeID string,
+func (n *NfsPublisher) Publish(ctx context.Context, publishContext map[string]string, req *csi.ControllerPublishVolumeRequest, client gopowerstore.Client,
+	kubeNodeID string, volumeID string, _ bool,
 ) (*csi.ControllerPublishVolumeResponse, error) {
 	fs, err := client.GetFS(ctx, volumeID)
 	if err != nil {
@@ -226,7 +247,6 @@ func (n *NfsPublisher) Publish(ctx context.Context, req *csi.ControllerPublishVo
 		}
 		return nil, status.Errorf(codes.Internal, "failure checking volume status for volume publishing: %s", err.Error())
 	}
-	publishContext := make(map[string]string)
 
 	ipList := common.GetIPListFromString(kubeNodeID)
 	if ipList == nil || len(ipList) == 0 {
