@@ -226,7 +226,7 @@ CREATE="false"
 PREPARE="false"
 REGISTRY=""
 DRIVER="csi-powerstore"
-HELMCHARTVERSION="csi-powerstore-2.11.0"
+HELMCHARTVERSION="csi-powerstore-2.11.1"
 
 while getopts "cprv:h" opt; do
   case $opt in
