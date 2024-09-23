@@ -2692,7 +2692,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				_, err := ctrlSvc.ControllerPublishVolume(context.Background(), req)
 
 				gomega.Expect(err).ToNot(gomega.BeNil())
-				gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to find array with given ID"))
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to find array with ID"))
 			})
 		})
 	})
