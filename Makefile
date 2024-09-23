@@ -30,10 +30,10 @@ ifndef MAJOR
     MAJOR=2
 endif
 ifndef MINOR
-    MINOR=10
+    MINOR=11
 endif
 ifndef PATCH
-    PATCH=0
+    PATCH=1
 endif
 ifndef NOTES
 	NOTES=
