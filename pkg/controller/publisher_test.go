@@ -48,7 +48,7 @@ func TestVolumePublisher_Publish(t *testing.T) {
 			clientMock := new(mocks.Client)
 			clientMock.On("GetVolume", context.Background(), validBaseVolID).
 				Return(gopowerstore.Volume{}, errors.New("error"))
-			_, err := sp.Publish(context.Background(), nil, nil, clientMock, validNodeID, validBaseVolID, true)
+			_, err := sp.Publish(context.Background(), nil, nil, clientMock, validNodeID, validBaseVolID, false)
 			assert.Error(t, err)
 			assert.Contains(t, err.Error(), "failure checking volume status for volume publishing")
 		})
@@ -61,7 +61,7 @@ func TestVolumePublisher_Publish(t *testing.T) {
 						StatusCode: http.StatusNotFound,
 					},
 				})
-			_, err := sp.Publish(context.Background(), nil, nil, clientMock, validNodeID, validBaseVolID, true)
+			_, err := sp.Publish(context.Background(), nil, nil, clientMock, validNodeID, validBaseVolID, false)
 			assert.Error(t, err)
 			assert.Contains(t, err.Error(), fmt.Sprintf("volume with ID '%s' not found", validBaseVolID))
 		})
@@ -94,7 +94,7 @@ func TestVolumePublisher_Publish(t *testing.T) {
 			clientMock.On("GetHostByName", mock.Anything, validNodeID).
 				Return(gopowerstore.Host{}, e).Once()
 
-			_, err := sp.Publish(context.Background(), nil, nil, clientMock, validNodeID, validBaseVolID, true)
+			_, err := sp.Publish(context.Background(), nil, nil, clientMock, validNodeID, validBaseVolID, false)
 			assert.Error(t, err)
 			assert.Contains(t, err.Error(),
 				fmt.Sprintf("failure checking host '%s' status for volume publishing: %s", validNodeID, e.Error()))
@@ -111,7 +111,7 @@ func TestVolumePublisher_Publish(t *testing.T) {
 			clientMock.On("GetHostVolumeMappingByVolumeID", mock.Anything, validBaseVolID).
 				Return([]gopowerstore.HostVolumeMapping{}, e).Once()
 
-			_, err := sp.Publish(context.Background(), nil, nil, clientMock, validNodeID, validBaseVolID, true)
+			_, err := sp.Publish(context.Background(), nil, nil, clientMock, validNodeID, validBaseVolID, false)
 			assert.Error(t, err)
 			assert.Contains(t, err.Error(),
 				fmt.Sprintf("failed to get mapping for volume with ID '%s': %s", validBaseVolID, e.Error()))
@@ -140,7 +140,7 @@ func TestVolumePublisher_Publish(t *testing.T) {
 			clientMock.On("GetHostVolumeMappingByVolumeID", mock.Anything, validBaseVolID).
 				Return([]gopowerstore.HostVolumeMapping{{HostID: validHostID, LogicalUnitNumber: 1}}, nil).Once()
 
-			_, err := sp.Publish(context.Background(), make(map[string]string), nil, clientMock, validNodeID, validBaseVolID, true)
+			_, err := sp.Publish(context.Background(), make(map[string]string), nil, clientMock, validNodeID, validBaseVolID, false)
 			assert.Error(t, err)
 			assert.Contains(t, err.Error(), e.Error())
 		})
@@ -163,7 +163,7 @@ func TestVolumePublisher_Publish(t *testing.T) {
 			clientMock := new(mocks.Client)
 			clientMock.On("GetFS", context.Background(), validBaseVolID).
 				Return(gopowerstore.FileSystem{}, errors.New("error"))
-			_, err := np.Publish(context.Background(), make(map[string]string), nil, clientMock, validNodeID, validBaseVolID, true)
+			_, err := np.Publish(context.Background(), make(map[string]string), nil, clientMock, validNodeID, validBaseVolID, false)
 			assert.Error(t, err)
 			assert.Contains(t, err.Error(), "failure checking volume status for volume publishing")
 		})
@@ -176,7 +176,7 @@ func TestVolumePublisher_Publish(t *testing.T) {
 						StatusCode: http.StatusNotFound,
 					},
 				})
-			_, err := np.Publish(context.Background(), make(map[string]string), nil, clientMock, validNodeID, validBaseVolID, true)
+			_, err := np.Publish(context.Background(), make(map[string]string), nil, clientMock, validNodeID, validBaseVolID, false)
 			assert.Error(t, err)
 			assert.Contains(t, err.Error(), fmt.Sprintf("volume with ID '%s' not found", validBaseVolID))
 		})
@@ -187,7 +187,7 @@ func TestVolumePublisher_Publish(t *testing.T) {
 			clientMock.On("GetFS", mock.Anything, validBaseVolID).
 				Return(gopowerstore.FileSystem{ID: validBaseVolID}, nil)
 
-			_, err := np.Publish(context.Background(), make(map[string]string), nil, clientMock, nodeID, validBaseVolID, true)
+			_, err := np.Publish(context.Background(), make(map[string]string), nil, clientMock, nodeID, validBaseVolID, false)
 			assert.Error(t, err)
 			assert.Contains(t, err.Error(), "can't find IP in node ID")
 		})
@@ -201,7 +201,7 @@ func TestVolumePublisher_Publish(t *testing.T) {
 			clientMock.On("GetNFSExportByFileSystemID", mock.Anything, mock.Anything).
 				Return(gopowerstore.NFSExport{}, e).Once()
 
-			_, err := np.Publish(context.Background(), make(map[string]string), nil, clientMock, validNodeID, validBaseVolID, true)
+			_, err := np.Publish(context.Background(), make(map[string]string), nil, clientMock, validNodeID, validBaseVolID, false)
 			assert.Error(t, err)
 			assert.Contains(t, err.Error(), "failure checking nfs export status for volume publishing")
 		})
@@ -216,7 +216,7 @@ func TestVolumePublisher_Publish(t *testing.T) {
 			clientMock.On("GetNFSExportByFileSystemID", mock.Anything, mock.Anything).
 				Return(gopowerstore.NFSExport{}, e).Once()
 
-			_, err := np.Publish(context.Background(), make(map[string]string), nil, clientMock, validNodeID, validBaseVolID, true)
+			_, err := np.Publish(context.Background(), make(map[string]string), nil, clientMock, validNodeID, validBaseVolID, false)
 			assert.Error(t, err)
 			assert.Contains(t, err.Error(), "failure getting nfs export")
 		})
@@ -231,7 +231,7 @@ func TestVolumePublisher_Publish(t *testing.T) {
 			clientMock.On("ModifyNFSExport", mock.Anything, mock.Anything, mock.Anything).
 				Return(gopowerstore.CreateResponse{}, e).Once()
 
-			_, err := np.Publish(context.Background(), make(map[string]string), nil, clientMock, validNodeID, validBaseVolID, true)
+			_, err := np.Publish(context.Background(), make(map[string]string), nil, clientMock, validNodeID, validBaseVolID, false)
 			assert.Error(t, err)
 			assert.Contains(t, err.Error(), "failure when adding new host to nfs export")
 		})

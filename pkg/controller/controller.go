@@ -670,13 +670,13 @@ func (s *Service) ControllerPublishVolume(ctx context.Context, req *csi.Controll
 	}
 
 	publishContext := make(map[string]string)
-	publishVolumeResponse, err := publisher.Publish(ctx, publishContext, req, arr.GetClient(), kubeNodeID, id, true)
+	publishVolumeResponse, err := publisher.Publish(ctx, publishContext, req, arr.GetClient(), kubeNodeID, id, false)
 	if err != nil {
 		return nil, err
 	}
 
 	if remoteArrayID != "" && remoteVolumeID != "" { // For Remote Metro volume
-		publishVolumeResponse, err = publisher.Publish(ctx, publishContext, req, remoteArray.GetClient(), kubeNodeID, remoteVolumeID, false)
+		publishVolumeResponse, err = publisher.Publish(ctx, publishContext, req, remoteArray.GetClient(), kubeNodeID, remoteVolumeID, true)
 	}
 
 	return publishVolumeResponse, err

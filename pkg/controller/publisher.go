@@ -39,7 +39,7 @@ type VolumePublisher interface {
 	CheckIfVolumeExists(ctx context.Context, client gopowerstore.Client, volID string) error
 	// Publish does the steps necessary for volume to be available on the node
 	Publish(ctx context.Context, publishContext map[string]string, req *csi.ControllerPublishVolumeRequest, client gopowerstore.Client,
-		kubeNodeID string, volumeID string, isLocal bool) (*csi.ControllerPublishVolumeResponse, error)
+		kubeNodeID string, volumeID string, isRemote bool) (*csi.ControllerPublishVolumeResponse, error)
 }
 
 // SCSIPublisher implementation of VolumePublisher for SCSI based (FC, iSCSI) volumes
@@ -47,7 +47,7 @@ type SCSIPublisher struct{}
 
 // Publish publishes Volume by attaching it to the host
 func (s *SCSIPublisher) Publish(ctx context.Context, publishContext map[string]string, req *csi.ControllerPublishVolumeRequest,
-	client gopowerstore.Client, kubeNodeID string, volumeID string, isLocal bool,
+	client gopowerstore.Client, kubeNodeID string, volumeID string, isRemote bool,
 ) (*csi.ControllerPublishVolumeResponse, error) {
 	volume, err := client.GetVolume(ctx, volumeID)
 	if err != nil {
@@ -84,7 +84,7 @@ func (s *SCSIPublisher) Publish(ctx context.Context, publishContext map[string]s
 			"failed to get mapping for volume with ID '%s': %s", volume.ID, err.Error())
 	}
 
-	err = s.addTargetsInfoToPublishContext(publishContext, volume.ApplianceID, client, isLocal)
+	err = s.addTargetsInfoToPublishContext(publishContext, volume.ApplianceID, client, isRemote)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "could not get scsi Targets: %s", err.Error())
 	}
@@ -95,7 +95,7 @@ func (s *SCSIPublisher) Publish(ctx context.Context, publishContext map[string]s
 	for _, m := range mapping {
 		if m.HostID == node.ID {
 			log.Debug("Volume already mapped")
-			s.addLUNIDToPublishContext(publishContext, m, volume, isLocal)
+			s.addLUNIDToPublishContext(publishContext, m, volume, isRemote)
 			return &csi.ControllerPublishVolumeResponse{
 				PublishContext: publishContext,
 			}, nil
@@ -133,7 +133,7 @@ func (s *SCSIPublisher) Publish(ctx context.Context, publishContext map[string]s
 	}
 	for _, m := range mapping {
 		if m.HostID == node.ID {
-			s.addLUNIDToPublishContext(publishContext, m, volume, isLocal)
+			s.addLUNIDToPublishContext(publishContext, m, volume, isRemote)
 			return &csi.ControllerPublishVolumeResponse{PublishContext: publishContext}, nil
 		}
 	}
@@ -158,9 +158,9 @@ func (s *SCSIPublisher) addLUNIDToPublishContext(
 	publishContext map[string]string,
 	mapping gopowerstore.HostVolumeMapping,
 	volume gopowerstore.Volume,
-	isLocal bool,
+	isRemote bool,
 ) {
-	if isLocal {
+	if !isRemote {
 		publishContext[common.PublishContextDeviceWWN] = strings.TrimPrefix(volume.Wwn, common.WWNPrefix)
 		publishContext[common.PublishContextLUNAddress] = strconv.FormatInt(mapping.LogicalUnitNumber, 10)
 	} else {
@@ -170,23 +170,23 @@ func (s *SCSIPublisher) addLUNIDToPublishContext(
 }
 
 func (s *SCSIPublisher) addTargetsInfoToPublishContext(
-	publishContext map[string]string, volumeApplianceID string, client gopowerstore.Client, isLocal bool,
+	publishContext map[string]string, volumeApplianceID string, client gopowerstore.Client, isRemote bool,
 ) error {
 	iscsiPortalsKey := common.PublishContextISCSIPortalsPrefix
 	iscsiTargetsKey := common.PublishContextISCSITargetsPrefix
 	fcWwpnKey := common.PublishContextFCWWPNPrefix
 	nvmeFcPortalsKey := common.PublishContextNVMEFCPortalsPrefix
 	nvmeFcTargetsKey := common.PublishContextNVMEFCTargetsPrefix
-	nvmeTcpPortalsKey := common.PublishContextNVMETCPPortalsPrefix
-	nvmeTcpTargetsKey := common.PublishContextNVMETCPTargetsPrefix
-	if !isLocal {
+	nvmeTCPPortalsKey := common.PublishContextNVMETCPPortalsPrefix
+	nvmeTCPTargetsKey := common.PublishContextNVMETCPTargetsPrefix
+	if isRemote {
 		iscsiPortalsKey = common.PublishContextRemoteISCSIPortalsPrefix
 		iscsiTargetsKey = common.PublishContextRemoteISCSITargetsPrefix
 		fcWwpnKey = common.PublishContextRemoteFCWWPNPrefix
 		nvmeFcPortalsKey = common.PublishContextRemoteNVMEFCPortalsPrefix
 		nvmeFcTargetsKey = common.PublishContextRemoteNVMEFCTargetsPrefix
-		nvmeTcpPortalsKey = common.PublishContextRemoteNVMETCPPortalsPrefix
-		nvmeTcpTargetsKey = common.PublishContextRemoteNVMETCPTargetsPrefix
+		nvmeTCPPortalsKey = common.PublishContextRemoteNVMETCPPortalsPrefix
+		nvmeTCPTargetsKey = common.PublishContextRemoteNVMETCPTargetsPrefix
 	}
 
 	iscsiTargetsInfo, err := common.GetISCSITargetsInfoFromStorage(client, volumeApplianceID)
@@ -219,8 +219,8 @@ func (s *SCSIPublisher) addTargetsInfoToPublishContext(
 		log.Error("error unable to get NVMeTCP targets from array", err)
 	}
 	for i, t := range nvmetcpTargetInfo {
-		publishContext[fmt.Sprintf("%s%d", nvmeTcpPortalsKey, i)] = t.Portal
-		publishContext[fmt.Sprintf("%s%d", nvmeTcpTargetsKey, i)] = t.Target
+		publishContext[fmt.Sprintf("%s%d", nvmeTCPPortalsKey, i)] = t.Portal
+		publishContext[fmt.Sprintf("%s%d", nvmeTCPTargetsKey, i)] = t.Target
 	}
 
 	// If the system is not capable of any protocol, then we will through the error

@@ -46,7 +46,7 @@ const (
 
 // VolumeStager allows to node stage a volume
 type VolumeStager interface {
-	Stage(ctx context.Context, req *csi.NodeStageVolumeRequest, logFields log.Fields, fs fs.Interface, id string) (*csi.NodeStageVolumeResponse, error)
+	Stage(ctx context.Context, req *csi.NodeStageVolumeRequest, logFields log.Fields, fs fs.Interface, id string, isRemote bool) (*csi.NodeStageVolumeResponse, error)
 }
 
 // ReachableEndPoint checks if the endpoint is reachable or not
@@ -63,12 +63,12 @@ type SCSIStager struct {
 
 // Stage stages volume by connecting it through either FC or iSCSI and creating bind mount to staging path
 func (s *SCSIStager) Stage(ctx context.Context, req *csi.NodeStageVolumeRequest,
-	logFields log.Fields, fs fs.Interface, id string,
+	logFields log.Fields, fs fs.Interface, id string, isRemote bool,
 ) (*csi.NodeStageVolumeResponse, error) {
 	// append additional path to be able to do bind mounts
 	stagingPath := getStagingPath(ctx, req.GetStagingTargetPath(), id)
 
-	publishContext, err := readSCSIInfoFromPublishContext(req.PublishContext, s.useFC, s.useNVME)
+	publishContext, err := readSCSIInfoFromPublishContext(req.PublishContext, s.useFC, s.useNVME, isRemote)
 	if err != nil {
 		return nil, err
 	}
@@ -134,7 +134,7 @@ type NFSStager struct {
 
 // Stage stages volume by mounting volumes as nfs to the staging path
 func (n *NFSStager) Stage(ctx context.Context, req *csi.NodeStageVolumeRequest,
-	logFields log.Fields, fs fs.Interface, id string,
+	logFields log.Fields, fs fs.Interface, id string, _ bool,
 ) (*csi.NodeStageVolumeResponse, error) {
 	// append additional path to be able to do bind mounts
 	stagingPath := getStagingPath(ctx, req.GetStagingTargetPath(), id)
@@ -252,31 +252,38 @@ type scsiPublishContextData struct {
 	fcTargets        []gobrick.FCTargetInfo
 }
 
-func readSCSIInfoFromPublishContext(publishContext map[string]string, useFC bool, useNVMe bool) (scsiPublishContextData, error) {
+func readSCSIInfoFromPublishContext(publishContext map[string]string, useFC bool, useNVMe bool, isRemote bool) (scsiPublishContextData, error) {
 	// Get publishContext
 	var data scsiPublishContextData
-	deviceWWN, ok := publishContext[common.PublishContextDeviceWWN]
+	deviceWwnKey := common.PublishContextDeviceWWN
+	lunAddressKey := common.PublishContextLUNAddress
+	if isRemote {
+		deviceWwnKey = common.PublishContextRemoteDeviceWWN
+		lunAddressKey = common.PublishContextRemoteLUNAddress
+	}
+
+	deviceWWN, ok := publishContext[deviceWwnKey]
 	if !ok {
 		return data, status.Error(codes.InvalidArgument, "deviceWWN must be in publish context")
 	}
-	volumeLUNAddress, ok := publishContext[common.PublishContextLUNAddress]
+	volumeLUNAddress, ok := publishContext[lunAddressKey]
 	if !ok {
 		return data, status.Error(codes.InvalidArgument, "volumeLUNAddress must be in publish context")
 	}
 
-	iscsiTargets := readISCSITargetsFromPublishContext(publishContext)
+	iscsiTargets := readISCSITargetsFromPublishContext(publishContext, isRemote)
 	if len(iscsiTargets) == 0 && !useFC && !useNVMe {
 		return data, status.Error(codes.InvalidArgument, "iscsiTargets data must be in publish context")
 	}
-	nvmeTCPTargets := readNVMETCPTargetsFromPublishContext(publishContext)
+	nvmeTCPTargets := readNVMETCPTargetsFromPublishContext(publishContext, isRemote)
 	if len(nvmeTCPTargets) == 0 && useNVMe && !useFC {
 		return data, status.Error(codes.InvalidArgument, "NVMeTCP Targets data must be in publish context")
 	}
-	nvmeFCTargets := readNVMEFCTargetsFromPublishContext(publishContext)
+	nvmeFCTargets := readNVMEFCTargetsFromPublishContext(publishContext, isRemote)
 	if len(nvmeFCTargets) == 0 && useNVMe && useFC {
 		return data, status.Error(codes.InvalidArgument, "NVMeFC Targets data must be in publish context")
 	}
-	fcTargets := readFCTargetsFromPublishContext(publishContext)
+	fcTargets := readFCTargetsFromPublishContext(publishContext, isRemote)
 	if len(fcTargets) == 0 && useFC && !useNVMe {
 		return data, status.Error(codes.InvalidArgument, "fcTargets data must be in publish context")
 	}
@@ -286,15 +293,21 @@ func readSCSIInfoFromPublishContext(publishContext map[string]string, useFC bool
 	}, nil
 }
 
-func readISCSITargetsFromPublishContext(pc map[string]string) []gobrick.ISCSITargetInfo {
+func readISCSITargetsFromPublishContext(pc map[string]string, isRemote bool) []gobrick.ISCSITargetInfo {
 	var targets []gobrick.ISCSITargetInfo
+	iscsiTargetsKey := common.PublishContextISCSITargetsPrefix
+	iscsiPortalsKey := common.PublishContextISCSIPortalsPrefix
+	if isRemote {
+		iscsiTargetsKey = common.PublishContextRemoteISCSITargetsPrefix
+		iscsiPortalsKey = common.PublishContextRemoteISCSIPortalsPrefix
+	}
 	for i := 0; ; i++ {
 		target := gobrick.ISCSITargetInfo{}
-		t, tfound := pc[fmt.Sprintf("%s%d", common.PublishContextISCSITargetsPrefix, i)]
+		t, tfound := pc[fmt.Sprintf("%s%d", iscsiTargetsKey, i)]
 		if tfound {
 			target.Target = t
 		}
-		p, pfound := pc[fmt.Sprintf("%s%d", common.PublishContextISCSIPortalsPrefix, i)]
+		p, pfound := pc[fmt.Sprintf("%s%d", iscsiPortalsKey, i)]
 		if pfound {
 			target.Portal = p
 		}
@@ -311,15 +324,21 @@ func readISCSITargetsFromPublishContext(pc map[string]string) []gobrick.ISCSITar
 	return targets
 }
 
-func readNVMETCPTargetsFromPublishContext(pc map[string]string) []gobrick.NVMeTargetInfo {
+func readNVMETCPTargetsFromPublishContext(pc map[string]string, isRemote bool) []gobrick.NVMeTargetInfo {
 	var targets []gobrick.NVMeTargetInfo
+	nvmeTCPTargetsKey := common.PublishContextNVMETCPTargetsPrefix
+	nvmeTCPPortalsKey := common.PublishContextNVMETCPPortalsPrefix
+	if isRemote {
+		nvmeTCPTargetsKey = common.PublishContextRemoteNVMETCPTargetsPrefix
+		nvmeTCPPortalsKey = common.PublishContextRemoteNVMETCPPortalsPrefix
+	}
 	for i := 0; ; i++ {
 		target := gobrick.NVMeTargetInfo{}
-		t, tfound := pc[fmt.Sprintf("%s%d", common.PublishContextNVMETCPTargetsPrefix, i)]
+		t, tfound := pc[fmt.Sprintf("%s%d", nvmeTCPTargetsKey, i)]
 		if tfound {
 			target.Target = t
 		}
-		p, pfound := pc[fmt.Sprintf("%s%d", common.PublishContextNVMETCPPortalsPrefix, i)]
+		p, pfound := pc[fmt.Sprintf("%s%d", nvmeTCPPortalsKey, i)]
 		if pfound {
 			target.Portal = p
 		}
@@ -332,15 +351,21 @@ func readNVMETCPTargetsFromPublishContext(pc map[string]string) []gobrick.NVMeTa
 	return targets
 }
 
-func readNVMEFCTargetsFromPublishContext(pc map[string]string) []gobrick.NVMeTargetInfo {
+func readNVMEFCTargetsFromPublishContext(pc map[string]string, isRemote bool) []gobrick.NVMeTargetInfo {
 	var targets []gobrick.NVMeTargetInfo
+	nvmeFcTargetsKey := common.PublishContextNVMEFCTargetsPrefix
+	nvmeFcPortalsKey := common.PublishContextNVMEFCPortalsPrefix
+	if isRemote {
+		nvmeFcTargetsKey = common.PublishContextRemoteNVMEFCTargetsPrefix
+		nvmeFcPortalsKey = common.PublishContextRemoteNVMEFCPortalsPrefix
+	}
 	for i := 0; ; i++ {
 		target := gobrick.NVMeTargetInfo{}
-		t, tfound := pc[fmt.Sprintf("%s%d", common.PublishContextNVMEFCTargetsPrefix, i)]
+		t, tfound := pc[fmt.Sprintf("%s%d", nvmeFcTargetsKey, i)]
 		if tfound {
 			target.Target = t
 		}
-		p, pfound := pc[fmt.Sprintf("%s%d", common.PublishContextNVMEFCPortalsPrefix, i)]
+		p, pfound := pc[fmt.Sprintf("%s%d", nvmeFcPortalsKey, i)]
 		if pfound {
 			target.Portal = p
 		}
@@ -353,10 +378,14 @@ func readNVMEFCTargetsFromPublishContext(pc map[string]string) []gobrick.NVMeTar
 	return targets
 }
 
-func readFCTargetsFromPublishContext(pc map[string]string) []gobrick.FCTargetInfo {
+func readFCTargetsFromPublishContext(pc map[string]string, isRemote bool) []gobrick.FCTargetInfo {
 	var targets []gobrick.FCTargetInfo
+	fcWwpnKey := common.PublishContextFCWWPNPrefix
+	if isRemote {
+		fcWwpnKey = common.PublishContextRemoteFCWWPNPrefix
+	}
 	for i := 0; ; i++ {
-		wwpn, tfound := pc[fmt.Sprintf("%s%d", common.PublishContextFCWWPNPrefix, i)]
+		wwpn, tfound := pc[fmt.Sprintf("%s%d", fcWwpnKey, i)]
 		if !tfound {
 			break
 		}

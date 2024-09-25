@@ -253,13 +253,19 @@ func (s *Service) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeR
 		return nil, status.Error(codes.InvalidArgument, "staging target path is required")
 	}
 
-	id, arrayID, protocol, _, _, _ := array.ParseVolumeID(ctx, id, s.DefaultArray(), req.VolumeCapability)
+	id, arrayID, protocol, remoteVolumeID, remoteArrayID, _ := array.ParseVolumeID(ctx, id, s.DefaultArray(), req.VolumeCapability)
 
 	var stager VolumeStager
 
 	arr, ok := s.Arrays()[arrayID]
 	if !ok {
-		return nil, status.Errorf(codes.Internal, "can't find array with provided arrayID %s", arrayID)
+		return nil, status.Errorf(codes.Internal, "can't find array with ID %s", arrayID)
+	}
+	if remoteArrayID != "" {
+		_, ok = s.Arrays()[remoteArrayID]
+		if !ok {
+			return nil, status.Errorf(codes.InvalidArgument, "failed to find remote array with ID %s", remoteArrayID)
+		}
 	}
 
 	if protocol == "nfs" {
@@ -276,7 +282,17 @@ func (s *Service) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeR
 		}
 	}
 
-	return stager.Stage(ctx, req, logFields, s.Fs, id)
+	response, err := stager.Stage(ctx, req, logFields, s.Fs, id, false)
+	if err != nil {
+		return nil, err
+	}
+
+	if remoteArrayID != "" && remoteVolumeID != "" { // For Remote Metro volume
+		log.Info("Staging remote metro volume")
+		response, err = stager.Stage(ctx, req, logFields, s.Fs, remoteVolumeID, true)
+	}
+
+	return response, err
 }
 
 // NodeUnstageVolume reverses steps done in NodeStage by disconnecting volume from the node

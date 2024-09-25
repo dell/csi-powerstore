@@ -2552,7 +2552,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				clientMock.On("GetHostVolumeMappingByVolumeID", mock.Anything, validBaseVolID).
 					Return([]gopowerstore.HostVolumeMapping{}, nil).Once()
 				clientMock.On("AttachVolumeToHost", mock.Anything, validHostID, mock.Anything).
-					Return(gopowerstore.EmptyResponse(""), nil)
+					Return(gopowerstore.EmptyResponse(""), nil).Times(2)
 				clientMock.On("GetHostVolumeMappingByVolumeID", mock.Anything, validBaseVolID).
 					Return([]gopowerstore.HostVolumeMapping{{HostID: validHostID, LogicalUnitNumber: 1}}, nil).Once()
 				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).

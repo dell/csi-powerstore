@@ -139,7 +139,7 @@ func TestSCSIStager_Stage(t *testing.T) {
 			StagingTargetPath: nodeStagePrivateDir,
 			VolumeCapability: getCapabilityWithVoltypeAccessFstype(
 				"block", "single-writer", "none"),
-		}, log.Fields{}, fsMock, validBaseVolumeID)
+		}, log.Fields{}, fsMock, validBaseVolumeID, false)
 
 		assert.Nil(t, err)
 	})
@@ -182,7 +182,7 @@ func TestSCSIStager_Stage(t *testing.T) {
 			StagingTargetPath: nodeStagePrivateDir,
 			VolumeCapability: getCapabilityWithVoltypeAccessFstype(
 				"block", "single-writer", "none"),
-		}, log.Fields{}, fsMock, validBaseVolumeID)
+		}, log.Fields{}, fsMock, validBaseVolumeID, false)
 
 		assert.Nil(t, err)
 	})
@@ -224,7 +224,7 @@ func TestSCSIStager_Stage(t *testing.T) {
 			StagingTargetPath: nodeStagePrivateDir,
 			VolumeCapability: getCapabilityWithVoltypeAccessFstype(
 				"block", "single-writer", "none"),
-		}, log.Fields{}, fsMock, validBaseVolumeID)
+		}, log.Fields{}, fsMock, validBaseVolumeID, false)
 
 		assert.Nil(t, err)
 	})
