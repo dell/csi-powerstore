@@ -253,6 +253,7 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 	var remoteSystemName string
 	isMetroVolume := false
 	isMetroVolumeGroup := false
+	var startMetroVolumeGroup func() error
 
 	if replicationEnabled == "true" && !useNFS {
 		log.Info("Preparing volume replication")
@@ -339,6 +340,7 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 				}
 			}
 
+			// Pass the VolumeGroup to the creator so it can create the new volume inside the vg
 			if c, ok := creator.(*SCSICreator); ok {
 				c.vg = &vg
 			}
@@ -352,13 +354,122 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 				return nil, status.Errorf(codes.Internal, "can't query remote system by name: %s", err.Error())
 			}
 
-			// TODO If volumeGroup input is specified in SC - Verify VolumeGroup exists, if not create one
-			// There shouldn't be any protection policy on it with replication rule
-			// Cannot configure Metro on empty VG. Configure after volume is added
-			// Check if the above sync/async block can be optimized w.r.t volume group calls
-			// isMetroVolumeGroup = true
+			// If volumeGroupPrefix storage class param is set, metro volume group is desired
+			vgPrefix, ok := params[s.WithRP(KeyReplicationVGPrefix)]
+			if !ok {
+				isMetroVolume = true
+			} else {
+				isMetroVolumeGroup = true
 
-			isMetroVolume = true // set to true if volume group is not specified
+				// Add the PVC namespace to the volume group name if storage class param ignoreNamespaces is "false"
+				namespace := ""
+				if ignoreNS, ok := params[s.WithRP(KeyReplicationIgnoreNamespaces)]; ok && ignoreNS == "false" {
+					pvcNS, ok := params[KeyCSIPVCNamespace]
+					if ok {
+						namespace = pvcNS + "-"
+					}
+				}
+
+				// Get the volume group name used for querying PowerStore array
+				vgName := vgPrefix + "-" + namespace + remoteSystemName
+				// truncate name length to comply with CSI gRPC spec
+				if len(vgName) > 128 {
+					vgName = vgName[:128]
+				}
+
+				// check if vg exists on powerstore array
+				vg, err := arr.Client.GetVolumeGroupByName(ctx, vgName)
+				if err == nil {
+					// A volume group with the vgName already exists
+					// Having a protection policy associated with the vg makes it invalid for metro replication.
+					if vg.ProtectionPolicyID != "" {
+						return nil, status.Errorf(codes.FailedPrecondition,
+							"volume group %s has a protection policy assigned making it incompatible for usage with metro replication.", vg.Name)
+					}
+
+					// Confirm VG is part of a meto session and pause the session to allow adding a volume to the vg
+					if vg.MetroReplicationSessionID != "" {
+						// make sure session is in good state
+						metroVGSession, err := arr.Client.GetReplicationSessionByID(ctx, vg.MetroReplicationSessionID)
+						if metroVGSession.State != gopowerstore.RsStateOk {
+							return nil, status.Errorf(codes.FailedPrecondition,
+								"cannot add volumes to volume group %s because the metro replication session is not in running state.", vg.Name)
+						}
+
+						// if session is running, pause metro
+						_, err = arr.Client.ExecuteActionOnReplicationSession(ctx, vg.MetroReplicationSessionID, gopowerstore.RsActionPause, nil)
+						if err != nil {
+							return nil, status.Errorf(codes.Internal, "unable to pause metro replication session on volume group %s: %s", vg.Name, err.Error())
+						}
+
+						// Metro session paused. Volume will be added to the vg and metro will be resumed below.
+						startMetroVolumeGroup = func() error {
+							// resume metro session
+							_, err = arr.Client.ExecuteActionOnReplicationSession(ctx, vg.MetroReplicationSessionID, gopowerstore.RsActionResume, nil)
+							if err != nil {
+								return status.Errorf(codes.Internal, "unable to resume metro replication session on volume group %s: %s", vg.Name, err.Error())
+							}
+
+							return nil
+						}
+					} else {
+						// vg exists but is not yet metro replicated
+						// if it already has volumes attached, exit with error
+						if len(vg.Volumes) > 0 {
+							return nil, status.Errorf(codes.FailedPrecondition,
+								"volume group %s found with volumes attached, but not part of a metro replication session.", vg.Name)
+						}
+
+						log.Infof("reusing empty volume group %s as part of metro replication", vg.Name)
+
+						// configure the metro session
+						startMetroVolumeGroup = func() error {
+							// configure the metro session
+							metroVGSession, err := arr.Client.ConfigureMetroVolumeGroup(ctx, vg.ID, &gopowerstore.MetroConfig{RemoteSystemID: remoteSystem.ID})
+							if err != nil {
+								return status.Errorf(codes.Internal, "unable to configure metro replication on volume group %s: %s", vg.Name, err.Error())
+							}
+
+							log.Infof("created metro volume group session %s", metroVGSession.ID)
+
+							return nil
+						}
+					}
+				} else if apiError, ok := err.(gopowerstore.APIError); ok && apiError.NotFound() {
+					// VG does not yet exist. Create it on powerstore array
+					log.Infof("creating volume group %s for metro replication", vgName)
+					newVG, err := arr.Client.CreateVolumeGroup(ctx, &gopowerstore.VolumeGroupCreate{
+						Name: vgName,
+					})
+					if err != nil {
+						return nil, status.Errorf(codes.Internal, "unable to create volume group %s on PowerStore array: %s", vgName, err.Error())
+					}
+
+					vg, err = arr.Client.GetVolumeGroup(ctx, newVG.ID)
+
+					startMetroVolumeGroup = func() error {
+						// configure metro
+						metroVGSession, err := arr.Client.ConfigureMetroVolumeGroup(ctx, vg.ID, &gopowerstore.MetroConfig{RemoteSystemID: remoteSystem.ID})
+						if err != nil {
+							return status.Errorf(codes.Internal, "unable to configure metro replication on volume group %s: %s", vg.Name, err.Error())
+						}
+
+						log.Infof("created metro volume group session %s", metroVGSession.ID)
+
+						return nil
+					}
+				} else {
+					// handle all other errors associated with getting the VG.
+					return nil, status.Error(codes.Internal, err.Error())
+				}
+
+				// Pass the VolumeGroup to the creator so it can create the new volume inside the vg
+				if c, ok := creator.(*SCSICreator); ok {
+					c.vg = &vg
+				}
+			}
+
+			// TODO: Check if the above sync/async block can be optimized w.r.t volume group calls
 		default:
 			return nil, status.Errorf(codes.InvalidArgument, "replication enabled but invalid replication mode specified in storage class")
 		}
@@ -418,6 +529,13 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 		// else pause and resume metro session for adding new volumes
 		// Session needs to be paused before the new volume can be added (before creator.Create()) and then resumed later here.
 		log.Warn("Configuring Metro on volume group, not yet implemented.")
+	}
+
+	if isMetroVolumeGroup && startMetroVolumeGroup != nil {
+		err := startMetroVolumeGroup()
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// Fetch the service tag

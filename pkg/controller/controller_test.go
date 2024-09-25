@@ -45,41 +45,43 @@ import (
 )
 
 const (
-	validBaseVolID            = "39bb1b5f-5624-490d-9ece-18f7b28a904e"
-	validBlockVolumeID        = "39bb1b5f-5624-490d-9ece-18f7b28a904e/globalvolid1/scsi"
-	validNfsVolumeID          = "39bb1b5f-5624-490d-9ece-18f7b28a904e/globalvolid2/nfs"
-	invalidBlockVolumeID      = "39bb1b5f-5624-490d-9ece-18f7b28a904e/globalvolid3/scsi"
-	validNasID                = "24aefac2-a796-47dc-886a-c73ff8c1a671"
-	validVolSize              = 16 * 1024 * 1024 * 1024
-	firstValidID              = "globalvolid1"
-	secondValidID             = "globalvolid2"
-	validNasName              = "my-nas-name"
-	validSnapName             = "my-snap"
-	validNodeID               = "csi-node-1a47a1b91c444a8a90193d8066669603-127.0.0.1"
-	validHostName             = "csi-node-1a47a1b91c444a8a90193d8066669603"
-	validHostID               = "24aefac2-a796-47dc-886a-c73ff8c1a671"
-	validClusterName          = "localSystemName"
-	validRemoteVolID          = "9f840c56-96e6-4de9-b5a3-27e7c20eaa77"
-	validRemoteSystemName     = "remoteName"
-	validRemoteSystemID       = "df7f804c-6373-4659-b197-36654d17979c"
-	validRPO                  = "Five_Minutes"
-	validGroupID              = "610adaef-4f0a-4dff-9812-29ffa5daf185"
-	validRemoteGroupID        = "62ed932b-329b-4ba6-b0e0-3f51c34c4701"
-	validSessionID            = "9abd0198-2733-4e46-b5fa-456e9c367184"
-	validNamespaceName        = "default"
-	validGroupName            = "csi-" + validRemoteSystemName + "-" + validRPO
-	validNamespacedGroupName  = "csi-" + validNamespaceName + "-" + validRemoteSystemName + "-" + validRPO
-	validPolicyID             = "e74f6cfd-ae2a-4cde-ad6b-529b40edee5e"
-	validPolicyName           = "pp-" + validGroupName
-	validRuleID               = "c721f30b-0b37-4aaf-a3a2-ef99caba2100"
-	validRuleName             = "rr-" + validGroupName
-	validReplicationPrefix    = "/" + controller.KeyReplicationEnabled
-	validVolumeGroupName      = "VGName"
-	validRemoteSystemGlobalID = "PS111111111111"
-	validNfsAcls              = "A::OWNER@:RWX"
-	validNfsServerID          = "24aefac2-a796-47dc-886a-c73ff8c1a671"
-	validApplianceID          = "my-appliance"
-	validServiceTag           = "service-tag"
+	validBaseVolID               = "39bb1b5f-5624-490d-9ece-18f7b28a904e"
+	validBlockVolumeID           = "39bb1b5f-5624-490d-9ece-18f7b28a904e/globalvolid1/scsi"
+	validNfsVolumeID             = "39bb1b5f-5624-490d-9ece-18f7b28a904e/globalvolid2/nfs"
+	invalidBlockVolumeID         = "39bb1b5f-5624-490d-9ece-18f7b28a904e/globalvolid3/scsi"
+	validNasID                   = "24aefac2-a796-47dc-886a-c73ff8c1a671"
+	validVolSize                 = 16 * 1024 * 1024 * 1024
+	firstValidID                 = "globalvolid1"
+	secondValidID                = "globalvolid2"
+	validNasName                 = "my-nas-name"
+	validSnapName                = "my-snap"
+	validNodeID                  = "csi-node-1a47a1b91c444a8a90193d8066669603-127.0.0.1"
+	validHostName                = "csi-node-1a47a1b91c444a8a90193d8066669603"
+	validHostID                  = "24aefac2-a796-47dc-886a-c73ff8c1a671"
+	validClusterName             = "localSystemName"
+	validRemoteVolID             = "9f840c56-96e6-4de9-b5a3-27e7c20eaa77"
+	validRemoteSystemName        = "remoteName"
+	validRemoteSystemID          = "df7f804c-6373-4659-b197-36654d17979c"
+	validRPO                     = "Five_Minutes"
+	validGroupID                 = "610adaef-4f0a-4dff-9812-29ffa5daf185"
+	validRemoteGroupID           = "62ed932b-329b-4ba6-b0e0-3f51c34c4701"
+	validSessionID               = "9abd0198-2733-4e46-b5fa-456e9c367184"
+	validNamespaceName           = "default"
+	validGroupName               = "csi-" + validRemoteSystemName + "-" + validRPO
+	validNamespacedGroupName     = "csi-" + validNamespaceName + "-" + validRemoteSystemName + "-" + validRPO
+	validMetroNamespaceGroupName = "csi-" + validNamespaceName + "-" + validRemoteSystemName
+	validMetroGroupName          = "csi-" + validRemoteSystemName
+	validPolicyID                = "e74f6cfd-ae2a-4cde-ad6b-529b40edee5e"
+	validPolicyName              = "pp-" + validGroupName
+	validRuleID                  = "c721f30b-0b37-4aaf-a3a2-ef99caba2100"
+	validRuleName                = "rr-" + validGroupName
+	validReplicationPrefix       = "/" + controller.KeyReplicationEnabled
+	validVolumeGroupName         = "VGName"
+	validRemoteSystemGlobalID    = "PS111111111111"
+	validNfsAcls                 = "A::OWNER@:RWX"
+	validNfsServerID             = "24aefac2-a796-47dc-886a-c73ff8c1a671"
+	validApplianceID             = "my-appliance"
+	validServiceTag              = "service-tag"
 )
 
 var (
@@ -416,7 +418,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			}))
 		})
 
-		ginkgo.Context("replication type is metro", func() {
+		ginkgo.Context("replication type is metro volume", func() {
 			var configureMetroRequest *gopowerstore.MetroConfig
 
 			ginkgo.BeforeEach(func() {
@@ -426,6 +428,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationMode)] = "METRO"
 				// not needed for testing metro
 				delete(req.Parameters, ctrlSvc.WithRP(controller.KeyReplicationRPO))
+				delete(req.Parameters, ctrlSvc.WithRP(controller.KeyReplicationVGPrefix))
 
 				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
 				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
@@ -440,7 +443,6 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 
 			ginkgo.It("should configure metro replication on volume", func() {
 				delete(req.Parameters, ctrlSvc.WithRP(controller.KeyReplicationIgnoreNamespaces))
-				delete(req.Parameters, ctrlSvc.WithRP(controller.KeyReplicationVGPrefix))
 
 				clientMock.On("ConfigureMetroVolume", mock.Anything, validBaseVolID, configureMetroRequest).
 					Return(gopowerstore.MetroSessionResponse{ID: validSessionID}, nil)
@@ -536,8 +538,55 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				gomega.Expect(err.Error()).To(gomega.ContainSubstring((fmt.Sprintf("replication session %s has a resource type %s, wanted type 'volume'",
 					validSessionID, resourceType))))
 			})
+		})
+
+		ginkgo.Context("replication type is metro volume group", func() {
+			var configureMetroRequest *gopowerstore.MetroConfig
+			var validMetroVolumeGroup gopowerstore.VolumeGroup
+
+			ginkgo.BeforeEach(func() {
+				// Default mock function functionality for metro replication.
+				// This base functionality can be overridden in the individual test implementation.
+				configureMetroRequest = &gopowerstore.MetroConfig{RemoteSystemID: validRemoteSystemID}
+				req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationMode)] = "METRO"
+				req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationIgnoreNamespaces)] = "false"
+				// not needed for testing metro
+				delete(req.Parameters, ctrlSvc.WithRP(controller.KeyReplicationRPO))
+
+				validMetroVolumeGroup = gopowerstore.VolumeGroup{
+					Name:                      validMetroNamespaceGroupName,
+					MetroReplicationSessionID: validSessionID,
+					ProtectionPolicyID:        "",
+				}
+
+				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
+				clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
+				clientMock.On("GetRemoteSystemByName", mock.Anything, validRemoteSystemName).Return(gopowerstore.RemoteSystem{
+					Name:         validRemoteSystemName,
+					ID:           validRemoteSystemID,
+					SerialNumber: secondValidID,
+				}, nil)
+				clientMock.On("GetVolume", context.Background(), mock.Anything).
+					Return(gopowerstore.Volume{ApplianceID: validApplianceID, MetroReplicationSessionID: validSessionID}, nil)
+				clientMock.On("GetAppliance", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
+
+				clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
+			})
 
 			ginkgo.It("should create a metro volume group with the namespace in the group name", func() {
+				// vg should not exist
+				clientMock.On("GetVolumeGroupByName", mock.Anything, validMetroNamespaceGroupName).
+					Return(gopowerstore.VolumeGroup{}, gopowerstore.APIError{ErrorMsg: &api.ErrorMsg{StatusCode: http.StatusNotFound}})
+				clientMock.On("CreateVolumeGroup", mock.Anything, &gopowerstore.VolumeGroupCreate{Name: validMetroNamespaceGroupName}).
+					Return(gopowerstore.CreateResponse{ID: validGroupID}, nil)
+				clientMock.On("GetVolumeGroup", mock.Anything, validGroupID).Return(gopowerstore.VolumeGroup{
+					ID:   validGroupID,
+					Name: validMetroNamespaceGroupName,
+				}, nil)
+				clientMock.On("ConfigureMetroVolumeGroup", mock.Anything, validGroupID, configureMetroRequest).
+					Return(gopowerstore.MetroSessionResponse{ID: validSessionID}, nil)
+
 				// ignoreNamespace parameter to false.
 				req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationIgnoreNamespaces)] = "false"
 
@@ -547,6 +596,18 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			})
 
 			ginkgo.It("should create a metro volume group without the namespace in the name", func() {
+				// vg should not exist
+				clientMock.On("GetVolumeGroupByName", mock.Anything, validMetroGroupName).
+					Return(gopowerstore.VolumeGroup{}, gopowerstore.APIError{ErrorMsg: &api.ErrorMsg{StatusCode: http.StatusNotFound}})
+				clientMock.On("CreateVolumeGroup", mock.Anything, &gopowerstore.VolumeGroupCreate{Name: validMetroGroupName}).
+					Return(gopowerstore.CreateResponse{ID: validGroupID}, nil)
+				clientMock.On("GetVolumeGroup", mock.Anything, validGroupID).Return(gopowerstore.VolumeGroup{
+					ID:   validGroupID,
+					Name: validMetroGroupName,
+				}, nil)
+				clientMock.On("ConfigureMetroVolumeGroup", mock.Anything, validGroupID, configureMetroRequest).
+					Return(gopowerstore.MetroSessionResponse{ID: validSessionID}, nil)
+
 				// add vg prefix parameters and set ignore namespace param to true/null/empty-string
 				req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationIgnoreNamespaces)] = "true"
 
@@ -556,21 +617,32 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			})
 
 			ginkgo.It("should fail to add a volume to a volume group with a protection policy", func() {
-				// return a volume group with a protection policy
-				clientMock.On("GetVolumeGroupByName", mock.Anything, mock.Anything).
-					Return(gopowerstore.VolumeGroup{ProtectionPolicyID: validPolicyID}, nil)
+				// return a volume group with a protection policy, triggering an error
+				clientMock.On("GetVolumeGroupByName", mock.Anything, validMetroNamespaceGroupName).
+					Return(gopowerstore.VolumeGroup{
+						Name:                      validMetroNamespaceGroupName,
+						MetroReplicationSessionID: validSessionID,
+						ProtectionPolicyID:        validPolicyID,
+					}, nil)
 
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
 				gomega.Expect(res).To(gomega.BeNil())
 				gomega.Expect(err).NotTo(gomega.BeNil())
 				gomega.Expect(err.Error()).To(
-					gomega.ContainSubstring(fmt.Sprint("metro volume group should not have protection policy assigned")))
+					gomega.ContainSubstring(fmt.Sprintf("volume group %s has a protection policy assigned making it incompatible for usage with metro replication", validMetroNamespaceGroupName)))
 			})
 
 			ginkgo.It("should fail to add a volume to a volume group if the metro session cannot be paused", func() {
+				clientMock.On("GetVolumeGroupByName", mock.Anything, validMetroNamespaceGroupName).
+					Return(validMetroVolumeGroup, nil)
+				clientMock.On("GetReplicationSessionByID", mock.Anything, validSessionID).Return(gopowerstore.ReplicationSession{
+					ID:    validSessionID,
+					State: gopowerstore.RsStateOk,
+				}, nil)
+
 				// return an error when trying to pause the metro session
-				clientMock.On("ExecuteActionOnReplicationSession", mock.Anything, gopowerstore.RsActionPause, mock.Anything).
-					Return(nil, gopowerstore.WrapErr(gopowerstore.APIError{
+				clientMock.On("ExecuteActionOnReplicationSession", mock.Anything, validSessionID, gopowerstore.RsActionPause, mock.Anything).
+					Return(gopowerstore.EmptyResponse(""), gopowerstore.WrapErr(gopowerstore.APIError{
 						ErrorMsg: &api.ErrorMsg{
 							StatusCode: http.StatusUnprocessableEntity,
 						},
@@ -579,13 +651,23 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
 				gomega.Expect(res).To(gomega.BeNil())
 				gomega.Expect(err).NotTo(gomega.BeNil())
-				gomega.Expect(err.Error()).To(gomega.ContainSubstring("could not pause metro replication session"))
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring(
+					fmt.Sprintf("unable to pause metro replication session on volume group %s", validMetroNamespaceGroupName)))
 			})
 
 			ginkgo.It("should fail if the metro replication session cannot be resumed", func() {
+				clientMock.On("GetVolumeGroupByName", mock.Anything, validMetroNamespaceGroupName).
+					Return(validMetroVolumeGroup, nil)
+				clientMock.On("ExecuteActionOnReplicationSession", mock.Anything, validSessionID, gopowerstore.RsActionPause, mock.Anything).
+					Return(gopowerstore.EmptyResponse(""), nil)
+				clientMock.On("GetReplicationSessionByID", mock.Anything, validSessionID).Return(gopowerstore.ReplicationSession{
+					ID:    validSessionID,
+					State: gopowerstore.RsStateOk,
+				}, nil)
+
 				// return an error when trying to resume the replication session.
-				clientMock.On("ExecuteActionOnReplicationSession", mock.Anything, gopowerstore.RsActionResume, mock.Anything).
-					Return(nil, gopowerstore.WrapErr(gopowerstore.APIError{
+				clientMock.On("ExecuteActionOnReplicationSession", mock.Anything, validSessionID, gopowerstore.RsActionResume, mock.Anything).
+					Return(gopowerstore.EmptyResponse(""), gopowerstore.WrapErr(gopowerstore.APIError{
 						ErrorMsg: &api.ErrorMsg{
 							StatusCode: http.StatusUnprocessableEntity,
 						},
@@ -594,28 +676,22 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
 				gomega.Expect(res).To(gomega.BeNil())
 				gomega.Expect(err).NotTo(gomega.BeNil())
-				gomega.Expect(err.Error()).To(gomega.ContainSubstring("could not resume metro replication session"))
-			})
-
-			ginkgo.It("should fail if the volume cannot be added to the volume group", func() {
-				// return an error when adding the volume to the volume group
-				clientMock.On("AddMembersToVolumeGroup", mock.Anything, mock.Anything, mock.Anything).
-					Return(nil, gopowerstore.WrapErr(gopowerstore.APIError{
-						ErrorMsg: &api.ErrorMsg{
-							StatusCode: http.StatusUnprocessableEntity,
-						},
-					}))
-
-				res, err := ctrlSvc.CreateVolume(context.Background(), req)
-				gomega.Expect(res).To(gomega.BeNil())
-				gomega.Expect(err).NotTo(gomega.BeNil())
-				gomega.Expect(err.Error()).To(gomega.ContainSubstring(fmt.Sprintf("volume %s could not be added to the volume group", validBaseVolID)))
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring(
+					fmt.Sprintf("unable to resume metro replication session on volume group %s", validMetroNamespaceGroupName)))
 			})
 
 			ginkgo.It("should fail if the volume group cannot be created", func() {
+				// report the vg as not existing
+				clientMock.On("GetVolumeGroupByName", mock.Anything, validMetroNamespaceGroupName).
+					Return(gopowerstore.VolumeGroup{}, gopowerstore.WrapErr(gopowerstore.APIError{
+						ErrorMsg: &api.ErrorMsg{
+							StatusCode: http.StatusNotFound,
+						},
+					}))
+
 				// return an error when creating the volume group
 				clientMock.On("CreateVolumeGroup", mock.Anything, mock.Anything).
-					Return(nil, gopowerstore.WrapErr(gopowerstore.APIError{
+					Return(gopowerstore.CreateResponse{}, gopowerstore.WrapErr(gopowerstore.APIError{
 						ErrorMsg: &api.ErrorMsg{
 							StatusCode: http.StatusInternalServerError,
 						},
@@ -624,13 +700,27 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
 				gomega.Expect(res).To(gomega.BeNil())
 				gomega.Expect(err).NotTo(gomega.BeNil())
-				gomega.Expect(err.Error()).To(gomega.ContainSubstring(fmt.Sprint("could not create volume group")))
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring(fmt.Sprintf(
+					"unable to create volume group %s on PowerStore array", validMetroNamespaceGroupName)))
 			})
 
 			ginkgo.It("should fail if metro replication cannot be configured on the volume group", func() {
+				clientMock.On("GetVolumeGroupByName", mock.Anything, validMetroNamespaceGroupName).
+					Return(gopowerstore.VolumeGroup{}, gopowerstore.APIError{
+						ErrorMsg: &api.ErrorMsg{
+							StatusCode: http.StatusNotFound,
+						},
+					})
+				clientMock.On("CreateVolumeGroup", mock.Anything, &gopowerstore.VolumeGroupCreate{Name: validMetroNamespaceGroupName}).
+					Return(gopowerstore.CreateResponse{ID: validGroupID}, nil)
+				clientMock.On("GetVolumeGroup", mock.Anything, validGroupID).Return(gopowerstore.VolumeGroup{
+					ID:   validGroupID,
+					Name: validMetroNamespaceGroupName,
+				}, nil)
+
 				// return an error when trying to start a metro replication session.
-				clientMock.On("ConfigureMetroVolumeGroup", mock.Anything, mock.Anything).
-					Return(nil, gopowerstore.WrapErr(gopowerstore.APIError{
+				clientMock.On("ConfigureMetroVolumeGroup", mock.Anything, validGroupID, mock.Anything).
+					Return(gopowerstore.MetroSessionResponse{}, gopowerstore.WrapErr(gopowerstore.APIError{
 						ErrorMsg: &api.ErrorMsg{
 							StatusCode: http.StatusInternalServerError,
 						},
@@ -639,7 +729,8 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
 				gomega.Expect(res).To(gomega.BeNil())
 				gomega.Expect(err).NotTo(gomega.BeNil())
-				gomega.Expect(err.Error()).To(gomega.ContainSubstring(fmt.Sprint("could not configure metro replication for volume group")))
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring(
+					fmt.Sprintf("unable to configure metro replication on volume group %s", validMetroNamespaceGroupName)))
 			})
 
 			// may be un-testable...
