@@ -1313,31 +1313,33 @@ func (s *Service) ControllerExpandVolume(ctx context.Context, req *csi.Controlle
 	}
 
 	powerStoreClient := s.Arrays()[arrayID].Client
-	isMetroSession := remoteArrayID != ""
-
-	// get session id
-	replicationSessionId := ""
-	if isMetroSession {
-		vgs, err := powerStoreClient.GetVolumeGroupsByVolumeID(ctx, req.GetVolumeId())
-		if err != nil {
-			return nil, err
-		}
-		if len(vgs.VolumeGroup) == 0 {
-			return nil, status.Error(codes.Unimplemented, "replication of volumes that aren't assigned to group is not implemented yet")
-		}
-		vg := vgs.VolumeGroup[0]
-		rs, err := powerStoreClient.GetReplicationSessionByLocalResourceID(ctx, vg.ID)
-		if err != nil {
-			return nil, err
-		}
-		replicationSessionId = rs.ID
-	}
 
 	if protocol == "scsi" {
 		vol, err := powerStoreClient.GetVolume(ctx, id)
 		if err != nil {
 			return nil, status.Errorf(codes.OutOfRange, "detected SCSI protocol but wasn't able to fetch the volume info")
 		}
+		isMetroSession := remoteArrayID != ""
+
+		// get session id
+		replicationSessionId := ""
+		if isMetroSession {
+			vgs, err := powerStoreClient.GetVolumeGroupsByVolumeID(ctx, req.GetVolumeId())
+			if err != nil {
+				return nil, err
+			}
+			if len(vgs.VolumeGroup) == 0 {
+				replicationSessionId = vol.MetroReplicationSessionID
+			} else {
+				vg := vgs.VolumeGroup[0]
+				rs, err := powerStoreClient.GetReplicationSessionByLocalResourceID(ctx, vg.ID)
+				if err != nil {
+					return nil, err
+				}
+				replicationSessionId = rs.ID
+			}
+		}
+
 		if vol.Size < requiredBytes {
 			pauseSessionIfMetro(isMetroSession, powerStoreClient, ctx, replicationSessionId)
 			_, err = powerStoreClient.ModifyVolume(context.Background(), &gopowerstore.VolumeModify{Size: requiredBytes}, id)
@@ -1352,9 +1354,7 @@ func (s *Service) ControllerExpandVolume(ctx context.Context, req *csi.Controlle
 	fs, err := powerStoreClient.GetFS(ctx, id)
 	if err == nil {
 		if fs.SizeTotal < requiredBytes {
-			pauseSessionIfMetro(isMetroSession, powerStoreClient, ctx, replicationSessionId)
 			_, err = powerStoreClient.ModifyFS(context.Background(), &gopowerstore.FSModify{Size: int(requiredBytes + ReservedSize)}, id)
-			resumeSessionIfMetro(isMetroSession, powerStoreClient, ctx, replicationSessionId)
 			if err != nil {
 				return nil, err
 			}
