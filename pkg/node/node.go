@@ -253,19 +253,13 @@ func (s *Service) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeR
 		return nil, status.Error(codes.InvalidArgument, "staging target path is required")
 	}
 
-	id, arrayID, protocol, remoteVolumeID, remoteArrayID, _ := array.ParseVolumeID(ctx, id, s.DefaultArray(), req.VolumeCapability)
+	id, arrayID, protocol, remoteVolumeID, _, _ := array.ParseVolumeID(ctx, id, s.DefaultArray(), req.VolumeCapability)
 
 	var stager VolumeStager
 
 	arr, ok := s.Arrays()[arrayID]
 	if !ok {
 		return nil, status.Errorf(codes.Internal, "can't find array with ID %s", arrayID)
-	}
-	if remoteArrayID != "" {
-		_, ok = s.Arrays()[remoteArrayID]
-		if !ok {
-			return nil, status.Errorf(codes.InvalidArgument, "failed to find remote array with ID %s", remoteArrayID)
-		}
 	}
 
 	if protocol == "nfs" {
@@ -287,7 +281,7 @@ func (s *Service) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeR
 		return nil, err
 	}
 
-	if remoteArrayID != "" && remoteVolumeID != "" { // For Remote Metro volume
+	if remoteVolumeID != "" { // For Remote Metro volume
 		log.Info("Staging remote metro volume")
 		response, err = stager.Stage(ctx, req, logFields, s.Fs, remoteVolumeID, true)
 	}
@@ -309,7 +303,7 @@ func (s *Service) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVol
 		return nil, status.Error(codes.InvalidArgument, "staging target path is required")
 	}
 
-	id, _, protocol, _, _, err := array.ParseVolumeID(ctx, id, s.DefaultArray(), nil)
+	id, _, protocol, remoteVolumeID, _, err := array.ParseVolumeID(ctx, id, s.DefaultArray(), nil)
 	if err != nil {
 		if apiError, ok := err.(gopowerstore.APIError); ok && apiError.NotFound() {
 			return &csi.NodeUnstageVolumeResponse{}, nil
@@ -325,6 +319,14 @@ func (s *Service) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVol
 	device, err := unstageVolume(ctx, stagingPath, id, logFields, err, s.Fs)
 	if err != nil {
 		return nil, err
+	}
+	if remoteVolumeID != "" { // For Remote Metro volume
+		log.Info("Unstaging remote metro volume")
+		remoteStagingPath := getStagingPath(ctx, req.GetStagingTargetPath(), remoteVolumeID)
+		_, err = unstageVolume(ctx, remoteStagingPath, remoteVolumeID, logFields, err, s.Fs)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if protocol == "nfs" {
