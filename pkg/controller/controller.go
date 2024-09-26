@@ -1286,9 +1286,23 @@ func (s *Service) ListSnapshots(ctx context.Context, req *csi.ListSnapshotsReque
 	}, nil
 }
 
+func pauseSessionIfMetro(isMetroSession bool, powerStoreClient gopowerstore.Client, ctx context.Context, id string) {
+	if isMetroSession {
+		var params *gopowerstore.FailoverParams
+		powerStoreClient.ExecuteActionOnReplicationSession(ctx, id, "pause", params)
+	}
+}
+
+func resumeSessionIfMetro(isMetroSession bool, powerStoreClient gopowerstore.Client, ctx context.Context, id string) {
+	if isMetroSession {
+		var params *gopowerstore.FailoverParams
+		powerStoreClient.ExecuteActionOnReplicationSession(ctx, id, "resume", params)
+	}
+}
+
 // ControllerExpandVolume resizes Volume or FileSystem by increasing available volume capacity in the storage array.
 func (s *Service) ControllerExpandVolume(ctx context.Context, req *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
-	id, arrayID, protocol, _, _, err := array.ParseVolumeID(ctx, req.VolumeId, s.DefaultArray(), nil)
+	id, arrayID, protocol, _, remoteArrayID, err := array.ParseVolumeID(ctx, req.VolumeId, s.DefaultArray(), nil)
 	if err != nil {
 		return nil, status.Errorf(codes.OutOfRange, "unable to parse the volume id")
 	}
@@ -1298,13 +1312,36 @@ func (s *Service) ControllerExpandVolume(ctx context.Context, req *csi.Controlle
 		return nil, status.Errorf(codes.OutOfRange, "volume exceeds allowed limit")
 	}
 
+	powerStoreClient := s.Arrays()[arrayID].Client
+	isMetroSession := remoteArrayID != ""
+
+	// get session id
+	replicationSessionId := ""
+	if isMetroSession {
+		vgs, err := powerStoreClient.GetVolumeGroupsByVolumeID(ctx, req.GetVolumeId())
+		if err != nil {
+			return nil, err
+		}
+		if len(vgs.VolumeGroup) == 0 {
+			return nil, status.Error(codes.Unimplemented, "replication of volumes that aren't assigned to group is not implemented yet")
+		}
+		vg := vgs.VolumeGroup[0]
+		rs, err := powerStoreClient.GetReplicationSessionByLocalResourceID(ctx, vg.ID)
+		if err != nil {
+			return nil, err
+		}
+		replicationSessionId = rs.ID
+	}
+
 	if protocol == "scsi" {
-		vol, err := s.Arrays()[arrayID].Client.GetVolume(ctx, id)
+		vol, err := powerStoreClient.GetVolume(ctx, id)
 		if err != nil {
 			return nil, status.Errorf(codes.OutOfRange, "detected SCSI protocol but wasn't able to fetch the volume info")
 		}
 		if vol.Size < requiredBytes {
-			_, err = s.Arrays()[arrayID].Client.ModifyVolume(context.Background(), &gopowerstore.VolumeModify{Size: requiredBytes}, id)
+			pauseSessionIfMetro(isMetroSession, powerStoreClient, ctx, replicationSessionId)
+			_, err = powerStoreClient.ModifyVolume(context.Background(), &gopowerstore.VolumeModify{Size: requiredBytes}, id)
+			resumeSessionIfMetro(isMetroSession, powerStoreClient, ctx, replicationSessionId)
 			if err != nil {
 				return nil, err
 			}
@@ -1312,10 +1349,12 @@ func (s *Service) ControllerExpandVolume(ctx context.Context, req *csi.Controlle
 		}
 		return &csi.ControllerExpandVolumeResponse{}, nil
 	}
-	fs, err := s.Arrays()[arrayID].Client.GetFS(ctx, id)
+	fs, err := powerStoreClient.GetFS(ctx, id)
 	if err == nil {
 		if fs.SizeTotal < requiredBytes {
-			_, err = s.Arrays()[arrayID].Client.ModifyFS(context.Background(), &gopowerstore.FSModify{Size: int(requiredBytes + ReservedSize)}, id)
+			pauseSessionIfMetro(isMetroSession, powerStoreClient, ctx, replicationSessionId)
+			_, err = powerStoreClient.ModifyFS(context.Background(), &gopowerstore.FSModify{Size: int(requiredBytes + ReservedSize)}, id)
+			resumeSessionIfMetro(isMetroSession, powerStoreClient, ctx, replicationSessionId)
 			if err != nil {
 				return nil, err
 			}
