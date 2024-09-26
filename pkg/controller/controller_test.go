@@ -678,6 +678,128 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				}))
 			})
 
+			ginkgo.It("should configure metro replication, re-using the existing, empty volume group with the same name", func() {
+				// an empty vg already exists but is not metro replicated
+				clientMock.On("GetVolumeGroupByName", mock.Anything, validMetroNamespaceGroupName).
+					Return(gopowerstore.VolumeGroup{
+						ID:                        validGroupID,
+						Name:                      validMetroNamespaceGroupName,
+						MetroReplicationSessionID: "",
+						ProtectionPolicyID:        "",
+						Volumes:                   []gopowerstore.Volume{},
+					}, nil)
+
+				clientMock.On("ConfigureMetroVolumeGroup", mock.Anything, validGroupID, configureMetroRequest).
+					Return(gopowerstore.MetroSessionResponse{ID: validSessionID}, nil)
+				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, validGroupID).
+					Return(gopowerstore.ReplicationSession{
+						ResourceType: "volume_group",
+						StorageElementPairs: []gopowerstore.StorageElementPair{
+							{
+								LocalStorageElementID:  validBaseVolID,
+								RemoteStorageElementID: validRemoteVolID,
+							},
+						},
+					}, nil)
+
+				res, err := ctrlSvc.CreateVolume(context.Background(), req)
+
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).NotTo(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.CreateVolumeResponse{
+					Volume: &csi.Volume{
+						CapacityBytes: validVolSize,
+						VolumeId:      fmt.Sprintf("%s/%s/%s:%s/%s", validBaseVolID, firstValidID, "scsi", validRemoteVolID, secondValidID),
+						VolumeContext: map[string]string{
+							common.KeyArrayVolumeName:                                 "my-vol",
+							common.KeyProtocol:                                        "scsi",
+							common.KeyArrayID:                                         firstValidID,
+							common.KeyVolumeDescription:                               req.Name + "-" + validNamespaceName,
+							common.KeyServiceTag:                                      validServiceTag,
+							controller.KeyCSIPVCName:                                  req.Name,
+							controller.KeyCSIPVCNamespace:                             validNamespaceName,
+							ctrlSvc.WithRP(controller.KeyReplicationEnabled):          "true",
+							ctrlSvc.WithRP(controller.KeyReplicationMode):             "METRO",
+							ctrlSvc.WithRP(controller.KeyReplicationRemoteSystem):     validRemoteSystemName,
+							ctrlSvc.WithRP(controller.KeyReplicationIgnoreNamespaces): "false",
+							ctrlSvc.WithRP(controller.KeyReplicationVGPrefix):         validReplicationVGPrefix,
+						},
+					},
+				}))
+			})
+
+			ginkgo.It("should fail to configure metro on an existing volume group if the volume group has attached volumes", func() {
+				// a vg already exists and is not part of a metro session,
+				// but it is disqualified from use because it has volumes attached
+				clientMock.On("GetVolumeGroupByName", mock.Anything, validMetroNamespaceGroupName).
+					Return(gopowerstore.VolumeGroup{
+						ID:                        validGroupID,
+						Name:                      validMetroNamespaceGroupName,
+						MetroReplicationSessionID: "",
+						ProtectionPolicyID:        "",
+						Volumes: []gopowerstore.Volume{
+							{
+								ID: validBaseVolID,
+							},
+						},
+					}, nil)
+
+				res, err := ctrlSvc.CreateVolume(context.Background(), req)
+
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err).NotTo(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring(
+					fmt.Sprintf("volume group %s found with volumes attached, but not part of a metro replication session.", validMetroNamespaceGroupName)))
+			})
+
+			ginkgo.It("should fail to add the volume to the vg if the replication session is not in OK state", func() {
+				clientMock.On("GetVolumeGroupByName", mock.Anything, validMetroNamespaceGroupName).
+					Return(validMetroVolumeGroup, nil)
+
+				// Replication session is in a 'fractured' state
+				clientMock.On("GetReplicationSessionByID", mock.Anything, validSessionID).
+					Return(gopowerstore.ReplicationSession{State: "Fractured"}, nil)
+
+				res, err := ctrlSvc.CreateVolume(context.Background(), req)
+
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err).NotTo(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring(
+					fmt.Sprintf("cannot add volumes to volume group %s because the metro replication session is not in running state.", validMetroNamespaceGroupName)))
+			})
+
+			ginkgo.It("should fail if the remote volume ID cannot be found", func() {
+				clientMock.On("GetVolumeGroupByName", mock.Anything, validMetroNamespaceGroupName).
+					Return(validMetroVolumeGroup, nil)
+				clientMock.On("GetReplicationSessionByID", mock.Anything, validSessionID).Return(gopowerstore.ReplicationSession{
+					ID:    validSessionID,
+					State: gopowerstore.RsStateOk,
+				}, nil)
+				clientMock.On("ExecuteActionOnReplicationSession", mock.Anything, validSessionID, gopowerstore.RsActionPause, mock.Anything).
+					Return(gopowerstore.EmptyResponse(""), nil)
+				clientMock.On("ExecuteActionOnReplicationSession", mock.Anything, validSessionID, gopowerstore.RsActionResume, mock.Anything).
+					Return(gopowerstore.EmptyResponse(""), nil)
+
+				// return a replication session that has a missing remote volume ID
+				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, validGroupID).
+					Return(gopowerstore.ReplicationSession{
+						ResourceType: "volume_group",
+						StorageElementPairs: []gopowerstore.StorageElementPair{
+							{
+								LocalStorageElementID:  validBaseVolID,
+								RemoteStorageElementID: "",
+							},
+						},
+					}, nil)
+
+				res, err := ctrlSvc.CreateVolume(context.Background(), req)
+
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err).NotTo(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring(
+					fmt.Sprintf("could not get remote volume pair for local volume %s", validBaseVolID)))
+			})
+
 			ginkgo.It("should fail if a new volume group cannot be created", func() {
 				// report the vg as not existing
 				clientMock.On("GetVolumeGroupByName", mock.Anything, validMetroNamespaceGroupName).
@@ -793,6 +915,22 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				gomega.Expect(err).NotTo(gomega.BeNil())
 				gomega.Expect(err.Error()).To(gomega.ContainSubstring(
 					fmt.Sprintf("unable to resume metro replication session on volume group %s", validMetroNamespaceGroupName)))
+			})
+
+			ginkgo.It("should fail if querying the volume group returns error other than NotFound", func() {
+				// return an error other than 404
+				clientMock.On("GetVolumeGroupByName", mock.Anything, validMetroNamespaceGroupName).
+					Return(gopowerstore.VolumeGroup{}, gopowerstore.APIError{
+						ErrorMsg: &api.ErrorMsg{
+							StatusCode: http.StatusInternalServerError,
+						},
+					})
+
+				res, err := ctrlSvc.CreateVolume(context.Background(), req)
+
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err).NotTo(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring(fmt.Sprintf("unexpected error occurred while getting the volume group")))
 			})
 		})
 

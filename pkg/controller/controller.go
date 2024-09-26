@@ -438,7 +438,7 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 					startMetroReplicationSession = configureMetroVolumeGroupSession
 				} else {
 					// handle all other errors associated with getting the VG.
-					return nil, status.Error(codes.Internal, err.Error())
+					return nil, status.Errorf(codes.Internal, "unexpected error occurred while getting the volume group: %s", err.Error())
 				}
 
 				// Pass the VolumeGroup to the creator so it can create the new volume inside the vg
@@ -476,11 +476,6 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 	if isMetroVolume || isMetroVolumeGroup {
 		volID := volumeResponse.VolumeId
 		var resourceID string
-
-		if startMetroReplicationSession == nil {
-			log.Debugf("startMetroReplicationSession function not set")
-			return nil, status.Error(codes.Internal, "unable to start the metro replication session.")
-		}
 
 		if isMetroVolume {
 			// Configure Metro on volume
