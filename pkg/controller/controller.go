@@ -253,7 +253,10 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 	var remoteSystemName string
 	isMetroVolume := false
 	isMetroVolumeGroup := false
-	var startMetroVolumeGroup func() error
+	// startMetroReplication will configure or resume metro replication on the volume or volume group
+	// resource is expected to be a *csi.Volume or a gopowerstore.VolumeGroup
+	var startMetroReplicationSession func(ctx context.Context,
+		arr *array.PowerStoreArray, remoteSystem gopowerstore.RemoteSystem, resource interface{}) error
 
 	if replicationEnabled == "true" && !useNFS {
 		log.Info("Preparing volume replication")
@@ -358,6 +361,8 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 			vgPrefix, ok := params[s.WithRP(KeyReplicationVGPrefix)]
 			if !ok {
 				isMetroVolume = true
+
+				startMetroReplicationSession = configureMetroVolumeSession
 			} else {
 				isMetroVolumeGroup = true
 
@@ -378,7 +383,7 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 				}
 
 				// check if vg exists on powerstore array
-				vg, err := arr.Client.GetVolumeGroupByName(ctx, vgName)
+				vg, err = arr.Client.GetVolumeGroupByName(ctx, vgName)
 				if err == nil {
 					// A volume group with the vgName already exists
 					// Having a protection policy associated with the vg makes it invalid for metro replication.
@@ -387,7 +392,7 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 							"volume group %s has a protection policy assigned making it incompatible for usage with metro replication.", vg.Name)
 					}
 
-					// Confirm VG is part of a meto session and pause the session to allow adding a volume to the vg
+					// Confirm VG is part of a metro session and pause the session to allow adding a volume to the vg
 					if vg.MetroReplicationSessionID != "" {
 						// make sure session is in good state
 						metroVGSession, err := arr.Client.GetReplicationSessionByID(ctx, vg.MetroReplicationSessionID)
@@ -397,21 +402,14 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 						}
 
 						// if session is running, pause metro
+						log.Debugf("metro session status is OK. Pausing metro volume group session for %s", vg.Name)
 						_, err = arr.Client.ExecuteActionOnReplicationSession(ctx, vg.MetroReplicationSessionID, gopowerstore.RsActionPause, nil)
 						if err != nil {
 							return nil, status.Errorf(codes.Internal, "unable to pause metro replication session on volume group %s: %s", vg.Name, err.Error())
 						}
 
 						// Metro session paused. Volume will be added to the vg and metro will be resumed below.
-						startMetroVolumeGroup = func() error {
-							// resume metro session
-							_, err = arr.Client.ExecuteActionOnReplicationSession(ctx, vg.MetroReplicationSessionID, gopowerstore.RsActionResume, nil)
-							if err != nil {
-								return status.Errorf(codes.Internal, "unable to resume metro replication session on volume group %s: %s", vg.Name, err.Error())
-							}
-
-							return nil
-						}
+						startMetroReplicationSession = resumeMetroVolumeGroupSession
 					} else {
 						// vg exists but is not yet metro replicated
 						// if it already has volumes attached, exit with error
@@ -422,18 +420,8 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 
 						log.Infof("reusing empty volume group %s as part of metro replication", vg.Name)
 
-						// configure the metro session
-						startMetroVolumeGroup = func() error {
-							// configure the metro session
-							metroVGSession, err := arr.Client.ConfigureMetroVolumeGroup(ctx, vg.ID, &gopowerstore.MetroConfig{RemoteSystemID: remoteSystem.ID})
-							if err != nil {
-								return status.Errorf(codes.Internal, "unable to configure metro replication on volume group %s: %s", vg.Name, err.Error())
-							}
-
-							log.Infof("created metro volume group session %s", metroVGSession.ID)
-
-							return nil
-						}
+						// configure the metro session after adding the new volume
+						startMetroReplicationSession = configureMetroVolumeGroupSession
 					}
 				} else if apiError, ok := err.(gopowerstore.APIError); ok && apiError.NotFound() {
 					// VG does not yet exist. Create it on powerstore array
@@ -447,17 +435,7 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 
 					vg, err = arr.Client.GetVolumeGroup(ctx, newVG.ID)
 
-					startMetroVolumeGroup = func() error {
-						// configure metro
-						metroVGSession, err := arr.Client.ConfigureMetroVolumeGroup(ctx, vg.ID, &gopowerstore.MetroConfig{RemoteSystemID: remoteSystem.ID})
-						if err != nil {
-							return status.Errorf(codes.Internal, "unable to configure metro replication on volume group %s: %s", vg.Name, err.Error())
-						}
-
-						log.Infof("created metro volume group session %s", metroVGSession.ID)
-
-						return nil
-					}
+					startMetroReplicationSession = configureMetroVolumeGroupSession
 				} else {
 					// handle all other errors associated with getting the VG.
 					return nil, status.Error(codes.Internal, err.Error())
@@ -494,45 +472,32 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 
 	metroVolumeIDSuffix := ""
 
-	if isMetroVolume {
-		// Configure Metro on volume
+	// Configure or restart metro and update the volume handle with the metro suffix :<remoteVolID>/<remoteGlobalID>
+	if isMetroVolume || isMetroVolumeGroup {
 		volID := volumeResponse.VolumeId
-		log.Infof("Configuring Metro on volume %s", volID)
+		var resourceID string
 
-		metroSession, err := arr.GetClient().ConfigureMetroVolume(ctx, volID, &gopowerstore.MetroConfig{
-			RemoteSystemID: remoteSystem.ID,
-		})
+		if startMetroReplicationSession == nil {
+			log.Debugf("startMetroReplicationSession function not set")
+			return nil, status.Error(codes.Internal, "unable to start the metro replication session.")
+		}
+
+		if isMetroVolume {
+			// Configure Metro on volume
+			log.Infof("Configuring Metro on volume %s", volID)
+			err = startMetroReplicationSession(ctx, arr, remoteSystem, *volumeResponse)
+			resourceID = volID
+		} else if isMetroVolumeGroup {
+			// Configure Metro volume for the volume group
+			log.Infof("Configuring Metro on volume group %s", vg.Name)
+			err = startMetroReplicationSession(ctx, arr, remoteSystem, vg)
+			resourceID = vg.ID
+		}
 		if err != nil {
-			if apiError, ok := err.(gopowerstore.APIError); ok && apiError.ReplicationSessionAlreadyCreated() { // idempotency check
-				log.Debugf("Metro has already been configured on volume %s", volID)
-			} else {
-				return nil, status.Errorf(codes.Internal, "can't configure metro on volume: %s", err.Error())
-			}
-		} else {
-			log.Infof("Metro Session %s created for volume %s", metroSession.ID, volID)
+			return nil, err
 		}
 
-		// Get the remote volume ID from the replication session.
-		replicationSession, err := arr.GetClient().GetReplicationSessionByLocalResourceID(ctx, volID)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "could not get metro replication session: %s", err.Error())
-		}
-		// Confirm the replication session is of the 'volume' type
-		if strings.ToLower(replicationSession.ResourceType) != "volume" {
-			return nil, status.Errorf(codes.FailedPrecondition, "replication session %s has a resource type %s, wanted type 'volume'",
-				replicationSession.ID, replicationSession.ResourceType)
-		}
-		// Build the metro volume handle suffix
-		metroVolumeIDSuffix = ":" + replicationSession.RemoteResourceID + "/" + remoteSystem.SerialNumber
-	} else if isMetroVolumeGroup {
-		// TODO configure Metro on volume group if it is first time
-		// else pause and resume metro session for adding new volumes
-		// Session needs to be paused before the new volume can be added (before creator.Create()) and then resumed later here.
-		log.Warn("Configuring Metro on volume group, not yet implemented.")
-	}
-
-	if isMetroVolumeGroup && startMetroVolumeGroup != nil {
-		err := startMetroVolumeGroup()
+		metroVolumeIDSuffix, err = createMetroVolumeNameSuffix(ctx, resourceID, volID, remoteSystem, arr)
 		if err != nil {
 			return nil, err
 		}
@@ -560,6 +525,107 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 	return &csi.CreateVolumeResponse{
 		Volume: volumeResponse,
 	}, nil
+}
+
+// createMetroVolumeNameSuffix generates the suffix for the name of a metro volume.
+// localResourceID is either a volume ID or a volume group ID and will be used to get the replication session.
+// The replication session is then used to find the remote volume ID corresponding to the local volume ID, volID.
+func createMetroVolumeNameSuffix(ctx context.Context,
+	localResourceID string,
+	localVolID string,
+	remoteSystem gopowerstore.RemoteSystem,
+	arr *array.PowerStoreArray,
+) (string, error) {
+	// Use the replication session to get the remote volume ID
+	replicationSession, err := arr.GetClient().GetReplicationSessionByLocalResourceID(ctx, localResourceID)
+	if err != nil {
+		return "", status.Errorf(codes.Internal, "could not get metro replication session: %s", err.Error())
+	}
+	// Confirm the replication session is of 'volume' or 'volume_group' type
+	resourceType := strings.ToLower(replicationSession.ResourceType)
+	if resourceType != "volume" && resourceType != "volume_group" {
+		return "", status.Errorf(codes.FailedPrecondition, "replication session %s has a resource type %s, wanted type 'volume' or 'volume_group'",
+			replicationSession.ID, replicationSession.ResourceType)
+	}
+
+	// Get the remote volume ID
+	remoteVolumeID := ""
+	if localResourceID == localVolID {
+		remoteVolumeID = replicationSession.RemoteResourceID
+	} else {
+		for _, volumePair := range replicationSession.StorageElementPairs {
+			if volumePair.LocalStorageElementID == localVolID {
+				remoteVolumeID = volumePair.RemoteStorageElementID
+			}
+		}
+		if remoteVolumeID == "" {
+			return "", status.Errorf(codes.Internal, "could not get remote volume pair for local volume %s", localVolID)
+		}
+	}
+
+	// Build the metro volume handle suffix
+	return fmt.Sprint(":" + remoteVolumeID + "/" + remoteSystem.SerialNumber), nil
+}
+
+// configureMetroVolumeSession configures a new metro replication session on the Volume resource.
+// resource is expected to be of type csi.Volume
+func configureMetroVolumeSession(ctx context.Context, arr *array.PowerStoreArray, remoteSystem gopowerstore.RemoteSystem, resource interface{}) error {
+	// convert to expected volume type
+	volume, ok := resource.(csi.Volume)
+	if !ok {
+		return status.Errorf(codes.Internal, "cannot configure metro on resource type %T", resource)
+	}
+
+	metroSession, err := arr.GetClient().ConfigureMetroVolume(ctx, volume.VolumeId, &gopowerstore.MetroConfig{RemoteSystemID: remoteSystem.ID})
+	if err != nil {
+		if apiError, ok := err.(gopowerstore.APIError); ok && apiError.ReplicationSessionAlreadyCreated() { // idempotency check
+			log.Debugf("Metro has already been configured on volume %s", volume.VolumeId)
+		} else {
+			return status.Errorf(codes.Internal, "can't configure metro on volume: %s", err.Error())
+		}
+	} else {
+		log.Infof("Metro Session %s created for volume %s", metroSession.ID, volume.VolumeId)
+	}
+
+	return nil
+}
+
+// resumeMetroVolumeGroupSession resumes a metro replication session that was paused for volume group resource.
+// resource is expected to be of type gopowerstore.VolumeGroup
+func resumeMetroVolumeGroupSession(ctx context.Context, arr *array.PowerStoreArray, _ gopowerstore.RemoteSystem, resource interface{}) error {
+	// convert to expected volume group type
+	volumeGroup, ok := resource.(gopowerstore.VolumeGroup)
+	if !ok {
+		return status.Errorf(codes.Internal, "cannot configure metro for resource type %T", resource)
+	}
+
+	// resume metro session
+	_, err := arr.Client.ExecuteActionOnReplicationSession(ctx, volumeGroup.MetroReplicationSessionID, gopowerstore.RsActionResume, nil)
+	if err != nil {
+		return status.Errorf(codes.Internal, "unable to resume metro replication session on volume group %s: %s", volumeGroup.Name, err.Error())
+	}
+
+	return nil
+}
+
+// configureMetroVolumeGroupSession configures a new metro replication session on the volume group resource.
+// resource is expected to be of type gopowerstore.VolumeGroup
+func configureMetroVolumeGroupSession(ctx context.Context, arr *array.PowerStoreArray, remoteSystem gopowerstore.RemoteSystem, resource interface{}) error {
+	// convert to expected volume group type
+	volumeGroup, ok := resource.(gopowerstore.VolumeGroup)
+	if !ok {
+		return status.Errorf(codes.Internal, "cannot configure metro for resource type %T", resource)
+	}
+
+	// configure the metro session
+	metroVGSession, err := arr.Client.ConfigureMetroVolumeGroup(ctx, volumeGroup.ID, &gopowerstore.MetroConfig{RemoteSystemID: remoteSystem.ID})
+	if err != nil {
+		return status.Errorf(codes.Internal, "unable to configure metro replication on volume group %s: %s", volumeGroup.Name, err.Error())
+	}
+
+	log.Infof("created metro volume group session %s", metroVGSession.ID)
+
+	return nil
 }
 
 // DeleteVolume deletes either FileSystem or Volume from storage array.
