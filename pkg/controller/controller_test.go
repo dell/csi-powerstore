@@ -559,6 +559,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 					Name:                      validMetroNamespaceGroupName,
 					MetroReplicationSessionID: validSessionID,
 					ProtectionPolicyID:        "",
+					IsWriteOrderConsistent:    true,
 				}
 
 				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
@@ -580,7 +581,10 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				// vg should not exist
 				clientMock.On("GetVolumeGroupByName", mock.Anything, validMetroNamespaceGroupName).
 					Return(gopowerstore.VolumeGroup{}, gopowerstore.APIError{ErrorMsg: &api.ErrorMsg{StatusCode: http.StatusNotFound}})
-				clientMock.On("CreateVolumeGroup", mock.Anything, &gopowerstore.VolumeGroupCreate{Name: validMetroNamespaceGroupName}).
+				clientMock.On("CreateVolumeGroup", mock.Anything, &gopowerstore.VolumeGroupCreate{
+					Name:                   validMetroNamespaceGroupName,
+					IsWriteOrderConsistent: true,
+				}).
 					Return(gopowerstore.CreateResponse{ID: validGroupID}, nil)
 				clientMock.On("GetVolumeGroup", mock.Anything, validGroupID).Return(gopowerstore.VolumeGroup{
 					ID:   validGroupID,
@@ -631,7 +635,10 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				// vg should not exist
 				clientMock.On("GetVolumeGroupByName", mock.Anything, validMetroGroupName).
 					Return(gopowerstore.VolumeGroup{}, gopowerstore.APIError{ErrorMsg: &api.ErrorMsg{StatusCode: http.StatusNotFound}})
-				clientMock.On("CreateVolumeGroup", mock.Anything, &gopowerstore.VolumeGroupCreate{Name: validMetroGroupName}).
+				clientMock.On("CreateVolumeGroup", mock.Anything, &gopowerstore.VolumeGroupCreate{
+					Name:                   validMetroGroupName,
+					IsWriteOrderConsistent: true,
+				}).
 					Return(gopowerstore.CreateResponse{ID: validGroupID}, nil)
 				clientMock.On("GetVolumeGroup", mock.Anything, validGroupID).Return(gopowerstore.VolumeGroup{
 					ID:   validGroupID,
@@ -687,6 +694,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 						MetroReplicationSessionID: "",
 						ProtectionPolicyID:        "",
 						Volumes:                   []gopowerstore.Volume{},
+						IsWriteOrderConsistent:    true,
 					}, nil)
 
 				clientMock.On("ConfigureMetroVolumeGroup", mock.Anything, validGroupID, configureMetroRequest).
@@ -750,6 +758,26 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				gomega.Expect(err).NotTo(gomega.BeNil())
 				gomega.Expect(err.Error()).To(gomega.ContainSubstring(
 					fmt.Sprintf("volume group %s found with volumes attached, but not part of a metro replication session.", validMetroNamespaceGroupName)))
+			})
+
+			ginkgo.It("should fail to configure metro on an existing volume group if the group is not write-order consistent", func() {
+				// Return a volume group that is not write-order consistent.
+				clientMock.On("GetVolumeGroupByName", mock.Anything, validMetroNamespaceGroupName).
+					Return(gopowerstore.VolumeGroup{
+						ID:                        validGroupID,
+						Name:                      validMetroNamespaceGroupName,
+						MetroReplicationSessionID: "",
+						ProtectionPolicyID:        "",
+						Volumes:                   []gopowerstore.Volume{},
+						IsWriteOrderConsistent:    false,
+					}, nil)
+
+				res, err := ctrlSvc.CreateVolume(context.Background(), req)
+
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err).NotTo(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring(
+					"volume group %s is not write-order consistent and cannot be used for metro replication.", validMetroNamespaceGroupName))
 			})
 
 			ginkgo.It("should fail to add the volume to the vg if the replication session is not in OK state", func() {
@@ -831,7 +859,10 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 							StatusCode: http.StatusNotFound,
 						},
 					})
-				clientMock.On("CreateVolumeGroup", mock.Anything, &gopowerstore.VolumeGroupCreate{Name: validMetroNamespaceGroupName}).
+				clientMock.On("CreateVolumeGroup", mock.Anything, &gopowerstore.VolumeGroupCreate{
+					Name:                   validMetroNamespaceGroupName,
+					IsWriteOrderConsistent: true,
+				}).
 					Return(gopowerstore.CreateResponse{ID: validGroupID}, nil)
 				clientMock.On("GetVolumeGroup", mock.Anything, validGroupID).Return(gopowerstore.VolumeGroup{
 					ID:   validGroupID,

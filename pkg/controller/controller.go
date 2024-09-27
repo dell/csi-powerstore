@@ -258,7 +258,12 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 	var startMetroReplicationSession func(ctx context.Context,
 		arr *array.PowerStoreArray, remoteSystem gopowerstore.RemoteSystem, resource interface{}) error
 
-	if replicationEnabled == "true" && !useNFS {
+	if replicationEnabled == "true" {
+		if useNFS {
+			// NFS replication not supported
+			return nil, status.Errorf(codes.InvalidArgument, "replication not supported for NFS")
+		}
+
 		log.Info("Preparing volume replication")
 
 		remoteSystemName, ok = params[s.WithRP(KeyReplicationRemoteSystem)]
@@ -266,6 +271,7 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 			return nil, status.Errorf(codes.InvalidArgument, "replication enabled but no remote system specified in storage class")
 		}
 		repMode := params[s.WithRP(KeyReplicationMode)]
+		// Default to ASYNC for backward compatibility
 		if repMode == "" {
 			repMode = "ASYNC"
 		}
@@ -357,11 +363,10 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 				return nil, status.Errorf(codes.Internal, "can't query remote system by name: %s", err.Error())
 			}
 
-			// If volumeGroupPrefix storage class param is set, metro volume group is desired
+			// Metro volume group is desired if volumeGroupPrefix storage-class param is set.
 			vgPrefix, ok := params[s.WithRP(KeyReplicationVGPrefix)]
-			if !ok {
+			if !ok || vgPrefix == "" {
 				isMetroVolume = true
-
 				startMetroReplicationSession = configureMetroVolumeSession
 			} else {
 				isMetroVolumeGroup = true
@@ -380,6 +385,7 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 				// truncate name length to comply with CSI gRPC spec
 				if len(vgName) > 128 {
 					vgName = vgName[:128]
+					log.Info("volume group name was truncated because it exceeded the max allowed length.")
 				}
 
 				// check if vg exists on powerstore array
@@ -418,7 +424,13 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 								"volume group %s found with volumes attached, but not part of a metro replication session.", vg.Name)
 						}
 
-						log.Infof("reusing empty volume group %s as part of metro replication", vg.Name)
+						// vg needs to be write-order consistent for metro replication
+						if !vg.IsWriteOrderConsistent {
+							return nil, status.Errorf(codes.FailedPrecondition,
+								"volume group %s is not write-order consistent and cannot be used for metro replication.", vg.Name)
+						}
+
+						log.Infof("reusing empty volume group %s for metro replication", vg.Name)
 
 						// configure the metro session after adding the new volume
 						startMetroReplicationSession = configureMetroVolumeGroupSession
@@ -427,7 +439,8 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 					// VG does not yet exist. Create it on powerstore array
 					log.Infof("creating volume group %s for metro replication", vgName)
 					newVG, err := arr.Client.CreateVolumeGroup(ctx, &gopowerstore.VolumeGroupCreate{
-						Name: vgName,
+						Name:                   vgName,
+						IsWriteOrderConsistent: true,
 					})
 					if err != nil {
 						return nil, status.Errorf(codes.Internal, "unable to create volume group %s on PowerStore array: %s", vgName, err.Error())
