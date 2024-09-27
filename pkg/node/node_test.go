@@ -21,6 +21,7 @@ package node
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	"os"
@@ -68,6 +69,7 @@ const (
 	validBlockVolumeID  = "39bb1b5f-5624-490d-9ece-18f7b28a904e/gid1/scsi"
 	validClusterName    = "localSystemName"
 	validNfsVolumeID    = "39bb1b5f-5624-490d-9ece-18f7b28a904e/gid2/nfs"
+	validRemoteVolID    = "9f840c56-96e6-4de9-b5a3-27e7c20eaa77"
 	validVolSize        = 16 * 1024 * 1024 * 1024
 	validLUNID          = "3"
 	validLUNIDINT       = 3
@@ -172,6 +174,17 @@ var (
 		Lun: validLUNIDINT,
 	}
 	validGobrickDevice = gobrick.Device{Name: validDevName, WWN: validDeviceWWN, MultipathID: validDeviceWWN}
+
+	validRemoteISCSIPortals = []string{"192.168.1.3:3260", "192.168.1.4:3260"}
+	validRemoteISCSITargets = []string{
+		"iqn.2015-10.com.dell:dellemc-powerstore-fnm00180700174-a-39f17e0e",
+		"iqn.2015-10.com.dell:dellemc-powerstore-fnm00180700174-b-10de15a5",
+	}
+	validRemoteFCTargetsWWPN   = []string{"58ccf09348a003a4", "58ccf09348a002a4"}
+	validRemoteISCSITargetInfo = []gobrick.ISCSITargetInfo{
+		{Portal: validRemoteISCSIPortals[0], Target: validRemoteISCSITargets[0]},
+		{Portal: validRemoteISCSIPortals[1], Target: validRemoteISCSITargets[1]},
+	}
 )
 
 func TestCSINodeService(t *testing.T) {
@@ -244,7 +257,7 @@ func setVariables() {
 	old := ReachableEndPoint
 	func() { ReachableEndPoint = old }()
 	ReachableEndPoint = func(ip string) bool {
-		if ip == "192.168.1.1:3260" || ip == "192.168.1.2:3260" {
+		if ip == "192.168.1.1:3260" || ip == "192.168.1.2:3260" || ip == "192.168.1.3:3260" || ip == "192.168.1.4:3260" {
 			return true
 		}
 		return false
@@ -1165,6 +1178,32 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 			})
 		})
 
+		ginkgo.When("using iSCSI for Metro volume", func() {
+			ginkgo.It("should successfully stage Metro iSCSI volume", func() {
+				iscsiConnectorMock.On("ConnectVolume", mock.Anything, gobrick.ISCSIVolumeInfo{
+					Targets: validISCSITargetInfo,
+					Lun:     validLUNIDINT,
+				}).Return(gobrick.Device{}, nil).Times(2)
+				iscsiConnectorMock.On("ConnectVolume", mock.Anything, gobrick.ISCSIVolumeInfo{
+					Targets: validRemoteISCSITargetInfo,
+					Lun:     validLUNIDINT,
+				}).Return(gobrick.Device{}, nil).Times(2)
+
+				scsiStageVolumeOK(utilMock, fsMock)
+				scsiStageRemoteMetroVolumeOK(utilMock, fsMock)
+				metroVolumeID := fmt.Sprintf("%s:%s/%s", validBlockVolumeID, validRemoteVolID, secondValidIP)
+				res, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
+					VolumeId:          metroVolumeID,
+					PublishContext:    getValidRemoteMetroPublishContext(),
+					StagingTargetPath: nodeStagePrivateDir,
+					VolumeCapability: getCapabilityWithVoltypeAccessFstype(
+						"mount", "single-writer", "ext4"),
+				})
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.NodeStageVolumeResponse{}))
+			})
+		})
+
 		ginkgo.When("volume is already staged", func() {
 			ginkgo.It("should return that stage is successful [SCSI]", func() {
 				iscsiConnectorMock.On("ConnectVolume", mock.Anything, gobrick.ISCSIVolumeInfo{
@@ -1602,6 +1641,39 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				gomega.Expect(err).To(gomega.BeNil())
 				gomega.Expect(res).To(gomega.Equal(&csi.NodeUnstageVolumeResponse{}))
 			})
+
+			ginkgo.It("should succeed for Metro volume [iSCSI]", func() {
+				mountInfo := []gofsutil.Info{{Device: validDevName, Path: stagingPath}}
+				remoteStagingPath := filepath.Join(nodeStagePrivateDir, validRemoteVolID)
+				remoteMountInfo := []gofsutil.Info{{Device: validDevName, Path: remoteStagingPath}}
+
+				fsMock.On("GetUtil").Return(utilMock)
+				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(4)
+				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return(mountInfo, nil).Once()
+				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return(remoteMountInfo, nil).Once()
+
+				utilMock.On("Unmount", mock.Anything, stagingPath).Return(nil).Once()
+				utilMock.On("Unmount", mock.Anything, remoteStagingPath).Return(nil).Once()
+				fsMock.On("Remove", stagingPath).Return(nil)
+				fsMock.On("Remove", remoteStagingPath).Return(nil)
+				fsMock.On("WriteFile", path.Join(nodeSvc.opts.TmpDir, validBaseVolumeID), []byte(validDevName), os.FileMode(0o640)).Return(nil)
+				fsMock.On("WriteFile", path.Join(nodeSvc.opts.TmpDir, validRemoteVolID), []byte(validDevName), os.FileMode(0o640)).Return(nil)
+
+				iscsiConnectorMock.On("DisconnectVolumeByDeviceName", mock.Anything, validDevName).Return(nil)
+
+				fsMock.On("Remove", path.Join(nodeSvc.opts.TmpDir, validBaseVolumeID)).Return(nil).Once()
+				fsMock.On("Remove", path.Join(nodeSvc.opts.TmpDir, validRemoteVolID)).Return(nil).Once()
+				fsMock.On("IsNotExist", mock.Anything).Return(false)
+
+				metroVolumeID := fmt.Sprintf("%s:%s/%s", validBlockVolumeID, validRemoteVolID, secondValidIP)
+				res, err := nodeSvc.NodeUnstageVolume(context.Background(), &csi.NodeUnstageVolumeRequest{
+					VolumeId:          metroVolumeID,
+					StagingTargetPath: nodeStagePrivateDir,
+				})
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.NodeUnstageVolumeResponse{}))
+			})
+
 			ginkgo.It("should succeed [FC]", func() {
 				nodeSvc.useFC = true
 				mountInfo := []gofsutil.Info{
@@ -3319,11 +3391,11 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
 					Return([]gopowerstore.IPPoolAddress{
 						{
-							Address: "192.168.1.3",
+							Address: "192.168.1.5",
 							IPPort:  gopowerstore.IPPortInstance{TargetIqn: "iqn"},
 						},
 						{
-							Address: "192.168.1.4",
+							Address: "192.168.1.6",
 							IPPort:  gopowerstore.IPPortInstance{TargetIqn: "iqn2"},
 						},
 					}, nil)
