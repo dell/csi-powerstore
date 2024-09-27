@@ -255,8 +255,9 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 	isMetroVolumeGroup := false
 	// startMetroReplication will configure or resume metro replication on the volume or volume group
 	// resource is expected to be a *csi.Volume or a gopowerstore.VolumeGroup
-	var startMetroReplicationSession func(ctx context.Context,
-		arr *array.PowerStoreArray, remoteSystem gopowerstore.RemoteSystem, resource interface{}) error
+	startMetroReplicationSession := func(context.Context, *array.PowerStoreArray, gopowerstore.RemoteSystem, interface{}) error {
+		return nil
+	}
 
 	if replicationEnabled == "true" {
 		if useNFS {
@@ -749,7 +750,7 @@ func (s *Service) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest
 		}
 
 		// used to restore session state after removing the volume
-		var metroSessionFormerState gopowerstore.RSStateEnum
+		restoreMetroSession := func() error { return nil }
 
 		if len(vgs.VolumeGroup) != 0 {
 			// Remove volume from volume group
@@ -762,7 +763,6 @@ func (s *Service) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest
 					return nil, status.Errorf(codes.Internal, "unable to get metro session %s: %s", vgs.VolumeGroup[0].MetroReplicationSessionID, err.Error())
 				}
 
-				metroSessionFormerState = metroSession.State
 				metroSessionID = metroSession.ID
 
 				// replication session should be in 'OK' or 'paused' state to continue
@@ -777,6 +777,15 @@ func (s *Service) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest
 						return nil, status.Errorf(codes.Internal,
 							"failed to delete volume %s because the replication session could not be paused", id)
 					}
+
+					restoreMetroSession = func() error {
+						_, err = arr.Client.ExecuteActionOnReplicationSession(ctx, metroSessionID, gopowerstore.RsActionResume, nil)
+						if err != nil {
+							return status.Errorf(codes.Internal,
+								"failed to delete volume %s because the replication session could not be resumed", id)
+						}
+						return nil
+					}
 				}
 			}
 
@@ -784,6 +793,13 @@ func (s *Service) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest
 			// TODO: Maybe adding volumegroup id/name to volume id can help?
 			_, err := arr.GetClient().RemoveMembersFromVolumeGroup(ctx, &gopowerstore.VolumeGroupMembers{VolumeIDs: []string{id}}, vgs.VolumeGroup[0].ID)
 			if err != nil {
+				// try to restore metro replication before returning
+				if isMetro {
+					log.Info("could not remove volume from the volume group. Attempting to restore metro replication to its previous state.")
+					if e := restoreMetroSession(); e != nil {
+						log.Error(e)
+					}
+				}
 				// TODO: check for idempotency cases
 				return nil, err
 			}
@@ -796,12 +812,8 @@ func (s *Service) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest
 				}
 			} else {
 				// Resume metro replication if it was running previously
-				if metroSessionFormerState == gopowerstore.RsStateOk {
-					_, err = arr.Client.ExecuteActionOnReplicationSession(ctx, metroSessionID, gopowerstore.RsActionResume, nil)
-					if err != nil {
-						return nil, status.Errorf(codes.Internal,
-							"failed to delete volume %s because the replication session could not be resumed", id)
-					}
+				if err := restoreMetroSession(); err != nil {
+					return nil, err
 				}
 			}
 		}

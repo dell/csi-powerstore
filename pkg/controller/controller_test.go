@@ -1900,6 +1900,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 					gomega.Expect(res).To(gomega.BeNil())
 					gomega.Expect(err.Error()).To(gomega.ContainSubstring("unable to get metro session %s", validSessionID))
 				})
+
 				ginkgo.It("should fail if the replication session is not in 'OK' or 'Paused' state", func() {
 					// override the good mock
 					clientMock.On("GetReplicationSessionByID", mock.Anything, validSessionID).Unset()
@@ -1959,7 +1960,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 						"failed to delete volume %s because the replication session could not be resumed", validBaseVolID))
 				})
 
-				ginkgo.It("should fail if the volume cannot be removed from the volume group", func() {
+				ginkgo.It("should fail and resume replication if the volume cannot be removed from the volume group", func() {
 					// override the good mock
 					clientMock.On("RemoveMembersFromVolumeGroup", mock.Anything, &gopowerstore.VolumeGroupMembers{VolumeIDs: []string{validBaseVolID}}, validGroupID).
 						Unset()
@@ -1968,6 +1969,36 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 						Return(gopowerstore.EmptyResponse(""), gopowerstore.APIError{
 							ErrorMsg: &api.ErrorMsg{
 								StatusCode: http.StatusInternalServerError,
+							},
+						})
+
+					req := &csi.DeleteVolumeRequest{VolumeId: validMetroVolumeID}
+					res, err := ctrlSvc.DeleteVolume(context.Background(), req)
+
+					gomega.Expect(err).NotTo(gomega.BeNil())
+					gomega.Expect(res).To(gomega.BeNil())
+					gomega.Expect(err.(gopowerstore.APIError).StatusCode).To(gomega.Equal(http.StatusInternalServerError))
+				})
+
+				ginkgo.It("should fail if the volume cannot be removed from the volume group and the replication session cannot be resumed", func() {
+					// override the good mocks
+					clientMock.On("RemoveMembersFromVolumeGroup", mock.Anything, &gopowerstore.VolumeGroupMembers{VolumeIDs: []string{validBaseVolID}}, validGroupID).
+						Unset()
+					clientMock.On("ExecuteActionOnReplicationSession", mock.Anything, validSessionID, gopowerstore.RsActionResume, mock.Anything).Unset()
+
+					// return an http error code when the volume cannot be removed from the volume group
+					clientMock.On("RemoveMembersFromVolumeGroup", mock.Anything, &gopowerstore.VolumeGroupMembers{VolumeIDs: []string{validBaseVolID}}, validGroupID).
+						Return(gopowerstore.EmptyResponse(""), gopowerstore.APIError{
+							ErrorMsg: &api.ErrorMsg{
+								StatusCode: http.StatusInternalServerError,
+							},
+						})
+					// Return an error when trying to restore the replication session after failing to remove the volume
+					clientMock.On("ExecuteActionOnReplicationSession", mock.Anything, validSessionID, gopowerstore.RsActionResume, mock.Anything).
+						Return(gopowerstore.EmptyResponse(""), gopowerstore.APIError{
+							ErrorMsg: &api.ErrorMsg{
+								StatusCode: http.StatusInternalServerError,
+								Message:    "error",
 							},
 						})
 
