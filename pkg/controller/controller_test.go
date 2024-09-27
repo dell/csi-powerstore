@@ -1782,7 +1782,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 					validBaseVolID).
 					Return(gopowerstore.EmptyResponse(""), nil)
 
-				req := &csi.DeleteVolumeRequest{VolumeId: validMetroVolumeID}
+				req := &csi.DeleteVolumeRequest{VolumeId: validBaseVolID}
 
 				res, err := ctrlSvc.DeleteVolume(context.Background(), req)
 
@@ -1828,7 +1828,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 					Return(gopowerstore.EmptyResponse(""), nil)
 				clientMock.On("GetVolume", mock.Anything, validBaseVolID).Return(gopowerstore.Volume{ID: validBaseVolID, Size: validVolSize}, nil)
 
-				req := &csi.DeleteVolumeRequest{VolumeId: validMetroVolumeID}
+				req := &csi.DeleteVolumeRequest{VolumeId: validBaseVolID}
 
 				clientMock.On("DeleteVolume",
 					mock.Anything,
@@ -1858,7 +1858,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 								},
 							},
 						}, nil)
-					clientMock.On("GetReplicationSession", mock.Anything, validSessionID).
+					clientMock.On("GetReplicationSessionByID", mock.Anything, validSessionID).
 						Return(gopowerstore.ReplicationSession{
 							ID:    validSessionID,
 							State: gopowerstore.RsStateOk,
@@ -1884,7 +1884,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 
 				ginkgo.It("should fail if the replication session is not in 'OK' or 'Paused' state", func() {
 					// return an error a replication session with a bad state
-					clientMock.On("GetReplicationSession", mock.Anything, validSessionID).
+					clientMock.On("GetReplicationSessionByID", mock.Anything, validSessionID).
 						Return(gopowerstore.ReplicationSession{
 							ID:    validSessionID,
 							State: gopowerstore.RsStateError,
