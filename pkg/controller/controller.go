@@ -408,7 +408,7 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 						}
 
 						// if session is running, pause metro
-						log.Debugf("metro session status is OK. Pausing metro volume group session for %s", vg.Name)
+						log.Debugf("metro session state is OK. Pausing metro volume group session for %s", vg.Name)
 						_, err = arr.Client.ExecuteActionOnReplicationSession(ctx, vg.MetroReplicationSessionID, gopowerstore.RsActionPause, nil)
 						if err != nil {
 							return nil, status.Errorf(codes.Internal, "unable to pause metro replication session on volume group %s: %s", vg.Name, err.Error())
