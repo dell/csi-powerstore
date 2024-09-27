@@ -643,12 +643,19 @@ func (s *Service) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest
 		return nil, status.Error(codes.InvalidArgument, "volume ID is required")
 	}
 
-	id, arrayID, protocol, _, _, err := array.ParseVolumeID(ctx, id, s.DefaultArray(), nil)
+	id, arrayID, protocol, remoteVolID, _, err := array.ParseVolumeID(ctx, id, s.DefaultArray(), nil)
 	if err != nil {
 		if apiError, ok := err.(gopowerstore.APIError); ok && apiError.NotFound() {
 			return &csi.DeleteVolumeResponse{}, nil
 		}
 		return nil, err
+	}
+
+	// use the volume ID to determine if the volume is metro replicated
+	isMetro := false
+	isMetroVolumeGroup := false
+	if remoteVolID != "" {
+		isMetro = true
 	}
 
 	arr, ok := s.Arrays()[arrayID]
@@ -741,8 +748,38 @@ func (s *Service) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest
 			}
 		}
 
+		// used to restore session state after removing the volume
+		var metroSessionFormerState gopowerstore.RSStateEnum
+
 		if len(vgs.VolumeGroup) != 0 {
 			// Remove volume from volume group
+			// Metro replication needs to be paused to remove the volume from the group.
+			var metroSessionID string
+			if isMetro {
+				isMetroVolumeGroup = true
+				metroSession, err := arr.Client.GetReplicationSessionByID(ctx, vgs.VolumeGroup[0].MetroReplicationSessionID)
+				if err != nil {
+					return nil, status.Errorf(codes.Internal, "unable to get metro session %s: %s", vgs.VolumeGroup[0].MetroReplicationSessionID, err.Error())
+				}
+
+				metroSessionFormerState = metroSession.State
+				metroSessionID = metroSession.ID
+
+				// replication session should be in 'OK' or 'paused' state to continue
+				if metroSession.State != gopowerstore.RsStateOk && metroSession.State != gopowerstore.RsStatePaused {
+					return nil, status.Errorf(codes.FailedPrecondition,
+						"failed to delete volume %s because the metro replication session is in %s state", id, metroSession.State)
+				}
+				if metroSession.State == gopowerstore.RsStateOk {
+					// pause the replication session
+					_, err = arr.Client.ExecuteActionOnReplicationSession(ctx, metroSessionID, gopowerstore.RsActionPause, nil)
+					if err != nil {
+						return nil, status.Errorf(codes.Internal,
+							"failed to delete volume %s because the replication session could not be paused", id)
+					}
+				}
+			}
+
 			// TODO: If volume has multiple volume group then how we should find ours?
 			// TODO: Maybe adding volumegroup id/name to volume id can help?
 			_, err := arr.GetClient().RemoveMembersFromVolumeGroup(ctx, &gopowerstore.VolumeGroupMembers{VolumeIDs: []string{id}}, vgs.VolumeGroup[0].ID)
@@ -751,10 +788,21 @@ func (s *Service) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest
 				return nil, err
 			}
 
-			// Unassign protection policy
-			_, err = arr.GetClient().ModifyVolume(ctx, &gopowerstore.VolumeModify{ProtectionPolicyID: ""}, id)
-			if err != nil {
-				return nil, err
+			if !isMetro {
+				// Unassign protection policy
+				_, err = arr.GetClient().ModifyVolume(ctx, &gopowerstore.VolumeModify{ProtectionPolicyID: ""}, id)
+				if err != nil {
+					return nil, err
+				}
+			} else {
+				// Resume metro replication if it was running previously
+				if metroSessionFormerState == gopowerstore.RsStateOk {
+					_, err = arr.Client.ExecuteActionOnReplicationSession(ctx, metroSessionID, gopowerstore.RsActionResume, nil)
+					if err != nil {
+						return nil, status.Errorf(codes.Internal,
+							"failed to delete volume %s because the replication session could not be resumed", id)
+					}
+				}
 			}
 		}
 		// TODO: if len(vgs.VolumeGroup == 1) && it is the last volume : delete volume group
@@ -769,20 +817,22 @@ func (s *Service) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest
 		}
 
 		// Check if volume has metro session and end it
-		volume, err := arr.GetClient().GetVolume(ctx, id)
-		if err != nil {
-			if apiError, ok := err.(gopowerstore.APIError); ok && apiError.NotFound() {
-				log.Infof("Volume %s not found, it may have been deleted.", id)
-				return &csi.DeleteVolumeResponse{}, nil
-			}
-			return nil, status.Errorf(codes.Internal, "failure getting volume: %s", err.Error())
-		}
-		if volume.MetroReplicationSessionID != "" {
-			_, err = arr.GetClient().EndMetroVolume(ctx, id, &gopowerstore.EndMetroVolumeOptions{
-				DeleteRemoteVolume: true, // delete remote volume when deleting local volume
-			})
+		if !isMetroVolumeGroup {
+			volume, err := arr.GetClient().GetVolume(ctx, id)
 			if err != nil {
-				return nil, status.Errorf(codes.Internal, "failure ending metro session on volume: %s", err.Error())
+				if apiError, ok := err.(gopowerstore.APIError); ok && apiError.NotFound() {
+					log.Infof("Volume %s not found, it may have been deleted.", id)
+					return &csi.DeleteVolumeResponse{}, nil
+				}
+				return nil, status.Errorf(codes.Internal, "failure getting volume: %s", err.Error())
+			}
+			if volume.MetroReplicationSessionID != "" {
+				_, err = arr.GetClient().EndMetroVolume(ctx, id, &gopowerstore.EndMetroVolumeOptions{
+					DeleteRemoteVolume: true, // delete remote volume when deleting local volume
+				})
+				if err != nil {
+					return nil, status.Errorf(codes.Internal, "failure ending metro session on volume: %s", err.Error())
+				}
 			}
 		}
 

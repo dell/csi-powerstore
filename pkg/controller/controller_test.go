@@ -1870,7 +1870,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 					clientMock.On("ExecuteActionOnReplicationSession", mock.Anything, validSessionID, gopowerstore.RsActionResume, mock.Anything).
 						Return(gopowerstore.EmptyResponse(""), nil)
 					clientMock.On("GetSnapshotsByVolumeID", mock.Anything, validBaseVolID).Return([]gopowerstore.Volume{}, nil)
-					clientMock.On("DeleteVolume", mock.Anything, nil, validBaseVolID).Return(gopowerstore.EmptyResponse(""), nil)
+					clientMock.On("DeleteVolume", mock.Anything, mock.AnythingOfType("*gopowerstore.VolumeDelete"), validBaseVolID).Return(gopowerstore.EmptyResponse(""), nil)
 				})
 
 				ginkgo.It("should successfully delete block metro volume", func() {
@@ -1882,7 +1882,27 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 					gomega.Expect(res).To(gomega.Equal(&csi.DeleteVolumeResponse{}))
 				})
 
+				ginkgo.It("should fail if the replication session cannot be retrieved", func() {
+					// override the good mock
+					clientMock.On("GetReplicationSessionByID", mock.Anything, validSessionID).Unset()
+					// return an error when trying to get the replication session
+					clientMock.On("GetReplicationSessionByID", mock.Anything, validSessionID).
+						Return(gopowerstore.ReplicationSession{}, gopowerstore.APIError{
+							ErrorMsg: &api.ErrorMsg{
+								StatusCode: http.StatusNotFound,
+							},
+						})
+
+					req := &csi.DeleteVolumeRequest{VolumeId: validMetroVolumeID}
+					res, err := ctrlSvc.DeleteVolume(context.Background(), req)
+
+					gomega.Expect(err).NotTo(gomega.BeNil())
+					gomega.Expect(res).To(gomega.BeNil())
+					gomega.Expect(err.Error()).To(gomega.ContainSubstring("unable to get metro session %s", validSessionID))
+				})
 				ginkgo.It("should fail if the replication session is not in 'OK' or 'Paused' state", func() {
+					// override the good mock
+					clientMock.On("GetReplicationSessionByID", mock.Anything, validSessionID).Unset()
 					// return an error a replication session with a bad state
 					clientMock.On("GetReplicationSessionByID", mock.Anything, validSessionID).
 						Return(gopowerstore.ReplicationSession{
@@ -1900,6 +1920,8 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				})
 
 				ginkgo.It("should fail if the replication session cannot be paused", func() {
+					// override the good mock
+					clientMock.On("ExecuteActionOnReplicationSession", mock.Anything, validSessionID, gopowerstore.RsActionPause, mock.Anything).Unset()
 					// retun an error when trying to pause the session
 					clientMock.On("ExecuteActionOnReplicationSession", mock.Anything, validSessionID, gopowerstore.RsActionPause, mock.Anything).
 						Return(gopowerstore.EmptyResponse(""), gopowerstore.APIError{
@@ -1918,6 +1940,8 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				})
 
 				ginkgo.It("should fail if the replication session state cannot be restored", func() {
+					// override the good mock
+					clientMock.On("ExecuteActionOnReplicationSession", mock.Anything, validSessionID, gopowerstore.RsActionResume, mock.Anything).Unset()
 					// return an error message when the replication session state cannot be restored
 					clientMock.On("ExecuteActionOnReplicationSession", mock.Anything, validSessionID, gopowerstore.RsActionResume, mock.Anything).
 						Return(gopowerstore.EmptyResponse(""), gopowerstore.APIError{
@@ -1936,6 +1960,9 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				})
 
 				ginkgo.It("should fail if the volume cannot be removed from the volume group", func() {
+					// override the good mock
+					clientMock.On("RemoveMembersFromVolumeGroup", mock.Anything, &gopowerstore.VolumeGroupMembers{VolumeIDs: []string{validBaseVolID}}, validGroupID).
+						Unset()
 					// return an http error code when the volume cannot be removed from the volume group
 					clientMock.On("RemoveMembersFromVolumeGroup", mock.Anything, &gopowerstore.VolumeGroupMembers{VolumeIDs: []string{validBaseVolID}}, validGroupID).
 						Return(gopowerstore.EmptyResponse(""), gopowerstore.APIError{
@@ -1970,6 +1997,24 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				gomega.Expect(res).To(gomega.Equal(&csi.DeleteVolumeResponse{}))
 			})
 
+			ginkgo.It("should report success even if the metro volume is not found", func() {
+				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).Return(gopowerstore.VolumeGroups{}, nil)
+				clientMock.On("GetSnapshotsByVolumeID", mock.Anything, validBaseVolID).Return([]gopowerstore.Volume{}, nil)
+				// report the volume as 404 Not Found.
+				clientMock.On("GetVolume", mock.Anything, validBaseVolID).
+					Return(gopowerstore.Volume{}, gopowerstore.APIError{
+						ErrorMsg: &api.ErrorMsg{
+							StatusCode: http.StatusNotFound,
+						},
+					})
+
+				req := &csi.DeleteVolumeRequest{VolumeId: validMetroVolumeID}
+				res, err := ctrlSvc.DeleteVolume(context.Background(), req)
+
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.DeleteVolumeResponse{}))
+			})
+
 			ginkgo.It("should fail to delete block metro volume", func() {
 				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).Return(gopowerstore.VolumeGroups{}, nil)
 				clientMock.On("GetSnapshotsByVolumeID", mock.Anything, validBaseVolID).Return([]gopowerstore.Volume{}, nil)
@@ -1984,6 +2029,26 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				gomega.Expect(err).ToNot(gomega.BeNil())
 				gomega.Expect(res).To(gomega.BeNil())
 				gomega.Expect(err.Error()).To(gomega.ContainSubstring("failure ending metro session on volume"))
+			})
+
+			ginkgo.It("should fail to delete the block metro volume if the volume info cannot be retrieved", func() {
+				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).Return(gopowerstore.VolumeGroups{}, nil)
+				clientMock.On("GetSnapshotsByVolumeID", mock.Anything, validBaseVolID).Return([]gopowerstore.Volume{}, nil)
+
+				// Return an 500 error when getting the volume
+				clientMock.On("GetVolume", mock.Anything, validBaseVolID).
+					Return(gopowerstore.Volume{}, gopowerstore.APIError{
+						ErrorMsg: &api.ErrorMsg{
+							StatusCode: http.StatusInternalServerError,
+						},
+					})
+
+				req := &csi.DeleteVolumeRequest{VolumeId: validMetroVolumeID}
+				res, err := ctrlSvc.DeleteVolume(context.Background(), req)
+
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("failure getting volume"))
 			})
 		})
 
