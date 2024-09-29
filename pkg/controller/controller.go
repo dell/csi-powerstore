@@ -1286,18 +1286,21 @@ func (s *Service) ListSnapshots(ctx context.Context, req *csi.ListSnapshotsReque
 	}, nil
 }
 
-func pauseSessionIfMetro(isMetroSession bool, powerStoreClient gopowerstore.Client, ctx context.Context, id string) {
+func pauseSessionIfMetro(isMetroSession bool, powerStoreClient gopowerstore.Client, ctx context.Context, id string) (gopowerstore.EmptyResponse, error) {
 	if isMetroSession {
 		var params *gopowerstore.FailoverParams
-		powerStoreClient.ExecuteActionOnReplicationSession(ctx, id, "pause", params)
+		return powerStoreClient.ExecuteActionOnReplicationSession(ctx, id, "pause", params)
 	}
+
+	return "", nil
 }
 
-func resumeSessionIfMetro(isMetroSession bool, powerStoreClient gopowerstore.Client, ctx context.Context, id string) {
+func resumeSessionIfMetro(isMetroSession bool, powerStoreClient gopowerstore.Client, ctx context.Context, id string) (gopowerstore.EmptyResponse, error) {
 	if isMetroSession {
 		var params *gopowerstore.FailoverParams
 		powerStoreClient.ExecuteActionOnReplicationSession(ctx, id, "resume", params)
 	}
+	return "", nil
 }
 
 // ControllerExpandVolume resizes Volume or FileSystem by increasing available volume capacity in the storage array.
@@ -1341,9 +1344,18 @@ func (s *Service) ControllerExpandVolume(ctx context.Context, req *csi.Controlle
 		}
 
 		if vol.Size < requiredBytes {
-			pauseSessionIfMetro(isMetroSession, powerStoreClient, ctx, replicationSessionId)
+			_, err = pauseSessionIfMetro(isMetroSession, powerStoreClient, ctx, replicationSessionId)
+			if err != nil {
+				return nil, err
+			}
+
 			_, err = powerStoreClient.ModifyVolume(context.Background(), &gopowerstore.VolumeModify{Size: requiredBytes}, id)
-			resumeSessionIfMetro(isMetroSession, powerStoreClient, ctx, replicationSessionId)
+
+			_, resumeSessionErr := resumeSessionIfMetro(isMetroSession, powerStoreClient, ctx, replicationSessionId)
+			if resumeSessionErr != nil {
+				return nil, resumeSessionErr
+			}
+
 			if err != nil {
 				return nil, err
 			}
