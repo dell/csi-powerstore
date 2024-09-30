@@ -263,27 +263,43 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 		}
 		repMode := params[s.WithRP(KeyReplicationMode)]
 		if repMode == "" {
-			repMode = "ASYNC"
+			repMode = common.AsyncMode
 		}
 		repMode = strings.ToUpper(repMode)
 
 		switch repMode {
-		case "SYNC", "ASYNC":
+		case common.SyncMode, common.AsyncMode:
 			// handle Sync and Async modes where protection policy with replication rule is applied on volume group
 			log.Infof("%s replication mode requested", repMode)
 			vgPrefix, ok := params[s.WithRP(KeyReplicationVGPrefix)]
 			if !ok {
 				return nil, status.Errorf(codes.InvalidArgument, "replication enabled but no volume group prefix specified in storage class")
 			}
+
 			rpo, ok := params[s.WithRP(KeyReplicationRPO)]
 			if !ok {
-				return nil, status.Errorf(codes.InvalidArgument, "replication enabled but no RPO specified in storage class")
+				// If Replication mode is ASYNC and there is no RPO specified, returning an error
+				if repMode == common.AsyncMode {
+					return nil, status.Errorf(codes.InvalidArgument, "replication mode is ASYNC but no RPO specified in storage class")
+				}
+				// If Replication mode is SYNC and there is no RPO, defaulting the value to Zero
+				rpo = common.Zero
 			}
 			rpoEnum := gopowerstore.RPOEnum(rpo)
 			if err := rpoEnum.IsValid(); err != nil {
 				return nil, status.Errorf(codes.InvalidArgument, "invalid RPO value")
 			}
 
+			// Validating RPO to be non Zero when replication mode is ASYNC
+			if repMode == common.AsyncMode && rpo == common.Zero {
+				log.Errorf("RPO value for %s cannot be : %s", repMode, rpo)
+				return nil, status.Errorf(codes.InvalidArgument, "replication mode ASYNC requires RPO value to be non Zero")
+			}
+
+			// Validating RPO to be Zero whe replication mode is SYNC
+			if repMode == common.SyncMode && rpo != common.Zero {
+				return nil, status.Errorf(codes.InvalidArgument, "replication mode SYNC requires RPO value to be Zero")
+			}
 			namespace := ""
 			if ignoreNS, ok := params[s.WithRP(KeyReplicationIgnoreNamespaces)]; ok && ignoreNS == "false" {
 				pvcNS, ok := params[KeyCSIPVCNamespace]
@@ -302,15 +318,24 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 				if apiError, ok := err.(gopowerstore.APIError); ok && apiError.NotFound() {
 					log.Infof("Volume group with name %s not found, creating it", vgName)
 
+					// Attribute that indicates whether snapshot sets of the volumegroup will be write-order consistent.
+					isWriteOrderConsistent := false
+
 					// ensure protection policy exists
 					pp, err := EnsureProtectionPolicyExists(ctx, arr, vgName, remoteSystemName, rpoEnum)
 					if err != nil {
 						return nil, status.Errorf(codes.Internal, "can't ensure protection policy exists %s", err.Error())
 					}
 
+					// To apply a  ProtectionPolicy with Sync rule, VolumeGroup must be write-order-consistent
+					if repMode == common.SyncMode {
+						isWriteOrderConsistent = true
+					}
+
 					group, err := arr.Client.CreateVolumeGroup(ctx, &gopowerstore.VolumeGroupCreate{
-						Name:               vgName,
-						ProtectionPolicyID: pp,
+						Name:                   vgName,
+						ProtectionPolicyID:     pp,
+						IsWriteOrderConsistent: isWriteOrderConsistent,
 					})
 					if err != nil {
 						return nil, status.Errorf(codes.Internal, "can't create volume group: %s", err.Error())
@@ -325,6 +350,12 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 					return nil, status.Errorf(codes.Internal, "can't query volume group by name %s : %s", vgName, err.Error())
 				}
 			} else {
+				// if Replication mode is SYNC, check if the VolumeGroup is write-order consistent
+				if repMode == common.SyncMode {
+					if !vg.IsWriteOrderConsistent {
+						return nil, status.Errorf(codes.Internal, "can't apply protection policy with sync rule if volume group is not write-order consistent")
+					}
+				}
 				// group exists, check that protection policy applied
 				if vg.ProtectionPolicyID == "" {
 					pp, err := EnsureProtectionPolicyExists(ctx, arr, vgName, remoteSystemName, rpoEnum)
@@ -342,7 +373,7 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 			if c, ok := creator.(*SCSICreator); ok {
 				c.vg = &vg
 			}
-		case "METRO":
+		case common.Metro:
 			// handle Metro mode where metro is configured directly on the volume (or volume group if requested)
 			log.Info("Metro replication mode requested")
 

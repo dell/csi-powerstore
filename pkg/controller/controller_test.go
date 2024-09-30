@@ -45,42 +45,48 @@ import (
 )
 
 const (
-	validBaseVolID            = "39bb1b5f-5624-490d-9ece-18f7b28a904e"
-	validBlockVolumeID        = "39bb1b5f-5624-490d-9ece-18f7b28a904e/globalvolid1/scsi"
-	validNfsVolumeID          = "39bb1b5f-5624-490d-9ece-18f7b28a904e/globalvolid2/nfs"
-	invalidBlockVolumeID      = "39bb1b5f-5624-490d-9ece-18f7b28a904e/globalvolid3/scsi"
-	validNasID                = "24aefac2-a796-47dc-886a-c73ff8c1a671"
-	validVolSize              = 16 * 1024 * 1024 * 1024
-	firstValidID              = "globalvolid1"
-	secondValidID             = "globalvolid2"
-	validNasName              = "my-nas-name"
-	validSnapName             = "my-snap"
-	validNodeID               = "csi-node-1a47a1b91c444a8a90193d8066669603-127.0.0.1"
-	validHostName             = "csi-node-1a47a1b91c444a8a90193d8066669603"
-	validHostID               = "24aefac2-a796-47dc-886a-c73ff8c1a671"
-	validClusterName          = "localSystemName"
-	validRemoteVolID          = "9f840c56-96e6-4de9-b5a3-27e7c20eaa77"
-	validRemoteSystemName     = "remoteName"
-	validRemoteSystemID       = "df7f804c-6373-4659-b197-36654d17979c"
-	validRPO                  = "Five_Minutes"
-	validGroupID              = "610adaef-4f0a-4dff-9812-29ffa5daf185"
-	validRemoteGroupID        = "62ed932b-329b-4ba6-b0e0-3f51c34c4701"
-	validSessionID            = "9abd0198-2733-4e46-b5fa-456e9c367184"
-	validNamespaceName        = "default"
-	validGroupName            = "csi-" + validRemoteSystemName + "-" + validRPO
-	validNamespacedGroupName  = "csi-" + validNamespaceName + "-" + validRemoteSystemName + "-" + validRPO
-	validPolicyID             = "e74f6cfd-ae2a-4cde-ad6b-529b40edee5e"
-	validPolicyName           = "pp-" + validGroupName
-	validRuleID               = "c721f30b-0b37-4aaf-a3a2-ef99caba2100"
-	validRuleName             = "rr-" + validGroupName
-	validReplicationPrefix    = "/" + controller.KeyReplicationEnabled
-	validVolumeGroupName      = "VGName"
-	validRemoteSystemGlobalID = "PS111111111111"
-	validNfsAcls              = "A::OWNER@:RWX"
-	validNfsServerID          = "24aefac2-a796-47dc-886a-c73ff8c1a671"
-	validApplianceID          = "my-appliance"
-	validRemoteApplianceID    = "my-appliance2"
-	validServiceTag           = "service-tag"
+	validBaseVolID               = "39bb1b5f-5624-490d-9ece-18f7b28a904e"
+	validBlockVolumeID           = "39bb1b5f-5624-490d-9ece-18f7b28a904e/globalvolid1/scsi"
+	validNfsVolumeID             = "39bb1b5f-5624-490d-9ece-18f7b28a904e/globalvolid2/nfs"
+	invalidBlockVolumeID         = "39bb1b5f-5624-490d-9ece-18f7b28a904e/globalvolid3/scsi"
+	validNasID                   = "24aefac2-a796-47dc-886a-c73ff8c1a671"
+	validVolSize                 = 16 * 1024 * 1024 * 1024
+	firstValidID                 = "globalvolid1"
+	secondValidID                = "globalvolid2"
+	validNasName                 = "my-nas-name"
+	validSnapName                = "my-snap"
+	validNodeID                  = "csi-node-1a47a1b91c444a8a90193d8066669603-127.0.0.1"
+	validHostName                = "csi-node-1a47a1b91c444a8a90193d8066669603"
+	validHostID                  = "24aefac2-a796-47dc-886a-c73ff8c1a671"
+	validClusterName             = "localSystemName"
+	validRemoteVolID             = "9f840c56-96e6-4de9-b5a3-27e7c20eaa77"
+	validRemoteSystemName        = "remoteName"
+	validRemoteSystemID          = "df7f804c-6373-4659-b197-36654d17979c"
+	validSessionID               = "9abd0198-2733-4e46-b5fa-456e9c367184"
+	validRPO                     = "Five_Minutes"
+	zeroRPO                      = "Zero"
+	replicationModeSync          = "SYNC"
+	replicationModeAsync         = "ASYNC"
+	validGroupID                 = "610adaef-4f0a-4dff-9812-29ffa5daf185"
+	validRemoteGroupID           = "62ed932b-329b-4ba6-b0e0-3f51c34c4701"
+	validNamespaceName           = "default"
+	validGroupName               = "csi-" + validRemoteSystemName + "-" + validRPO
+	validGroupNameSync           = "csi-" + validRemoteSystemName + "-" + zeroRPO
+	validNamespacedGroupName     = "csi-" + validNamespaceName + "-" + validRemoteSystemName + "-" + validRPO
+	validNamespacedGroupNameSync = "csi-" + validNamespaceName + "-" + validRemoteSystemName + "-" + zeroRPO
+	validPolicyID                = "e74f6cfd-ae2a-4cde-ad6b-529b40edee5e"
+	validPolicyName              = "pp-" + validGroupName
+	validPolicyNameSync          = "pp-" + validGroupNameSync
+	validRuleID                  = "c721f30b-0b37-4aaf-a3a2-ef99caba2100"
+	validRuleName                = "rr-" + validGroupName
+	validReplicationPrefix       = "/" + controller.KeyReplicationEnabled
+	validVolumeGroupName         = "VGName"
+	validRemoteSystemGlobalID    = "PS111111111111"
+	validNfsAcls                 = "A::OWNER@:RWX"
+	validNfsServerID             = "24aefac2-a796-47dc-886a-c73ff8c1a671"
+	validApplianceID             = "my-appliance"
+	validRemoteApplianceID       = "my-appliance2"
+	validServiceTag              = "service-tag"
 )
 
 var (
@@ -244,7 +250,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
 		})
 
-		ginkgo.It("should create volume and volumeGroup if policy exists", func() {
+		ginkgo.It("should create volume and volumeGroup if policy exists - ASYNC", func() {
 			clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
 			clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
 			clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
@@ -286,7 +292,54 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			}))
 		})
 
-		ginkgo.It("should create vg with namespace if namespaces not ignored", func() {
+		ginkgo.It("should create volume and volumeGroup if policy exists - SYNC", func() {
+			clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+			clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
+			clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
+			// Setting Replciation mode and corresponding attributes for SYNC
+			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationMode)] = replicationModeSync
+			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationRPO)] = zeroRPO
+
+			// all entities not exists
+			clientMock.On("GetVolumeGroupByName", mock.Anything, validGroupNameSync).
+				Return(gopowerstore.VolumeGroup{}, gopowerstore.NewNotFoundError())
+
+			EnsureProtectionPolicyExistsMockSync()
+
+			createGroupRequest := &gopowerstore.VolumeGroupCreate{Name: validGroupNameSync, ProtectionPolicyID: validPolicyID, IsWriteOrderConsistent: true}
+			clientMock.On("CreateVolumeGroup", mock.Anything, createGroupRequest).Return(gopowerstore.CreateResponse{ID: validGroupID}, nil)
+			clientMock.On("GetVolumeGroup", mock.Anything, validGroupID).Return(gopowerstore.VolumeGroup{ID: validGroupID, ProtectionPolicyID: validPolicyID}, nil)
+
+			clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
+			clientMock.On("GetVolume", context.Background(), mock.Anything).Return(gopowerstore.Volume{ApplianceID: validApplianceID}, nil)
+			clientMock.On("GetAppliance", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
+
+			res, err := ctrlSvc.CreateVolume(context.Background(), req)
+			gomega.Expect(err).To(gomega.BeNil())
+			gomega.Expect(res).To(gomega.Equal(&csi.CreateVolumeResponse{
+				Volume: &csi.Volume{
+					CapacityBytes: validVolSize,
+					VolumeId:      filepath.Join(validBaseVolID, firstValidID, "scsi"),
+					VolumeContext: map[string]string{
+						common.KeyArrayVolumeName:                                 "my-vol",
+						common.KeyProtocol:                                        "scsi",
+						common.KeyArrayID:                                         firstValidID,
+						common.KeyVolumeDescription:                               req.Name + "-" + validNamespaceName,
+						common.KeyServiceTag:                                      validServiceTag,
+						controller.KeyCSIPVCName:                                  req.Name,
+						controller.KeyCSIPVCNamespace:                             validNamespaceName,
+						ctrlSvc.WithRP(controller.KeyReplicationMode):             replicationModeSync,
+						ctrlSvc.WithRP(controller.KeyReplicationEnabled):          "true",
+						ctrlSvc.WithRP(controller.KeyReplicationRPO):              zeroRPO,
+						ctrlSvc.WithRP(controller.KeyReplicationRemoteSystem):     validRemoteSystemName,
+						ctrlSvc.WithRP(controller.KeyReplicationIgnoreNamespaces): "true",
+						ctrlSvc.WithRP(controller.KeyReplicationVGPrefix):         "csi",
+					},
+				},
+			}))
+		})
+
+		ginkgo.It("should create vg with namespace if namespaces not ignored - ASYNC", func() {
 			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationIgnoreNamespaces)] = "false"
 			req.Parameters[controller.KeyCSIPVCName] = req.Name
 			req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
@@ -341,7 +394,66 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			}))
 		})
 
-		ginkgo.It("should create new volume with existing volumeGroup with policy", func() {
+		ginkgo.It("should create vg with namespace if namespaces not ignored - SYNC", func() {
+			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationIgnoreNamespaces)] = "false"
+			req.Parameters[controller.KeyCSIPVCName] = req.Name
+			req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
+			// Setting Replciation mode and corresponding attributes for SYNC
+			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationMode)] = replicationModeSync
+			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationRPO)] = zeroRPO
+
+			defer func() {
+				req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationIgnoreNamespaces)] = "true"
+				req.Parameters[controller.KeyCSIPVCNamespace] = ""
+			}()
+
+			clientMock.On("GetVolumeGroupByName", mock.Anything, validNamespacedGroupNameSync).
+				Return(gopowerstore.VolumeGroup{}, gopowerstore.NewNotFoundError())
+
+			clientMock.On("GetRemoteSystemByName", mock.Anything, validRemoteSystemName).Return(gopowerstore.RemoteSystem{
+				Name: validRemoteSystemName,
+				ID:   validRemoteSystemID,
+			}, nil)
+
+			clientMock.On("GetProtectionPolicyByName", mock.Anything, "pp-"+validNamespacedGroupNameSync).
+				Return(gopowerstore.ProtectionPolicy{ID: validPolicyID}, nil)
+
+			createGroupRequest := &gopowerstore.VolumeGroupCreate{Name: validNamespacedGroupNameSync, ProtectionPolicyID: validPolicyID, IsWriteOrderConsistent: true}
+			clientMock.On("CreateVolumeGroup", mock.Anything, createGroupRequest).Return(gopowerstore.CreateResponse{ID: validGroupID}, nil)
+			clientMock.On("GetVolumeGroup", mock.Anything, validGroupID).Return(gopowerstore.VolumeGroup{ID: validGroupID, ProtectionPolicyID: validPolicyID}, nil)
+			clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+			clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
+			clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
+			clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
+			clientMock.On("GetVolume", context.Background(), mock.Anything).Return(gopowerstore.Volume{ApplianceID: validApplianceID}, nil)
+			clientMock.On("GetAppliance", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
+
+			res, err := ctrlSvc.CreateVolume(context.Background(), req)
+			gomega.Expect(err).To(gomega.BeNil())
+			gomega.Expect(res).To(gomega.Equal(&csi.CreateVolumeResponse{
+				Volume: &csi.Volume{
+					CapacityBytes: validVolSize,
+					VolumeId:      filepath.Join(validBaseVolID, firstValidID, "scsi"),
+					VolumeContext: map[string]string{
+						common.KeyArrayVolumeName:                                 "my-vol",
+						common.KeyProtocol:                                        "scsi",
+						common.KeyArrayID:                                         firstValidID,
+						common.KeyVolumeDescription:                               req.Name + "-" + validNamespaceName,
+						common.KeyServiceTag:                                      validServiceTag,
+						controller.KeyCSIPVCName:                                  req.Name,
+						controller.KeyCSIPVCNamespace:                             validNamespaceName,
+						ctrlSvc.WithRP(controller.KeyReplicationMode):             replicationModeSync,
+						ctrlSvc.WithRP(controller.KeyReplicationEnabled):          "true",
+						ctrlSvc.WithRP(controller.KeyReplicationRPO):              zeroRPO,
+						ctrlSvc.WithRP(controller.KeyReplicationRemoteSystem):     validRemoteSystemName,
+						ctrlSvc.WithRP(controller.KeyReplicationIgnoreNamespaces): "false",
+						ctrlSvc.WithRP(controller.KeyReplicationVGPrefix):         "csi",
+					},
+				},
+			}))
+		})
+
+		ginkgo.It("should create new volume with existing volumeGroup with policy - ASYNC", func() {
 			clientMock.On("GetVolumeGroupByName", mock.Anything, validGroupName).
 				Return(gopowerstore.VolumeGroup{ID: validGroupID, ProtectionPolicyID: validPolicyID}, nil)
 
@@ -378,7 +490,70 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			}))
 		})
 
-		ginkgo.It("should create volume and update volumeGroup without policy, but policy exists", func() {
+		ginkgo.It("should create new volume with existing volumeGroup with policy - SYNC", func() {
+			clientMock.On("GetVolumeGroupByName", mock.Anything, validGroupNameSync).
+				Return(gopowerstore.VolumeGroup{ID: validGroupID, ProtectionPolicyID: validPolicyID, IsWriteOrderConsistent: true}, nil)
+			// Setting Replciation mode and corresponding attributes for SYNC
+			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationMode)] = replicationModeSync
+			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationRPO)] = zeroRPO
+
+			req.Parameters[controller.KeyCSIPVCName] = req.Name
+			req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
+			clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+			clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
+			clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
+			clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
+			clientMock.On("GetVolume", context.Background(), mock.Anything).Return(gopowerstore.Volume{ApplianceID: validApplianceID}, nil)
+			clientMock.On("GetAppliance", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
+
+			res, err := ctrlSvc.CreateVolume(context.Background(), req)
+			gomega.Expect(err).To(gomega.BeNil())
+			gomega.Expect(res).To(gomega.Equal(&csi.CreateVolumeResponse{
+				Volume: &csi.Volume{
+					CapacityBytes: validVolSize,
+					VolumeId:      filepath.Join(validBaseVolID, firstValidID, "scsi"),
+					VolumeContext: map[string]string{
+						common.KeyArrayVolumeName:                                 "my-vol",
+						common.KeyProtocol:                                        "scsi",
+						common.KeyArrayID:                                         firstValidID,
+						common.KeyVolumeDescription:                               req.Name + "-" + validNamespaceName,
+						common.KeyServiceTag:                                      validServiceTag,
+						controller.KeyCSIPVCName:                                  req.Name,
+						controller.KeyCSIPVCNamespace:                             validNamespaceName,
+						ctrlSvc.WithRP(controller.KeyReplicationEnabled):          "true",
+						ctrlSvc.WithRP(controller.KeyReplicationMode):             replicationModeSync,
+						ctrlSvc.WithRP(controller.KeyReplicationRPO):              zeroRPO,
+						ctrlSvc.WithRP(controller.KeyReplicationRemoteSystem):     validRemoteSystemName,
+						ctrlSvc.WithRP(controller.KeyReplicationIgnoreNamespaces): "true",
+						ctrlSvc.WithRP(controller.KeyReplicationVGPrefix):         "csi",
+					},
+				},
+			}))
+		})
+
+		ginkgo.It("should fail create new volume with existing volumeGroup with policy and when IsWriteOrderConsistent is false - SYNC", func() {
+			clientMock.On("GetVolumeGroupByName", mock.Anything, validGroupNameSync).
+				Return(gopowerstore.VolumeGroup{ID: validGroupID, ProtectionPolicyID: validPolicyID}, nil)
+			// Setting Replciation mode and corresponding attributes for SYNC
+			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationMode)] = replicationModeSync
+			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationRPO)] = zeroRPO
+
+			req.Parameters[controller.KeyCSIPVCName] = req.Name
+			req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
+			clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+			clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
+			clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
+			clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
+			clientMock.On("GetVolume", context.Background(), mock.Anything).Return(gopowerstore.Volume{ApplianceID: validApplianceID}, nil)
+			clientMock.On("GetAppliance", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
+
+			res, err := ctrlSvc.CreateVolume(context.Background(), req)
+			gomega.Expect(res).To(gomega.BeNil())
+			gomega.Expect(err).NotTo(gomega.BeNil())
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("can't apply protection policy with sync rule if volume group is not write-order consistent"))
+		})
+
+		ginkgo.It("should create volume and update volumeGroup without policy, but policy exists - ASYNC", func() {
 			clientMock.On("GetVolumeGroupByName", mock.Anything, validGroupName).
 				Return(gopowerstore.VolumeGroup{ID: validGroupID, ProtectionPolicyID: validPolicyID}, nil)
 
@@ -415,6 +590,226 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 					},
 				},
 			}))
+		})
+
+		ginkgo.It("should create volume and update volumeGroup without policy, but policy exists - SYNC", func() {
+			clientMock.On("GetVolumeGroupByName", mock.Anything, validGroupNameSync).
+				Return(gopowerstore.VolumeGroup{ID: validGroupID, ProtectionPolicyID: validPolicyID, IsWriteOrderConsistent: true}, nil)
+
+			EnsureProtectionPolicyExistsMockSync()
+
+			req.Parameters[controller.KeyCSIPVCName] = req.Name
+			req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
+			// Setting Replciation mode and corresponding attributes for SYNC
+			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationMode)] = replicationModeSync
+			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationRPO)] = zeroRPO
+			clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+			clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
+			clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
+			clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
+			clientMock.On("GetVolume", context.Background(), mock.Anything).Return(gopowerstore.Volume{ApplianceID: validApplianceID}, nil)
+			clientMock.On("GetAppliance", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
+
+			res, err := ctrlSvc.CreateVolume(context.Background(), req)
+			gomega.Expect(err).To(gomega.BeNil())
+			gomega.Expect(res).To(gomega.Equal(&csi.CreateVolumeResponse{
+				Volume: &csi.Volume{
+					CapacityBytes: validVolSize,
+					VolumeId:      filepath.Join(validBaseVolID, firstValidID, "scsi"),
+					VolumeContext: map[string]string{
+						common.KeyArrayVolumeName:                                 "my-vol",
+						common.KeyProtocol:                                        "scsi",
+						common.KeyArrayID:                                         firstValidID,
+						common.KeyVolumeDescription:                               req.Name + "-" + validNamespaceName,
+						common.KeyServiceTag:                                      validServiceTag,
+						controller.KeyCSIPVCName:                                  req.Name,
+						controller.KeyCSIPVCNamespace:                             validNamespaceName,
+						ctrlSvc.WithRP(controller.KeyReplicationEnabled):          "true",
+						ctrlSvc.WithRP(controller.KeyReplicationMode):             replicationModeSync,
+						ctrlSvc.WithRP(controller.KeyReplicationRPO):              zeroRPO,
+						ctrlSvc.WithRP(controller.KeyReplicationRemoteSystem):     validRemoteSystemName,
+						ctrlSvc.WithRP(controller.KeyReplicationIgnoreNamespaces): "true",
+						ctrlSvc.WithRP(controller.KeyReplicationVGPrefix):         "csi",
+					},
+				},
+			}))
+		})
+
+		ginkgo.It("should fail create volume and update volumeGroup without policy, but policy exists when IsWriteOrderConsistent is false - SYNC", func() {
+			clientMock.On("GetVolumeGroupByName", mock.Anything, validGroupNameSync).
+				Return(gopowerstore.VolumeGroup{ID: validGroupID, ProtectionPolicyID: validPolicyID}, nil)
+
+			EnsureProtectionPolicyExistsMockSync()
+
+			req.Parameters[controller.KeyCSIPVCName] = req.Name
+			req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
+			// Setting Replciation mode and corresponding attributes for SYNC
+			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationMode)] = replicationModeSync
+			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationRPO)] = zeroRPO
+			clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+			clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
+			clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
+			clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
+			clientMock.On("GetVolume", context.Background(), mock.Anything).Return(gopowerstore.Volume{ApplianceID: validApplianceID}, nil)
+			clientMock.On("GetAppliance", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
+
+			res, err := ctrlSvc.CreateVolume(context.Background(), req)
+			gomega.Expect(res).To(gomega.BeNil())
+			gomega.Expect(err).NotTo(gomega.BeNil())
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("can't apply protection policy with sync rule if volume group is not write-order consistent"))
+		})
+
+		ginkgo.It("should fail create volume and update volumeGroup if we can't ensure that policy exists - ASYNC", func() {
+			clientMock.On("GetVolumeGroupByName", mock.Anything, validGroupName).
+				Return(gopowerstore.VolumeGroup{}, gopowerstore.NewNotFoundError())
+
+			clientMock.On("GetRemoteSystemByName", mock.Anything, validRemoteSystemName).
+				Return(gopowerstore.RemoteSystem{}, gopowerstore.NewHostIsNotExistError())
+
+			res, err := ctrlSvc.CreateVolume(context.Background(), req)
+			gomega.Expect(res).To(gomega.BeNil())
+			gomega.Expect(err).NotTo(gomega.BeNil())
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("can't ensure protection policy exists"))
+		})
+
+		ginkgo.It("should fail create volume and update volumeGroup if we can't ensure that policy exists - SYNC", func() {
+			clientMock.On("GetVolumeGroupByName", mock.Anything, validGroupNameSync).
+				Return(gopowerstore.VolumeGroup{}, gopowerstore.NewNotFoundError())
+
+			clientMock.On("GetRemoteSystemByName", mock.Anything, validRemoteSystemName).
+				Return(gopowerstore.RemoteSystem{}, gopowerstore.NewHostIsNotExistError())
+
+			// Setting Replciation mode and corresponding attributes for SYNC
+			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationMode)] = replicationModeSync
+			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationRPO)] = zeroRPO
+
+			res, err := ctrlSvc.CreateVolume(context.Background(), req)
+			gomega.Expect(res).To(gomega.BeNil())
+			gomega.Expect(err).NotTo(gomega.BeNil())
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("can't ensure protection policy exists"))
+		})
+
+		ginkgo.It("should fail when rpo incorrect", func() {
+			clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
+
+			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationRPO)] = "invalidRpo"
+
+			res, err := ctrlSvc.CreateVolume(context.Background(), req)
+			gomega.Expect(res).To(gomega.BeNil())
+			gomega.Expect(err).NotTo(gomega.BeNil())
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("invalid RPO value"))
+		})
+
+		ginkgo.It("should fail when rpo not declared in parameters -ASYNC", func() {
+			delete(req.Parameters, ctrlSvc.WithRP(controller.KeyReplicationRPO))
+
+			res, err := ctrlSvc.CreateVolume(context.Background(), req)
+			gomega.Expect(res).To(gomega.BeNil())
+			gomega.Expect(err).NotTo(gomega.BeNil())
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("replication mode is ASYNC but no RPO specified in storage class"))
+		})
+
+		ginkgo.It("should default RPO to Zero when mode is SYNC and RPO is not specified", func() {
+			delete(req.Parameters, ctrlSvc.WithRP(controller.KeyReplicationRPO))
+			clientMock.On("GetVolumeGroupByName", mock.Anything, validGroupNameSync).
+				Return(gopowerstore.VolumeGroup{ID: validGroupID, ProtectionPolicyID: validPolicyID, IsWriteOrderConsistent: true}, nil)
+
+			EnsureProtectionPolicyExistsMockSync()
+
+			clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+			clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
+			clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
+			clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
+			clientMock.On("GetVolume", context.Background(), mock.Anything).Return(gopowerstore.Volume{ApplianceID: validApplianceID}, nil)
+			clientMock.On("GetAppliance", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
+
+			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationMode)] = "SYNC"
+			res, err := ctrlSvc.CreateVolume(context.Background(), req)
+			gomega.Expect(err).To(gomega.BeNil())
+			gomega.Expect(res).To(gomega.Equal(&csi.CreateVolumeResponse{
+				Volume: &csi.Volume{
+					CapacityBytes: validVolSize,
+					VolumeId:      filepath.Join(validBaseVolID, firstValidID, "scsi"),
+					VolumeContext: map[string]string{
+						common.KeyArrayVolumeName:                                 "my-vol",
+						common.KeyProtocol:                                        "scsi",
+						common.KeyArrayID:                                         firstValidID,
+						common.KeyVolumeDescription:                               req.Name + "-" + validNamespaceName,
+						common.KeyServiceTag:                                      validServiceTag,
+						controller.KeyCSIPVCName:                                  req.Name,
+						controller.KeyCSIPVCNamespace:                             validNamespaceName,
+						ctrlSvc.WithRP(controller.KeyReplicationEnabled):          "true",
+						ctrlSvc.WithRP(controller.KeyReplicationMode):             replicationModeSync,
+						ctrlSvc.WithRP(controller.KeyReplicationRemoteSystem):     validRemoteSystemName,
+						ctrlSvc.WithRP(controller.KeyReplicationIgnoreNamespaces): "true",
+						ctrlSvc.WithRP(controller.KeyReplicationVGPrefix):         "csi",
+					},
+				},
+			}))
+		})
+
+		ginkgo.It("should fail when remote system not declared in parameters", func() {
+			delete(req.Parameters, ctrlSvc.WithRP(controller.KeyReplicationRemoteSystem))
+
+			res, err := ctrlSvc.CreateVolume(context.Background(), req)
+			gomega.Expect(res).To(gomega.BeNil())
+			gomega.Expect(err).NotTo(gomega.BeNil())
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("replication enabled but no remote system specified in storage class"))
+		})
+
+		ginkgo.It("should fail when mode is incorrect", func() {
+			clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
+
+			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationMode)] = "SYNCMETRO"
+
+			res, err := ctrlSvc.CreateVolume(context.Background(), req)
+			gomega.Expect(res).To(gomega.BeNil())
+			gomega.Expect(err).NotTo(gomega.BeNil())
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("invalid replication mode"))
+		})
+
+		ginkgo.It("should fail when mode is ASYNC and RPO is Zero", func() {
+			clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
+
+			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationMode)] = replicationModeAsync
+			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationRPO)] = zeroRPO
+			res, err := ctrlSvc.CreateVolume(context.Background(), req)
+			gomega.Expect(res).To(gomega.BeNil())
+			gomega.Expect(err).NotTo(gomega.BeNil())
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("replication mode ASYNC requires RPO value to be non Zero"))
+		})
+
+		ginkgo.It("should fail when mode is SYNC and RPO is not Zero", func() {
+			clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
+
+			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationMode)] = "SYNC"
+			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationRPO)] = validRPO
+			res, err := ctrlSvc.CreateVolume(context.Background(), req)
+			gomega.Expect(res).To(gomega.BeNil())
+			gomega.Expect(err).NotTo(gomega.BeNil())
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("replication mode SYNC requires RPO value to be Zero"))
+		})
+
+		ginkgo.It("should fail when volume group prefix not declared in parameters", func() {
+			delete(req.Parameters, ctrlSvc.WithRP(controller.KeyReplicationVGPrefix))
+
+			res, err := ctrlSvc.CreateVolume(context.Background(), req)
+			gomega.Expect(res).To(gomega.BeNil())
+			gomega.Expect(err).NotTo(gomega.BeNil())
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("replication enabled but no volume group prefix specified in storage class"))
+		})
+
+		ginkgo.It("should fail when invalid remote system is specified in parameters for metro volume", func() {
+			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationMode)] = "METRO"
+			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationRemoteSystem)] = "invalid"
+
+			clientMock.On("GetRemoteSystemByName", mock.Anything, "invalid").Return(gopowerstore.RemoteSystem{}, gopowerstore.NewNotFoundError())
+
+			res, err := ctrlSvc.CreateVolume(context.Background(), req)
+
+			gomega.Expect(res).To(gomega.BeNil())
+			gomega.Expect(err).NotTo(gomega.BeNil())
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("can't query remote system by name"))
 		})
 
 		ginkgo.Context("replication type is metro", func() {
@@ -536,81 +931,6 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				gomega.Expect(err.Error()).To(gomega.ContainSubstring((fmt.Sprintf("replication session %s has a resource type %s, wanted type 'volume'",
 					validSessionID, resourceType))))
 			})
-		})
-
-		ginkgo.It("should fail create volume and update volumeGroup if we can't ensure that policy exists", func() {
-			clientMock.On("GetVolumeGroupByName", mock.Anything, validGroupName).
-				Return(gopowerstore.VolumeGroup{}, gopowerstore.NewNotFoundError())
-
-			clientMock.On("GetRemoteSystemByName", mock.Anything, validRemoteSystemName).
-				Return(gopowerstore.RemoteSystem{}, gopowerstore.NewHostIsNotExistError())
-
-			res, err := ctrlSvc.CreateVolume(context.Background(), req)
-			gomega.Expect(res).To(gomega.BeNil())
-			gomega.Expect(err).NotTo(gomega.BeNil())
-			gomega.Expect(err.Error()).To(gomega.ContainSubstring("can't ensure protection policy exists"))
-		})
-
-		ginkgo.It("should fail when rpo incorrect", func() {
-			clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
-
-			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationRPO)] = "invalidRpo"
-
-			res, err := ctrlSvc.CreateVolume(context.Background(), req)
-			gomega.Expect(res).To(gomega.BeNil())
-			gomega.Expect(err).NotTo(gomega.BeNil())
-			gomega.Expect(err.Error()).To(gomega.ContainSubstring("invalid RPO value"))
-		})
-
-		ginkgo.It("should fail when rpo not declared in parameters", func() {
-			delete(req.Parameters, ctrlSvc.WithRP(controller.KeyReplicationRPO))
-
-			res, err := ctrlSvc.CreateVolume(context.Background(), req)
-			gomega.Expect(res).To(gomega.BeNil())
-			gomega.Expect(err).NotTo(gomega.BeNil())
-			gomega.Expect(err.Error()).To(gomega.ContainSubstring("replication enabled but no RPO specified in storage class"))
-		})
-
-		ginkgo.It("should fail when remote system not declared in parameters", func() {
-			delete(req.Parameters, ctrlSvc.WithRP(controller.KeyReplicationRemoteSystem))
-
-			res, err := ctrlSvc.CreateVolume(context.Background(), req)
-			gomega.Expect(res).To(gomega.BeNil())
-			gomega.Expect(err).NotTo(gomega.BeNil())
-			gomega.Expect(err.Error()).To(gomega.ContainSubstring("replication enabled but no remote system specified in storage class"))
-		})
-
-		ginkgo.It("should fail when mode is incorrect", func() {
-			clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
-
-			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationMode)] = "SYNCMETRO"
-
-			res, err := ctrlSvc.CreateVolume(context.Background(), req)
-			gomega.Expect(res).To(gomega.BeNil())
-			gomega.Expect(err).NotTo(gomega.BeNil())
-			gomega.Expect(err.Error()).To(gomega.ContainSubstring("invalid replication mode"))
-		})
-
-		ginkgo.It("should fail when volume group prefix not declared in parameters", func() {
-			delete(req.Parameters, ctrlSvc.WithRP(controller.KeyReplicationVGPrefix))
-
-			res, err := ctrlSvc.CreateVolume(context.Background(), req)
-			gomega.Expect(res).To(gomega.BeNil())
-			gomega.Expect(err).NotTo(gomega.BeNil())
-			gomega.Expect(err.Error()).To(gomega.ContainSubstring("replication enabled but no volume group prefix specified in storage class"))
-		})
-
-		ginkgo.It("should fail when invalid remote system is specified in parameters for metro volume", func() {
-			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationMode)] = "METRO"
-			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationRemoteSystem)] = "invalid"
-
-			clientMock.On("GetRemoteSystemByName", mock.Anything, "invalid").Return(gopowerstore.RemoteSystem{}, gopowerstore.NewNotFoundError())
-
-			res, err := ctrlSvc.CreateVolume(context.Background(), req)
-
-			gomega.Expect(res).To(gomega.BeNil())
-			gomega.Expect(err).NotTo(gomega.BeNil())
-			gomega.Expect(err.Error()).To(gomega.ContainSubstring("can't query remote system by name"))
 		})
 	})
 
@@ -4685,5 +5005,16 @@ func EnsureProtectionPolicyExistsMock() {
 	}, nil)
 
 	clientMock.On("GetProtectionPolicyByName", mock.Anything, validPolicyName).
+		Return(gopowerstore.ProtectionPolicy{ID: validPolicyID}, nil)
+}
+
+func EnsureProtectionPolicyExistsMockSync() {
+	// start ensure protection policy exists
+	clientMock.On("GetRemoteSystemByName", mock.Anything, validRemoteSystemName).Return(gopowerstore.RemoteSystem{
+		Name: validRemoteSystemName,
+		ID:   validRemoteSystemID,
+	}, nil)
+
+	clientMock.On("GetProtectionPolicyByName", mock.Anything, validPolicyNameSync).
 		Return(gopowerstore.ProtectionPolicy{ID: validPolicyID}, nil)
 }

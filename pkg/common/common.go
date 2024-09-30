@@ -178,6 +178,14 @@ const (
 	PublishContextRemoteFCWWPNPrefix = "REMOTE_FCWWPN"
 	// WWNPrefix indicates WWN prefix
 	WWNPrefix = "naa."
+	// SyncMode indicates Synchronous Replication
+	SyncMode = "SYNC"
+	// AsyncMode indicats Asynchronous Replication
+	AsyncMode = "ASYNC"
+	// Zero indicates value zero for RPO
+	Zero = "Zero"
+	// Metro indicates Metro mode
+	Metro = "METRO"
 
 	contextLogFieldsKey key = iota
 
