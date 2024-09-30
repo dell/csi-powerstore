@@ -758,9 +758,9 @@ func (s *Service) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest
 			var metroSessionID string
 			if isMetro {
 				isMetroVolumeGroup = true
-				metroSession, err := arr.Client.GetReplicationSessionByID(ctx, vgs.VolumeGroup[0].MetroReplicationSessionID)
+				metroSession, err := arr.Client.GetReplicationSessionByLocalResourceID(ctx, vgs.VolumeGroup[0].ID)
 				if err != nil {
-					return nil, status.Errorf(codes.Internal, "unable to get metro session %s: %s", vgs.VolumeGroup[0].MetroReplicationSessionID, err.Error())
+					return nil, status.Errorf(codes.Internal, "unable to get metro session for volume group %s: %s", vgs.VolumeGroup[0].ID, err.Error())
 				}
 
 				metroSessionID = metroSession.ID
