@@ -292,6 +292,7 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 
 			// Validating RPO to be non Zero when replication mode is ASYNC
 			if repMode == common.AsyncMode && rpo == common.Zero {
+				log.Errorf("RPO value for %s cannot be : %s", repMode, rpo)
 				return nil, status.Errorf(codes.InvalidArgument, "replication mode ASYNC requires RPO value to be non Zero")
 			}
 
