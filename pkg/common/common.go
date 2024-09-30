@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2021-2024 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -158,8 +158,34 @@ const (
 	NVMEFCTransport TransportType = "NVMEFC"
 	// PublishContextFCWWPNPrefix indicates publish context FC WWPN prefix
 	PublishContextFCWWPNPrefix = "FCWWPN"
+	// PublishContextRemoteDeviceWWN indicates publish context device wwn of remote device
+	PublishContextRemoteDeviceWWN = "REMOTE_DEVICE_WWN"
+	// PublishContextRemoteLUNAddress indicates publish context LUN address of remote device
+	PublishContextRemoteLUNAddress = "REMOTE_LUN_ADDRESS"
+	// PublishContextRemoteISCSIPortalsPrefix indicates publish context iSCSI portals prefix of remote array
+	PublishContextRemoteISCSIPortalsPrefix = "REMOTE_PORTAL"
+	// PublishContextRemoteISCSITargetsPrefix indicates publish context iSCSI targets prefix of remote array
+	PublishContextRemoteISCSITargetsPrefix = "REMOTE_TARGET"
+	// PublishContextRemoteNVMETCPPortalsPrefix indicates publish context NVMeTCP portals prefix of remote array
+	PublishContextRemoteNVMETCPPortalsPrefix = "REMOTE_NVMETCPPORTAL"
+	// PublishContextRemoteNVMETCPTargetsPrefix indicates publish context NVMe targets prefix of remote array
+	PublishContextRemoteNVMETCPTargetsPrefix = "REMOTE_NVMETCPTARGET"
+	// PublishContextRemoteNVMEFCPortalsPrefix indicates publish context NVMe targets prefix of remote array
+	PublishContextRemoteNVMEFCPortalsPrefix = "REMOTE_NVMEFCPORTAL"
+	// PublishContextRemoteNVMEFCTargetsPrefix indicates publish context NVMe targets prefix of remote array
+	PublishContextRemoteNVMEFCTargetsPrefix = "REMOTE_NVMEFCTARGET"
+	// PublishContextRemoteFCWWPNPrefix indicates publish context FC WWPN prefix of remote array
+	PublishContextRemoteFCWWPNPrefix = "REMOTE_FCWWPN"
 	// WWNPrefix indicates WWN prefix
 	WWNPrefix = "naa."
+	// SyncMode indicates Synchronous Replication
+	SyncMode = "SYNC"
+	// AsyncMode indicats Asynchronous Replication
+	AsyncMode = "ASYNC"
+	// Zero indicates value zero for RPO
+	Zero = "Zero"
+	// Metro indicates Metro mode
+	Metro = "METRO"
 
 	contextLogFieldsKey key = iota
 

@@ -36,6 +36,7 @@ parameters:
   # replication.storage.dell.com/mode: replication mode
   # Allowed values:
   #   "ASYNC" - Asynchronous mode
+  #   "SYNC" - Synchronous mode
   #   "METRO" - Metro mode
   # Optional: true
   # Default value: "ASYNC"
@@ -60,9 +61,10 @@ parameters:
   replication.storage.dell.com/remoteSystem: "RT-0000"
 
   # replication.storage.dell.com/rpo: change to any other RPOs supported by PowerStore
-  # Allowed values: "Five_Minutes", "Fifteen_Minutes", "Thirty_Minutes", "One_Hour", "Six_Hours", "Twelve_Hours", "One_Day"
+  # Allowed values: "Five_Minutes", "Fifteen_Minutes", "Thirty_Minutes", "One_Hour", "Six_Hours", "Twelve_Hours", "One_Day","Zero"
   # Optional: true
   # Default value: None
+  # For SYNC replication, this value must be set to Zero
   replication.storage.dell.com/rpo: Five_Minutes
 
   # replication.storage.dell.com/ignoreNamespaces: set to 'true' if you want to ignore namespaces and use one volume group
