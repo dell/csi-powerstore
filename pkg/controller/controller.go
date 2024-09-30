@@ -1341,7 +1341,7 @@ func (s *Service) ControllerExpandVolume(ctx context.Context, req *csi.Controlle
 				vg := vgs.VolumeGroup[0]
 				rs, err := powerStoreClient.GetReplicationSessionByLocalResourceID(ctx, vg.ID)
 				if err != nil {
-					return nil, err
+					return nil, status.Errorf(codes.OutOfRange, "unable to get replication session with volume group id")
 				}
 				if rs.ID == "" {
 					replicationSessionID = vol.MetroReplicationSessionID
