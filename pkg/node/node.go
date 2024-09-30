@@ -253,15 +253,17 @@ func (s *Service) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeR
 		return nil, status.Error(codes.InvalidArgument, "staging target path is required")
 	}
 
-	id, arrayID, protocol, remoteVolumeID, _, _ := array.ParseVolumeID(ctx, id, s.DefaultArray(), req.VolumeCapability)
-
-	var stager VolumeStager
+	id, arrayID, protocol, remoteVolumeID, _, err := array.ParseVolumeID(ctx, id, s.DefaultArray(), req.VolumeCapability)
+	if err != nil {
+		return nil, err
+	}
 
 	arr, ok := s.Arrays()[arrayID]
 	if !ok {
 		return nil, status.Errorf(codes.Internal, "can't find array with ID %s", arrayID)
 	}
 
+	var stager VolumeStager
 	if protocol == "nfs" {
 		stager = &NFSStager{
 			array: arr,
