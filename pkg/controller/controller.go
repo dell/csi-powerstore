@@ -275,9 +275,16 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 			if !ok {
 				return nil, status.Errorf(codes.InvalidArgument, "replication enabled but no volume group prefix specified in storage class")
 			}
+
 			rpo, ok := params[s.WithRP(KeyReplicationRPO)]
 			if !ok {
-				return nil, status.Errorf(codes.InvalidArgument, "replication enabled but no RPO specified in storage class")
+				// If Replication mode is ASYNC and there is no RPO specified, returning an error
+				if repMode == "ASYNC" {
+					return nil, status.Errorf(codes.InvalidArgument, "replication mode is ASYNC but no RPO specified in storage class")
+				} else {
+					// If Replication mode is SYNC and there is no RPO, defaulting the value to Zero
+					rpo = "Zero"
+				}
 			}
 			rpoEnum := gopowerstore.RPOEnum(rpo)
 			if err := rpoEnum.IsValid(); err != nil {
@@ -343,7 +350,7 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 					return nil, status.Errorf(codes.Internal, "can't query volume group by name %s : %s", vgName, err.Error())
 				}
 			} else {
-				// if Replication mode is SYNC, check if the VolumeGroup is write-order cnsistent
+				// if Replication mode is SYNC, check if the VolumeGroup is write-order consistent
 				if repMode == "SYNC" {
 					if !vg.IsWriteOrderConsistent {
 						return nil, status.Errorf(codes.Internal, "can't apply protection policy with sync rule if volume group is not write-order consistent")
