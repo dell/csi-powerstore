@@ -2254,7 +2254,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 								},
 							},
 						}, nil)
-					clientMock.On("GetReplicationSessionByID", mock.Anything, validSessionID).
+					clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, validGroupID).
 						Return(gopowerstore.ReplicationSession{
 							ID:    validSessionID,
 							State: gopowerstore.RsStateOk,
@@ -2280,9 +2280,9 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 
 				ginkgo.It("should fail if the replication session cannot be retrieved", func() {
 					// override the good mock
-					clientMock.On("GetReplicationSessionByID", mock.Anything, validSessionID).Unset()
+					clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, validGroupID).Unset()
 					// return an error when trying to get the replication session
-					clientMock.On("GetReplicationSessionByID", mock.Anything, validSessionID).
+					clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, validGroupID).
 						Return(gopowerstore.ReplicationSession{}, gopowerstore.APIError{
 							ErrorMsg: &api.ErrorMsg{
 								StatusCode: http.StatusNotFound,
@@ -2294,14 +2294,14 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 
 					gomega.Expect(err).NotTo(gomega.BeNil())
 					gomega.Expect(res).To(gomega.BeNil())
-					gomega.Expect(err.Error()).To(gomega.ContainSubstring("unable to get metro session %s", validSessionID))
+					gomega.Expect(err.Error()).To(gomega.ContainSubstring("unable to get metro session for volume group %s", validGroupID))
 				})
 
 				ginkgo.It("should fail if the replication session is not in 'OK' or 'Paused' state", func() {
 					// override the good mock
-					clientMock.On("GetReplicationSessionByID", mock.Anything, validSessionID).Unset()
+					clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, validGroupID).Unset()
 					// return an error a replication session with a bad state
-					clientMock.On("GetReplicationSessionByID", mock.Anything, validSessionID).
+					clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, validGroupID).
 						Return(gopowerstore.ReplicationSession{
 							ID:    validSessionID,
 							State: gopowerstore.RsStateError,
