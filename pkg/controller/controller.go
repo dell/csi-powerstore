@@ -479,6 +479,9 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 					}
 
 					vg, err = arr.Client.GetVolumeGroup(ctx, newVG.ID)
+					if err != nil {
+						return nil, status.Errorf(codes.FailedPrecondition, "unable to get volume group %s: %s", vgName, err.Error())
+					}
 
 					startMetroReplicationSession = configureMetroVolumeGroupSession
 				} else {
@@ -596,6 +599,7 @@ func createMetroVolumeNameSuffix(ctx context.Context,
 		for _, volumePair := range replicationSession.StorageElementPairs {
 			if volumePair.LocalStorageElementID == localVolID {
 				remoteVolumeID = volumePair.RemoteStorageElementID
+				break
 			}
 		}
 		if remoteVolumeID == "" {
@@ -824,13 +828,6 @@ func (s *Service) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest
 			// TODO: Maybe adding volumegroup id/name to volume id can help?
 			_, err := arr.GetClient().RemoveMembersFromVolumeGroup(ctx, &gopowerstore.VolumeGroupMembers{VolumeIDs: []string{id}}, vgs.VolumeGroup[0].ID)
 			if err != nil {
-				// try to restore metro replication before returning
-				if isMetro {
-					log.Info("could not remove volume from the volume group. Attempting to restore metro replication to its previous state.")
-					if e := restoreMetroSession(); e != nil {
-						log.Error(e)
-					}
-				}
 				// TODO: check for idempotency cases
 				return nil, err
 			}
