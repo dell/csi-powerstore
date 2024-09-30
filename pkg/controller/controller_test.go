@@ -66,6 +66,7 @@ const (
 	validRPO                     = "Five_Minutes"
 	zeroRPO                      = "Zero"
 	replicationModeSync          = "SYNC"
+	replicationModeAsync         = "ASYNC"
 	validGroupID                 = "610adaef-4f0a-4dff-9812-29ffa5daf185"
 	validRemoteGroupID           = "62ed932b-329b-4ba6-b0e0-3f51c34c4701"
 	validNamespaceName           = "default"
@@ -769,7 +770,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 		ginkgo.It("should fail when mode is ASYNC and RPO is Zero", func() {
 			clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
 
-			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationMode)] = "ASYNC"
+			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationMode)] = replicationModeAsync
 			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationRPO)] = zeroRPO
 			res, err := ctrlSvc.CreateVolume(context.Background(), req)
 			gomega.Expect(res).To(gomega.BeNil())
