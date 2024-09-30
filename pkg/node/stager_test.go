@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2021-2024 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -55,6 +55,20 @@ func getValidPublishContext() map[string]string {
 	}
 }
 
+func getValidRemoteMetroPublishContext() map[string]string {
+	publishContext := getValidPublishContext()
+	publishContext[common.PublishContextRemoteLUNAddress] = validLUNID
+	publishContext[common.PublishContextRemoteDeviceWWN] = validDeviceWWN
+	publishContext[common.PublishContextRemoteISCSIPortalsPrefix+"0"] = validRemoteISCSIPortals[0]
+	publishContext[common.PublishContextRemoteISCSIPortalsPrefix+"1"] = validRemoteISCSIPortals[1]
+	publishContext[common.PublishContextRemoteISCSITargetsPrefix+"0"] = validRemoteISCSITargets[0]
+	publishContext[common.PublishContextRemoteISCSITargetsPrefix+"1"] = validRemoteISCSITargets[1]
+	publishContext[common.PublishContextRemoteFCWWPNPrefix+"0"] = validRemoteFCTargetsWWPN[0]
+	publishContext[common.PublishContextRemoteFCWWPNPrefix+"1"] = validRemoteFCTargetsWWPN[1]
+
+	return publishContext
+}
+
 func getCapabilityWithVoltypeAccessFstype(voltype, access, fstype string) *csi.VolumeCapability {
 	// Construct the volume capability
 	capability := new(csi.VolumeCapability)
@@ -94,6 +108,14 @@ func scsiStageVolumeOK(util *mocks.UtilInterface, fs *mocks.FsInterface) {
 	fs.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
 	fs.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
 	fs.On("MkFileIdempotent", filepath.Join(nodeStagePrivateDir, validBaseVolumeID)).Return(true, nil)
+	fs.On("GetUtil").Return(util)
+}
+
+func scsiStageRemoteMetroVolumeOK(util *mocks.UtilInterface, fs *mocks.FsInterface) {
+	util.On("BindMount", mock.Anything, "/dev", filepath.Join(nodeStagePrivateDir, validRemoteVolID)).Return(nil)
+	fs.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
+	fs.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
+	fs.On("MkFileIdempotent", filepath.Join(nodeStagePrivateDir, validRemoteVolID)).Return(true, nil)
 	fs.On("GetUtil").Return(util)
 }
 
@@ -139,7 +161,7 @@ func TestSCSIStager_Stage(t *testing.T) {
 			StagingTargetPath: nodeStagePrivateDir,
 			VolumeCapability: getCapabilityWithVoltypeAccessFstype(
 				"block", "single-writer", "none"),
-		}, log.Fields{}, fsMock, validBaseVolumeID)
+		}, log.Fields{}, fsMock, validBaseVolumeID, false)
 
 		assert.Nil(t, err)
 	})
@@ -182,7 +204,7 @@ func TestSCSIStager_Stage(t *testing.T) {
 			StagingTargetPath: nodeStagePrivateDir,
 			VolumeCapability: getCapabilityWithVoltypeAccessFstype(
 				"block", "single-writer", "none"),
-		}, log.Fields{}, fsMock, validBaseVolumeID)
+		}, log.Fields{}, fsMock, validBaseVolumeID, false)
 
 		assert.Nil(t, err)
 	})
@@ -224,7 +246,7 @@ func TestSCSIStager_Stage(t *testing.T) {
 			StagingTargetPath: nodeStagePrivateDir,
 			VolumeCapability: getCapabilityWithVoltypeAccessFstype(
 				"block", "single-writer", "none"),
-		}, log.Fields{}, fsMock, validBaseVolumeID)
+		}, log.Fields{}, fsMock, validBaseVolumeID, false)
 
 		assert.Nil(t, err)
 	})

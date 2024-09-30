@@ -85,6 +85,7 @@ const (
 	validNfsAcls                 = "A::OWNER@:RWX"
 	validNfsServerID             = "24aefac2-a796-47dc-886a-c73ff8c1a671"
 	validApplianceID             = "my-appliance"
+	validRemoteApplianceID       = "my-appliance2"
 	validServiceTag              = "service-tag"
 )
 
@@ -2862,6 +2863,126 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			})
 		})
 
+		ginkgo.When("publishing metro volume", func() {
+			ginkgo.It("should succeed [Block]", func() {
+				// local info
+				clientMock.On("GetVolume", mock.Anything, validBaseVolID).
+					Return(gopowerstore.Volume{ID: validBaseVolID, Wwn: "naa.68ccf098003ceb5e4577a20be6d11bf9", ApplianceID: validApplianceID}, nil)
+				clientMock.On("GetHostByName", mock.Anything, validNodeID).Return(gopowerstore.Host{ID: validHostID}, nil)
+				clientMock.On("GetHostVolumeMappingByVolumeID", mock.Anything, validBaseVolID).
+					Return([]gopowerstore.HostVolumeMapping{}, nil).Once()
+				clientMock.On("AttachVolumeToHost", mock.Anything, validHostID, mock.Anything).
+					Return(gopowerstore.EmptyResponse(""), nil).Times(2)
+				clientMock.On("GetHostVolumeMappingByVolumeID", mock.Anything, validBaseVolID).
+					Return([]gopowerstore.HostVolumeMapping{{HostID: validHostID, LogicalUnitNumber: 1}}, nil).Once()
+				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
+					Return([]gopowerstore.IPPoolAddress{
+						{
+							Address:     "192.168.1.1",
+							IPPort:      gopowerstore.IPPortInstance{TargetIqn: "iqn"},
+							ApplianceID: validApplianceID,
+						},
+					}, nil).Once()
+				clientMock.On("GetStorageNVMETCPTargetAddresses", mock.Anything).
+					Return([]gopowerstore.IPPoolAddress{
+						{
+							Address:     "192.168.1.1",
+							IPPort:      gopowerstore.IPPortInstance{TargetIqn: "iqn"},
+							ApplianceID: validApplianceID,
+						},
+					}, nil).Times(2)
+				clientMock.On("GetCluster", mock.Anything).
+					Return(gopowerstore.Cluster{Name: validClusterName, NVMeNQN: "nqn"}, nil).Times(2)
+				clientMock.On("GetFCPorts", mock.Anything).
+					Return([]gopowerstore.FcPort{
+						{
+							IsLinkUp:    true,
+							Wwn:         "58:cc:f0:93:48:a0:03:a3",
+							WwnNVMe:     "58ccf091492b0c22",
+							WwnNode:     "58ccf090c9200c22",
+							ApplianceID: validApplianceID,
+						},
+					}, nil).Times(2)
+
+				// remote info
+				clientMock.On("GetVolume", mock.Anything, validRemoteVolID).
+					Return(gopowerstore.Volume{ID: validRemoteVolID, Wwn: "naa.68ccf098003ceb5e4577a20be6d11bf9", ApplianceID: validRemoteApplianceID}, nil)
+				clientMock.On("GetHostVolumeMappingByVolumeID", mock.Anything, validRemoteVolID).
+					Return([]gopowerstore.HostVolumeMapping{}, nil).Once()
+				clientMock.On("GetHostVolumeMappingByVolumeID", mock.Anything, validRemoteVolID).
+					Return([]gopowerstore.HostVolumeMapping{{HostID: validHostID, LogicalUnitNumber: 1}}, nil).Once()
+				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
+					Return([]gopowerstore.IPPoolAddress{
+						{
+							Address:     "192.168.1.2",
+							IPPort:      gopowerstore.IPPortInstance{TargetIqn: "iqn.2015-10.com.dell:dellemc-powerstore-apm00223"},
+							ApplianceID: validRemoteApplianceID,
+						},
+					}, nil).Once()
+				clientMock.On("GetStorageNVMETCPTargetAddresses", mock.Anything).
+					Return([]gopowerstore.IPPoolAddress{
+						{
+							Address:     "192.168.1.2",
+							IPPort:      gopowerstore.IPPortInstance{TargetIqn: "iqn.2015-10.com.dell:dellemc-powerstore-apm00223"},
+							ApplianceID: validRemoteApplianceID,
+						},
+					}, nil).Times(2)
+				clientMock.On("GetCluster", mock.Anything).
+					Return(gopowerstore.Cluster{Name: validClusterName, NVMeNQN: "nqn.1988-11.com.dell:powerstore:00:303030303030ABCDEFGH"}, nil).Times(2)
+				clientMock.On("GetFCPorts", mock.Anything).
+					Return([]gopowerstore.FcPort{
+						{
+							IsLinkUp:    true,
+							Wwn:         "58:cc:f0:93:48:a0:03:33",
+							WwnNVMe:     "58ccf091492b0c33",
+							WwnNode:     "58ccf090c9200c33",
+							ApplianceID: validRemoteApplianceID,
+						},
+					}, nil).Times(2)
+
+				volumeID := fmt.Sprintf("%s/%s/%s:%s/%s", validBaseVolID, firstValidID, "scsi", validRemoteVolID, secondValidID)
+				req := getTypicalControllerPublishVolumeRequest("single-writer", validNodeID, volumeID)
+				req.VolumeContext = map[string]string{controller.KeyFsType: "xfs"}
+
+				res, err := ctrlSvc.ControllerPublishVolume(context.Background(), req)
+
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.ControllerPublishVolumeResponse{
+					PublishContext: map[string]string{
+						"PORTAL0":              "192.168.1.1:3260",
+						"TARGET0":              "iqn",
+						"NVMEFCPORTAL0":        "nn-0x58ccf090c9200c22:pn-0x58ccf091492b0c22",
+						"NVMEFCTARGET0":        "nqn",
+						"DEVICE_WWN":           "68ccf098003ceb5e4577a20be6d11bf9",
+						"LUN_ADDRESS":          "1",
+						"FCWWPN0":              "58ccf09348a003a3",
+						"NVMETCPTARGET0":       "nqn",
+						"NVMETCPPORTAL0":       "192.168.1.1:4420",
+						"REMOTE_DEVICE_WWN":    "68ccf098003ceb5e4577a20be6d11bf9",
+						"REMOTE_LUN_ADDRESS":   "1",
+						"REMOTE_FCWWPN0":       "58ccf09348a00333",
+						"REMOTE_TARGET0":       "iqn.2015-10.com.dell:dellemc-powerstore-apm00223",
+						"REMOTE_NVMEFCTARGET0": "nqn.1988-11.com.dell:powerstore:00:303030303030ABCDEFGH",
+						"REMOTE_PORTAL0":       "192.168.1.2:3260",
+						"REMOTE_NVMEFCPORTAL0": "nn-0x58ccf090c9200c33:pn-0x58ccf091492b0c33",
+					},
+				}))
+			})
+
+			ginkgo.It("should fail", func() {
+				ip := "127.0.0.1" // we don't have array with this IP
+				volumeID := fmt.Sprintf("%s/%s/%s:%s/%s", validBaseVolID, firstValidID, "scsi", validRemoteVolID, ip)
+				req := getTypicalControllerPublishVolumeRequest("single-writer", validNodeID, volumeID)
+				req.VolumeContext = map[string]string{controller.KeyFsType: "xfs"}
+				req.VolumeCapability = nil
+
+				_, err := ctrlSvc.ControllerPublishVolume(context.Background(), req)
+
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to find remote array with ID"))
+			})
+		})
+
 		ginkgo.When("volume id is empty", func() {
 			ginkgo.It("should fail", func() {
 				req := getTypicalControllerPublishVolumeRequest("single-writer", validNodeID, validBlockVolumeID)
@@ -3012,7 +3133,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				_, err := ctrlSvc.ControllerPublishVolume(context.Background(), req)
 
 				gomega.Expect(err).ToNot(gomega.BeNil())
-				gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to find array with given ID"))
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to find array with ID"))
 			})
 		})
 	})
@@ -3169,6 +3290,33 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 
 			gomega.Expect(err).To(gomega.BeNil())
 			_ = ctrlSvc.Init()
+		})
+
+		ginkgo.When("unpublishing metro volume", func() {
+			ginkgo.It("should succeed [Block]", func() {
+				clientMock.On("GetHostByName", mock.Anything, mock.Anything).
+					Return(gopowerstore.Host{ID: validHostID}, nil).Times(2)
+				clientMock.On("DetachVolumeFromHost", mock.Anything, mock.Anything, mock.Anything).
+					Return(gopowerstore.EmptyResponse(""), nil).Times(2)
+
+				volumeID := fmt.Sprintf("%s/%s/%s:%s/%s", validBaseVolID, firstValidID, "scsi", validRemoteVolID, secondValidID)
+				req := &csi.ControllerUnpublishVolumeRequest{VolumeId: volumeID, NodeId: validNodeID}
+
+				res, err := ctrlSvc.ControllerUnpublishVolume(context.Background(), req)
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.ControllerUnpublishVolumeResponse{}))
+			})
+
+			ginkgo.It("should fail", func() {
+				ip := "127.0.0.1" // we don't have array with this IP
+				volumeID := fmt.Sprintf("%s/%s/%s:%s/%s", validBaseVolID, firstValidID, "scsi", validRemoteVolID, ip)
+				req := &csi.ControllerUnpublishVolumeRequest{VolumeId: volumeID, NodeId: validNodeID}
+
+				_, err := ctrlSvc.ControllerUnpublishVolume(context.Background(), req)
+
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("cannot find remote array"))
+			})
 		})
 
 		ginkgo.When("volume do not exist", func() {

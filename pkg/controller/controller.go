@@ -652,15 +652,21 @@ func (s *Service) ControllerPublishVolume(ctx context.Context, req *csi.Controll
 		return nil, status.Error(codes.InvalidArgument, "volume ID is required")
 	}
 
-	id, arrayID, protocol, _, _, err := array.ParseVolumeID(ctx, id, s.DefaultArray(), req.VolumeCapability)
+	id, arrayID, protocol, remoteVolumeID, remoteArrayID, err := array.ParseVolumeID(ctx, id, s.DefaultArray(), req.VolumeCapability)
 	if err != nil {
-		log.Info(err)
+		log.Error(err)
 		return nil, err
 	}
 	arr, ok := s.Arrays()[arrayID]
 	if !ok {
-		log.Info("ip is nil")
-		return nil, status.Error(codes.InvalidArgument, "failed to find array with given ID")
+		return nil, status.Errorf(codes.InvalidArgument, "failed to find array with ID %s", arrayID)
+	}
+	var remoteArray *array.PowerStoreArray
+	if remoteArrayID != "" {
+		remoteArray, ok = s.Arrays()[remoteArrayID]
+		if !ok {
+			return nil, status.Errorf(codes.InvalidArgument, "failed to find remote array with ID %s", remoteArrayID)
+		}
 	}
 
 	vc := req.GetVolumeCapability()
@@ -682,7 +688,6 @@ func (s *Service) ControllerPublishVolume(ctx context.Context, req *csi.Controll
 	}
 
 	var publisher VolumePublisher
-
 	if protocol == "nfs" {
 		publisher = &NfsPublisher{
 			ExternalAccess: s.externalAccess,
@@ -695,7 +700,17 @@ func (s *Service) ControllerPublishVolume(ctx context.Context, req *csi.Controll
 		return nil, err
 	}
 
-	return publisher.Publish(ctx, req, arr.GetClient(), kubeNodeID, id)
+	publishContext := make(map[string]string)
+	publishVolumeResponse, err := publisher.Publish(ctx, publishContext, req, arr.GetClient(), kubeNodeID, id, false)
+	if err != nil {
+		return nil, err
+	}
+
+	if remoteArrayID != "" && remoteVolumeID != "" { // For Remote Metro volume
+		publishVolumeResponse, err = publisher.Publish(ctx, publishContext, req, remoteArray.GetClient(), kubeNodeID, remoteVolumeID, true)
+	}
+
+	return publishVolumeResponse, err
 }
 
 // ControllerUnpublishVolume prepares Volume/FileSystem to be deleted by unattaching/disabling access to the host.
@@ -710,7 +725,7 @@ func (s *Service) ControllerUnpublishVolume(ctx context.Context, req *csi.Contro
 		return nil, status.Error(codes.InvalidArgument, "node ID is required")
 	}
 
-	id, arrayID, protocol, _, _, err := array.ParseVolumeID(ctx, id, s.DefaultArray(), nil)
+	id, arrayID, protocol, remoteVolumeID, remoteArrayID, err := array.ParseVolumeID(ctx, id, s.DefaultArray(), nil)
 	if err != nil {
 		if apiError, ok := err.(gopowerstore.APIError); ok && apiError.NotFound() {
 			return &csi.ControllerUnpublishVolumeResponse{}, nil
@@ -722,6 +737,13 @@ func (s *Service) ControllerUnpublishVolume(ctx context.Context, req *csi.Contro
 	arr, ok := s.Arrays()[arrayID]
 	if !ok {
 		return nil, status.Errorf(codes.InvalidArgument, "cannot find array %s", arrayID)
+	}
+	var remoteArray *array.PowerStoreArray
+	if remoteArrayID != "" {
+		remoteArray, ok = s.Arrays()[remoteArrayID]
+		if !ok {
+			return nil, status.Errorf(codes.InvalidArgument, "cannot find remote array %s", remoteArrayID)
+		}
 	}
 
 	if protocol == "scsi" {
@@ -748,6 +770,18 @@ func (s *Service) ControllerUnpublishVolume(ctx context.Context, req *csi.Contro
 		err = detachVolumeFromHost(ctx, node.ID, id, arr.GetClient())
 		if err != nil {
 			return nil, err
+		}
+
+		if remoteArrayID != "" && remoteVolumeID != "" { // For Remote Metro volume
+			node, err := remoteArray.GetClient().GetHostByName(ctx, kubeNodeID)
+			if err != nil {
+				return nil, status.Errorf(codes.Internal,
+					"failure checking host '%s' status for volume unpublishing on remote array: %s", kubeNodeID, err.Error())
+			}
+			err = detachVolumeFromHost(ctx, node.ID, remoteVolumeID, remoteArray.GetClient())
+			if err != nil {
+				return nil, err
+			}
 		}
 
 		return &csi.ControllerUnpublishVolumeResponse{}, nil
