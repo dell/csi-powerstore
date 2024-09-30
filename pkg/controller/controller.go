@@ -1286,21 +1286,29 @@ func (s *Service) ListSnapshots(ctx context.Context, req *csi.ListSnapshotsReque
 	}, nil
 }
 
-func pauseSessionIfMetro(ctx context.Context, isMetroSession bool, powerStoreClient gopowerstore.Client, id string) error {
-	if isMetroSession {
-		_, err := powerStoreClient.ExecuteActionOnReplicationSession(ctx, id, gopowerstore.RsActionPause, nil)
-		return err
+// Returns the metro replication session ID for the volume.
+// If Metro is configured on the volume group that the volume is part of, then returns the ID of the volume group's session.
+func GetMetroSessionID(ctx context.Context, client gopowerstore.Client, volumeID string, volume gopowerstore.Volume, remoteArrayID string) (string, error) {
+	metroSessionID := ""
+	if remoteArrayID != "" {
+		vgs, err := client.GetVolumeGroupsByVolumeID(ctx, volumeID)
+		if err != nil {
+			return "", status.Errorf(codes.Internal, "error while retrieving volume groups for volume %s", volumeID)
+		}
+		if len(vgs.VolumeGroup) == 0 {
+			metroSessionID = volume.MetroReplicationSessionID
+		} else {
+			vg := vgs.VolumeGroup[0]
+			rs, err := client.GetReplicationSessionByLocalResourceID(ctx, vg.ID)
+			if err != nil {
+				return "", status.Errorf(codes.Internal, "unable to get replication session for volume group %s", vg.ID)
+			}
+			if rs.ID != "" {
+				metroSessionID = rs.ID
+			}
+		}
 	}
-
-	return nil
-}
-
-func resumeSessionIfMetro(ctx context.Context, isMetroSession bool, powerStoreClient gopowerstore.Client, id string) error {
-	if isMetroSession {
-		_, err := powerStoreClient.ExecuteActionOnReplicationSession(ctx, id, gopowerstore.RsActionResume, nil)
-		return err
-	}
-	return nil
+	return metroSessionID, nil
 }
 
 // ControllerExpandVolume resizes Volume or FileSystem by increasing available volume capacity in the storage array.
@@ -1315,70 +1323,53 @@ func (s *Service) ControllerExpandVolume(ctx context.Context, req *csi.Controlle
 		return nil, status.Errorf(codes.OutOfRange, "volume exceeds allowed limit")
 	}
 
-	powerstoreArray, ok := s.Arrays()[arrayID]
+	array, ok := s.Arrays()[arrayID]
 	if !ok {
-		return nil, status.Errorf(codes.OutOfRange, "unable to find powerstore array")
+		return nil, status.Errorf(codes.InvalidArgument, "unable to find array with ID %s", arrayID)
 	}
-	powerStoreClient := powerstoreArray.Client
+	client := array.Client
 
 	if protocol == "scsi" {
-		vol, err := powerStoreClient.GetVolume(ctx, id)
+		vol, err := client.GetVolume(ctx, id)
 		if err != nil {
-			return nil, status.Errorf(codes.OutOfRange, "detected SCSI protocol but wasn't able to fetch the volume info")
-		}
-		isMetroSession := remoteArrayID != ""
-
-		// get session id
-		replicationSessionID := ""
-		if isMetroSession {
-			vgs, err := powerStoreClient.GetVolumeGroupsByVolumeID(ctx, req.GetVolumeId())
-			if err != nil {
-				return nil, err
-			}
-			if len(vgs.VolumeGroup) == 0 {
-				replicationSessionID = vol.MetroReplicationSessionID
-			} else {
-				vg := vgs.VolumeGroup[0]
-				rs, err := powerStoreClient.GetReplicationSessionByLocalResourceID(ctx, vg.ID)
-				if err != nil {
-					return nil, status.Errorf(codes.OutOfRange, "unable to get replication session with volume group id")
-				}
-				if rs.ID == "" {
-					replicationSessionID = vol.MetroReplicationSessionID
-				} else {
-					replicationSessionID = rs.ID
-				}
-			}
+			return nil, status.Error(codes.NotFound, "detected SCSI protocol but wasn't able to fetch the volume info")
 		}
 
 		if vol.Size < requiredBytes {
-			err = pauseSessionIfMetro(ctx, isMetroSession, powerStoreClient, replicationSessionID)
+			// get replication session ID if Metro is configured. Pause the session and resume after updating size.
+			replicationSessionID, err := GetMetroSessionID(ctx, client, id, vol, remoteArrayID)
 			if err != nil {
-				return nil, status.Errorf(codes.Aborted, "unable to pause metro session")
+				return nil, status.Error(codes.Internal, "error while identifying metro configuration on volume")
 			}
 
-			_, err = powerStoreClient.ModifyVolume(context.Background(), &gopowerstore.VolumeModify{Size: requiredBytes}, id)
-
-			resumeSessionErr := resumeSessionIfMetro(ctx, isMetroSession, powerStoreClient, replicationSessionID)
-			if resumeSessionErr != nil {
+			if replicationSessionID != "" {
+				_, err := client.ExecuteActionOnReplicationSession(ctx, replicationSessionID, gopowerstore.RsActionPause, nil)
 				if err != nil {
-					log.Error(err)
+					return nil, status.Error(codes.Internal, "unable to pause metro session")
 				}
-
-				return nil, status.Errorf(codes.Aborted, "unable to resume metro session")
 			}
 
+			_, err = client.ModifyVolume(context.Background(), &gopowerstore.VolumeModify{Size: requiredBytes}, id)
 			if err != nil {
-				return nil, err
+				return nil, status.Error(codes.Internal, "unable to modify volume size")
 			}
+
+			if replicationSessionID != "" {
+				_, err := client.ExecuteActionOnReplicationSession(ctx, replicationSessionID, gopowerstore.RsActionResume, nil)
+				if err != nil {
+					return nil, status.Error(codes.Internal, "unable to resume metro session")
+				}
+			}
+
 			return &csi.ControllerExpandVolumeResponse{CapacityBytes: requiredBytes, NodeExpansionRequired: true}, nil
 		}
 		return &csi.ControllerExpandVolumeResponse{}, nil
 	}
-	fs, err := powerStoreClient.GetFS(ctx, id)
+
+	fs, err := client.GetFS(ctx, id)
 	if err == nil {
 		if fs.SizeTotal < requiredBytes {
-			_, err = powerStoreClient.ModifyFS(context.Background(), &gopowerstore.FSModify{Size: int(requiredBytes + ReservedSize)}, id)
+			_, err = client.ModifyFS(context.Background(), &gopowerstore.FSModify{Size: int(requiredBytes + ReservedSize)}, id)
 			if err != nil {
 				return nil, err
 			}
