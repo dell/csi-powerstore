@@ -1286,7 +1286,7 @@ func (s *Service) ListSnapshots(ctx context.Context, req *csi.ListSnapshotsReque
 	}, nil
 }
 
-func pauseSessionIfMetro(isMetroSession bool, powerStoreClient gopowerstore.Client, ctx context.Context, id string) error {
+func pauseSessionIfMetro(ctx context.Context, isMetroSession bool, powerStoreClient gopowerstore.Client, id string) error {
 	if isMetroSession {
 		_, err := powerStoreClient.ExecuteActionOnReplicationSession(ctx, id, gopowerstore.RsActionPause, nil)
 		return err
@@ -1295,7 +1295,7 @@ func pauseSessionIfMetro(isMetroSession bool, powerStoreClient gopowerstore.Clie
 	return nil
 }
 
-func resumeSessionIfMetro(isMetroSession bool, powerStoreClient gopowerstore.Client, ctx context.Context, id string) error {
+func resumeSessionIfMetro(ctx context.Context, isMetroSession bool, powerStoreClient gopowerstore.Client, id string) error {
 	if isMetroSession {
 		_, err := powerStoreClient.ExecuteActionOnReplicationSession(ctx, id, gopowerstore.RsActionResume, nil)
 		return err
@@ -1329,14 +1329,14 @@ func (s *Service) ControllerExpandVolume(ctx context.Context, req *csi.Controlle
 		isMetroSession := remoteArrayID != ""
 
 		// get session id
-		replicationSessionId := ""
+		replicationSessionID := ""
 		if isMetroSession {
 			vgs, err := powerStoreClient.GetVolumeGroupsByVolumeID(ctx, req.GetVolumeId())
 			if err != nil {
 				return nil, err
 			}
 			if len(vgs.VolumeGroup) == 0 {
-				replicationSessionId = vol.MetroReplicationSessionID
+				replicationSessionID = vol.MetroReplicationSessionID
 			} else {
 				vg := vgs.VolumeGroup[0]
 				rs, err := powerStoreClient.GetReplicationSessionByLocalResourceID(ctx, vg.ID)
@@ -1344,22 +1344,22 @@ func (s *Service) ControllerExpandVolume(ctx context.Context, req *csi.Controlle
 					return nil, err
 				}
 				if rs.ID == "" {
-					replicationSessionId = vol.MetroReplicationSessionID
+					replicationSessionID = vol.MetroReplicationSessionID
 				} else {
-					replicationSessionId = rs.ID
+					replicationSessionID = rs.ID
 				}
 			}
 		}
 
 		if vol.Size < requiredBytes {
-			err = pauseSessionIfMetro(isMetroSession, powerStoreClient, ctx, replicationSessionId)
+			err = pauseSessionIfMetro(ctx, isMetroSession, powerStoreClient, replicationSessionID)
 			if err != nil {
 				return nil, status.Errorf(codes.Aborted, "unable to pause metro session")
 			}
 
 			_, err = powerStoreClient.ModifyVolume(context.Background(), &gopowerstore.VolumeModify{Size: requiredBytes}, id)
 
-			resumeSessionErr := resumeSessionIfMetro(isMetroSession, powerStoreClient, ctx, replicationSessionId)
+			resumeSessionErr := resumeSessionIfMetro(ctx, isMetroSession, powerStoreClient, replicationSessionID)
 			if resumeSessionErr != nil {
 				if err != nil {
 					log.Error(err)
