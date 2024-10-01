@@ -855,6 +855,7 @@ func (s *Service) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest
 							return nil, status.Errorf(codes.Internal,
 								"failed to delete volume %s because the replication session could not be paused", id)
 						}
+					}
 
 						restoreMetroSession = func() error {
 							// after pausing, we cannot resume until the session has successfully been paused
@@ -875,7 +876,6 @@ func (s *Service) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest
 									"failed to resume metro session for volume group %s: %s", vg.Name, err.Error())
 							}
 							return nil
-						}
 					}
 				}
 			}
