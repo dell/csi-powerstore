@@ -789,12 +789,18 @@ func (s *Service) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest
 
 		if len(vgs.VolumeGroup) != 0 {
 			// Remove volume from volume group
-			vg := vgs.VolumeGroup[0]
+			vg, err := arr.Client.GetVolumeGroup(ctx, vgs.VolumeGroup[0].ID)
+			if err != nil {
+				return nil, err
+			}
+
 			deleteMetroVolumeGroup := false
 			var metroSessionID string
 
 			// Metro replication needs to be paused to remove the volume from the group.
 			if isMetro {
+				log.Infof("deleting volume %s from metro volume group %s", id, vg.Name)
+
 				isMetroVolumeGroup = true
 				metroSession, err := arr.Client.GetReplicationSessionByLocalResourceID(ctx, vg.ID)
 				if err != nil {
@@ -811,6 +817,8 @@ func (s *Service) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest
 
 				// Must end metro to remove the last volume in a metro volume group
 				if len(vg.Volumes) == 1 {
+					log.Debugf("deleting last member of metro volume group %s. The volume group will also be deleted.", vg.Name)
+
 					_, err = arr.Client.EndMetroVolumeGroup(ctx, vg.ID, &gopowerstore.EndMetroVolumeGroupOptions{DeleteRemoteVolumeGroup: true})
 					if err != nil {
 						return nil, status.Errorf(codes.Internal, "failed to delete volume %s because the metro replication session could not be ended", id)
@@ -819,6 +827,8 @@ func (s *Service) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest
 					deleteMetroVolumeGroup = true
 				} else {
 					if metroSession.State == gopowerstore.RsStateOk {
+						log.Debugf("pausing replication session for volume group %s", vg.Name)
+
 						// pause the replication session
 						_, err = arr.Client.ExecuteActionOnReplicationSession(ctx, metroSessionID, gopowerstore.RsActionPause, nil)
 						if err != nil {
@@ -827,6 +837,8 @@ func (s *Service) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest
 						}
 
 						restoreMetroSession = func() error {
+							log.Debugf("resuming replication session for volume group %s", vg.Name)
+
 							_, err = arr.Client.ExecuteActionOnReplicationSession(ctx, metroSessionID, gopowerstore.RsActionResume, nil)
 							if err != nil {
 								return status.Errorf(codes.Internal,
