@@ -145,6 +145,8 @@ github.com/dell/gopowerstore v1.15.2-0.20240924212949-8aecb0c6e9d9 h1:H2aTOEFVZy
 github.com/dell/gopowerstore v1.15.2-0.20240924212949-8aecb0c6e9d9/go.mod h1:vyN1JAZ+TO7Px+gNVa61a23/KwlI/Nj/6ttzMOQFyG0=
 github.com/dell/gopowerstore v1.15.2-0.20240925141718-82897478ca7f h1:YdBsmUfMIFRQfOvgBCtfQAXYCmhR+4elNFHDiOs8k7Y=
 github.com/dell/gopowerstore v1.15.2-0.20240925141718-82897478ca7f/go.mod h1:vyN1JAZ+TO7Px+gNVa61a23/KwlI/Nj/6ttzMOQFyG0=
+github.com/dell/gopowerstore v1.15.2-0.20241001202140-db2de61a4338 h1:YwWUcphY/HY5rPYY2g9vJnLMbOAgD/ITEdz6nlVW9nI=
+github.com/dell/gopowerstore v1.15.2-0.20241001202140-db2de61a4338/go.mod h1:vyN1JAZ+TO7Px+gNVa61a23/KwlI/Nj/6ttzMOQFyG0=
 github.com/dgrijalva/jwt-go v3.2.0+incompatible/go.mod h1:E3ru+11k8xSBh+hMPgOLZmtrrCbhqsmaPHjLKYnJCaQ=
 github.com/dgryski/go-sip13 v0.0.0-20181026042036-e10d5fee7954/go.mod h1:vAd38F8PWV+bWy6jNmig1y/TA+kYO4g3RSRF0IAv0no=
 github.com/docopt/docopt-go v0.0.0-20180111231733-ee0de3bc6815/go.mod h1:WwZ+bS3ebgob9U8Nd0kOddGdZWjyMGR8Wziv+TBNwSE=

@@ -439,7 +439,7 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 							metroVGSession.State != gopowerstore.RsStateSynchronizing &&
 							metroVGSession.State != gopowerstore.RsStatePaused &&
 							metroVGSession.State != gopowerstore.RsStateSystemPaused &&
-							metroVGSession.State != "Fractured" {
+							metroVGSession.State != gopowerstore.RsStateFractured {
 							return nil, status.Errorf(codes.FailedPrecondition,
 								"cannot add volumes to volume group %s because the metro replication session is not in expected state to pause: %s", vg.Name, err.Error())
 						}
@@ -846,7 +846,7 @@ func (s *Service) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest
 						metroSession.State != gopowerstore.RsStateSynchronizing &&
 						metroSession.State != gopowerstore.RsStatePaused &&
 						metroSession.State != gopowerstore.RsStateSystemPaused &&
-						metroSession.State != "Fractured" {
+						metroSession.State != gopowerstore.RsStateFractured {
 						return nil, status.Errorf(codes.FailedPrecondition,
 							"failed to delete volume %s because the metro replication session is in %s state", id, metroSession.State)
 					}
