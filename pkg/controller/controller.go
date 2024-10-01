@@ -919,7 +919,7 @@ func (s *Service) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest
 		}
 
 		// Check if volume has metro session and end it
-		if !isMetroVolumeGroup {
+		if isMetro && !isMetroVolumeGroup {
 			volume, err := arr.GetClient().GetVolume(ctx, id)
 			if err != nil {
 				if apiError, ok := err.(gopowerstore.APIError); ok && apiError.NotFound() {
