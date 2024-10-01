@@ -434,16 +434,18 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 					if vg.MetroReplicationSessionID != "" {
 						// make sure session is in good state
 						metroVGSession, err := arr.Client.GetReplicationSessionByID(ctx, vg.MetroReplicationSessionID)
-						if metroVGSession.State != gopowerstore.RsStateOk {
+						if metroVGSession.State != gopowerstore.RsStateOk && metroVGSession.State != gopowerstore.RsStatePaused {
 							return nil, status.Errorf(codes.FailedPrecondition,
 								"cannot add volumes to volume group %s because the metro replication session is not in running state.", vg.Name)
 						}
 
-						// if session is running, pause metro
+						// if metro session is running, pause it
+						if metroVGSession.State == gopowerstore.RsStateOk {
 						log.Debugf("metro session state is OK. Pausing metro volume group session for %s", vg.Name)
 						_, err = arr.Client.ExecuteActionOnReplicationSession(ctx, vg.MetroReplicationSessionID, gopowerstore.RsActionPause, nil)
 						if err != nil {
 							return nil, status.Errorf(codes.Internal, "unable to pause metro replication session on volume group %s: %s", vg.Name, err.Error())
+							}
 						}
 
 						// Metro session paused. Volume will be added to the vg and metro will be resumed below.
