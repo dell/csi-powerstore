@@ -253,15 +253,17 @@ func (s *Service) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeR
 		return nil, status.Error(codes.InvalidArgument, "staging target path is required")
 	}
 
-	id, arrayID, protocol, _, _, _ := array.ParseVolumeID(ctx, id, s.DefaultArray(), req.VolumeCapability)
-
-	var stager VolumeStager
+	id, arrayID, protocol, remoteVolumeID, _, err := array.ParseVolumeID(ctx, id, s.DefaultArray(), req.VolumeCapability)
+	if err != nil {
+		return nil, err
+	}
 
 	arr, ok := s.Arrays()[arrayID]
 	if !ok {
-		return nil, status.Errorf(codes.Internal, "can't find array with provided arrayID %s", arrayID)
+		return nil, status.Errorf(codes.Internal, "can't find array with ID %s", arrayID)
 	}
 
+	var stager VolumeStager
 	if protocol == "nfs" {
 		stager = &NFSStager{
 			array: arr,
@@ -276,7 +278,17 @@ func (s *Service) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeR
 		}
 	}
 
-	return stager.Stage(ctx, req, logFields, s.Fs, id)
+	response, err := stager.Stage(ctx, req, logFields, s.Fs, id, false)
+	if err != nil {
+		return nil, err
+	}
+
+	if remoteVolumeID != "" { // For Remote Metro volume
+		log.Info("Staging remote metro volume")
+		response, err = stager.Stage(ctx, req, logFields, s.Fs, remoteVolumeID, true)
+	}
+
+	return response, err
 }
 
 // NodeUnstageVolume reverses steps done in NodeStage by disconnecting volume from the node
@@ -293,7 +305,7 @@ func (s *Service) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVol
 		return nil, status.Error(codes.InvalidArgument, "staging target path is required")
 	}
 
-	id, _, protocol, _, _, err := array.ParseVolumeID(ctx, id, s.DefaultArray(), nil)
+	id, _, protocol, remoteVolumeID, _, err := array.ParseVolumeID(ctx, id, s.DefaultArray(), nil)
 	if err != nil {
 		if apiError, ok := err.(gopowerstore.APIError); ok && apiError.NotFound() {
 			return &csi.NodeUnstageVolumeResponse{}, nil
@@ -309,6 +321,14 @@ func (s *Service) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVol
 	device, err := unstageVolume(ctx, stagingPath, id, logFields, err, s.Fs)
 	if err != nil {
 		return nil, err
+	}
+	if remoteVolumeID != "" { // For Remote Metro volume
+		log.Info("Unstaging remote metro volume")
+		remoteStagingPath := getStagingPath(ctx, req.GetStagingTargetPath(), remoteVolumeID)
+		_, err = unstageVolume(ctx, remoteStagingPath, remoteVolumeID, logFields, err, s.Fs)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if protocol == "nfs" {
