@@ -436,14 +436,16 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 						// 'fractured' state is normal state flow after adding volumes and resuming the session.
 						metroVGSession, err := arr.Client.GetReplicationSessionByID(ctx, vg.MetroReplicationSessionID)
 						if metroVGSession.State != gopowerstore.RsStateOk &&
+							metroVGSession.State != gopowerstore.RsStateSynchronizing &&
 							metroVGSession.State != gopowerstore.RsStatePaused &&
+							metroVGSession.State != gopowerstore.RsStateSystemPaused &&
 							metroVGSession.State != "Fractured" {
 							return nil, status.Errorf(codes.FailedPrecondition,
 								"cannot add volumes to volume group %s because the metro replication session is not in running state: %s", vg.Name, err.Error())
 						}
 
 						// if metro session is running, pause it
-						if metroVGSession.State == gopowerstore.RsStateOk || metroVGSession.State == "Fractured" {
+						if metroVGSession.State != gopowerstore.RsStateSystemPaused {
 							log.Debugf("metro session state is OK. Pausing metro volume group session for %s", vg.Name)
 							_, err = arr.Client.ExecuteActionOnReplicationSession(ctx, vg.MetroReplicationSessionID, gopowerstore.RsActionPause, nil)
 							if err != nil {
@@ -826,15 +828,6 @@ func (s *Service) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest
 
 				metroSessionID = metroSession.ID
 
-				// confirm the session is in a state we can pause from.
-				// 'Fractured' state is normal state flow after deleting a volume from the group and resuming replication.
-				if metroSession.State != gopowerstore.RsStateOk &&
-					metroSession.State != gopowerstore.RsStatePaused &&
-					metroSession.State != "Fractured" {
-					return nil, status.Errorf(codes.FailedPrecondition,
-						"failed to delete volume %s because the metro replication session is in %s state", id, metroSession.State)
-				}
-
 				// Must end metro to remove the last volume in a metro volume group
 				if len(vg.Volumes) == 1 {
 					log.Debugf("deleting last member of metro volume group %s. The volume group will also be deleted.", vg.Name)
@@ -846,7 +839,18 @@ func (s *Service) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest
 					// delete volume group on success
 					deleteMetroVolumeGroup = true
 				} else {
-					if metroSession.State == gopowerstore.RsStateOk || metroSession.State == "Fractured" {
+					// confirm the session is in a state we can pause from.
+					// 'Fractured' state is normal state flow after deleting a volume from the group and resuming replication.
+					if metroSession.State != gopowerstore.RsStateOk &&
+						metroSession.State != gopowerstore.RsStateSynchronizing &&
+						metroSession.State != gopowerstore.RsStatePaused &&
+						metroSession.State != gopowerstore.RsStateSystemPaused &&
+						metroSession.State != "Fractured" {
+						return nil, status.Errorf(codes.FailedPrecondition,
+							"failed to delete volume %s because the metro replication session is in %s state", id, metroSession.State)
+					}
+
+					if metroSession.State != gopowerstore.RsStatePaused {
 						log.Debugf("pausing replication session for volume group %s", vg.Name)
 
 						// pause the replication session
