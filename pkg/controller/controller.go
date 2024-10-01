@@ -888,8 +888,14 @@ func (s *Service) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest
 			// TODO: Maybe adding volumegroup id/name to volume id can help?
 			_, err = arr.GetClient().RemoveMembersFromVolumeGroup(ctx, &gopowerstore.VolumeGroupMembers{VolumeIDs: []string{id}}, vg.ID)
 			if err != nil {
-				// TODO: check for idempotency cases
-				return nil, err
+				apiErr, ok := err.(gopowerstore.APIError)
+				if !ok {
+					return nil, err
+				}
+				// continue with delete request if the volume is not part of the group.
+				if apiErr.StatusCode != http.StatusUnprocessableEntity || !strings.Contains(err.Error(), "are not part of") {
+					return nil, err
+				}
 			}
 
 			if !isMetro {
