@@ -262,14 +262,14 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 	if replicationEnabled == "true" {
 		if useNFS {
 			// NFS replication not supported
-			return nil, status.Errorf(codes.InvalidArgument, "replication not supported for NFS")
+			return nil, status.Error(codes.InvalidArgument, "replication not supported for NFS")
 		}
 
 		log.Info("Preparing volume replication")
 
 		remoteSystemName, ok = params[s.WithRP(KeyReplicationRemoteSystem)]
 		if !ok {
-			return nil, status.Errorf(codes.InvalidArgument, "replication enabled but no remote system specified in storage class")
+			return nil, status.Error(codes.InvalidArgument, "replication enabled but no remote system specified in storage class")
 		}
 		repMode := params[s.WithRP(KeyReplicationMode)]
 		// Default to ASYNC for backward compatibility
@@ -284,32 +284,32 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 			log.Infof("%s replication mode requested", repMode)
 			vgPrefix, ok := params[s.WithRP(KeyReplicationVGPrefix)]
 			if !ok {
-				return nil, status.Errorf(codes.InvalidArgument, "replication enabled but no volume group prefix specified in storage class")
+				return nil, status.Error(codes.InvalidArgument, "replication enabled but no volume group prefix specified in storage class")
 			}
 
 			rpo, ok := params[s.WithRP(KeyReplicationRPO)]
 			if !ok {
 				// If Replication mode is ASYNC and there is no RPO specified, returning an error
 				if repMode == common.AsyncMode {
-					return nil, status.Errorf(codes.InvalidArgument, "replication mode is ASYNC but no RPO specified in storage class")
+					return nil, status.Error(codes.InvalidArgument, "replication mode is ASYNC but no RPO specified in storage class")
 				}
 				// If Replication mode is SYNC and there is no RPO, defaulting the value to Zero
 				rpo = common.Zero
 			}
 			rpoEnum := gopowerstore.RPOEnum(rpo)
 			if err := rpoEnum.IsValid(); err != nil {
-				return nil, status.Errorf(codes.InvalidArgument, "invalid RPO value")
+				return nil, status.Error(codes.InvalidArgument, "invalid RPO value")
 			}
 
 			// Validating RPO to be non Zero when replication mode is ASYNC
 			if repMode == common.AsyncMode && rpo == common.Zero {
 				log.Errorf("RPO value for %s cannot be : %s", repMode, rpo)
-				return nil, status.Errorf(codes.InvalidArgument, "replication mode ASYNC requires RPO value to be non Zero")
+				return nil, status.Error(codes.InvalidArgument, "replication mode ASYNC requires RPO value to be non Zero")
 			}
 
 			// Validating RPO to be Zero whe replication mode is SYNC
 			if repMode == common.SyncMode && rpo != common.Zero {
-				return nil, status.Errorf(codes.InvalidArgument, "replication mode SYNC requires RPO value to be Zero")
+				return nil, status.Error(codes.InvalidArgument, "replication mode SYNC requires RPO value to be Zero")
 			}
 			namespace := ""
 			if ignoreNS, ok := params[s.WithRP(KeyReplicationIgnoreNamespaces)]; ok && ignoreNS == "false" {
@@ -441,7 +441,7 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 							metroVGSession.State != gopowerstore.RsStateSystemPaused &&
 							metroVGSession.State != "Fractured" {
 							return nil, status.Errorf(codes.FailedPrecondition,
-								"cannot add volumes to volume group %s because the metro replication session is not in running state: %s", vg.Name, err.Error())
+								"cannot add volumes to volume group %s because the metro replication session is not in expected state to pause: %s", vg.Name, err.Error())
 						}
 
 						// if metro session is running, pause it
@@ -834,7 +834,8 @@ func (s *Service) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest
 
 					_, err = arr.Client.EndMetroVolumeGroup(ctx, vg.ID, &gopowerstore.EndMetroVolumeGroupOptions{DeleteRemoteVolumeGroup: true})
 					if err != nil {
-						return nil, status.Errorf(codes.Internal, "failed to delete volume %s because the metro replication session could not be ended", id)
+						return nil, status.Errorf(codes.Internal,
+							"failed to delete volume %s because the metro replication session could not be ended on volume group %s: %s", id, vg.ID, err.Error())
 					}
 					// delete volume group on success
 					deleteMetroVolumeGroup = true
@@ -857,7 +858,7 @@ func (s *Service) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest
 						_, err = arr.Client.ExecuteActionOnReplicationSession(ctx, metroSessionID, gopowerstore.RsActionPause, nil)
 						if err != nil {
 							return nil, status.Errorf(codes.Internal,
-								"failed to delete volume %s because the replication session could not be paused", id)
+								"failed to delete volume %s because the replication session could not be paused on volume group %s: %s", id, vg.ID, err.Error())
 						}
 					}
 
