@@ -645,8 +645,20 @@ func resumeMetroVolumeGroupSession(ctx context.Context, arr *array.PowerStoreArr
 		return status.Errorf(codes.Internal, "cannot configure metro for resource type %T", resource)
 	}
 
+	// after pausing, we cannot resume until the session has successfully been paused
+	metroSession, err := arr.Client.GetReplicationSessionByLocalResourceID(ctx, volumeGroup.ID)
+	if err != nil {
+		return err
+	}
+	if metroSession.State != gopowerstore.RsStatePaused {
+		return status.Errorf(codes.FailedPrecondition,
+			"metro volume group %s needs to be in 'paused' state before resuming.", volumeGroup.ID)
+	}
+
+	log.Debugf("resuming replication session for volume group %s", volumeGroup.Name)
+
 	// resume metro session
-	_, err := arr.Client.ExecuteActionOnReplicationSession(ctx, volumeGroup.MetroReplicationSessionID, gopowerstore.RsActionResume, nil)
+	_, err = arr.Client.ExecuteActionOnReplicationSession(ctx, volumeGroup.MetroReplicationSessionID, gopowerstore.RsActionResume, nil)
 	if err != nil {
 		return status.Errorf(codes.Internal, "unable to resume metro replication session on volume group %s: %s", volumeGroup.Name, err.Error())
 	}
@@ -839,6 +851,16 @@ func (s *Service) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest
 						}
 
 						restoreMetroSession = func() error {
+							// after pausing, we cannot resume until the session has successfully been paused
+							metroSession, err = arr.Client.GetReplicationSessionByID(ctx, metroSessionID)
+							if err != nil {
+								return err
+							}
+							if metroSession.State != gopowerstore.RsStatePaused {
+								return status.Errorf(codes.FailedPrecondition,
+									"metro volume group %s needs to be in 'paused' state before resuming.", vg.ID)
+							}
+
 							log.Debugf("resuming replication session for volume group %s", vg.Name)
 
 							_, err = arr.Client.ExecuteActionOnReplicationSession(ctx, metroSessionID, gopowerstore.RsActionResume, nil)
