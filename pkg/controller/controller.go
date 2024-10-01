@@ -444,10 +444,10 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 
 						// if metro session is running, pause it
 						if metroVGSession.State == gopowerstore.RsStateOk || metroVGSession.State == "Fractured" {
-						log.Debugf("metro session state is OK. Pausing metro volume group session for %s", vg.Name)
-						_, err = arr.Client.ExecuteActionOnReplicationSession(ctx, vg.MetroReplicationSessionID, gopowerstore.RsActionPause, nil)
-						if err != nil {
-							return nil, status.Errorf(codes.Internal, "unable to pause metro replication session on volume group %s: %s", vg.Name, err.Error())
+							log.Debugf("metro session state is OK. Pausing metro volume group session for %s", vg.Name)
+							_, err = arr.Client.ExecuteActionOnReplicationSession(ctx, vg.MetroReplicationSessionID, gopowerstore.RsActionPause, nil)
+							if err != nil {
+								return nil, status.Errorf(codes.Internal, "unable to pause metro replication session on volume group %s: %s", vg.Name, err.Error())
 							}
 						}
 
@@ -857,25 +857,25 @@ func (s *Service) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest
 						}
 					}
 
-						restoreMetroSession = func() error {
-							// after pausing, we cannot resume until the session has successfully been paused
-							metroSession, err = arr.Client.GetReplicationSessionByID(ctx, metroSessionID)
-							if err != nil {
-								return err
-							}
-							if metroSession.State != gopowerstore.RsStatePaused {
-								return status.Errorf(codes.FailedPrecondition,
-									"metro volume group %s needs to be in 'paused' state before resuming.", vg.ID)
-							}
+					restoreMetroSession = func() error {
+						// after pausing, we cannot resume until the session has successfully been paused
+						metroSession, err = arr.Client.GetReplicationSessionByID(ctx, metroSessionID)
+						if err != nil {
+							return err
+						}
+						if metroSession.State != gopowerstore.RsStatePaused {
+							return status.Errorf(codes.FailedPrecondition,
+								"metro volume group %s needs to be in 'paused' state before resuming.", vg.ID)
+						}
 
-							log.Debugf("resuming replication session for volume group %s", vg.Name)
+						log.Debugf("resuming replication session for volume group %s", vg.Name)
 
-							_, err = arr.Client.ExecuteActionOnReplicationSession(ctx, metroSessionID, gopowerstore.RsActionResume, nil)
-							if err != nil {
-								return status.Errorf(codes.Internal,
-									"failed to resume metro session for volume group %s: %s", vg.Name, err.Error())
-							}
-							return nil
+						_, err = arr.Client.ExecuteActionOnReplicationSession(ctx, metroSessionID, gopowerstore.RsActionResume, nil)
+						if err != nil {
+							return status.Errorf(codes.Internal,
+								"failed to resume metro session for volume group %s: %s", vg.Name, err.Error())
+						}
+						return nil
 					}
 				}
 			}
