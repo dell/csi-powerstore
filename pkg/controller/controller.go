@@ -413,7 +413,7 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 				}
 
 				// Get the volume group name used for querying PowerStore array
-				vgName := vgPrefix + "-" + namespace + remoteSystemName
+				vgName := vgPrefix + "-" + namespace + common.Metro + remoteSystemName
 				// truncate name length to comply with CSI gRPC spec
 				if len(vgName) > 128 {
 					vgName = vgName[:128]
