@@ -444,25 +444,22 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 							if !ok || !apiErr.NotFound() {
 								return nil, status.Errorf(codes.Internal, "could not verify volume group membership for volume %s: %s", req.GetName(), err.Error())
 							}
-							// volume group exists, but volume does not. Pause metro session to allow addition.
+						}
+						if existingVolume.ID != "" && len(existingVolume.VolumeGroup) > 0 {
+							if existingVolume.VolumeGroup[0].ID == vg.ID {
+								// log that pause is not needed
+								log.Debugf("volume, %s, is already a part of volume group %s. skipping metro session pause", req.GetName(), vg.Name)
+							} else {
+								// volume is already part of a vg, but not this vg
+								return nil, status.Errorf(codes.Aborted,
+									"failed to create volume %s. The volume exists but is part of a different volume group %s",
+									existingVolume.Name, existingVolume.VolumeGroup[0].Name)
+							}
+						} else {
 							err = pauseMetroVolumeGroupSession(ctx, metroVGSession, arr)
 							if err != nil {
 								return nil, status.Errorf(codes.FailedPrecondition,
 									"failed to create volume %s for volume group %s: %s", req.GetName(), vg.Name, err.Error())
-							}
-						} else {
-							// only pause the metro session if the volume is not part of the volume group
-							if len(existingVolume.VolumeGroup) == 0 {
-								// volume is not part of the vg yet. Pause metro to allow addition.
-								err = pauseMetroVolumeGroupSession(ctx, metroVGSession, arr)
-								if err != nil {
-									return nil, status.Errorf(codes.FailedPrecondition,
-										"failed to create volume %s for volume group %s: %s", req.GetName(), vg.Name, err.Error())
-								}
-							}
-							if existingVG := existingVolume.VolumeGroup[0]; existingVG.ID != vg.ID {
-								// volume is already part of a vg, but not this vg
-								return nil, status.Errorf(codes.Aborted, "failed to create volume %s. The volume exists but is part of a different volume group %s", existingVolume.Name, existingVG.Name)
 							}
 						}
 
@@ -470,12 +467,6 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 						startMetroReplicationSession = resumeMetroVolumeGroupSession
 
 					} else {
-						// vg exists but is not yet metro replicated
-						// if it already has volumes attached, exit with error
-						if len(vg.Volumes) > 0 {
-							return nil, status.Errorf(codes.FailedPrecondition,
-								"volume group %s found with volumes attached, but not part of a metro replication session.", vg.Name)
-						}
 
 						// vg needs to be write-order consistent for metro replication
 						if !vg.IsWriteOrderConsistent {
