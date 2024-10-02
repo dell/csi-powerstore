@@ -413,7 +413,7 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 				}
 
 				// Get the volume group name used for querying PowerStore array
-				vgName := vgPrefix + "-" + namespace + common.Metro + remoteSystemName
+				vgName := vgPrefix + "-" + namespace + remoteSystemName + "-" + common.Metro
 				// truncate name length to comply with CSI gRPC spec
 				if len(vgName) > 128 {
 					vgName = vgName[:128]
@@ -440,14 +440,12 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 						// check if the volume about to be created exists in the volume group already
 						existingVolume, err := arr.Client.GetVolumeByName(ctx, req.GetName())
 						if err != nil {
-							apiErr, ok := err.(gopowerstore.APIError)
-							if !ok || !apiErr.NotFound() {
+							if apiErr, ok := err.(gopowerstore.APIError); !ok || !apiErr.NotFound() {
 								return nil, status.Errorf(codes.Internal, "could not verify volume group membership for volume %s: %s", req.GetName(), err.Error())
 							}
 						}
 						if existingVolume.ID != "" && len(existingVolume.VolumeGroup) > 0 {
 							if existingVolume.VolumeGroup[0].ID == vg.ID {
-								// log that pause is not needed
 								log.Debugf("volume, %s, is already a part of volume group %s. skipping metro session pause", req.GetName(), vg.Name)
 							} else {
 								// volume is already part of a vg, but not this vg
@@ -467,7 +465,6 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 						startMetroReplicationSession = resumeMetroVolumeGroupSession
 
 					} else {
-
 						// vg needs to be write-order consistent for metro replication
 						if !vg.IsWriteOrderConsistent {
 							return nil, status.Errorf(codes.FailedPrecondition,
@@ -900,13 +897,10 @@ func (s *Service) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest
 			// TODO: Maybe adding volumegroup id/name to volume id can help?
 			_, err = arr.GetClient().RemoveMembersFromVolumeGroup(ctx, &gopowerstore.VolumeGroupMembers{VolumeIDs: []string{id}}, vg.ID)
 			if err != nil {
-				apiErr, ok := err.(gopowerstore.APIError)
-				if !ok {
-					return nil, err
-				}
-				// continue with delete request if the volume is not part of the group.
-				if apiErr.StatusCode != http.StatusUnprocessableEntity || !apiErr.VolumeAlreadyRemovedFromVolumeGroup() {
-					return nil, err
+				if apiError, ok := err.(gopowerstore.APIError); ok && apiError.VolumeAlreadyRemovedFromVolumeGroup() { // idempotency check
+					log.Debugf("Volume %s has already been removed from volume group %s", id, vg.ID) // continue to delete volume
+				} else {
+					return nil, status.Errorf(codes.Internal, "failed to remove volume %s from volume group: %s", id, err.Error())
 				}
 			}
 
