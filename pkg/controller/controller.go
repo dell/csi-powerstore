@@ -1355,22 +1355,24 @@ func (s *Service) ListSnapshots(ctx context.Context, req *csi.ListSnapshotsReque
 // If Metro is configured on the volume group that the volume is part of, then returns the ID of the volume group's session.
 func GetMetroSessionID(ctx context.Context, client gopowerstore.Client, volumeID string, volume gopowerstore.Volume, remoteArrayID string) (string, error) {
 	metroSessionID := ""
-	if remoteArrayID != "" {
-		vgs, err := client.GetVolumeGroupsByVolumeID(ctx, volumeID)
+	if remoteArrayID == "" {
+		return metroSessionID, nil
+	}
+
+	vgs, err := client.GetVolumeGroupsByVolumeID(ctx, volumeID)
+	if err != nil {
+		return "", status.Errorf(codes.Internal, "error while retrieving volume groups for volume %s", volumeID)
+	}
+	if len(vgs.VolumeGroup) == 0 {
+		metroSessionID = volume.MetroReplicationSessionID
+	} else {
+		vg := vgs.VolumeGroup[0]
+		rs, err := client.GetReplicationSessionByLocalResourceID(ctx, vg.ID)
 		if err != nil {
-			return "", status.Errorf(codes.Internal, "error while retrieving volume groups for volume %s", volumeID)
+			return "", status.Errorf(codes.Internal, "unable to get replication session for volume group %s", vg.ID)
 		}
-		if len(vgs.VolumeGroup) == 0 {
-			metroSessionID = volume.MetroReplicationSessionID
-		} else {
-			vg := vgs.VolumeGroup[0]
-			rs, err := client.GetReplicationSessionByLocalResourceID(ctx, vg.ID)
-			if err != nil {
-				return "", status.Errorf(codes.Internal, "unable to get replication session for volume group %s", vg.ID)
-			}
-			if rs.ID != "" {
-				metroSessionID = rs.ID
-			}
+		if rs.ID != "" {
+			metroSessionID = rs.ID
 		}
 	}
 	return metroSessionID, nil
