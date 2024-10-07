@@ -2278,7 +2278,6 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 					mock.AnythingOfType("*gopowerstore.VolumeModify"),
 					validBaseVolID).
 					Return(gopowerstore.EmptyResponse(""), nil)
-				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).Return([]gopowerstore.VolumeGroup{}, nil)
 				// Return okay to pause session
 				clientMock.On("GetReplicationSessionByID", mock.Anything, validSessionID).Return(gopowerstore.ReplicationSession{
 					ID:    validSessionID,
@@ -2350,7 +2349,6 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 						mock.AnythingOfType("*gopowerstore.VolumeModify"),
 						validBaseVolID).
 						Return(gopowerstore.EmptyResponse(""), nil)
-					clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).Return([]gopowerstore.VolumeGroup{}, nil)
 					// Return okay to pause session
 					clientMock.On("GetReplicationSessionByID", mock.Anything, validSessionID).Return(gopowerstore.ReplicationSession{
 						ID:    validSessionID,
@@ -2385,7 +2383,6 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 						mock.AnythingOfType("*gopowerstore.VolumeModify"),
 						validBaseVolID).
 						Return(gopowerstore.EmptyResponse(""), nil)
-					clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).Return([]gopowerstore.VolumeGroup{}, nil)
 					// Return okay to pause session
 					clientMock.On("GetReplicationSessionByID", mock.Anything, validSessionID).Return(gopowerstore.ReplicationSession{
 						ID:    validSessionID,
@@ -2430,7 +2427,6 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 						mock.AnythingOfType("*gopowerstore.VolumeModify"),
 						validBaseVolID).
 						Return(gopowerstore.EmptyResponse(""), nil)
-					clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).Return([]gopowerstore.VolumeGroup{}, nil)
 					// Return okay to pause session
 					clientMock.On("GetReplicationSessionByID", mock.Anything, validSessionID).Return(gopowerstore.ReplicationSession{
 						ID:    validSessionID,
@@ -2454,7 +2450,6 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 						mock.AnythingOfType("*gopowerstore.VolumeModify"),
 						validBaseVolID).
 						Return(gopowerstore.EmptyResponse(""), nil)
-					clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).Return([]gopowerstore.VolumeGroup{}, nil)
 					// Return okay to pause session
 					clientMock.On("GetReplicationSessionByID", mock.Anything, validSessionID).Return(gopowerstore.ReplicationSession{
 						ID:    validSessionID,
