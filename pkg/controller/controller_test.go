@@ -2407,6 +2407,74 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 					gomega.Expect(err.Error()).To(gomega.ContainSubstring("because the metro replication session could not be resumed"))
 				})
 			})
+
+			ginkgo.When("array id is not found", func() {
+				ginkgo.It("should fail", func() {
+					req := getTypicalControllerExpandRequest(invalidBlockVolumeID, validVolSize*2)
+
+					_, err := ctrlSvc.ControllerExpandVolume(context.Background(), req)
+
+					gomega.Expect(err).ToNot(gomega.BeNil())
+					gomega.Expect(err.Error()).To(gomega.ContainSubstring("unable to find array with ID"))
+				})
+			})
+
+			ginkgo.When("not in correct metro session state", func() {
+				ginkgo.It("should fail when trying to pause session", func() {
+					clientMock.On("GetVolume", mock.Anything, validBaseVolID).Return(gopowerstore.Volume{
+						MetroReplicationSessionID: validSessionID,
+						Size:                      validVolSize,
+					}, nil)
+					clientMock.On("ModifyVolume",
+						mock.Anything,
+						mock.AnythingOfType("*gopowerstore.VolumeModify"),
+						validBaseVolID).
+						Return(gopowerstore.EmptyResponse(""), nil)
+					clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).Return([]gopowerstore.VolumeGroup{}, nil)
+					// Return okay to pause session
+					clientMock.On("GetReplicationSessionByID", mock.Anything, validSessionID).Return(gopowerstore.ReplicationSession{
+						ID:    validSessionID,
+						State: gopowerstore.RsStateError,
+					}, nil).Times(1)
+
+					req := getTypicalControllerExpandRequest(validMetroBlockVolumeID, validVolSize*2)
+
+					_, err := ctrlSvc.ControllerExpandVolume(context.Background(), req)
+
+					gomega.Expect(err).ToNot(gomega.BeNil())
+					gomega.Expect(err.Error()).To(gomega.ContainSubstring("because the session is not in expected state to pause"))
+				})
+				ginkgo.It("should fail when trying to resume session", func() {
+					clientMock.On("GetVolume", mock.Anything, validBaseVolID).Return(gopowerstore.Volume{
+						MetroReplicationSessionID: validSessionID,
+						Size:                      validVolSize,
+					}, nil)
+					clientMock.On("ModifyVolume",
+						mock.Anything,
+						mock.AnythingOfType("*gopowerstore.VolumeModify"),
+						validBaseVolID).
+						Return(gopowerstore.EmptyResponse(""), nil)
+					clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).Return([]gopowerstore.VolumeGroup{}, nil)
+					// Return okay to pause session
+					clientMock.On("GetReplicationSessionByID", mock.Anything, validSessionID).Return(gopowerstore.ReplicationSession{
+						ID:    validSessionID,
+						State: gopowerstore.RsStateOk,
+					}, nil).Times(1)
+					// Return paused to resume session
+					clientMock.On("GetReplicationSessionByID", mock.Anything, validSessionID).Return(gopowerstore.ReplicationSession{
+						ID:    validSessionID,
+						State: gopowerstore.RsStateFailedOver,
+					}, nil).Times(1)
+					clientMock.On("ExecuteActionOnReplicationSession", mock.Anything, validSessionID, gopowerstore.RsActionPause, (*gopowerstore.FailoverParams)(nil)).Return(gopowerstore.EmptyResponse(""), nil)
+
+					req := getTypicalControllerExpandRequest(validMetroBlockVolumeID, validVolSize*2)
+
+					_, err := ctrlSvc.ControllerExpandVolume(context.Background(), req)
+
+					gomega.Expect(err).ToNot(gomega.BeNil())
+					gomega.Expect(err.Error()).To(gomega.ContainSubstring("could not be resumed:"))
+				})
+			})
 		})
 
 		ginkgo.When("expanding nfs volume", func() {
