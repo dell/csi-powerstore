@@ -122,7 +122,7 @@ func CreateStatefulSet(ns string, ss *apps.StatefulSet, c clientset.Interface) {
 
 	_, err := c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
-	fss.WaitForRunningAndReady(c, *ss.Spec.Replicas, ss)
+	fss.WaitForRunningAndReady(ctx, c, *ss.Spec.Replicas, ss)
 }
 
 // CreateDeployment creates a deployment in the provided namespace
@@ -280,12 +280,14 @@ func getStorageClassSpec(scName string, testParameters map[interface{}]interface
 func createPVC(client clientset.Interface, pvcnamespace string, pvclaimlabels map[string]string, ds string,
 	storageclass *storagev1.StorageClass, accessMode v1.PersistentVolumeAccessMode,
 ) (*v1.PersistentVolumeClaim, error) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	pvcspec := getPersistentVolumeClaimSpecWithStorageClass(pvcnamespace, ds, storageclass, pvclaimlabels, accessMode)
 
 	ginkgo.By(fmt.Sprintf("Creating PVC using the Storage Class %s with disk size %s and labels: %+v accessMode: %+v",
 		storageclass.Name, ds, pvclaimlabels, accessMode))
 
-	pvclaim, err := fpv.CreatePVC(client, pvcnamespace, pvcspec)
+	pvclaim, err := fpv.CreatePVC(ctx, client, pvcnamespace, pvcspec)
 
 	gomega.Expect(err).NotTo(gomega.HaveOccurred(), fmt.Sprintf("Failed to create pvc with err: %v", err))
 	framework.Logf("PVC created: %v in namespace: %v", pvclaim.Name, pvcnamespace)
@@ -314,7 +316,7 @@ func getPersistentVolumeClaimSpecWithStorageClass(namespace string, ds string, s
 			AccessModes: []v1.PersistentVolumeAccessMode{
 				accessMode,
 			},
-			Resources: v1.ResourceRequirements{
+			Resources: v1.VolumeResourceRequirements{
 				Requests: v1.ResourceList{
 					v1.ResourceName(v1.ResourceStorage): resource.MustParse(disksize),
 				},
