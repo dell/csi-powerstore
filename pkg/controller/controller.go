@@ -322,24 +322,15 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 				if apiError, ok := err.(gopowerstore.APIError); ok && apiError.NotFound() {
 					log.Infof("Volume group with name %s not found, creating it", vgName)
 
-					// Attribute that indicates whether snapshot sets of the volumegroup will be write-order consistent.
-					isWriteOrderConsistent := false
-
 					// ensure protection policy exists
 					pp, err := EnsureProtectionPolicyExists(ctx, arr, vgName, remoteSystemName, rpoEnum)
 					if err != nil {
 						return nil, status.Errorf(codes.Internal, "can't ensure protection policy exists %s", err.Error())
 					}
 
-					// To apply a  ProtectionPolicy with Sync rule, VolumeGroup must be write-order-consistent
-					if repMode == common.SyncMode {
-						isWriteOrderConsistent = true
-					}
-
 					group, err := arr.Client.CreateVolumeGroup(ctx, &gopowerstore.VolumeGroupCreate{
-						Name:                   vgName,
-						ProtectionPolicyID:     pp,
-						IsWriteOrderConsistent: isWriteOrderConsistent,
+						Name:               vgName,
+						ProtectionPolicyID: pp,
 					})
 					if err != nil {
 						return nil, status.Errorf(codes.Internal, "can't create volume group: %s", err.Error())
