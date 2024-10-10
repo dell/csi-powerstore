@@ -307,7 +307,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 
 			EnsureProtectionPolicyExistsMockSync()
 
-			createGroupRequest := &gopowerstore.VolumeGroupCreate{Name: validGroupNameSync, ProtectionPolicyID: validPolicyID, IsWriteOrderConsistent: true}
+			createGroupRequest := &gopowerstore.VolumeGroupCreate{Name: validGroupNameSync, ProtectionPolicyID: validPolicyID}
 			clientMock.On("CreateVolumeGroup", mock.Anything, createGroupRequest).Return(gopowerstore.CreateResponse{ID: validGroupID}, nil)
 			clientMock.On("GetVolumeGroup", mock.Anything, validGroupID).Return(gopowerstore.VolumeGroup{ID: validGroupID, ProtectionPolicyID: validPolicyID}, nil)
 
@@ -419,7 +419,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			clientMock.On("GetProtectionPolicyByName", mock.Anything, "pp-"+validNamespacedGroupNameSync).
 				Return(gopowerstore.ProtectionPolicy{ID: validPolicyID}, nil)
 
-			createGroupRequest := &gopowerstore.VolumeGroupCreate{Name: validNamespacedGroupNameSync, ProtectionPolicyID: validPolicyID, IsWriteOrderConsistent: true}
+			createGroupRequest := &gopowerstore.VolumeGroupCreate{Name: validNamespacedGroupNameSync, ProtectionPolicyID: validPolicyID}
 			clientMock.On("CreateVolumeGroup", mock.Anything, createGroupRequest).Return(gopowerstore.CreateResponse{ID: validGroupID}, nil)
 			clientMock.On("GetVolumeGroup", mock.Anything, validGroupID).Return(gopowerstore.VolumeGroup{ID: validGroupID, ProtectionPolicyID: validPolicyID}, nil)
 			clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
@@ -534,7 +534,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 
 		ginkgo.It("should fail create new volume with existing volumeGroup with policy and when IsWriteOrderConsistent is false - SYNC", func() {
 			clientMock.On("GetVolumeGroupByName", mock.Anything, validGroupNameSync).
-				Return(gopowerstore.VolumeGroup{ID: validGroupID, ProtectionPolicyID: validPolicyID}, nil)
+				Return(gopowerstore.VolumeGroup{ID: validGroupID, ProtectionPolicyID: validPolicyID, IsWriteOrderConsistent: false}, nil)
 			// Setting Replciation mode and corresponding attributes for SYNC
 			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationMode)] = replicationModeSync
 			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationRPO)] = zeroRPO
@@ -638,7 +638,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 
 		ginkgo.It("should fail create volume and update volumeGroup without policy, but policy exists when IsWriteOrderConsistent is false - SYNC", func() {
 			clientMock.On("GetVolumeGroupByName", mock.Anything, validGroupNameSync).
-				Return(gopowerstore.VolumeGroup{ID: validGroupID, ProtectionPolicyID: validPolicyID}, nil)
+				Return(gopowerstore.VolumeGroup{ID: validGroupID, ProtectionPolicyID: validPolicyID, IsWriteOrderConsistent: false}, nil)
 
 			EnsureProtectionPolicyExistsMockSync()
 
