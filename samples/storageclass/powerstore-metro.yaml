@@ -16,7 +16,7 @@ kind: StorageClass
 metadata:
   name: "powerstore-metro"
 provisioner: "csi-powerstore.dellemc.com"
-reclaimPolicy: Retain
+reclaimPolicy: Delete
 volumeBindingMode: Immediate
 allowVolumeExpansion: true
 parameters:
