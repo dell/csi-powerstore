@@ -6,7 +6,7 @@ toolchain go1.23.1
 
 require (
 	github.com/dell/csi-powerstore/v2 v2.11.0
-	github.com/dell/gopowerstore v1.15.2-0.20241004144335-14f8fa34731c
+	github.com/dell/gopowerstore v1.15.2-0.20241008144633-6990d1b86e5b
 	github.com/onsi/ginkgo/v2 v2.19.0
 	github.com/onsi/gomega v1.33.1
 	gopkg.in/yaml.v2 v2.4.0
@@ -176,7 +176,7 @@ require (
 )
 
 replace (
-	github.com/dell/csi-powerstore/v2 => ../../
+	github.com/dell/csi-powerstore/v2 => ../../../
 	k8s.io/api => k8s.io/api v0.31.1
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.31.1
 	k8s.io/apimachinery => k8s.io/apimachinery v0.31.1
