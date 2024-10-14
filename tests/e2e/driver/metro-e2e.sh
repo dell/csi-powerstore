@@ -97,7 +97,7 @@ function ssh_exec() {
     if [ -z "$key_path" ]; then
         ssh $username@$host_ip $cmd
     else
-        ssh -i=$key_path $username@$host_ip $cmd
+        ssh -i $key_path $username@$host_ip $cmd
     fi
 }
 
