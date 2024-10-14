@@ -1,0 +1,57 @@
+# Copyright © 2024 Dell Inc. or its subsidiaries. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#      http://www.apache.org/licenses/LICENSE-2.0
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: "powerstore-metro"
+provisioner: "csi-powerstore.dellemc.com"
+reclaimPolicy: Retain
+volumeBindingMode: Immediate
+allowVolumeExpansion: true
+parameters:
+  # Indicates whether replication is enabled 
+  # Allowed values:
+  #   true: replication is enabled
+  #   false: replication is disabled 
+  # Default value: false
+  replication.storage.dell.com/isReplicationEnabled: "true"
+
+  # Indicates the replication mode
+  # Allowed values:
+  #   "ASYNC" - Asynchronous mode
+  #   "SYNC" - Synchronous mode
+  #   "METRO" - Metro mode
+  # Default value: "ASYNC"
+  replication.storage.dell.com/mode: "METRO"
+
+  # Indicates the remote PowerStore system to be used to configure Metro replication
+  # Allowed values: string
+  # Default value: None
+  replication.storage.dell.com/remoteSystem: "RT-0000"
+
+  # Indicates the array ID to be used for provisioning the volume
+  # Allowed values: arrayID corresponding to array's globalID specified in secret.yaml
+  # Default value: None
+  arrayID: "Unique"
+
+  # Indicates the file system type for mounted volumes
+  # Allowed values:
+  #   ext3: ext3 filesystem type
+  #   ext4: ext4 filesystem type
+  #   xfs: XFS filesystem type
+  #   nfs: NFS filesystem type
+  # Optional: true
+  # Default value: None if defaultFsType is not mentioned in values.yaml
+  # Else defaultFsType value mentioned in values.yaml will be used
+  csi.storage.k8s.io/fstype: "ext4"
