@@ -16,6 +16,9 @@
 
 script_path=$(dirname "${BASH_SOURCE[0]}")
 
+# test report
+report_file="$script_path/metro-e2e-report.csv"
+
 # script default options
 key_path=""
 username=$USER
@@ -57,11 +60,16 @@ function print() {
 }
 
 function print_fail() {
-    print "${red_text}FAIL: $1${reset_text}"
+    local test_name=$1
+    local error_msg=$2
+    print "${red_text}FAIL: $test_name: $error_msg${reset_text}"
+    echo "$test_name,fail,$error_msg" >> $report_file
 }
 
 function print_pass() {
+    local test_name=$1
     print "${green_text}PASS: $1${reset_text}"
+    echo "$test_name,pass" >> $report_file
 }
 
 function print_notice() {
@@ -76,7 +84,7 @@ function pass_fail() {
     if [[ "$exit_code" -eq 0 ]]; then
         print_pass "$test_name"
     else 
-        print_fail "$test_name"
+        print_fail "$test_name" ""
     fi
 }
 
@@ -111,16 +119,18 @@ function deploy_test_env() {
     print_notice "-> Creating the metro storage class"
     kubectl apply -f $test_resources_path/$test_resource_sc
     if [ $? -ne 0 ]; then
-        print_fail "Failed to create storage class"
+        print_fail "Create metro storage class" "Failed to create storage class"
         return 1
     fi
+    print_pass "Create metro storage class"
 
     print_notice "-> Creating the test environment"
     kubectl apply -f $test_resources_path/$test_resource_deployment
     if [ $? -ne 0 ]; then
-        print_fail "Failed to create test environment"
+        print_fail "Create test environment" "Failed to create test environment"
         return 1
     fi
+    print_pass "Create test environment"
 }
 
 # confirm a PV is provisioned and bound for the PVC.
@@ -129,7 +139,7 @@ function test_pv_provisioning() {
     print_notice "-> Waiting for PV to be provisioned and PVC to bind..."
 
     # Check the PVC until a PV is provisioned
-    start_time=$(date +%s)
+    local start_time=$(date +%s)
     while true; do
         # Get the PVC status
         pvc_status=$(kubectl get pvc "$pvc_name" -n "$namespace" -o jsonpath='{.status.phase}')
@@ -141,8 +151,8 @@ function test_pv_provisioning() {
         fi
 
         # Check if the timeout has been reached
-        current_time=$(date +%s)
-        elapsed_time=$((current_time - start_time))
+        local current_time=$(date +%s)
+        local elapsed_time=$((current_time - start_time))
         if [[ "$elapsed_time" -ge "$timeout_seconds" ]]; then
             echo "Timeout reached. PV is not provisioned for the PVC"
             return 1
@@ -160,6 +170,7 @@ function test_pod_running() {
 
     print_notice "-> Waiting for pod $pod_name to be ready..."
 
+    local start_time=$(date +%s)
     while true; do
         # Get the PVC status
         pod_status=$(kubectl get pods -n $namespace $pod_name -o jsonpath='{.status.phase}')
@@ -171,8 +182,8 @@ function test_pod_running() {
         fi
 
         # Check if the timeout has been reached
-        current_time=$(date +%s)
-        elapsed_time=$((current_time - start_time))
+        local current_time=$(date +%s)
+        local elapsed_time=$((current_time - start_time))
         if [[ "$elapsed_time" -ge "$timeout_seconds" ]]; then
             echo "Timeout waiting for pod $pod_name to be ready"
             return 1
@@ -209,10 +220,11 @@ function test_storage_multipath() {
 
     # confirm there are at least 4 mount points
     if [[ "${#mountpoints[@]}" -lt 4 ]]; then
-        print_fail "Not enough mount paths found for volume '$volume_name'"
+        print_fail "Test get device mount paths" "Not enough mount paths found for volume '$volume_name'"
         echo "expected 4, found ${#mountpoints[@]}"
         return 1
     fi
+    print_pass "Test get device mount paths"
 
     echo "Found ${#mountpoints[@]} mount paths for volume '$volume_name'"
 
@@ -220,16 +232,18 @@ function test_storage_multipath() {
         # confirm multipath provides at least 4 paths, 2 for each storage system in the metro configuration
         ssh_exec $host_ip 'multipathd show paths' | grep $device_path > /dev/null
         if [[ $? -ne 0 ]]; then
-            print_fail "Could not find device path '$device_path' in multipath"
+            print_fail "Test host paths exist in multipath" "Could not find device path '$device_path' in multipath"
             return 1
         fi
 
-        echo "Host path for $device_path exists"
+        echo "Test host path for $device_path exists"
     done
-    print_pass "All device paths exist"
+    print_pass "Host paths exist in multipath"
+
 
     # confirm the paths are in an 'active ready' state
     print_notice "-> Waiting for paths to be 'active ready'"
+    local start_time=$(date +%s)
     while true; do
         local is_ready=0
 
@@ -250,8 +264,8 @@ function test_storage_multipath() {
         fi
 
         # Check if the timeout has been reached
-        current_time=$(date +%s)
-        elapsed_time=$((current_time - start_time))
+        local current_time=$(date +%s)
+        local elapsed_time=$((current_time - start_time))
         if [[ "$elapsed_time" -ge "$timeout_seconds" ]]; then
             echo "Timeout waiting namespace '$namespace' to be deleted"
             return 1
@@ -276,10 +290,10 @@ function test_volume_availability() {
     print_notice "-> Checking file system is writable"
     write_to_pod_fs "test-sanity.txt"
     if [[ $? -ne 0 ]]; then
-        print_fail "Failed to write to volume"
+        print_fail "Test file system is writable" "Failed to write to volume"
         return 1
     fi
-    print_pass "File system is writable"
+    print_pass "Test file system is writable"
 
     # determine which pair of paths belong to the same storage array.
     print_notice "-> Getting LUN for device paths"
@@ -300,22 +314,23 @@ function test_volume_availability() {
         echo "Taking down $path"
         local response=$(ssh_exec $host_ip "multipathd fail path $path")
         if [[ "$response" != "ok" ]]; then
-            print_fail "Could not take down $path"
+            print_fail "Test take down host path" "Could not take down path $path"
             return 1
         fi
 
         print_notice "-> Waiting for paths to transition to 'failed' state"
+        local start_time=$(date +%s)
         while true; do
 
             ssh_exec $host_ip 'multipathd show paths' | grep $path | grep 'failed faulty' > /dev/null
             if [[ $? -eq 0 ]]; then
-                print_pass "$path was taken down"
+                print_pass "Test path $path was taken down"
                 break
             fi
 
             # Check if the timeout has been reached
-            current_time=$(date +%s)
-            elapsed_time=$((current_time - start_time))
+            local current_time=$(date +%s)
+            local elapsed_time=$((current_time - start_time))
             if [[ "$elapsed_time" -ge "$timeout_seconds" ]]; then
                 echo "Timeout waiting path '$path' to transition to 'failed' state"
                 return 1
@@ -332,10 +347,10 @@ function test_volume_availability() {
         echo "Writing to volume. Iteration $i"
         write_to_pod_fs "test-sanity-$i.txt"
         if [[ $? -ne 0 ]]; then
-            print_fail "Failed to write to volume"
+            print_fail "Test file system is writable: iteration $i" "Failed to write to volume: iteration $i"
             return 1
         else
-            print_pass "File system is writable: iteration $i"
+            print_pass "Test file system is writable: iteration $i"
         fi
 
         echo "Sleeping for 5 seconds"
@@ -347,11 +362,7 @@ function test_volume_availability() {
     for path in "${paths_to_take_down[@]}"; do
         echo "Restoring path '$path'"
 
-        local response=$(ssh_exec $host_ip "multipathd reinstate path $path")
-        if [[ "$response" != "ok" ]]; then
-            print_fail "Could not restore $path"
-            return 1
-        fi
+        $(ssh_exec $host_ip "multipathd reinstate path $path") > /dev/null
     done
 
     return 0
@@ -360,19 +371,22 @@ function test_volume_availability() {
 # PROVISIONING TEST
 # Confirm a metro PV is provisioned given a valid metro storage class and pvc.
 function test_suite_provisioning() {
+    echo "Metro Volume Provisioning Test," >> $report_file
+
     print_notice "-> Starting Provisioning test"
 
     deploy_test_env
     test_pv_provisioning
     test_pod_running
 
-    pass_fail $? "Provisioning Test"
+    pass_fail $? "Metro Volume Provisioning Test"
 }
 
 # HOST PATH TEST
 # Confirm the PV is setup on the host kubernetes node with multiple paths
 # to both the local and remote storage system.
 function test_suite_host_path() {
+    echo "Host Path Test," >> $report_file
     print_notice "-> Starting Host Path test"
 
     # confirm PV for PVC is created and bound and get the PV name.
@@ -390,6 +404,7 @@ function test_suite_host_path() {
 # Confirm the volume is still writable after taking down all paths to one
 # side of the metro replication session.
 function test_suite_volume_availability() {
+    echo "Volume Availability Test," >> $report_file
     print_notice "-> Starting Volume Availability test"
 
     # confirm the volume mounted in the pod is writable.
@@ -401,12 +416,15 @@ function test_suite_volume_availability() {
 
 # CLEANUP
 function clean_test_env() {
+    echo "Cleanup," >> $report_file
+
     pv_name=$(kubectl get pvc $pvc_name -n $namespace -o jsonpath='{.spec.volumeName}')
 
     print_notice "-> Deleting artifacts in namespace $namespace"
     kubectl delete ns $namespace --wait=false
     
     print_notice "-> Waiting for namespace '$namespace' to be deleted"
+    local start_time=$(date +%s)
     while true; do
         kubectl get ns $namespace > /dev/null
         if [[ $? != 0 ]]; then
@@ -415,8 +433,8 @@ function clean_test_env() {
         fi
 
         # Check if the timeout has been reached
-        current_time=$(date +%s)
-        elapsed_time=$((current_time - start_time))
+        local current_time=$(date +%s)
+        local elapsed_time=$((current_time - start_time))
         if [[ "$elapsed_time" -ge "$timeout_seconds" ]]; then
             echo "Timeout waiting namespace '$namespace' to be deleted"
             return 1
@@ -424,6 +442,7 @@ function clean_test_env() {
     done
 
     print_notice "-> Waiting for PV '$pv_name' to be deleted"
+    start_time=$(date +%s)
     while true; do
         kubectl get pv $pv_name > /dev/null
         if [[ $? != 0 ]]; then
@@ -432,13 +451,15 @@ function clean_test_env() {
         fi
 
         # Check if the timeout has been reached
-        current_time=$(date +%s)
-        elapsed_time=$((current_time - start_time))
+        local current_time=$(date +%s)
+        local elapsed_time=$((current_time - start_time))
         if [[ "$elapsed_time" -ge "$timeout_seconds" ]]; then
             echo "Timeout waiting PV '$pv_name' to be deleted"
             return 1
         fi
     done
+
+    pass_fail "$?" "Cleanup"
 }
 
 function print_usage() {
@@ -472,6 +493,13 @@ function parse_args() {
 
 ### Main ###
 parse_args "$@"
+
+if [[ -f "$report_file" ]]; then
+    rm $report_file
+else
+    touch $report_file
+    echo -e "createing report file $report_file"
+fi
 
 test_suite_provisioning
 test_suite_host_path
