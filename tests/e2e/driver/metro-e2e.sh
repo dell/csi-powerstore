@@ -95,9 +95,9 @@ function ssh_exec() {
     local cmd=$2
 
     if [ -z "$key_path" ]; then
-        ssh $username@$host_ip $cmd
+        ssh $username@$host_ip sudo $cmd
     else
-        ssh -i $key_path $username@$host_ip $cmd
+        ssh -i $key_path $username@$host_ip sudo $cmd
     fi
 }
 
@@ -361,7 +361,7 @@ function test_volume_availability() {
     for path in "${paths_to_take_down[@]}"; do
         echo "Restoring path '$path'"
 
-        $(ssh_exec $host_ip "multipathd reinstate path $path") > /dev/null
+        ssh_exec $host_ip "multipathd reinstate path ${path}" > /dev/null
     done
 
     return 0
