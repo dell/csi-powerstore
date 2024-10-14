@@ -45,8 +45,7 @@ reset_text="\033[0m"
 
 # Function to handle SIGINT (Ctrl+C)
 exit_script() {
-    echo "Cleaning and exiting script..."
-    clean_test_env
+    echo "SIGINT received. Exiting script..."
     exit 0
 }
 
@@ -98,7 +97,7 @@ function ssh_exec() {
     if [ -z "$key_path" ]; then
         ssh $username@$host_ip $cmd
     else
-        ssh -i $key_path $username@$host_ip $cmd
+        ssh -i=$key_path $username@$host_ip $cmd
     fi
 }
 
