@@ -1,0 +1,84 @@
+# Copyright © 2020-2024 Dell Inc. or its subsidiaries. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#      http://www.apache.org/licenses/LICENSE-2.0
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+# This test creates three different PersistentVolumeClaims using default
+# ext4, xfs, and nfs storage classes and automatically mounts them to the pod.
+#
+# It assumes that you’ve created the same basic three storage classes from
+# samples/storageclass folder without changing their names.
+#
+# To test the driver just run from root directory of repository
+# > kubectl create -f ./tests/simple/
+#
+# You can find all resources in testpowerstore namespace.
+# Check if pod is created and Ready and Running by running
+# > kubectl get all -n testpowerstore
+# (if it's in CrashLoopback state then driver installation wasn't successful, check logs of node and controller)
+# After that can go into created container and check if everything is mounted correctly.
+#
+# After that you can uninstall the testing PVCs and StatefulSet
+# > kubectl delete -f ./tests/simple/
+# 
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: testpowerstore
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: pvol0
+  namespace: testpowerstore
+spec:
+  accessModes:
+  - ReadWriteOnce
+  volumeMode: Filesystem
+  resources:
+    requests:
+      storage: 8Gi
+  storageClassName: powerstore-metro
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+    name: powerstoretest
+    namespace: testpowerstore
+---
+kind: StatefulSet
+apiVersion: apps/v1
+metadata:
+    name: powerstoretest
+    namespace: testpowerstore
+spec:
+    serviceName: powerstoretest
+    selector:
+        matchLabels:
+          app: powerstoretest
+    template:
+      metadata:
+        labels:
+          app: powerstoretest
+      spec:
+        serviceAccount: powerstoretest
+        hostNetwork: true
+        containers:
+          - name: test
+            image: quay.io/centos/centos:latest
+            command: [ "/bin/sleep", "3600" ]
+            volumeMounts:
+              - mountPath: "/data0"
+                name: pvol0
+        volumes:
+          - name: pvol0
+            persistentVolumeClaim:
+              claimName: pvol0

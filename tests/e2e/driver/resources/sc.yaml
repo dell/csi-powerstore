@@ -1,0 +1,13 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: powerstore-metro
+parameters:
+  arrayID: "unique" # PowerStore Global ID
+  replication.storage.dell.com/ignoreNamespaces: "false"
+  replication.storage.dell.com/isReplicationEnabled: "true"
+  replication.storage.dell.com/mode: METRO
+  replication.storage.dell.com/remoteSystem: "system-ID" # PowerStore system name
+provisioner: csi-powerstore.dellemc.com
+reclaimPolicy: Delete
+volumeBindingMode: Immediate
