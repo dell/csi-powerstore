@@ -21,8 +21,7 @@ After successfully deploying the workloads and provisioning the storage, the tes
 remote PowerStore array system name to `parameters.replication.storage.dell.com/remoteSystem:`.
 - __*Optional Recommended:*__ Setup ssh keys between the machine where this test is executed and the Kubernetes nodes where workload resources are deployed
 (typically worker nodes).
-> __*Note:*__ If ssh keys are not configured, the user may be prompted to authenticate
-via password at runtime.
+> __*Note:*__ If ssh keys are not configured, the user may be prompted to authenticate via password at runtime.
 
 ## Test Execution
 
@@ -30,7 +29,10 @@ Execute the shell script `./metro-e2e.sh`. Provide the username for the machine 
 Provide the path to any ssh keys required to authenticate with the Kubernetes worker nodes using the `-k` option.
 
 ```bash
-./metro-e2e.sh -u root -k $HOME/.ssh/your_ssh_keys
+./metro-e2e.sh -u root -k $HOME/.ssh/id_rsa
 ```
 
 ## Test Reports
+
+Test results are written to a csv file, `./reports/test_results.csv`, and a python script is executed to use the csv file to generate a JUnit report.
+The JUnit report will automatically be generated at the end of the test run at `./metro-e2e-report.xml`.
