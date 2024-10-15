@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright © 2020-2022 Dell Inc., or its subsidiaries. All Rights Reserved.
+# Copyright © 2020-2024 Dell Inc., or its subsidiaries. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -227,7 +227,7 @@ CREATE="false"
 PREPARE="false"
 REGISTRY=""
 DRIVER="csi-powerstore"
-HELMCHARTVERSION="csi-powerstore-2.11.0"
+HELMCHARTVERSION="csi-powerstore-2.12.0"
 
 while getopts "cprv:h" opt; do
   case $opt in
