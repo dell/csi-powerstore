@@ -17,7 +17,8 @@
 script_path=$(dirname "${BASH_SOURCE[0]}")
 
 # test report
-report_file="$script_path/metro-e2e-report.csv"
+report_file="$script_path/reports/test_results.csv"
+report_script="$script_path/reports/generate-report.py"
 
 # script default options
 key_path=""
@@ -377,8 +378,6 @@ function test_suite_provisioning() {
     deploy_test_env
     test_pv_provisioning
     test_pod_running
-
-    pass_fail $? "Metro Volume Provisioning Test"
 }
 
 # HOST PATH TEST
@@ -395,8 +394,6 @@ function test_suite_host_path() {
     # confirm host machine has multiple multipath devices, and the multipaths are mounted
     # for the corresponding PV.
     test_storage_multipath
-
-    pass_fail $? "Host Path Test"
 }
 
 # VOLUME AVAILABILITY TEST
@@ -409,8 +406,6 @@ function test_suite_volume_availability() {
     # confirm the volume mounted in the pod is writable.
     test_pv_provisioning
     test_volume_availability
-
-    pass_fail $? "Volume Availability Test"
 }
 
 # CLEANUP
@@ -457,8 +452,6 @@ function clean_test_env() {
             return 1
         fi
     done
-
-    pass_fail "$?" "Cleanup"
 }
 
 function print_usage() {
@@ -497,7 +490,7 @@ if [[ -f "$report_file" ]]; then
     rm $report_file
 else
     touch $report_file
-    echo -e "createing report file $report_file"
+    echo -e "creating report file $report_file"
 fi
 
 test_suite_provisioning
@@ -505,3 +498,5 @@ test_suite_host_path
 test_suite_volume_availability
 
 clean_test_env
+
+python3 $report_script $report_file
