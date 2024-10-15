@@ -9,7 +9,7 @@ def csv_to_junit_xml(csv_file, xml_file):
         rows = list(csv_reader)
 
     # Create the root element
-    root = ET.Element('testsuites')
+    root = ET.Element('testsuites', name="Metro E2E")
 
     # Create the testsuite element
     testsuite = None
@@ -25,8 +25,7 @@ def csv_to_junit_xml(csv_file, xml_file):
 
         # Create the failure element if the result is 'fail'
         if row[1] == 'fail':
-            failure = ET.SubElement(testcase, 'failure')
-            failure.text = row[2]
+            failure = ET.SubElement(testcase, 'failure', message=row[2])
 
     # Write the XML file
     tree = ET.ElementTree(root)
