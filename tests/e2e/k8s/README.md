@@ -1,4 +1,4 @@
-# CSI PowerStore E2E Tests
+# CSI PowerStore K8s E2E Tests
 
 
 ## Prerequisites

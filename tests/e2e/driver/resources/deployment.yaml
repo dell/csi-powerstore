@@ -1,4 +1,4 @@
-# Copyright © 2020-2024 Dell Inc. or its subsidiaries. All Rights Reserved.
+# Copyright © 2024 Dell Inc. or its subsidiaries. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -9,26 +9,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
 
-# This test creates three different PersistentVolumeClaims using default
-# ext4, xfs, and nfs storage classes and automatically mounts them to the pod.
-#
-# It assumes that you’ve created the same basic three storage classes from
-# samples/storageclass folder without changing their names.
-#
-# To test the driver just run from root directory of repository
-# > kubectl create -f ./tests/simple/
-#
-# You can find all resources in testpowerstore namespace.
-# Check if pod is created and Ready and Running by running
-# > kubectl get all -n testpowerstore
-# (if it's in CrashLoopback state then driver installation wasn't successful, check logs of node and controller)
-# After that can go into created container and check if everything is mounted correctly.
-#
-# After that you can uninstall the testing PVCs and StatefulSet
-# > kubectl delete -f ./tests/simple/
-# 
 apiVersion: v1
 kind: Namespace
 metadata:

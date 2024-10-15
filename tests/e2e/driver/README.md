@@ -14,6 +14,7 @@ After successfully deploying the workloads and provisioning the storage, the tes
 - A Kubernetes or OpenShift cluster.
 - Two PowerStore arrays.
 - CSI-PowerStore installed and Kubernetes secrets configured for both PowerStore arrays.
+- Multipath configured on the Kubernetes nodes with at least 2 paths for each of the PowerStore array.
 
 ## Test Setup
 
