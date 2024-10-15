@@ -247,6 +247,7 @@ function test_storage_multipath() {
     while true; do
         local is_ready=0
 
+        # get the device multipath status and report ready when all are 'active ready'
         for device_path in "${mountpoints[@]}"; do
             ssh_exec $host_ip 'multipathd show paths' | grep $device_path | grep 'active ready' > /dev/null
             if [[ $? -ne 0 ]]; then
@@ -261,6 +262,8 @@ function test_storage_multipath() {
         if [[ "$is_ready" -eq 1 ]]; then
             print_pass "All paths are 'active ready'"
             break
+        else
+            sleep $sleep_interval
         fi
 
         # Check if the timeout has been reached
