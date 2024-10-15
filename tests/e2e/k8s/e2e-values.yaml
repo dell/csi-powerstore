@@ -17,7 +17,7 @@
 kubeconfigEnvVar : "KUBECONFIG"
 busyBoxImageOnGcr : "gcr.io/google_containers/busybox:1.27"
 
-driverNamespace : "csi-powerstore"
+driverNamespace : "powerstore"
 e2eCSIDriverName : "csi-powerstore.dellemc.com"
 arrayID: "unique"
 
