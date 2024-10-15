@@ -19,7 +19,7 @@ kind: StorageClass
 metadata:
   name: "powerstore-replication"
 provisioner: "csi-powerstore.dellemc.com"
-reclaimPolicy: Retain
+reclaimPolicy: Delete
 volumeBindingMode: Immediate
 parameters:
   # replicationPrefix paramater in values.yaml must be used as prefix for all replication parameters in storage class
