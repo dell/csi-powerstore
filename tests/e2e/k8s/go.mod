@@ -1,8 +1,6 @@
 module github.com/dell/csi-powerstore/v2/tests/e2e
 
-go 1.23
-
-toolchain go1.23.1
+go 1.23.2
 
 require (
 	github.com/dell/csi-powerstore/v2 v2.11.0
@@ -18,7 +16,15 @@ require (
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
 
-require k8s.io/pod-security-admission v0.0.0
+require (
+	github.com/dell/csi-powerstore/v2 v2.8.0
+	github.com/dell/gopowerstore v1.15.2-0.20241008144633-6990d1b86e5b
+	github.com/onsi/ginkgo/v2 v2.17.2
+	gopkg.in/yaml.v2 v2.4.0
+	k8s.io/api v0.30.2
+	k8s.io/apimachinery v0.30.2
+	k8s.io/client-go v0.30.2
+)
 
 require (
 	github.com/JeffAshton/win_pdh v0.0.0-20161109143554-76bb4ee9f0ab // indirect
@@ -43,7 +49,7 @@ require (
 	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
 	github.com/cyphar/filepath-securejoin v0.2.4 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
-	github.com/dell/gobrick v1.11.3 // indirect
+	github.com/dell/gobrick v1.11.5-0.20241014113235-06cfe9928229 // indirect
 	github.com/dell/gocsi v1.11.0 // indirect
 	github.com/dell/gofsutil v1.16.1 // indirect
 	github.com/dell/goiscsi v1.9.0 // indirect
