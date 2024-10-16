@@ -31,6 +31,7 @@ import (
 
 	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/pod-security-admission/api"
 
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -92,12 +93,12 @@ var _ = ginkgo.Describe("External Access Test", func() {
 	})
 
 	ginkgo.AfterEach(func() {
-		_, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		DeleteDeployment(client, deploymentObject, namespace)
 		if extCredential.TestStatefulset {
 			ginkgo.By(fmt.Sprintf("Deleting all statefulsets in namespace: %v", namespace))
-			fss.DeleteAllStatefulSets(client, namespace)
+			fss.DeleteAllStatefulSets(ctx, client, namespace)
 		}
 	})
 
@@ -137,7 +138,7 @@ var _ = ginkgo.Describe("External Access Test", func() {
 		}()
 
 		ginkgo.By("Expect PVC's claim status to be in Bound state")
-		err = fpv.WaitForPersistentVolumeClaimPhase(corev1.ClaimBound, client,
+		err = fpv.WaitForPersistentVolumeClaimPhase(ctx, corev1.ClaimBound, client,
 			pvclaim.Namespace, pvclaim.Name, framework.Poll, 2*time.Minute)
 
 		gomega.Expect(err).NotTo(gomega.HaveOccurred(),
@@ -148,7 +149,7 @@ var _ = ginkgo.Describe("External Access Test", func() {
 		}
 		// Deployment is a resource to deploy a stateless application, if using a PVC, all replicas will be using the same Volume
 		ginkgo.By("Creating Deployment having 10 replicas")
-		deploymentObject, err = deployment.CreateDeployment(client, 10, podLabels, nil, namespace, []*corev1.PersistentVolumeClaim{pvclaim}, fmt.Sprintf("%v", testParameters["execCommand"]))
+		deploymentObject, err = deployment.CreateDeployment(ctx, client, int32(10), podLabels, nil, namespace, []*corev1.PersistentVolumeClaim{pvclaim}, api.LevelPrivileged, fmt.Sprintf("%v", testParameters["execCommand"]))
 		gomega.Expect(err).NotTo(gomega.HaveOccurred(),
 			fmt.Sprintf("Failed to create deployment resource with err: %v", err))
 
@@ -175,7 +176,7 @@ var _ = ginkgo.Describe("External Access Test", func() {
 		ScaleDownDeployment(client, deploymentObject, namespace, 0)
 		checkExternalAccessPresence(ctx, clientForArray, extCredential.ExternalAccessIP, v.GetName(), true)
 
-		err = fpv.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
+		err = fpv.DeletePersistentVolumeClaim(ctx, client, pvclaim.Name, namespace)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred(),
 			fmt.Sprintf("Unable to delete PVC with err: %v", err))
 
@@ -204,15 +205,15 @@ var _ = ginkgo.Describe("External Access Test", func() {
 
 			defer func() {
 				ginkgo.By(fmt.Sprintf("Deleting all statefulsets in namespace: %v", namespace))
-				fss.DeleteAllStatefulSets(client, namespace)
+				fss.DeleteAllStatefulSets(ctx, client, namespace)
 			}()
 			replicas := *(statefulset.Spec.Replicas)
 			// Waiting for pods status to be Ready
-			fss.WaitForStatusReadyReplicas(client, statefulset, replicas)
+			fss.WaitForStatusReadyReplicas(ctx, client, statefulset, replicas)
 
-			gomega.Expect(fss.CheckMount(client, statefulset, mountPath)).NotTo(gomega.HaveOccurred())
+			gomega.Expect(fss.CheckMount(ctx, client, statefulset, mountPath)).NotTo(gomega.HaveOccurred())
 
-			ssPodsBeforeScaleDown := fss.GetPodList(client, statefulset)
+			ssPodsBeforeScaleDown := fss.GetPodList(ctx, client, statefulset)
 			gomega.Expect(ssPodsBeforeScaleDown.Items).NotTo(gomega.BeEmpty(),
 				fmt.Sprintf("Unable to get list of Pods from the Statefulset: %v", statefulset.Name))
 			gomega.Expect(len(ssPodsBeforeScaleDown.Items) == int(replicas)).To(gomega.BeTrue(),
@@ -233,10 +234,10 @@ var _ = ginkgo.Describe("External Access Test", func() {
 			// 1
 			replicas = 1
 			ginkgo.By(fmt.Sprintf("Scaling down statefulsets to number of Replica: %v", replicas))
-			_, scaledownErr := fss.Scale(client, statefulset, replicas)
+			_, scaledownErr := fss.Scale(ctx, client, statefulset, replicas)
 			gomega.Expect(scaledownErr).NotTo(gomega.HaveOccurred())
-			fss.WaitForStatusReplicas(client, statefulset, replicas)
-			ssPodsAfterScaleDown := fss.GetPodList(client, statefulset)
+			fss.WaitForStatusReplicas(ctx, client, statefulset, replicas)
+			ssPodsAfterScaleDown := fss.GetPodList(ctx, client, statefulset)
 			gomega.Expect(ssPodsAfterScaleDown.Items).NotTo(gomega.BeEmpty(),
 				fmt.Sprintf("Unable to get list of Pods from the Statefulset: %v", statefulset.Name))
 			gomega.Expect(len(ssPodsAfterScaleDown.Items) == int(replicas)).To(gomega.BeTrue(),
@@ -261,14 +262,14 @@ var _ = ginkgo.Describe("External Access Test", func() {
 			// deleting all pods
 			replicas = 0
 			ginkgo.By(fmt.Sprintf("Scaling down statefulsets to number of Replica: %v", replicas))
-			_, scaledownErr = fss.Scale(client, statefulset, replicas)
+			_, scaledownErr = fss.Scale(ctx, client, statefulset, replicas)
 			gomega.Expect(scaledownErr).NotTo(gomega.HaveOccurred())
-			fss.WaitForStatusReplicas(client, statefulset, replicas)
-			ssPodsAfterScaleDown = fss.GetPodList(client, statefulset)
+			fss.WaitForStatusReplicas(ctx, client, statefulset, replicas)
+			ssPodsAfterScaleDown = fss.GetPodList(ctx, client, statefulset)
 			gomega.Expect(len(ssPodsAfterScaleDown.Items) == int(replicas)).To(gomega.BeTrue(),
 				"Number of Pods in the statefulset should match with number of replicas")
 
-			err = fpv.DeletePersistentVolumeClaim(client, pv.Name, namespace)
+			err = fpv.DeletePersistentVolumeClaim(ctx, client, pv.Name, namespace)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred(),
 				fmt.Sprintf("Unable to delete PVC with err: %v", err))
 		}
