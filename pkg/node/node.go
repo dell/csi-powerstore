@@ -80,8 +80,8 @@ type Service struct {
 	opts           Opts
 	nodeID         string
 
-	useFC                  bool
-	useNVME                bool
+	useFC                  map[string]bool
+	useNVME                map[string]bool
 	useNFS                 bool
 	initialized            bool
 	reusedHost             bool
@@ -109,6 +109,8 @@ func (s *Service) Init() error {
 	}
 	s.iscsiTargets = make(map[string][]string)
 	s.nvmeTargets = make(map[string][]string)
+	s.useFC = make(map[string]bool)
+	s.useNVME = make(map[string]bool)
 	iscsiInitiators, fcInitiators, nvmeInitiators, err := s.getInitiators()
 	if err != nil {
 		return fmt.Errorf("can't get initiators of the node: %s", err.Error())
@@ -138,38 +140,38 @@ func (s *Service) Init() error {
 			if len(nvmeInitiators) == 0 {
 				log.Errorf("NVMeTCP transport was requested but NVMe initiator is not available")
 			}
-			s.useNVME = true
-			s.useFC = false
+			s.useNVME[arr.GlobalID] = true
+			s.useFC[arr.GlobalID] = false
 		case common.NVMEFCTransport:
 			if len(nvmeInitiators) == 0 {
 				log.Errorf("NVMeFC transport was requested but NVMe initiator is not available")
 			}
-			s.useNVME = true
-			s.useFC = true
+			s.useNVME[arr.GlobalID] = true
+			s.useFC[arr.GlobalID] = true
 		case common.ISCSITransport:
 			if len(iscsiInitiators) == 0 {
 				log.Errorf("iSCSI transport was requested but iSCSI initiator is not available")
 			}
-			s.useNVME = false
-			s.useFC = false
+			s.useNVME[arr.GlobalID] = false
+			s.useFC[arr.GlobalID] = false
 		case common.FcTransport:
 			if len(fcInitiators) == 0 {
 				log.Errorf("FC transport was requested but FC initiator is not available")
 			}
-			s.useNVME = false
-			s.useFC = true
+			s.useNVME[arr.GlobalID] = false
+			s.useFC[arr.GlobalID] = true
 		default:
-			s.useNVME = len(nvmeInitiators) > 0
-			s.useFC = len(fcInitiators) > 0
+			s.useNVME[arr.GlobalID] = len(nvmeInitiators) > 0
+			s.useFC[arr.GlobalID] = len(fcInitiators) > 0
 		}
-		if s.useNVME {
+		if s.useNVME[arr.GlobalID] {
 			initiators = nvmeInitiators
-			if s.useFC {
+			if s.useFC[arr.GlobalID] {
 				log.Infof("NVMeFC Protocol is requested")
 			} else {
 				log.Infof("NVMeTCP Protocol is requested")
 			}
-		} else if s.useFC {
+		} else if s.useFC[arr.GlobalID] {
 			initiators = fcInitiators
 			log.Infof("FC Protocol is requested")
 		} else {
@@ -177,7 +179,7 @@ func (s *Service) Init() error {
 			log.Infof("iSCSI Protocol is requested")
 		}
 
-		err = s.setupHost(initiators, arr.GetClient(), arr.GetIP())
+		err = s.setupHost(initiators, arr.GetClient(), arr.GetIP(), arr.GetGlobalID())
 		if err != nil {
 			log.Errorf("can't setup host on %s: %s", arr.Endpoint, err.Error())
 		}
@@ -270,8 +272,8 @@ func (s *Service) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeR
 		}
 	} else {
 		stager = &SCSIStager{
-			useFC:          s.useFC,
-			useNVME:        s.useNVME,
+			useFC:          s.useFC[arr.GlobalID],
+			useNVME:        s.useNVME[arr.GlobalID],
 			iscsiConnector: s.iscsiConnector,
 			nvmeConnector:  s.nvmeConnector,
 			fcConnector:    s.fcConnector,
@@ -305,7 +307,7 @@ func (s *Service) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVol
 		return nil, status.Error(codes.InvalidArgument, "staging target path is required")
 	}
 
-	id, _, protocol, remoteVolumeID, _, err := array.ParseVolumeID(ctx, id, s.DefaultArray(), nil)
+	id, arrayID, protocol, remoteVolumeID, _, err := array.ParseVolumeID(ctx, id, s.DefaultArray(), nil)
 	if err != nil {
 		if apiError, ok := err.(gopowerstore.APIError); ok && apiError.NotFound() {
 			return &csi.NodeUnstageVolumeResponse{}, nil
@@ -313,6 +315,11 @@ func (s *Service) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVol
 		return nil, status.Errorf(codes.Unknown,
 			"failure checking volume status for volume node unstage: %s",
 			err.Error())
+	}
+
+	arr, ok := s.Arrays()[arrayID]
+	if !ok {
+		return nil, status.Errorf(codes.Internal, "can't find array with ID %s", arrayID)
 	}
 
 	// append additional path to be able to do bind mounts
@@ -352,9 +359,9 @@ func (s *Service) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVol
 
 	connectorCtx := common.SetLogFields(context.Background(), logFields)
 
-	if s.useNVME {
+	if s.useNVME[arr.GlobalID] {
 		err = s.nvmeConnector.DisconnectVolumeByDeviceName(connectorCtx, device)
-	} else if s.useFC {
+	} else if s.useFC[arr.GlobalID] {
 		err = s.fcConnector.DisconnectVolumeByDeviceName(connectorCtx, device)
 	} else {
 		err = s.iscsiConnector.DisconnectVolumeByDeviceName(connectorCtx, device)
@@ -885,7 +892,7 @@ func (s *Service) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolum
 	}
 	log.WithFields(f).Info("Calling resize the file system")
 
-	if !s.useNVME {
+	if !s.useNVME[arr.GlobalID] {
 		// Rescan the device for the volume expanded on the array
 		for _, device := range devMnt.DeviceNames {
 			devicePath := sysBlock + device
@@ -1064,8 +1071,8 @@ func (s *Service) NodeGetInfo(ctx context.Context, _ *csi.NodeGetInfoRequest) (*
 		}
 
 		if arr.BlockProtocol != common.NoneTransport {
-			if s.useNVME {
-				if s.useFC {
+			if s.useNVME[arr.GlobalID] {
+				if s.useFC[arr.GlobalID] {
 					nvmefcInfo, err := common.GetNVMEFCTargetInfoFromStorage(arr.GetClient(), "")
 					if err != nil {
 						log.Errorf("couldn't get targets from the array: %s", err.Error())
@@ -1131,7 +1138,7 @@ func (s *Service) NodeGetInfo(ctx context.Context, _ *csi.NodeGetInfoRequest) (*
 						s.useNFS = true
 					}
 				}
-			} else if s.useFC {
+			} else if s.useFC[arr.GlobalID] {
 				// Check node initiators connection to array
 				nodeID := s.nodeID
 				if s.reusedHost {
@@ -1413,7 +1420,7 @@ func (s *Service) readFCPortsFilterFile() ([]string, error) {
 	return result, nil
 }
 
-func (s *Service) setupHost(initiators []string, client gopowerstore.Client, arrayIP string) error {
+func (s *Service) setupHost(initiators []string, client gopowerstore.Client, arrayIP, arrayID string) error {
 	log.Infof("setting up host on %s", arrayIP)
 	defer log.Infof("finished setting up host on %s", arrayIP)
 
@@ -1421,19 +1428,19 @@ func (s *Service) setupHost(initiators []string, client gopowerstore.Client, arr
 		return fmt.Errorf("nodeID not set")
 	}
 
-	reqInitiators := s.buildInitiatorsArray(initiators)
+	reqInitiators := s.buildInitiatorsArray(initiators, arrayID)
 	var host *gopowerstore.Host
 	updateCHAP := false
 
 	h, err := client.GetHostByName(context.Background(), s.nodeID)
 	if err == nil {
-		err := s.updateHost(context.Background(), initiators, client, h)
+		err := s.updateHost(context.Background(), initiators, client, h, arrayID)
 		if err != nil {
 			return err
 		}
 		if s.opts.EnableCHAP && len(h.Initiators) > 0 && (h.Initiators[0].ChapSingleUsername == "" || h.Initiators[0].ChapSingleUsername == "admin") {
 			log.Debug("CHAP was enabled earlier, modifying credentials")
-			err := s.modifyHostInitiators(context.Background(), h.ID, client, nil, nil, initiators)
+			err := s.modifyHostInitiators(context.Background(), h.ID, client, nil, nil, initiators, arrayID)
 			if err != nil {
 				return fmt.Errorf("can't modify initiators CHAP credentials %s", err.Error())
 			}
@@ -1472,7 +1479,7 @@ func (s *Service) setupHost(initiators []string, client gopowerstore.Client, arr
 
 	if host == nil {
 		// register node on PowerStore
-		_, err := s.createHost(context.Background(), initiators, client)
+		_, err := s.createHost(context.Background(), initiators, client, arrayID)
 		if err != nil {
 			log.Error(err.Error())
 			return err
@@ -1480,7 +1487,7 @@ func (s *Service) setupHost(initiators []string, client gopowerstore.Client, arr
 	} else {
 		// node already registered
 		if updateCHAP { // add CHAP credentials if they aren't available
-			err := s.modifyHostInitiators(context.Background(), host.ID, client, nil, nil, initiators)
+			err := s.modifyHostInitiators(context.Background(), host.ID, client, nil, nil, initiators, arrayID)
 			if err != nil {
 				return fmt.Errorf("can't modify initiators CHAP credentials %s", err.Error())
 			}
@@ -1510,11 +1517,11 @@ func (s *Service) modifyHostName(ctx context.Context, client gopowerstore.Client
 	return nil
 }
 
-func (s *Service) buildInitiatorsArray(initiators []string) []gopowerstore.InitiatorCreateModify {
+func (s *Service) buildInitiatorsArray(initiators []string, arrayID string) []gopowerstore.InitiatorCreateModify {
 	var portType gopowerstore.InitiatorProtocolTypeEnum
-	if s.useNVME {
+	if s.useNVME[arrayID] {
 		portType = gopowerstore.InitiatorProtocolTypeEnumNVME
-	} else if s.useFC {
+	} else if s.useFC[arrayID] {
 		portType = gopowerstore.InitiatorProtocolTypeEnumFC
 	} else {
 		portType = gopowerstore.InitiatorProtocolTypeEnumISCSI
@@ -1522,7 +1529,7 @@ func (s *Service) buildInitiatorsArray(initiators []string) []gopowerstore.Initi
 	initiatorsReq := make([]gopowerstore.InitiatorCreateModify, len(initiators))
 	for i, iqn := range initiators {
 		iqn := iqn
-		if !s.useFC && s.opts.EnableCHAP {
+		if !s.useFC[arrayID] && s.opts.EnableCHAP {
 			initiatorsReq[i] = gopowerstore.InitiatorCreateModify{
 				ChapSinglePassword: &s.opts.CHAPPassword,
 				ChapSingleUsername: &s.opts.CHAPUsername,
@@ -1540,15 +1547,15 @@ func (s *Service) buildInitiatorsArray(initiators []string) []gopowerstore.Initi
 }
 
 // create or update host on PowerStore array
-func (s *Service) updateHost(ctx context.Context, initiators []string, client gopowerstore.Client, host gopowerstore.Host) (err error) {
+func (s *Service) updateHost(ctx context.Context, initiators []string, client gopowerstore.Client, host gopowerstore.Host, arrayID string) (err error) {
 	initiatorsToAdd, initiatorsToDelete := checkIQNS(initiators, host)
-	return s.modifyHostInitiators(ctx, host.ID, client, initiatorsToAdd, initiatorsToDelete, nil)
+	return s.modifyHostInitiators(ctx, host.ID, client, initiatorsToAdd, initiatorsToDelete, nil, arrayID)
 }
 
 // register host
-func (s *Service) createHost(ctx context.Context, initiators []string, client gopowerstore.Client) (id string, err error) {
+func (s *Service) createHost(ctx context.Context, initiators []string, client gopowerstore.Client, arrayID string) (id string, err error) {
 	osType := gopowerstore.OSTypeEnumLinux
-	reqInitiators := s.buildInitiatorsArray(initiators)
+	reqInitiators := s.buildInitiatorsArray(initiators, arrayID)
 	description := fmt.Sprintf("k8s node: %s", s.opts.KubeNodeName)
 
 	var createParams gopowerstore.HostCreate
@@ -1595,7 +1602,7 @@ func (s *Service) createHost(ctx context.Context, initiators []string, client go
 
 // add or remove initiators from host
 func (s *Service) modifyHostInitiators(ctx context.Context, hostID string, client gopowerstore.Client,
-	initiatorsToAdd []string, initiatorsToDelete []string, initiatorsToModify []string,
+	initiatorsToAdd []string, initiatorsToDelete []string, initiatorsToModify []string, arrayID string,
 ) error {
 	if len(initiatorsToDelete) > 0 {
 		modifyParams := gopowerstore.HostModify{}
@@ -1607,7 +1614,7 @@ func (s *Service) modifyHostInitiators(ctx context.Context, hostID string, clien
 	}
 	if len(initiatorsToAdd) > 0 {
 		modifyParams := gopowerstore.HostModify{}
-		initiators := s.buildInitiatorsArray(initiatorsToAdd)
+		initiators := s.buildInitiatorsArray(initiatorsToAdd, arrayID)
 		modifyParams.AddInitiators = &initiators
 		_, err := client.ModifyHost(ctx, &modifyParams, hostID)
 		if err != nil {
@@ -1616,7 +1623,7 @@ func (s *Service) modifyHostInitiators(ctx context.Context, hostID string, clien
 	}
 	if len(initiatorsToModify) > 0 {
 		modifyParams := gopowerstore.HostModify{}
-		initiators := s.buildInitiatorsArrayModify(initiatorsToModify)
+		initiators := s.buildInitiatorsArrayModify(initiatorsToModify, arrayID)
 		modifyParams.ModifyInitiators = &initiators
 		_, err := client.ModifyHost(ctx, &modifyParams, hostID)
 		if err != nil {
@@ -1653,11 +1660,11 @@ func checkIQNS(IQNs []string, host gopowerstore.Host) (iqnToAdd, iqnToDelete []s
 	return
 }
 
-func (s *Service) buildInitiatorsArrayModify(initiators []string) []gopowerstore.UpdateInitiatorInHost {
+func (s *Service) buildInitiatorsArrayModify(initiators []string, arrayID string) []gopowerstore.UpdateInitiatorInHost {
 	initiatorsReq := make([]gopowerstore.UpdateInitiatorInHost, len(initiators))
 	for i, iqn := range initiators {
 		iqn := iqn
-		if !s.useFC && s.opts.EnableCHAP {
+		if !s.useFC[arrayID] && s.opts.EnableCHAP {
 			initiatorsReq[i] = gopowerstore.UpdateInitiatorInHost{
 				ChapSinglePassword: &s.opts.CHAPPassword,
 				ChapSingleUsername: &s.opts.CHAPUsername,
