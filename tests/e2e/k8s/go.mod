@@ -2,7 +2,7 @@ module github.com/dell/csi-powerstore/v2/tests/e2e
 
 go 1.23
 
-toolchain go1.23.1
+toolchain go1.23.2
 
 require (
 	github.com/dell/csi-powerstore/v2 v2.11.0
@@ -43,7 +43,7 @@ require (
 	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
 	github.com/cyphar/filepath-securejoin v0.2.4 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
-	github.com/dell/gobrick v1.11.3 // indirect
+	github.com/dell/gobrick v1.11.5-0.20241014113235-06cfe9928229 // indirect
 	github.com/dell/gocsi v1.11.0 // indirect
 	github.com/dell/gofsutil v1.16.1 // indirect
 	github.com/dell/goiscsi v1.9.0 // indirect
