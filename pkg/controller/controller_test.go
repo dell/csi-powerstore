@@ -2295,17 +2295,13 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				// Return okay to pause session
 				clientMock.On("GetReplicationSessionByID", mock.Anything, validSessionID).Return(gopowerstore.ReplicationSession{
 					ID:    validSessionID,
-					State: gopowerstore.RsStateOk,
+					State: gopowerstore.RsStatePaused,
 				}, nil).Times(1)
 				// Return paused to resume session
 				clientMock.On("GetReplicationSessionByID", mock.Anything, validSessionID).Return(gopowerstore.ReplicationSession{
 					ID:    validSessionID,
-					State: gopowerstore.RsStatePaused,
+					State: gopowerstore.RsStateOk,
 				}, nil).Times(1)
-				clientMock.On("ExecuteActionOnReplicationSession", mock.Anything, validSessionID, gopowerstore.RsActionPause, (*gopowerstore.FailoverParams)(nil)).
-					Return(gopowerstore.EmptyResponse(""), nil)
-				clientMock.On("ExecuteActionOnReplicationSession", mock.Anything, validSessionID, gopowerstore.RsActionResume, (*gopowerstore.FailoverParams)(nil)).
-					Return(gopowerstore.EmptyResponse(""), nil)
 
 				req := getTypicalControllerExpandRequest(validMetroBlockVolumeID, validVolSize*2)
 				res, err := ctrlSvc.ControllerExpandVolume(context.Background(), req)
@@ -2381,66 +2377,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				gomega.Expect(err.Error()).To(gomega.ContainSubstring("could not get metro replication session"))
 			})
 
-			ginkgo.It("should fail when trying to pause metro session due to API error", func() {
-				e := errors.New("some-api-error")
-				clientMock.On("GetVolume", mock.Anything, validBaseVolID).Return(gopowerstore.Volume{
-					MetroReplicationSessionID: validSessionID,
-					Size:                      validVolSize,
-				}, nil)
-				clientMock.On("ModifyVolume",
-					mock.Anything,
-					mock.AnythingOfType("*gopowerstore.VolumeModify"),
-					validBaseVolID).
-					Return(gopowerstore.EmptyResponse(""), nil)
-				// Return okay to pause session
-				clientMock.On("GetReplicationSessionByID", mock.Anything, validSessionID).Return(gopowerstore.ReplicationSession{
-					ID:    validSessionID,
-					State: gopowerstore.RsStateOk,
-				}, nil).Times(1)
-				clientMock.On("ExecuteActionOnReplicationSession", mock.Anything, validSessionID, gopowerstore.RsActionPause, (*gopowerstore.FailoverParams)(nil)).
-					Return(gopowerstore.EmptyResponse(""), e)
-
-				req := getTypicalControllerExpandRequest(validMetroBlockVolumeID, validVolSize*2)
-				_, err := ctrlSvc.ControllerExpandVolume(context.Background(), req)
-
-				gomega.Expect(err).ToNot(gomega.BeNil())
-				gomega.Expect(err.Error()).To(gomega.ContainSubstring("because the metro replication session could not be paused"))
-			})
-
-			ginkgo.It("should fail when trying to resume metro session due to API error", func() {
-				e := errors.New("some-api-error")
-				clientMock.On("GetVolume", mock.Anything, validBaseVolID).Return(gopowerstore.Volume{
-					MetroReplicationSessionID: validSessionID,
-					Size:                      validVolSize,
-				}, nil)
-				clientMock.On("ModifyVolume",
-					mock.Anything,
-					mock.AnythingOfType("*gopowerstore.VolumeModify"),
-					validBaseVolID).
-					Return(gopowerstore.EmptyResponse(""), nil)
-				// Return okay to pause session
-				clientMock.On("GetReplicationSessionByID", mock.Anything, validSessionID).Return(gopowerstore.ReplicationSession{
-					ID:    validSessionID,
-					State: gopowerstore.RsStateOk,
-				}, nil).Times(1)
-				// Return paused to resume session
-				clientMock.On("GetReplicationSessionByID", mock.Anything, validSessionID).Return(gopowerstore.ReplicationSession{
-					ID:    validSessionID,
-					State: gopowerstore.RsStatePaused,
-				}, nil).Times(1)
-				clientMock.On("ExecuteActionOnReplicationSession", mock.Anything, validSessionID, gopowerstore.RsActionPause, (*gopowerstore.FailoverParams)(nil)).
-					Return(gopowerstore.EmptyResponse(""), nil)
-				clientMock.On("ExecuteActionOnReplicationSession", mock.Anything, validSessionID, gopowerstore.RsActionResume, (*gopowerstore.FailoverParams)(nil)).
-					Return(gopowerstore.EmptyResponse(""), e)
-
-				req := getTypicalControllerExpandRequest(validMetroBlockVolumeID, validVolSize*2)
-				_, err := ctrlSvc.ControllerExpandVolume(context.Background(), req)
-
-				gomega.Expect(err).ToNot(gomega.BeNil())
-				gomega.Expect(err.Error()).To(gomega.ContainSubstring("because the metro replication session could not be resumed"))
-			})
-
-			ginkgo.It("should fail when trying to pause metro session due to unexpected state", func() {
+			ginkgo.It("should fail if metro session is not paused", func() {
 				clientMock.On("GetVolume", mock.Anything, validBaseVolID).Return(gopowerstore.Volume{
 					MetroReplicationSessionID: validSessionID,
 					Size:                      validVolSize,
@@ -2448,17 +2385,17 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				// Return error state for pause failure
 				clientMock.On("GetReplicationSessionByID", mock.Anything, validSessionID).Return(gopowerstore.ReplicationSession{
 					ID:    validSessionID,
-					State: gopowerstore.RsStateError,
+					State: gopowerstore.RsStateOk,
 				}, nil).Times(1)
 
 				req := getTypicalControllerExpandRequest(validMetroBlockVolumeID, validVolSize*2)
 				_, err := ctrlSvc.ControllerExpandVolume(context.Background(), req)
 
 				gomega.Expect(err).ToNot(gomega.BeNil())
-				gomega.Expect(err.Error()).To(gomega.ContainSubstring("because the session is not in expected state to pause"))
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("metro replication session not in 'paused' state"))
 			})
 
-			ginkgo.It("should fail when trying to resume metro session due to unexpected state", func() {
+			ginkgo.It("should fail if metro session is not resumed after volume expansion", func() {
 				clientMock.On("GetVolume", mock.Anything, validBaseVolID).Return(gopowerstore.Volume{
 					MetroReplicationSessionID: validSessionID,
 					Size:                      validVolSize,
@@ -2471,21 +2408,19 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				// Return okay to pause session
 				clientMock.On("GetReplicationSessionByID", mock.Anything, validSessionID).Return(gopowerstore.ReplicationSession{
 					ID:    validSessionID,
-					State: gopowerstore.RsStateOk,
+					State: gopowerstore.RsStatePaused,
 				}, nil).Times(1)
 				// Return error state for resume failure
 				clientMock.On("GetReplicationSessionByID", mock.Anything, validSessionID).Return(gopowerstore.ReplicationSession{
 					ID:    validSessionID,
-					State: gopowerstore.RsStateError,
+					State: gopowerstore.RsStatePaused,
 				}, nil).Times(1)
-				clientMock.On("ExecuteActionOnReplicationSession", mock.Anything, validSessionID, gopowerstore.RsActionPause, (*gopowerstore.FailoverParams)(nil)).
-					Return(gopowerstore.EmptyResponse(""), nil)
 
 				req := getTypicalControllerExpandRequest(validMetroBlockVolumeID, validVolSize*2)
 				_, err := ctrlSvc.ControllerExpandVolume(context.Background(), req)
 
 				gomega.Expect(err).ToNot(gomega.BeNil())
-				gomega.Expect(err.Error()).To(gomega.ContainSubstring("the metro session must be in 'paused' state before resuming"))
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("the metro replication session has not been resumed"))
 			})
 		})
 
