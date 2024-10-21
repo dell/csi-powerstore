@@ -1357,27 +1357,6 @@ func isPausedMetroSession(ctx context.Context, metroSessionID string, arr *array
 	return true, nil
 }
 
-func isResumedMetroSession(ctx context.Context, metroSessionID string, array *array.PowerStoreArray) (resumed bool, err error) {
-	metroSession, err := array.Client.GetReplicationSessionByID(ctx, metroSessionID)
-	if err != nil {
-		return false, fmt.Errorf("could not get metro replication session: %s", err.Error())
-	}
-
-	log.Debugf("checking if metro replication session, %s, has been resumed", metroSession.ID)
-
-	// nothing to do if not paused
-	if metroSession.State == gopowerstore.RsStateOk ||
-		metroSession.State == gopowerstore.RsStateSynchronizing ||
-		metroSession.State == gopowerstore.RsStateResuming ||
-		metroSession.State == gopowerstore.RsStateSwitchingToMetroSync ||
-		metroSession.State == gopowerstore.RsStateFractured {
-		log.Debugf("metro replication session, %s, has been resumed", metroSession.ID)
-		return true, nil
-	}
-
-	return false, errors.New("the metro replication session has not been resumed")
-}
-
 // ControllerExpandVolume resizes Volume or FileSystem by increasing available volume capacity in the storage array.
 func (s *Service) ControllerExpandVolume(ctx context.Context, req *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
 	id, arrayID, protocol, remoteVolumeID, _, err := array.ParseVolumeID(ctx, req.VolumeId, s.DefaultArray(), nil)
@@ -1402,7 +1381,6 @@ func (s *Service) ControllerExpandVolume(ctx context.Context, req *csi.Controlle
 			return nil, status.Error(codes.NotFound, "detected SCSI protocol but wasn't able to fetch the volume info")
 		}
 
-		volExpanded := false // to return appropriate response based on whether the volume is expanded or not
 		isMetro := remoteVolumeID != ""
 		if isMetro && vol.MetroReplicationSessionID == "" {
 			return nil, status.Errorf(codes.Internal,
@@ -1424,21 +1402,9 @@ func (s *Service) ControllerExpandVolume(ctx context.Context, req *csi.Controlle
 			if err != nil {
 				return nil, status.Errorf(codes.Internal, "unable to modify volume size: %s", err.Error())
 			}
-			volExpanded = true
-		}
-
-		// check the metro session state and resume if necessary
-		// in case the previous request failed after expanding the volume, resume the session
-		if isMetro {
-			volExpanded, err = isResumedMetroSession(ctx, vol.MetroReplicationSessionID, array)
-			if err != nil {
-				return nil, status.Errorf(codes.Internal,
-					"failed to expand the volume %s because the metro replication session could not be resumed: %s", vol.Name, err.Error())
-			}
-		}
-		if volExpanded {
 			return &csi.ControllerExpandVolumeResponse{CapacityBytes: requiredBytes, NodeExpansionRequired: true}, nil
 		}
+
 		return &csi.ControllerExpandVolumeResponse{}, nil
 	}
 

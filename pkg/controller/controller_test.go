@@ -2292,15 +2292,10 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 					mock.AnythingOfType("*gopowerstore.VolumeModify"),
 					validBaseVolID).
 					Return(gopowerstore.EmptyResponse(""), nil)
-				// Return okay to pause session
+				// Return metro session status as paused
 				clientMock.On("GetReplicationSessionByID", mock.Anything, validSessionID).Return(gopowerstore.ReplicationSession{
 					ID:    validSessionID,
 					State: gopowerstore.RsStatePaused,
-				}, nil).Times(1)
-				// Return paused to resume session
-				clientMock.On("GetReplicationSessionByID", mock.Anything, validSessionID).Return(gopowerstore.ReplicationSession{
-					ID:    validSessionID,
-					State: gopowerstore.RsStateOk,
 				}, nil).Times(1)
 
 				req := getTypicalControllerExpandRequest(validMetroBlockVolumeID, validVolSize*2)
@@ -2393,34 +2388,6 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 
 				gomega.Expect(err).ToNot(gomega.BeNil())
 				gomega.Expect(err.Error()).To(gomega.ContainSubstring("metro replication session not in 'paused' state"))
-			})
-
-			ginkgo.It("should fail if metro session is not resumed after volume expansion", func() {
-				clientMock.On("GetVolume", mock.Anything, validBaseVolID).Return(gopowerstore.Volume{
-					MetroReplicationSessionID: validSessionID,
-					Size:                      validVolSize,
-				}, nil)
-				clientMock.On("ModifyVolume",
-					mock.Anything,
-					mock.AnythingOfType("*gopowerstore.VolumeModify"),
-					validBaseVolID).
-					Return(gopowerstore.EmptyResponse(""), nil)
-				// Return okay to pause session
-				clientMock.On("GetReplicationSessionByID", mock.Anything, validSessionID).Return(gopowerstore.ReplicationSession{
-					ID:    validSessionID,
-					State: gopowerstore.RsStatePaused,
-				}, nil).Times(1)
-				// Return error state for resume failure
-				clientMock.On("GetReplicationSessionByID", mock.Anything, validSessionID).Return(gopowerstore.ReplicationSession{
-					ID:    validSessionID,
-					State: gopowerstore.RsStatePaused,
-				}, nil).Times(1)
-
-				req := getTypicalControllerExpandRequest(validMetroBlockVolumeID, validVolSize*2)
-				_, err := ctrlSvc.ControllerExpandVolume(context.Background(), req)
-
-				gomega.Expect(err).ToNot(gomega.BeNil())
-				gomega.Expect(err.Error()).To(gomega.ContainSubstring("the metro replication session has not been resumed"))
 			})
 		})
 
