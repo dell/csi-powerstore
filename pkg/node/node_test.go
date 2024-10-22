@@ -247,13 +247,13 @@ func setVariables() {
 		iscsiLib:        iscsiLibMock,
 		nvmeLib:         nvmeLibMock,
 		nodeID:          validNodeID,
-		useFC:           false,
-		useNVME:         false,
 		initialized:     true,
 		isPodmonEnabled: false,
 	}
 	nodeSvc.iscsiTargets = make(map[string][]string)
 	nodeSvc.nvmeTargets = make(map[string][]string)
+	nodeSvc.useFC = make(map[string]bool)
+	nodeSvc.useNVME = make(map[string]bool)
 	old := ReachableEndPoint
 	func() { ReachableEndPoint = old }()
 	ReachableEndPoint = func(ip string) bool {
@@ -549,7 +549,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 			ginkgo.It("should create FC host", func() {
 				nodeSvc.Arrays()[firstValidIP].BlockProtocol = common.FcTransport
 				nodeSvc.nodeID = ""
-				nodeSvc.useFC = true
+				nodeSvc.useFC["unique"] = true
 				conn, _ := net.Dial("udp", "127.0.0.1:80")
 				fsMock.On("NetDial", mock.Anything).Return(
 					conn,
@@ -598,7 +598,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 			ginkgo.It("should create NVMe host", func() {
 				nodeSvc.Arrays()[firstValidIP].BlockProtocol = common.NVMEFCTransport
 				nodeSvc.nodeID = ""
-				nodeSvc.useNVME = true
+				nodeSvc.useNVME[firstValidIP] = true
 				fsMock.On("ReadFile", mock.Anything).Return([]byte("my-host-id"), nil)
 				conn, _ := net.Dial("udp", "127.0.0.1:80")
 				fsMock.On("NetDial", mock.Anything).Return(
@@ -715,7 +715,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					}, nil)
 
 				arrays := getTestArrays()
-				nodeSvc.useNVME = true
+				nodeSvc.useNVME["unique"] = true
 				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
 					Return([]gopowerstore.IPPoolAddress{}, nil)
 				clientMock.On("GetStorageNVMETCPTargetAddresses", mock.Anything).
@@ -726,7 +726,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 						NVMeNQN: validNVMEInitiators[0],
 					}, nil)
 				err := nodeSvc.nodeProbe(context.Background(), arrays["gid1"])
-				nodeSvc.useNVME = false
+				nodeSvc.useNVME["unique"] = false
 				gomega.Expect(err.Error()).To(gomega.ContainSubstring("no active nvme sessions"))
 			})
 		})
@@ -788,11 +788,11 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 						NVMeNQN: validNVMEInitiators[0],
 					}, nil)
 				nodeSvc.useNFS = true
-				nodeSvc.useNVME = true
+				nodeSvc.useNVME["unique"] = true
 				arrays := getTestArrays()
 				err := nodeSvc.nodeProbe(context.Background(), arrays["gid1"])
 				nodeSvc.useNFS = false
-				nodeSvc.useNVME = false
+				nodeSvc.useNVME["unique"] = false
 				gomega.Expect(err).To(gomega.BeNil())
 			})
 		})
@@ -871,10 +871,10 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					Return([]gopowerstore.IPPoolAddress{}, nil)
 				arrays := getTestArrays()
 				nodeSvc.useNFS = true
-				nodeSvc.useNVME = true
+				nodeSvc.useNVME["unique"] = true
 				nodeSvc.nvmeTargets["unique"] = []string{"nqn.1988-11.com.dell.mock:00:e6e2d5b871f1403E169D0"}
 				err := nodeSvc.nodeProbe(context.Background(), arrays["gid1"])
-				nodeSvc.useNVME = false
+				nodeSvc.useNVME["unique"] = false
 				gomega.Expect(err).To(gomega.BeNil())
 				gomega.Expect(nodeSvc.useNFS).To(gomega.BeFalse())
 			})
@@ -967,11 +967,11 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					}, nil)
 
 				arrays := getTestArrays()
-				if nodeSvc.useNVME {
-					nodeSvc.useNVME = false
+				if nodeSvc.useNVME["unique"] {
+					nodeSvc.useNVME["unique"] = false
 				}
-				if !nodeSvc.useFC {
-					nodeSvc.useFC = true
+				if !nodeSvc.useFC["unique"] {
+					nodeSvc.useFC["unique"] = true
 				}
 
 				err := nodeSvc.nodeProbe(context.Background(), arrays["gid1"])
@@ -991,15 +991,15 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					}, nil)
 
 				arrays := getTestArrays()
-				if nodeSvc.useNVME {
-					nodeSvc.useNVME = false
+				if nodeSvc.useNVME["unique"] {
+					nodeSvc.useNVME["unique"] = false
 				}
-				nodeSvc.useFC = true
+				nodeSvc.useFC["unique"] = true
 
 				err := nodeSvc.nodeProbe(context.Background(), arrays["gid1"])
 				gomega.Expect(err).ToNot(gomega.BeNil())
-				if nodeSvc.useFC {
-					nodeSvc.useFC = false
+				if nodeSvc.useFC["unique"] {
+					nodeSvc.useFC["unique"] = false
 				}
 			})
 		})
@@ -1030,8 +1030,8 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 		ginkgo.When("using NVMeFC", func() {
 			ginkgo.It("should successfully stage NVMeFC volume", func() {
-				nodeSvc.useNVME = true
-				nodeSvc.useFC = true
+				nodeSvc.useNVME["unique"] = true
+				nodeSvc.useFC["unique"] = true
 				nvmeConnectorMock.On("ConnectVolume", mock.Anything, gobrick.NVMeVolumeInfo{
 					Targets: validNVMEFCTargetInfo,
 					WWN:     validDeviceWWN,
@@ -1052,7 +1052,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 		ginkgo.When("using FC", func() {
 			ginkgo.It("should successfully stage FC volume", func() {
-				nodeSvc.useFC = true
+				nodeSvc.useFC["unique"] = true
 				fcConnectorMock.On("ConnectVolume", mock.Anything, gobrick.FCVolumeInfo{
 					Targets: validFCTargetsInfo,
 					Lun:     validLUNIDINT,
@@ -1410,8 +1410,8 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 			})
 
 			ginkgo.It("should fail [nvmefcTargets]", func() {
-				nodeSvc.useNVME = true
-				nodeSvc.useFC = true
+				nodeSvc.useNVME["unique"] = true
+				nodeSvc.useFC["unique"] = true
 				res, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
 					VolumeId: validBlockVolumeID,
 					PublishContext: map[string]string{
@@ -1428,7 +1428,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 			})
 
 			ginkgo.It("should fail [fcTargets]", func() {
-				nodeSvc.useFC = true
+				nodeSvc.useFC["unique"] = true
 				res, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
 					VolumeId: validBlockVolumeID,
 					PublishContext: map[string]string{
@@ -1675,7 +1675,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 			})
 
 			ginkgo.It("should succeed [FC]", func() {
-				nodeSvc.useFC = true
+				nodeSvc.useFC["unique"] = true
 				mountInfo := []gofsutil.Info{
 					{
 						Device: validDevName,
@@ -1706,7 +1706,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 			})
 
 			ginkgo.It("should succeed [NVMe]", func() {
-				nodeSvc.useNVME = true
+				nodeSvc.useNVME["unique"] = true
 				mountInfo := []gofsutil.Info{
 					{
 						Device: validDevName,
@@ -3486,7 +3486,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 		ginkgo.When("using FC", func() {
 			ginkgo.It("should return FC topology segments", func() {
-				nodeSvc.useFC = true
+				nodeSvc.useFC["unique"] = true
 				conn, _ := net.Dial("udp", "127.0.0.1:80")
 				fsMock.On("NetDial", mock.Anything).Return(
 					conn,
@@ -3536,7 +3536,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 			ginkgo.When("reusing host", func() {
 				ginkgo.It("should properly deal with additional IPs", func() {
-					nodeSvc.useFC = true
+					nodeSvc.useFC["unique"] = true
 					nodeID := nodeSvc.nodeID
 					nodeSvc.nodeID = nodeID + "-" + "192.168.0.1"
 					nodeSvc.reusedHost = true
@@ -3589,7 +3589,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 				ginkgo.When("there is no ip in nodeID", func() {
 					ginkgo.It("should not return FC topology key", func() {
-						nodeSvc.useFC = true
+						nodeSvc.useFC["unique"] = true
 						nodeID := nodeSvc.nodeID
 						nodeSvc.nodeID = "nodeid-with-no-ip"
 						nodeSvc.reusedHost = true
@@ -3643,7 +3643,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 			ginkgo.When("we can not get info about hosts from array", func() {
 				ginkgo.It("should not return FC topology key", func() {
-					nodeSvc.useFC = true
+					nodeSvc.useFC["unique"] = true
 					e := "internal error"
 					clientMock.On("GetHostByName", mock.Anything, nodeSvc.nodeID).
 						Return(gopowerstore.Host{}, errors.New(e))
@@ -3671,7 +3671,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 			ginkgo.When("host initiators is empty", func() {
 				ginkgo.It("should not return FC topology key", func() {
-					nodeSvc.useFC = true
+					nodeSvc.useFC["unique"] = true
 					clientMock.On("GetHostByName", mock.Anything, nodeSvc.nodeID).
 						Return(gopowerstore.Host{
 							ID:         "host-id",
@@ -3702,7 +3702,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 			ginkgo.When("there is no active sessions", func() {
 				ginkgo.It("should not return FC topology key", func() {
-					nodeSvc.useFC = true
+					nodeSvc.useFC["unique"] = true
 					conn, _ := net.Dial("udp", "127.0.0.1:80")
 					fsMock.On("NetDial", mock.Anything).Return(
 						conn,
@@ -3743,8 +3743,8 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 		ginkgo.When("using NVMeFC", func() {
 			ginkgo.It("should return NVMeFC topology segments", func() {
-				nodeSvc.useNVME = true
-				nodeSvc.useFC = true
+				nodeSvc.useNVME["unique"] = true
+				nodeSvc.useFC["unique"] = true
 				clientMock.On("GetCluster", mock.Anything).
 					Return(gopowerstore.Cluster{
 						Name:    validClusterName,
@@ -3782,8 +3782,8 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 			ginkgo.When("NVMeFC targets cannot be discovered", func() {
 				ginkgo.It("should not return NVMeFC topology segments", func() {
-					nodeSvc.useNVME = true
-					nodeSvc.useFC = true
+					nodeSvc.useNVME["unique"] = true
+					nodeSvc.useFC["unique"] = true
 					clientMock.On("GetCluster", mock.Anything).
 						Return(gopowerstore.Cluster{
 							Name:    validClusterName,
@@ -3821,8 +3821,8 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 		ginkgo.When("using NVMeTCP", func() {
 			ginkgo.It("should return NVMeTCP topology segments", func() {
-				nodeSvc.useNVME = true
-				nodeSvc.useFC = false
+				nodeSvc.useNVME["unique"] = true
+				nodeSvc.useFC["unique"] = false
 				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).Return([]gopowerstore.IPPoolAddress{
 					{
 						Address: "192.168.1.1",
@@ -3867,8 +3867,8 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				ginkgo.It("should not return nvme topology key", func() {
 					goiscsi.GOISCSIMock.InduceDiscoveryError = true
 					gonvme.GONVMEMock.InduceDiscoveryError = true
-					nodeSvc.useNVME = true
-					nodeSvc.useFC = false
+					nodeSvc.useNVME["unique"] = true
+					nodeSvc.useFC["unique"] = false
 					clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).Return([]gopowerstore.IPPoolAddress{
 						{
 							Address: "192.168.1.1",
@@ -3912,8 +3912,8 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 			ginkgo.When("we cannot get NVMeTCP targets from the array", func() {
 				ginkgo.It("should not return NVMeTCP topology segments", func() {
-					nodeSvc.useNVME = true
-					nodeSvc.useFC = false
+					nodeSvc.useNVME["unique"] = true
+					nodeSvc.useFC["unique"] = false
 					e := "internalerror"
 					clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).Return([]gopowerstore.IPPoolAddress{
 						{
@@ -4150,7 +4150,6 @@ func TestInitConnectors(t *testing.T) {
 		fcConnector:    nil,
 		iscsiLib:       nil,
 		nodeID:         validNodeID,
-		useFC:          false,
 		initialized:    true,
 	}
 	nodeSvc.SetArrays(arrays)
@@ -4169,7 +4168,6 @@ func TestGetNodeOptions(t *testing.T) {
 		fcConnector:    nil,
 		iscsiLib:       nil,
 		nodeID:         validNodeID,
-		useFC:          false,
 		initialized:    true,
 	}
 	nodeSvc.SetArrays(arrays)

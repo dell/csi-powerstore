@@ -134,50 +134,55 @@ func (s *Service) Init() error {
 		}
 
 		var initiators []string
+		var useNVME, useFC bool
 
 		switch arr.BlockProtocol {
 		case common.NVMETCPTransport:
 			if len(nvmeInitiators) == 0 {
 				log.Errorf("NVMeTCP transport was requested but NVMe initiator is not available")
 			}
-			s.useNVME[arr.GlobalID] = true
-			s.useFC[arr.GlobalID] = false
+			useNVME = true
+			useFC = false
 		case common.NVMEFCTransport:
 			if len(nvmeInitiators) == 0 {
 				log.Errorf("NVMeFC transport was requested but NVMe initiator is not available")
 			}
-			s.useNVME[arr.GlobalID] = true
-			s.useFC[arr.GlobalID] = true
+			useNVME = true
+			useFC = true
 		case common.ISCSITransport:
 			if len(iscsiInitiators) == 0 {
 				log.Errorf("iSCSI transport was requested but iSCSI initiator is not available")
 			}
-			s.useNVME[arr.GlobalID] = false
-			s.useFC[arr.GlobalID] = false
+			useNVME = false
+			useFC = false
 		case common.FcTransport:
 			if len(fcInitiators) == 0 {
 				log.Errorf("FC transport was requested but FC initiator is not available")
 			}
-			s.useNVME[arr.GlobalID] = false
-			s.useFC[arr.GlobalID] = true
+			useNVME = false
+			useFC = true
 		default:
-			s.useNVME[arr.GlobalID] = len(nvmeInitiators) > 0
-			s.useFC[arr.GlobalID] = len(fcInitiators) > 0
+			useNVME = len(nvmeInitiators) > 0
+			useFC = len(fcInitiators) > 0
 		}
-		if s.useNVME[arr.GlobalID] {
+		if useNVME {
 			initiators = nvmeInitiators
-			if s.useFC[arr.GlobalID] {
+			if useFC {
 				log.Infof("NVMeFC Protocol is requested")
 			} else {
 				log.Infof("NVMeTCP Protocol is requested")
 			}
-		} else if s.useFC[arr.GlobalID] {
+		} else if useFC {
 			initiators = fcInitiators
 			log.Infof("FC Protocol is requested")
 		} else {
 			initiators = iscsiInitiators
 			log.Infof("iSCSI Protocol is requested")
 		}
+
+		// store the values in the array list for later use
+		s.useNVME[arr.GlobalID] = useNVME
+		s.useFC[arr.GlobalID] = useFC
 
 		err = s.setupHost(initiators, arr.GetClient(), arr.GetIP(), arr.GetGlobalID())
 		if err != nil {
