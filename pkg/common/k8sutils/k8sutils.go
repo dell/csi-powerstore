@@ -128,8 +128,17 @@ func (svc *NodeLabelsModifierImpl) AddNVMeLabels(ctx context.Context, k8sclients
 		node.Labels = make(map[string]string)
 	}
 
-	// Update the node with the new label
-	node.Labels[labelKey] = strings.Join(labelValue, ",")
+	// Fetch the uuids from hostnqns
+	var uuids []string
+	for _, nqn := range labelValue {
+		parts := strings.Split(nqn, ":")
+		if len(parts) == 3 { // nqn format is nqn.yyyy-mm.nvmexpress:uuid:xxxx-yyyy-zzzz
+			uuids = append(uuids, parts[2]) // Extract the UUID
+		}
+	}
+
+	// Update the node with the new labels
+	node.Labels[labelKey] = strings.Join(uuids, ",")
 	_, err = k8sclientset.CoreV1().Nodes().Update(ctx, node, v1.UpdateOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to update node %s labels: %v", kubeNodeName, err.Error())
