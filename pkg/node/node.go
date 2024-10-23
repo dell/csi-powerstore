@@ -125,6 +125,11 @@ func (s *Service) Init() error {
 		return nil
 	}
 
+	err = k8sutils.AddNVMeLabels(ctx, s.opts.KubeConfigPath, s.opts.KubeNodeName, "hostnqn-uuid", nvmeInitiators)
+	if err != nil {
+		log.Warnf("Unable to add hostnqn uuid label for node %s: %v", s.opts.KubeNodeName, err.Error())
+	}
+
 	// Setup host on each of available arrays
 	for _, arr := range s.Arrays() {
 		if arr.BlockProtocol == common.NoneTransport {
