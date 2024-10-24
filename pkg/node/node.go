@@ -1466,7 +1466,7 @@ func (s *Service) setupHost(initiators []string, client gopowerstore.Client, arr
 		return fmt.Errorf("nodeID not set")
 	}
 
-	if s.useNVME {
+	if s.useNVME[arrayID] {
 		// Initialize the Kubernetes client
 		k8sclientset, err := k8sutils.CreateKubeClientSet(s.opts.KubeConfigPath)
 		if err != nil {
