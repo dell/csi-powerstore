@@ -318,6 +318,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 				clientMock.On("CreateHost", mock.Anything, mock.Anything).
 					Return(gopowerstore.CreateResponse{ID: validHostID}, nil)
+				setDefaultNodeLabelsRetrieverMock()
 				nodeSvc.opts.NodeNamePrefix = ""
 				err := nodeSvc.Init()
 				gomega.Expect(err).To(gomega.BeNil())
@@ -329,6 +330,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				nodeSvc.nodeID = ""
 
 				fsMock.On("ReadFile", mock.Anything).Return([]byte("my-host-id"), errors.New("no such file"))
+				setDefaultNodeLabelsRetrieverMock()
 
 				err := nodeSvc.Init()
 				gomega.Expect(err.Error()).To(gomega.ContainSubstring("no such file"))
@@ -368,6 +370,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					}}, nil)
 				clientMock.On("CreateHost", mock.Anything, mock.Anything).
 					Return(gopowerstore.CreateResponse{ID: validHostID}, nil)
+				setDefaultNodeLabelsRetrieverMock()
 				nodeSvc.opts.NodeNamePrefix = ""
 				err := nodeSvc.Init()
 				gomega.Expect(err.Error()).To(gomega.ContainSubstring("Could not connect to PowerStore array"))
@@ -407,6 +410,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					}}, nil)
 				clientMock.On("CreateHost", mock.Anything, mock.Anything).
 					Return(gopowerstore.CreateResponse{ID: validHostID}, nil)
+				setDefaultNodeLabelsRetrieverMock()
 				nodeSvc.opts.NodeNamePrefix = ""
 				err := nodeSvc.Init()
 				gomega.Expect(err.Error()).To(gomega.ContainSubstring("node name prefix is too long"))
@@ -438,6 +442,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 							},
 							Name: "host-name",
 						}, nil)
+					setDefaultNodeLabelsRetrieverMock()
 					err := nodeSvc.Init()
 					gomega.Expect(err).To(gomega.BeNil())
 				})
@@ -462,6 +467,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 					clientMock.On("ModifyHost", mock.Anything, mock.Anything, "host-id").
 						Return(gopowerstore.CreateResponse{}, nil)
+					setDefaultNodeLabelsRetrieverMock()
 
 					err := nodeSvc.Init()
 					gomega.Expect(err).To(gomega.BeNil())
@@ -501,6 +507,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 						}}, nil)
 					clientMock.On("ModifyHost", mock.Anything, mock.Anything, "host-id").
 						Return(gopowerstore.CreateResponse{ID: "host-id"}, nil)
+					setDefaultNodeLabelsRetrieverMock()
 
 					err := nodeSvc.Init()
 					gomega.Expect(err).To(gomega.BeNil())
@@ -540,6 +547,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 						}}, nil)
 					clientMock.On("ModifyHost", mock.Anything, mock.Anything, "host-id").
 						Return(gopowerstore.CreateResponse{ID: "host-id"}, nil)
+					setDefaultNodeLabelsRetrieverMock()
 
 					err := nodeSvc.Init()
 					gomega.Expect(err).To(gomega.BeNil())
@@ -590,6 +598,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 				clientMock.On("CreateHost", mock.Anything, mock.Anything).
 					Return(gopowerstore.CreateResponse{ID: validHostID}, nil)
+				setDefaultNodeLabelsRetrieverMock()
 
 				err := nodeSvc.Init()
 				gomega.Expect(err).To(gomega.BeNil())
@@ -635,6 +644,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 				clientMock.On("CreateHost", mock.Anything, mock.Anything).
 					Return(gopowerstore.CreateResponse{ID: validHostID}, nil)
+				setDefaultNodeLabelsRetrieverMock()
 
 				err := nodeSvc.Init()
 				gomega.Expect(err).To(gomega.BeNil())
@@ -676,6 +686,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 				clientMock.On("CreateHost", mock.Anything, mock.Anything).
 					Return(gopowerstore.CreateResponse{ID: validHostID}, nil)
+				setDefaultNodeLabelsRetrieverMock()
 
 				err := nodeSvc.Init()
 				gomega.Expect(err).To(gomega.BeNil())
@@ -719,6 +730,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 				clientMock.On("CreateHost", mock.Anything, mock.Anything).
 					Return(gopowerstore.CreateResponse{ID: validHostID}, nil)
+				setDefaultNodeLabelsRetrieverMock()
 
 				err := nodeSvc.Init()
 				gomega.Expect(err).To(gomega.BeNil())
@@ -4081,6 +4093,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 			clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 			clientMock.On("CreateHost", mock.Anything, mock.Anything).
 				Return(gopowerstore.CreateResponse{ID: validHostID}, nil)
+			setDefaultNodeLabelsRetrieverMock()
 			nodeSvc.opts.NodeNamePrefix = ""
 			nodeSvc.Init()
 
