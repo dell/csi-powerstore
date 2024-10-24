@@ -40,7 +40,7 @@ images:
   replication: quay.io/dell/container-storage-modules/dell-csi-replicator:v1.10.0
   vgsnapshotter: quay.io/dell/container-storage-modules/csi-volumegroup-snapshotter:v1.7.0
   podmon: quay.io/dell/container-storage-modules/podmon:v1.11.0
-  metadataretriever: quay.io/dell/container-storage-modules/csi-metadata-retriever:v1.8.0
+  metadataretriever: quay.io/dell/container-storage-modules/csi-metadata-retriever:v1.9.0
 
 # Specify kubelet config dir path.
 # Ensure that the config.yaml file is present at this path.
