@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2022-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2022-2024 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -228,7 +228,7 @@ func (s *Service) nodeProbe(_ context.Context, array *array.PowerStoreArray) err
 	log.Debugf("Successfully got Host on %s", array.GlobalID)
 	s.populateTargetsInCache(array)
 	// check if nvme sessions are active
-	if s.useNVME {
+	if s.useNVME[array.GlobalID] {
 		log.Debugf("Checking if nvme sessions are active on node or not")
 		sessions, _ := s.nvmeLib.GetSessions()
 		for _, target := range s.nvmeTargets[array.GlobalID] {
@@ -247,7 +247,7 @@ func (s *Service) nodeProbe(_ context.Context, array *array.PowerStoreArray) err
 			return nil
 		}
 		return fmt.Errorf("no active nvme sessions")
-	} else if s.useFC {
+	} else if s.useFC[array.GlobalID] {
 		log.Debugf("Checking if FC sessions are active on node or not")
 		for _, initiator := range host.Initiators {
 			if len(initiator.ActiveSessions) > 0 {
@@ -282,12 +282,12 @@ func (s *Service) nodeProbe(_ context.Context, array *array.PowerStoreArray) err
 func (s *Service) populateTargetsInCache(array *array.PowerStoreArray) {
 	// if nvmeTargets in cache is empty
 	// this could be empty in 2 cases: Either container is getting restarted or discovery & login has failed in NodeGetInfo
-	if s.useNVME {
+	if s.useNVME[array.GlobalID] {
 		if len(s.nvmeTargets[array.GlobalID]) != 0 {
 			return
 		}
 		// for NVMeFC
-		if s.useFC {
+		if s.useFC[array.GlobalID] {
 			nvmefcInfo, err := common.GetNVMEFCTargetInfoFromStorage(array.GetClient(), "")
 			if err != nil {
 				log.Errorf("couldn't get targets from the array: %s", err.Error())
@@ -328,7 +328,7 @@ func (s *Service) populateTargetsInCache(array *array.PowerStoreArray) {
 				break
 			}
 		}
-	} else if !s.useFC && !s.useNFS {
+	} else if !s.useFC[array.GlobalID] && !s.useNFS {
 		// if iscsiTargets in cache is empty
 		if len(s.iscsiTargets[array.GlobalID]) != 0 {
 			return

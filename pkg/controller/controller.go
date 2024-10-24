@@ -1340,61 +1340,19 @@ func (s *Service) ListSnapshots(ctx context.Context, req *csi.ListSnapshotsReque
 	}, nil
 }
 
-func pauseMetroSession(ctx context.Context, metroSessionID string, arr *array.PowerStoreArray) (paused bool, err error) {
+func isPausedMetroSession(ctx context.Context, metroSessionID string, arr *array.PowerStoreArray) (paused bool, err error) {
 	metroSession, err := arr.Client.GetReplicationSessionByID(ctx, metroSessionID)
 	if err != nil {
 		return false, fmt.Errorf("could not get metro replication session %s", metroSessionID)
 	}
 
-	// confirm the session is in a state we can pause from.
-	if metroSession.State != gopowerstore.RsStateOk &&
-		metroSession.State != gopowerstore.RsStateSynchronizing &&
-		metroSession.State != gopowerstore.RsStatePaused &&
-		metroSession.State != gopowerstore.RsStateSystemPaused &&
-		metroSession.State != gopowerstore.RsStateFractured {
-		return false, fmt.Errorf("could not pause the metro replication session, %s, because the session is not in expected state to pause", metroSession.ID)
-	}
+	log.Debugf("checking if metro replication session, %s, is paused", metroSession.ID)
 
 	if metroSession.State != gopowerstore.RsStatePaused {
-		log.Debugf("pausing metro replication session, %s", metroSession.ID)
-
-		// pause the replication session
-		_, err := arr.Client.ExecuteActionOnReplicationSession(ctx, metroSession.ID, gopowerstore.RsActionPause, nil)
-		if err != nil {
-			return false, fmt.Errorf("metro replication session, %s, could not be paused: %s", metroSession.ID, err.Error())
-		}
-	} else {
-		log.Debugf("metro replication session, %s, already paused", metroSession.ID)
-	}
-	return true, nil
-}
-
-func resumeMetroSession(ctx context.Context, metroSessionID string, array *array.PowerStoreArray) (resumed bool, err error) {
-	metroSession, err := array.Client.GetReplicationSessionByID(ctx, metroSessionID)
-	if err != nil {
-		return false, fmt.Errorf("could not get metro replication session: %s", err.Error())
+		return false, errors.New("metro replication session not in 'paused' state")
 	}
 
-	// nothing to do if not paused
-	if metroSession.State == gopowerstore.RsStateOk ||
-		metroSession.State == gopowerstore.RsStateSynchronizing ||
-		metroSession.State == gopowerstore.RsStateResuming ||
-		metroSession.State == gopowerstore.RsStateSwitchingToMetroSync ||
-		metroSession.State == gopowerstore.RsStateFractured {
-		log.Debugf("metro replication session, %s, already resumed", metroSession.ID)
-		return false, nil
-	}
-
-	// metro session can only be resumed if it is in 'paused' state
-	if metroSession.State != gopowerstore.RsStatePaused {
-		return false, errors.New("the metro session must be in 'paused' state before resuming")
-	}
-
-	log.Debugf("resuming metro replication session %s", metroSession.ID)
-	_, err = array.Client.ExecuteActionOnReplicationSession(ctx, metroSession.ID, gopowerstore.RsActionResume, nil)
-	if err != nil {
-		return false, fmt.Errorf("metro replication session, %s, could not be resumed: %s", metroSession.ID, err.Error())
-	}
+	log.Debugf("metro replication session, %s, is paused", metroSession.ID)
 
 	return true, nil
 }
@@ -1423,7 +1381,6 @@ func (s *Service) ControllerExpandVolume(ctx context.Context, req *csi.Controlle
 			return nil, status.Error(codes.NotFound, "detected SCSI protocol but wasn't able to fetch the volume info")
 		}
 
-		volExpanded := false // to return appropriate response based on whether the volume is expanded or not
 		isMetro := remoteVolumeID != ""
 		if isMetro && vol.MetroReplicationSessionID == "" {
 			return nil, status.Errorf(codes.Internal,
@@ -1433,10 +1390,11 @@ func (s *Service) ControllerExpandVolume(ctx context.Context, req *csi.Controlle
 		if vol.Size < requiredBytes {
 			if isMetro {
 				// must pause metro session before modifying the volume
-				_, err = pauseMetroSession(ctx, vol.MetroReplicationSessionID, array)
+				_, err = isPausedMetroSession(ctx, vol.MetroReplicationSessionID, array)
 				if err != nil {
 					return nil, status.Errorf(codes.Internal,
-						"failed to expand the volume %s because the metro replication session could not be paused: %s", vol.Name, err.Error())
+						"failed to expand the volume, %s, because the metro replication session is not paused. please pause the metro replication session: %s",
+						vol.Name, err.Error())
 				}
 			}
 
@@ -1444,21 +1402,9 @@ func (s *Service) ControllerExpandVolume(ctx context.Context, req *csi.Controlle
 			if err != nil {
 				return nil, status.Errorf(codes.Internal, "unable to modify volume size: %s", err.Error())
 			}
-			volExpanded = true
-		}
-
-		// check the metro session state and resume if necessary
-		// in case the previous request failed after expanding the volume, resume the session
-		if isMetro {
-			volExpanded, err = resumeMetroSession(ctx, vol.MetroReplicationSessionID, array)
-			if err != nil {
-				return nil, status.Errorf(codes.Internal,
-					"failed to expand the volume %s because the metro replication session could not be resumed: %s", vol.Name, err.Error())
-			}
-		}
-		if volExpanded {
 			return &csi.ControllerExpandVolumeResponse{CapacityBytes: requiredBytes, NodeExpansionRequired: true}, nil
 		}
+
 		return &csi.ControllerExpandVolumeResponse{}, nil
 	}
 
