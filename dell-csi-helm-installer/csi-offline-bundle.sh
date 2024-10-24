@@ -24,7 +24,8 @@ usage() {
    echo "               Supply the registry name/path which will hold the images"
    echo "               For example: my.registry.com:5000/dell/csi"
    echo "-h             Displays this information"
-   echo "-v             Pass the helm chart version "
+   echo "-v             Pass the helm chart version"
+   echo "-n             Use the nightly tag for all CSI images on quay.io/dell"
    echo
    echo "Exactly one of '-c' or '-p' needs to be specified"
    echo
@@ -36,7 +37,7 @@ status() {
   echo
   echo "*"
   echo "* $@"
-  echo 
+  echo
 }
 
 # run_command
@@ -88,7 +89,7 @@ build_image_manifest() {
   done
 
   # Forming this only for drivers supporting standalone helm charts
-  if [ ! -z ${DRIVERREPO} ]; then 
+  if [ ! -z ${DRIVERREPO} ]; then
    echo "${DRIVERREPO}/${DRIVERNAME}\:${DRIVERVERSIONVALUESYAML}"
    echo "${DRIVERREPO}/${DRIVERNAME}:${DRIVERVERSIONVALUESYAML}" >> "${IMAGEMANIFEST}.tmp"
   fi
@@ -109,15 +110,20 @@ archive_images() {
   # the images, pull first in case some are not local
   while read line; do
       echo "   $line"
-      run_command "${DOCKER}" pull "${line}"
+      if [[ "$NIGHTLY" = "true" ]] && [[ "$line" =~ quay.io/dell/container-storage-modules ]]; then
+        dockerImage=$(echo $line | sed 's/:[^:]*$/:nightly/')
+        run_command "${DOCKER}" pull "${dockerImage}" && run_command "${DOCKER}" tag "${dockerImage}" "${line}"
+      else
+        run_command "${DOCKER}" pull "${line}"
+      fi
+
       IMAGEFILE=$(echo "${line}" | sed 's|[/:]|-|g')
       # if we already have the image exported, skip it
       if [ ! -f "${IMAGEFILEDIR}/${IMAGEFILE}.tar" ]; then
         run_command "${DOCKER}" save -o "${IMAGEFILEDIR}/${IMAGEFILE}.tar" "${line}"
       fi
   done < "${IMAGEMANIFEST}"
-
-} 
+}
 
 # restore_images
 # load the images from an archive into the local registry
@@ -146,7 +152,7 @@ copy_files() {
     else
       cp -R "${f}" "${DISTDIR}"
     fi
-    
+
     if [ $? -ne 0 ]; then
       echo "Unable to copy ${f} to the distribution directory"
       exit 1
@@ -226,12 +232,13 @@ set_mode() {
 CREATE="false"
 PREPARE="false"
 REGISTRY=""
+NIGHTLY="false"
 DRIVER="csi-powerstore"
 HELMCHARTVERSION="csi-powerstore-2.12.0"
 
-while getopts "cprv:h" opt; do
+while getopts "cprnv:h" opt; do
   case $opt in
-    
+
     c)
       CREATE="true"
       ;;
@@ -249,6 +256,9 @@ while getopts "cprv:h" opt; do
       usage
       exit 0
       ;;
+    n)
+      NIGHTLY="true"
+      ;;
     \?)
       echo "Invalid option: -$OPTARG" >&2
       exit 1
@@ -265,12 +275,12 @@ done
 SCRIPTDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 REPODIR="$( dirname "${SCRIPTDIR}" )"
 if [ ! -d "$REPODIR/helm-charts" ]; then
-  
+
   if  [ ! -d "$SCRIPTDIR/helm-charts" ]; then
     git clone --quiet -c advice.detachedHead=false -b $HELMCHARTVERSION https://github.com/dell/helm-charts
   fi
   mv helm-charts $REPODIR
-else 
+else
   if [  -d "$SCRIPTDIR/helm-charts" ]; then
     rm -rf $SCRIPTDIR/helm-charts
   fi
@@ -359,7 +369,7 @@ if [ "${REGISTRY: -1}" != "/" ]; then
 fi
 
 # figure out if we should use docker or podman, preferring docker
-DOCKER=$(which docker 2>/dev/null || which podman 2>/dev/null)   
+DOCKER=$(which docker 2>/dev/null || which podman 2>/dev/null)
 if [ "${DOCKER}" == "" ]; then
   echo "Unable to find either docker or podman in $PATH"
   exit 1

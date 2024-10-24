@@ -1,5 +1,3 @@
-#
-#
 # Copyright © 2020-2024 Dell Inc. or its subsidiaries. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -23,26 +21,26 @@
 driverName: "csi-powerstore.dellemc.com"
 # "version" is used to verify the values file matches driver version
 # Not recommend to change
-version: v2.9.0
+version: v2.12.0
 
 # "images" defines every container images used for the driver and its sidecars.
 #  To use your own images, or a private registry, change the values here.
 images:
   # "driver" defines the container image, used for the driver container.
-  driver: dellemc/csi-powerstore:v2.9.0
+  driver: quay.io/dell/container-storage-modules/csi-powerstore:v2.12.0
   # CSI sidecars
-  attacher: registry.k8s.io/sig-storage/csi-attacher:v4.4.2
-  provisioner: registry.k8s.io/sig-storage/csi-provisioner:v3.6.2
-  snapshotter: registry.k8s.io/sig-storage/csi-snapshotter:v6.3.2
-  resizer: registry.k8s.io/sig-storage/csi-resizer:v1.9.2
-  registrar: registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.9.1
-  healthmonitor: registry.k8s.io/sig-storage/csi-external-health-monitor-controller:v0.10.0
+  attacher: registry.k8s.io/sig-storage/csi-attacher:v4.7.0
+  provisioner: registry.k8s.io/sig-storage/csi-provisioner:v5.1.0
+  snapshotter: registry.k8s.io/sig-storage/csi-snapshotter:v8.1.0
+  resizer: registry.k8s.io/sig-storage/csi-resizer:v1.12.0
+  registrar: registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.12.0
+  healthmonitor: registry.k8s.io/sig-storage/csi-external-health-monitor-controller:v0.13.0
 
   # CSM sidecars
-  replication: dellemc/dell-csi-replicator:v1.7.0
-  vgsnapshotter: dellemc/csi-volumegroup-snapshotter:v1.4.0
-  podmon: dellemc/podmon:v1.8.0
-  metadataretriever: dellemc/csi-metadata-retriever:v1.6.0
+  replication: quay.io/dell/container-storage-modules/dell-csi-replicator:v1.9.0
+  vgsnapshotter: quay.io/dell/container-storage-modules/csi-volumegroup-snapshotter:v1.7.0
+  podmon: quay.io/dell/container-storage-modules/podmon:v1.11.0
+  metadataretriever: quay.io/dell/container-storage-modules/csi-metadata-retriever:v1.8.0
 
 # Specify kubelet config dir path.
 # Ensure that the config.yaml file is present at this path.
