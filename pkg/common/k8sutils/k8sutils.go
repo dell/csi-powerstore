@@ -47,8 +47,10 @@ type NodeLabelsRetrieverImpl struct{}
 type NodeLabelsModifierImpl struct{}
 
 // NodeLabelsRetriever is the actual instance of NodeLabelsRetrieverInterface which is used to retrieve the node labels
-var NodeLabelsRetriever NodeLabelsRetrieverInterface
-var NodeLabelsModifier NodeLabelsModifierInterface
+var (
+	NodeLabelsRetriever NodeLabelsRetrieverInterface
+	NodeLabelsModifier  NodeLabelsModifierInterface
+)
 
 func init() {
 	NodeLabelsRetriever = new(NodeLabelsRetrieverImpl)
