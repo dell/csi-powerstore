@@ -32,6 +32,8 @@ import (
 	"strings"
 
 	"github.com/dell/gonvme"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-powerstore/v2/pkg/array"
@@ -125,6 +127,13 @@ func (s *Service) Init() error {
 		s.useNFS = true
 		go s.startAPIService(ctx)
 		return nil
+	}
+
+	if len(nvmeInitiators) != 0 {
+		err = k8sutils.AddNVMeLabels(ctx, s.opts.KubeConfigPath, s.opts.KubeNodeName, "hostnqn-uuid", nvmeInitiators)
+		if err != nil {
+			log.Warnf("Unable to add hostnqn uuid label for node %s: %v", s.opts.KubeNodeName, err.Error())
+		}
 	}
 
 	// Setup host on each of available arrays
@@ -240,6 +249,30 @@ func (s *Service) initConnectors() {
 		NVMeOpts["chrootDirectory"] = s.opts.NodeChrootPath
 
 		s.nvmeLib = gonvme.NewNVMe(NVMeOpts)
+	}
+}
+
+// Check for duplicate hostnqn uuids
+func (s *Service) checkForDuplicateUUIDs(k8sclientset *kubernetes.Clientset) {
+	nodeUUIDs := make(map[string]string)
+
+	// Retrieve the list of nodes
+	nodes, err := k8sclientset.CoreV1().Nodes().List(context.Background(), v1.ListOptions{})
+	if err != nil {
+		log.Errorf("failed to get node list: %v", err.Error())
+		return
+	}
+
+	// Iterate over all nodes to check their labels
+	for _, node := range nodes.Items {
+		labels := node.Labels
+		if uuid, exists := labels["hostnqn-uuid"]; exists {
+			if existingNode, found := nodeUUIDs[uuid]; found {
+				log.Errorf("Duplicate hostnqn uuid %s found on nodes: %s and %s", uuid, existingNode, node.Name)
+			} else {
+				nodeUUIDs[uuid] = node.Name
+			}
+		}
 	}
 }
 
@@ -1433,7 +1466,19 @@ func (s *Service) setupHost(initiators []string, client gopowerstore.Client, arr
 		return fmt.Errorf("nodeID not set")
 	}
 
+	if s.useNVME[arrayID] {
+		// Initialize the Kubernetes client
+		k8sclientset, err := k8sutils.CreateKubeClientSet(s.opts.KubeConfigPath)
+		if err != nil {
+			return fmt.Errorf("failed to create Kubernetes clientset: %v", err.Error())
+		}
+
+		// Check for duplicate hostnqn uuids
+		s.checkForDuplicateUUIDs(k8sclientset)
+	}
+
 	reqInitiators := s.buildInitiatorsArray(initiators, arrayID)
+
 	var host *gopowerstore.Host
 	updateCHAP := false
 
