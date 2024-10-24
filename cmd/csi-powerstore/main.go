@@ -86,7 +86,7 @@ func init() {
 }
 
 func main() {
-	f := &fs.Fs{Util: &gofsutil.FS{}}
+	f := &fs.Fs{Util: &gofsutil.FS{SysBlockDir: "/sys/block"}}
 
 	common.RmSockFile(f)
 
