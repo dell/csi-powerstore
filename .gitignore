@@ -10,6 +10,7 @@ service/test/
 
 # IDE
 .idea
+.vscode
 
 # gosec
 gosec.log
