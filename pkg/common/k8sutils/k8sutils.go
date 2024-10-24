@@ -35,7 +35,7 @@ type NodeLabelsRetrieverInterface interface {
 	GetNodeLabels(ctx context.Context, k8sclientset *kubernetes.Clientset, kubeNodeName string) (map[string]string, error)
 }
 
-// NodeLabelsRetrieverInterface defines the methods for retrieving Kubernetes Node Labels
+// NodeLabelsModifierInterface defines the methods for retrieving Kubernetes Node Labels
 type NodeLabelsModifierInterface interface {
 	AddNVMeLabels(ctx context.Context, k8sclientset *kubernetes.Clientset, kubeNodeName string, labelKey string, labelValue []string) error
 }
