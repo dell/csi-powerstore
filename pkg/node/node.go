@@ -127,19 +127,12 @@ func (s *Service) Init() error {
 		return nil
 	}
 
-	err = k8sutils.AddNVMeLabels(ctx, s.opts.KubeConfigPath, s.opts.KubeNodeName, "hostnqn-uuid", nvmeInitiators)
-	if err != nil {
-		log.Warnf("Unable to add hostnqn uuid label for node %s: %v", s.opts.KubeNodeName, err.Error())
+	if len(nvmeInitiators) != 0 {
+		err = k8sutils.AddNVMeLabels(ctx, s.opts.KubeConfigPath, s.opts.KubeNodeName, "hostnqn-uuid", nvmeInitiators)
+		if err != nil {
+			log.Warnf("Unable to add hostnqn uuid label for node %s: %v", s.opts.KubeNodeName, err.Error())
+		}
 	}
-
-	// Initialize the Kubernetes client
-	k8sclientset, err := k8sutils.CreateKubeClientSet(s.opts.KubeConfigPath)
-	if err != nil {
-		return fmt.Errorf("failed to create Kubernetes clientset: %v", err.Error())
-	}
-
-	// Check for duplicate uuids
-	s.checkForDuplicateUUIDs(k8sclientset)
 
 	// Setup host on each of available arrays
 	for _, arr := range s.Arrays() {
@@ -1459,6 +1452,17 @@ func (s *Service) setupHost(initiators []string, client gopowerstore.Client, arr
 
 	if s.nodeID == "" {
 		return fmt.Errorf("nodeID not set")
+	}
+
+	if s.useNVME {
+		// Initialize the Kubernetes client
+		k8sclientset, err := k8sutils.CreateKubeClientSet(s.opts.KubeConfigPath)
+		if err != nil {
+			return fmt.Errorf("failed to create Kubernetes clientset: %v", err.Error())
+		}
+
+		// Check for duplicate hostnqn uuids
+		s.checkForDuplicateUUIDs(k8sclientset)
 	}
 
 	reqInitiators := s.buildInitiatorsArray(initiators)
