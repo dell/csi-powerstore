@@ -84,7 +84,7 @@ func TestGetPowerStoreArrays(t *testing.T) {
 	}{
 		{
 			name:    "two arrays",
-			args:    args{data: "./testdata/two-arr.yaml", fs: &fs.Fs{Util: &gofsutil.FS{}}},
+			args:    args{data: "./testdata/two-arr.yaml", fs: &fs.Fs{Util: &gofsutil.FS{SysBlockDir: "/sys/block"}}},
 			wantErr: false,
 			want: map[string]*array.PowerStoreArray{
 				"gid1": {
@@ -107,7 +107,7 @@ func TestGetPowerStoreArrays(t *testing.T) {
 		},
 		{
 			name:    "one array",
-			args:    args{data: "./testdata/one-arr.yaml", fs: &fs.Fs{Util: &gofsutil.FS{}}},
+			args:    args{data: "./testdata/one-arr.yaml", fs: &fs.Fs{Util: &gofsutil.FS{SysBlockDir: "/sys/block"}}},
 			wantErr: false,
 			want: map[string]*array.PowerStoreArray{
 				"gid1": {
@@ -122,7 +122,7 @@ func TestGetPowerStoreArrays(t *testing.T) {
 		},
 		{
 			name:    "empty arrays",
-			args:    args{data: "./testdata/no-arr.yaml", fs: &fs.Fs{Util: &gofsutil.FS{}}},
+			args:    args{data: "./testdata/no-arr.yaml", fs: &fs.Fs{Util: &gofsutil.FS{SysBlockDir: "/sys/block"}}},
 			wantErr: false,
 			want:    map[string]*array.PowerStoreArray{},
 		},
@@ -169,20 +169,20 @@ func TestGetPowerStoreArrays(t *testing.T) {
 	})
 
 	t.Run("incorrect endpoint", func(t *testing.T) {
-		f := &fs.Fs{Util: &gofsutil.FS{}}
+		f := &fs.Fs{Util: &gofsutil.FS{SysBlockDir: "/sys/block"}}
 		_, _, _, err := array.GetPowerStoreArrays(f, "./testdata/incorrect-endpoint.yaml")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "can't get ips from endpoint")
 	})
 
 	t.Run("invalid endpoint", func(t *testing.T) {
-		f := &fs.Fs{Util: &gofsutil.FS{}}
+		f := &fs.Fs{Util: &gofsutil.FS{SysBlockDir: "/sys/block"}}
 		_, _, _, err := array.GetPowerStoreArrays(f, "./testdata/invalid-endpoint.yaml")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "can't get ips from endpoint")
 	})
 	t.Run("no global ID", func(t *testing.T) {
-		f := &fs.Fs{Util: &gofsutil.FS{}}
+		f := &fs.Fs{Util: &gofsutil.FS{SysBlockDir: "/sys/block"}}
 		_, _, _, err := array.GetPowerStoreArrays(f, "./testdata/no-globalID.yaml")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "no GlobalID field found in config.yaml")
@@ -190,7 +190,7 @@ func TestGetPowerStoreArrays(t *testing.T) {
 
 	t.Run("incorrect throttling limit", func(t *testing.T) {
 		_ = os.Setenv(common.EnvThrottlingRateLimit, "abc")
-		f := &fs.Fs{Util: &gofsutil.FS{}}
+		f := &fs.Fs{Util: &gofsutil.FS{SysBlockDir: "/sys/block"}}
 		_, _, _, err := array.GetPowerStoreArrays(f, "./testdata/one-arr.yaml")
 		assert.NoError(t, err)
 	})
@@ -396,7 +396,7 @@ func TestParseVolumeID(t *testing.T) {
 
 func TestLocker_UpdateArrays(t *testing.T) {
 	lck := array.Locker{}
-	err := lck.UpdateArrays("./testdata/one-arr.yaml", &fs.Fs{Util: &gofsutil.FS{}})
+	err := lck.UpdateArrays("./testdata/one-arr.yaml", &fs.Fs{Util: &gofsutil.FS{SysBlockDir: "/sys/block"}})
 	assert.NoError(t, err)
 	assert.Equal(t, lck.DefaultArray().Endpoint, "https://127.0.0.1/api/rest")
 }
