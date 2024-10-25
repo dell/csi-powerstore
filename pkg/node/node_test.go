@@ -273,7 +273,7 @@ func setDefaultNodeLabelsRetrieverMock() {
 	nodeLabelsRetrieverMock.On("GetNodeLabels", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
 	nodeLabelsRetrieverMock.On("InClusterConfig", mock.Anything).Return(nil, nil)
 	nodeLabelsRetrieverMock.On("NewForConfig", mock.Anything).Return(nil, nil)
-	nodeLabelsRetrieverMock.On("GetNVMeUUIDs", mock.Anything, mock.Anything, mock.Anything).Return(map[string]string{}, nil)
+	nodeLabelsRetrieverMock.On("GetNVMeUUIDs", mock.Anything, mock.Anything).Return(map[string]string{}, nil)
 }
 
 var _ = ginkgo.Describe("CSINodeService", func() {

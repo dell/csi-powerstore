@@ -33,7 +33,7 @@ type NodeLabelsRetrieverInterface interface {
 	InClusterConfig() (*rest.Config, error)
 	NewForConfig(config *rest.Config) (*kubernetes.Clientset, error)
 	GetNodeLabels(ctx context.Context, k8sclientset *kubernetes.Clientset, kubeNodeName string) (map[string]string, error)
-	GetNVMeUUIDs(ctx context.Context, k8sclientset *kubernetes.Clientset, kubeNodeName string) (map[string]string, error)
+	GetNVMeUUIDs(ctx context.Context, k8sclientset *kubernetes.Clientset) (map[string]string, error)
 }
 
 // NodeLabelsModifierInterface defines the methods for retrieving Kubernetes Node Labels
@@ -150,14 +150,14 @@ func (svc *NodeLabelsModifierImpl) AddNVMeLabels(ctx context.Context, k8sclients
 }
 
 // GetNVMeUUIDs returns map of hosts with their hostnqn uuids
-func (svc *NodeLabelsRetrieverImpl) GetNVMeUUIDs(ctx context.Context, k8sclientset *kubernetes.Clientset, kubeNodeName string) (map[string]string, error) {
+func (svc *NodeLabelsRetrieverImpl) GetNVMeUUIDs(ctx context.Context, k8sclientset *kubernetes.Clientset) (map[string]string, error) {
 	nodeUUIDs := make(map[string]string)
 	if k8sclientset == nil {
 		return nodeUUIDs, fmt.Errorf("k8sclientset is nil")
 	}
 
 	// Retrieve the list of nodes
-	nodes, err := k8sclientset.CoreV1().Nodes().List(context.Background(), v1.ListOptions{})
+	nodes, err := k8sclientset.CoreV1().Nodes().List(ctx, v1.ListOptions{})
 	if err != nil {
 		return nodeUUIDs, fmt.Errorf("failed to get node list: %v", err.Error())
 	}
@@ -194,11 +194,11 @@ func AddNVMeLabels(ctx context.Context, kubeConfigPath string, kubeNodeName stri
 }
 
 // GetNVMeUUIDs checks for duplicate hostnqn uuid labels in the k8s node
-func GetNVMeUUIDs(ctx context.Context, kubeConfigPath string, kubeNodeName string) (map[string]string, error) {
+func GetNVMeUUIDs(ctx context.Context, kubeConfigPath string) (map[string]string, error) {
 	k8sclientset, err := CreateKubeClientSet(kubeConfigPath)
 	if err != nil {
 		return map[string]string{}, err
 	}
 
-	return NodeLabelsRetriever.GetNVMeUUIDs(ctx, k8sclientset, kubeNodeName)
+	return NodeLabelsRetriever.GetNVMeUUIDs(ctx, k8sclientset)
 }

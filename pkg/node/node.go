@@ -256,7 +256,7 @@ func (s *Service) checkForDuplicateUUIDs() {
 	duplicateUUIDs := make(map[string]string)
 
 	var err error
-	nodeUUIDs, err = k8sutils.GetNVMeUUIDs(context.Background(), s.opts.KubeConfigPath, s.opts.KubeNodeName)
+	nodeUUIDs, err = k8sutils.GetNVMeUUIDs(context.Background(), s.opts.KubeConfigPath)
 	if err != nil {
 		log.Errorf("Unable to check uuids")
 		return
