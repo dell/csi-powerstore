@@ -85,7 +85,6 @@ func (_m *NodeLabelsRetrieverInterface) GetNVMeUUIDs(ctx context.Context, k8scli
 	return r0, r1
 }
 
-
 // GetNodeLabels provides a mock function with given fields: ctx, k8sclientset, kubeNodeName
 func (_m *NodeLabelsRetrieverInterface) GetNodeLabels(ctx context.Context, k8sclientset *kubernetes.Clientset, kubeNodeName string) (map[string]string, error) {
 	ret := _m.Called(k8sclientset, ctx, kubeNodeName)
