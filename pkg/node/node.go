@@ -127,6 +127,13 @@ func (s *Service) Init() error {
 		return nil
 	}
 
+	if len(nvmeInitiators) != 0 {
+		err = k8sutils.AddNVMeLabels(ctx, s.opts.KubeConfigPath, s.opts.KubeNodeName, "hostnqn-uuid", nvmeInitiators)
+		if err != nil {
+			log.Warnf("Unable to add hostnqn uuid label for node %s: %v", s.opts.KubeNodeName, err.Error())
+		}
+	}
+
 	// Setup host on each of available arrays
 	for _, arr := range s.Arrays() {
 		if arr.BlockProtocol == common.NoneTransport {
@@ -240,6 +247,28 @@ func (s *Service) initConnectors() {
 		NVMeOpts["chrootDirectory"] = s.opts.NodeChrootPath
 
 		s.nvmeLib = gonvme.NewNVMe(NVMeOpts)
+	}
+}
+
+// Check for duplicate hostnqn uuids
+func (s *Service) checkForDuplicateUUIDs() {
+	nodeUUIDs := make(map[string]string)
+	duplicateUUIDs := make(map[string]string)
+
+	var err error
+	nodeUUIDs, err = k8sutils.GetNVMeUUIDs(context.Background(), s.opts.KubeConfigPath)
+	if err != nil {
+		log.Errorf("Unable to check uuids")
+		return
+	}
+
+	// Iterate over all nodes to check their uuid
+	for node, uuid := range nodeUUIDs {
+		if existingNode, found := duplicateUUIDs[uuid]; found {
+			log.Errorf("Duplicate hostnqn uuid %s found on nodes: %s and %s", uuid, existingNode, node)
+		} else {
+			duplicateUUIDs[uuid] = node
+		}
 	}
 }
 
@@ -993,12 +1022,29 @@ func (s *Service) nodeExpandRawBlockVolume(ctx context.Context, volumeWWN string
 	if len(deviceNames) > 0 {
 		var devName string
 		for _, deviceName := range deviceNames {
-			devicePath := sysBlock + deviceName
-			log.Infof("Rescanning unmounted (raw block) device %s to expand size", deviceName)
-			err = s.Fs.GetUtil().DeviceRescan(context.Background(), devicePath)
-			if err != nil {
-				log.Errorf("Failed to rescan device (%s) with error (%s)", devicePath, err.Error())
-				return nil, status.Error(codes.Internal, err.Error())
+			if strings.HasPrefix(deviceName, "nvme") {
+				nvmeControllerDevice, err := s.Fs.GetUtil().GetNVMeController(deviceName)
+				if err != nil {
+					log.Errorf("Failed to rescan device (%s) with error (%s)", deviceName, err.Error())
+					return nil, status.Error(codes.Internal, err.Error())
+				}
+				if nvmeControllerDevice != "" {
+					devicePath := dev + nvmeControllerDevice
+					log.Infof("Rescanning unmounted (raw block) device %s to expand size", devicePath)
+					err = s.nvmeLib.DeviceRescan(devicePath)
+					if err != nil {
+						log.Errorf("Failed to rescan device (%s) with error (%s)", devicePath, err.Error())
+						return nil, status.Error(codes.Internal, err.Error())
+					}
+				}
+			} else {
+				devicePath := sysBlock + deviceName
+				log.Infof("Rescanning unmounted (raw block) device %s to expand size", deviceName)
+				err = s.Fs.GetUtil().DeviceRescan(context.Background(), devicePath)
+				if err != nil {
+					log.Errorf("Failed to rescan device (%s) with error (%s)", devicePath, err.Error())
+					return nil, status.Error(codes.Internal, err.Error())
+				}
 			}
 			devName = deviceName
 		}
@@ -1433,7 +1479,13 @@ func (s *Service) setupHost(initiators []string, client gopowerstore.Client, arr
 		return fmt.Errorf("nodeID not set")
 	}
 
+	if s.useNVME[arrayID] {
+		// Check for duplicate hostnqn uuids
+		s.checkForDuplicateUUIDs()
+	}
+
 	reqInitiators := s.buildInitiatorsArray(initiators, arrayID)
+
 	var host *gopowerstore.Host
 	updateCHAP := false
 
