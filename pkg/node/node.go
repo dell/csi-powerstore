@@ -1000,8 +1000,8 @@ func (s *Service) nodeExpandRawBlockVolume(ctx context.Context, volumeWWN string
 					return nil, status.Error(codes.Internal, err.Error())
 				}
 				if nvmeControllerDevice != "" {
-					log.Infof("Rescanning unmounted (raw block) device %s to expand size", deviceName)
 					devicePath := dev + nvmeControllerDevice
+					log.Infof("Rescanning unmounted (raw block) device %s to expand size", devicePath)
 					err = s.nvmeLib.DeviceRescan(devicePath)
 					if err != nil {
 						log.Errorf("Failed to rescan device (%s) with error (%s)", devicePath, err.Error())
@@ -1016,8 +1016,8 @@ func (s *Service) nodeExpandRawBlockVolume(ctx context.Context, volumeWWN string
 					log.Errorf("Failed to rescan device (%s) with error (%s)", devicePath, err.Error())
 					return nil, status.Error(codes.Internal, err.Error())
 				}
-				devName = deviceName
 			}
+			devName = deviceName
 		}
 
 		mpathDev, err := s.Fs.GetUtil().GetMpathNameFromDevice(ctx, devName)
