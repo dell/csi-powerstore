@@ -98,6 +98,7 @@ type UtilInterface interface {
 	ResizeMultipath(ctx context.Context, deviceName string) error
 	FindFSType(ctx context.Context, mountpoint string) (fsType string, err error)
 	GetMpathNameFromDevice(ctx context.Context, device string) (string, error)
+	GetNVMeController(device string) (string, error)
 }
 
 // Fs implementation of FsInterface that uses default os/file calls

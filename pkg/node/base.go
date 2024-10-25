@@ -44,6 +44,7 @@ const (
 	powerStoreMaxNodeNameLength = 64
 	blockVolumePathMarker       = "/csi/volumeDevices/publish/"
 	sysBlock                    = "/sys/block/"
+	dev                         = "/dev/"
 	defaultNodeNamePrefix       = "csi-node"
 	defaultNodeChrootPath       = "/noderoot"
 
