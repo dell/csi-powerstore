@@ -273,7 +273,7 @@ func setDefaultNodeLabelsRetrieverMock() {
 	nodeLabelsRetrieverMock.On("GetNodeLabels", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
 	nodeLabelsRetrieverMock.On("InClusterConfig", mock.Anything).Return(nil, nil)
 	nodeLabelsRetrieverMock.On("NewForConfig", mock.Anything).Return(nil, nil)
-	nodeLabelsRetrieverMock.On("GetNVMeUUIDs", mock.Anything, mock.Anything).Return(map[string]string{}, nil)
+	nodeLabelsRetrieverMock.On("GetNVMeUUIDs", mock.Anything, mock.Anything).Return(nil, nil)
 }
 
 var _ = ginkgo.Describe("CSINodeService", func() {
@@ -623,6 +623,60 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					Return(validNVMEInitiators, nil)
 				fcConnectorMock.On("GetInitiatorPorts", mock.Anything).
 					Return(validFCTargetsWWPN, nil)
+
+				clientMock.On("GetHostByName", mock.Anything, mock.AnythingOfType("string")).
+					Return(gopowerstore.Host{}, gopowerstore.APIError{
+						ErrorMsg: &api.ErrorMsg{
+							StatusCode: http.StatusNotFound,
+						},
+					})
+				clientMock.On("GetHosts", mock.Anything).Return(
+					[]gopowerstore.Host{{
+						ID: "host-id",
+						Initiators: []gopowerstore.InitiatorInstance{{
+							PortName: "not-matching-port-name",
+							PortType: gopowerstore.InitiatorProtocolTypeEnumNVME,
+						}},
+						Name: "host-name",
+					}}, nil)
+
+				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+				clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
+				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
+				clientMock.On("CreateHost", mock.Anything, mock.Anything).
+					Return(gopowerstore.CreateResponse{ID: validHostID}, nil)
+				setDefaultNodeLabelsRetrieverMock()
+
+				err := nodeSvc.Init()
+				gomega.Expect(err).To(gomega.BeNil())
+			})
+
+			ginkgo.It("should create NVMe host and check for duplicate UUIDs", func() {
+				nodeSvc.Arrays()[firstValidIP].BlockProtocol = common.NVMEFCTransport
+				nodeSvc.nodeID = ""
+				nodeSvc.useNVME[firstGlobalID] = true
+				fsMock.On("ReadFile", mock.Anything).Return([]byte("my-host-id"), nil)
+				conn, _ := net.Dial("udp", "127.0.0.1:80")
+				fsMock.On("NetDial", mock.Anything).Return(
+					conn,
+					nil,
+				)
+				iscsiConnectorMock.On("GetInitiatorName", mock.Anything).
+					Return(validISCSIInitiators, nil)
+				nvmeConnectorMock.On("GetInitiatorName", mock.Anything).
+					Return(validNVMEInitiators, nil)
+				fcConnectorMock.On("GetInitiatorPorts", mock.Anything).
+					Return(validFCTargetsWWPN, nil)
+
+				nodeSvc.opts.KubeNodeName = common.EnvKubeNodeName
+				nodeSvc.opts.KubeConfigPath = common.EnvKubeConfigPath
+				nodeLabelsRetrieverMock.On("GetNVMeUUIDs", mock.Anything, mock.Anything).Return(
+					map[string]string{
+						"node1": "duplicate-uuid",
+						"node2": "duplicate-uuid",
+					},
+					nil,
+				)
 
 				clientMock.On("GetHostByName", mock.Anything, mock.AnythingOfType("string")).
 					Return(gopowerstore.Host{}, gopowerstore.APIError{
