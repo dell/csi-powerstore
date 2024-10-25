@@ -32,8 +32,6 @@ import (
 	"strings"
 
 	"github.com/dell/gonvme"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-powerstore/v2/pkg/array"
@@ -253,25 +251,23 @@ func (s *Service) initConnectors() {
 }
 
 // Check for duplicate hostnqn uuids
-func (s *Service) checkForDuplicateUUIDs(k8sclientset *kubernetes.Clientset) {
+func (s *Service) checkForDuplicateUUIDs() {
 	nodeUUIDs := make(map[string]string)
+	duplicateUUIDs := make(map[string]string)
 
-	// Retrieve the list of nodes
-	nodes, err := k8sclientset.CoreV1().Nodes().List(context.Background(), v1.ListOptions{})
+	var err error
+	nodeUUIDs, err = k8sutils.GetNVMeUUIDs(context.Background(), s.opts.KubeConfigPath, s.opts.KubeNodeName)
 	if err != nil {
-		log.Errorf("failed to get node list: %v", err.Error())
+		log.Errorf("Unable to check uuids")
 		return
 	}
 
-	// Iterate over all nodes to check their labels
-	for _, node := range nodes.Items {
-		labels := node.Labels
-		if uuid, exists := labels["hostnqn-uuid"]; exists {
-			if existingNode, found := nodeUUIDs[uuid]; found {
-				log.Errorf("Duplicate hostnqn uuid %s found on nodes: %s and %s", uuid, existingNode, node.Name)
-			} else {
-				nodeUUIDs[uuid] = node.Name
-			}
+	// Iterate over all nodes to check their uuid
+	for node, uuid := range nodeUUIDs {
+		if existingNode, found := duplicateUUIDs[uuid]; found {
+			log.Errorf("Duplicate hostnqn uuid %s found on nodes: %s and %s", uuid, existingNode, node)
+		} else {
+			duplicateUUIDs[uuid] = node
 		}
 	}
 }
@@ -1467,14 +1463,8 @@ func (s *Service) setupHost(initiators []string, client gopowerstore.Client, arr
 	}
 
 	if s.useNVME[arrayID] {
-		// Initialize the Kubernetes client
-		k8sclientset, err := k8sutils.CreateKubeClientSet(s.opts.KubeConfigPath)
-		if err != nil {
-			return fmt.Errorf("failed to create Kubernetes clientset: %v", err.Error())
-		}
-
 		// Check for duplicate hostnqn uuids
-		s.checkForDuplicateUUIDs(k8sclientset)
+		s.checkForDuplicateUUIDs()
 	}
 
 	reqInitiators := s.buildInitiatorsArray(initiators, arrayID)
