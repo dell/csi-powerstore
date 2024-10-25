@@ -18,6 +18,8 @@ package k8sutils
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -31,16 +33,29 @@ type NodeLabelsRetrieverInterface interface {
 	InClusterConfig() (*rest.Config, error)
 	NewForConfig(config *rest.Config) (*kubernetes.Clientset, error)
 	GetNodeLabels(ctx context.Context, k8sclientset *kubernetes.Clientset, kubeNodeName string) (map[string]string, error)
+	GetNVMeUUIDs(ctx context.Context, k8sclientset *kubernetes.Clientset) (map[string]string, error)
+}
+
+// NodeLabelsModifierInterface defines the methods for retrieving Kubernetes Node Labels
+type NodeLabelsModifierInterface interface {
+	AddNVMeLabels(ctx context.Context, k8sclientset *kubernetes.Clientset, kubeNodeName string, labelKey string, labelValue []string) error
 }
 
 // NodeLabelsRetrieverImpl provided the implementation for NodeLabelsRetrieverInterface
 type NodeLabelsRetrieverImpl struct{}
 
+// NodeLabelsModifierImpl provides the implementation for NodeLabelsModifierInterface
+type NodeLabelsModifierImpl struct{}
+
 // NodeLabelsRetriever is the actual instance of NodeLabelsRetrieverInterface which is used to retrieve the node labels
-var NodeLabelsRetriever NodeLabelsRetrieverInterface
+var (
+	NodeLabelsRetriever NodeLabelsRetrieverInterface
+	NodeLabelsModifier  NodeLabelsModifierInterface
+)
 
 func init() {
 	NodeLabelsRetriever = new(NodeLabelsRetrieverImpl)
+	NodeLabelsModifier = new(NodeLabelsModifierImpl)
 }
 
 // BuildConfigFromFlags is a method for building kubernetes client config
@@ -99,6 +114,65 @@ func CreateKubeClientSet(kubeconfig string) (*kubernetes.Clientset, error) {
 	return clientset, nil
 }
 
+// AddNVMeLabels adds a hostnqn uuid label to the specified Kubernetes node
+func (svc *NodeLabelsModifierImpl) AddNVMeLabels(ctx context.Context, k8sclientset *kubernetes.Clientset, kubeNodeName string, labelKey string, labelValue []string) error {
+	if k8sclientset == nil {
+		return fmt.Errorf("k8sclientset is nil")
+	}
+
+	// Get the current node
+	node, err := k8sclientset.CoreV1().Nodes().Get(ctx, kubeNodeName, v1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to get node %s: %v", kubeNodeName, err.Error())
+	}
+
+	// Initialize node labels if it is nil
+	if node.Labels == nil {
+		node.Labels = make(map[string]string)
+	}
+
+	// Fetch the uuids from hostnqns
+	var uuids []string
+	for _, nqn := range labelValue {
+		parts := strings.Split(nqn, ":")
+		if len(parts) == 3 { // nqn format is nqn.yyyy-mm.nvmexpress:uuid:xxxx-yyyy-zzzz
+			uuids = append(uuids, parts[2]) // Extract the UUID
+		}
+	}
+
+	// Update the node with the new labels
+	node.Labels[labelKey] = strings.Join(uuids, ",")
+	_, err = k8sclientset.CoreV1().Nodes().Update(ctx, node, v1.UpdateOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to update node %s labels: %v", kubeNodeName, err.Error())
+	}
+	return nil
+}
+
+// GetNVMeUUIDs returns map of hosts with their hostnqn uuids
+func (svc *NodeLabelsRetrieverImpl) GetNVMeUUIDs(ctx context.Context, k8sclientset *kubernetes.Clientset) (map[string]string, error) {
+	nodeUUIDs := make(map[string]string)
+	if k8sclientset == nil {
+		return nodeUUIDs, fmt.Errorf("k8sclientset is nil")
+	}
+
+	// Retrieve the list of nodes
+	nodes, err := k8sclientset.CoreV1().Nodes().List(ctx, v1.ListOptions{})
+	if err != nil {
+		return nodeUUIDs, fmt.Errorf("failed to get node list: %v", err.Error())
+	}
+
+	// Iterate over all nodes to check their labels
+	for _, node := range nodes.Items {
+		labels := node.Labels
+		if uuid, exists := labels["hostnqn-uuid"]; exists {
+			nodeUUIDs[node.Name] = uuid
+		}
+	}
+
+	return nodeUUIDs, nil
+}
+
 // GetNodeLabels returns labels present in the k8s node
 func GetNodeLabels(ctx context.Context, kubeConfigPath string, kubeNodeName string) (map[string]string, error) {
 	k8sclientset, err := CreateKubeClientSet(kubeConfigPath)
@@ -107,4 +181,24 @@ func GetNodeLabels(ctx context.Context, kubeConfigPath string, kubeNodeName stri
 	}
 
 	return NodeLabelsRetriever.GetNodeLabels(ctx, k8sclientset, kubeNodeName)
+}
+
+// AddNVMeLabels adds a hostnqn uuid label in the k8s node
+func AddNVMeLabels(ctx context.Context, kubeConfigPath string, kubeNodeName string, labelKey string, labelValue []string) error {
+	k8sclientset, err := CreateKubeClientSet(kubeConfigPath)
+	if err != nil {
+		return err
+	}
+
+	return NodeLabelsModifier.AddNVMeLabels(ctx, k8sclientset, kubeNodeName, labelKey, labelValue)
+}
+
+// GetNVMeUUIDs checks for duplicate hostnqn uuid labels in the k8s node
+func GetNVMeUUIDs(ctx context.Context, kubeConfigPath string) (map[string]string, error) {
+	k8sclientset, err := CreateKubeClientSet(kubeConfigPath)
+	if err != nil {
+		return map[string]string{}, err
+	}
+
+	return NodeLabelsRetriever.GetNVMeUUIDs(ctx, k8sclientset)
 }

@@ -59,6 +59,32 @@ func (_m *NodeLabelsRetrieverInterface) BuildConfigFromFlags(masterURL string, k
 	return r0, r1
 }
 
+// GetNVMeUUIDs provides a mock function with given fields: ctx, k8sclientset
+func (_m *NodeLabelsRetrieverInterface) GetNVMeUUIDs(ctx context.Context, k8sclientset *kubernetes.Clientset) (map[string]string, error) {
+	ret := _m.Called(k8sclientset, ctx)
+
+	var r0 map[string]string
+	var r1 error
+	if rf, ok := ret.Get(0).(func(*kubernetes.Clientset, context.Context) (map[string]string, error)); ok {
+		return rf(k8sclientset, ctx)
+	}
+	if rf, ok := ret.Get(0).(func(*kubernetes.Clientset, context.Context) map[string]string); ok {
+		r0 = rf(k8sclientset, ctx)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(map[string]string)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(*kubernetes.Clientset, context.Context) error); ok {
+		r1 = rf(k8sclientset, ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetNodeLabels provides a mock function with given fields: ctx, k8sclientset, kubeNodeName
 func (_m *NodeLabelsRetrieverInterface) GetNodeLabels(ctx context.Context, k8sclientset *kubernetes.Clientset, kubeNodeName string) (map[string]string, error) {
 	ret := _m.Called(k8sclientset, ctx, kubeNodeName)
