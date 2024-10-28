@@ -154,10 +154,6 @@ func main() {
 			if err != nil {
 				log.Fatalf("couldn't initialize arrays in node service: %s", err.Error())
 			}
-			err = nodeService.Init()
-			if err != nil {
-				log.Fatalf("couldn't create node service: %s", err.Error())
-			}
 		}
 	})
 
