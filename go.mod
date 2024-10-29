@@ -7,7 +7,7 @@ toolchain go1.23.2
 require (
 	github.com/akutz/gosync v0.1.0
 	github.com/apparentlymart/go-cidr v1.1.0
-	github.com/container-storage-interface/spec v1.10.0
+	github.com/container-storage-interface/spec v1.6.0
 	github.com/dell/csi-metadata-retriever v1.8.0
 	github.com/dell/dell-csi-extensions/common v1.6.0
 	github.com/dell/dell-csi-extensions/podmon v1.5.0
@@ -22,18 +22,18 @@ require (
 	github.com/fsnotify/fsnotify v1.7.0
 	github.com/go-openapi/strfmt v0.23.0
 	github.com/golang/mock v1.6.0
-	github.com/gorilla/mux v1.8.1
-	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
-	github.com/kubernetes-csi/csi-lib-utils v0.19.0
+	github.com/gorilla/mux v1.8.0
+	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0
+	github.com/kubernetes-csi/csi-lib-utils v0.11.0
 	github.com/onsi/ginkgo v1.16.5
-	github.com/onsi/gomega v1.34.2
+	github.com/onsi/gomega v1.33.1
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/viper v1.19.0
 	github.com/stretchr/testify v1.9.0
 	github.com/uber/jaeger-client-go v2.30.0+incompatible
 	github.com/uber/jaeger-lib v2.4.1+incompatible
-	golang.org/x/net v0.30.0
+	golang.org/x/net v0.29.0
 	google.golang.org/grpc v1.67.1
 	google.golang.org/protobuf v1.35.1
 	gopkg.in/yaml.v3 v3.0.1
@@ -53,7 +53,6 @@ require (
 	github.com/emicklei/go-restful/v3 v3.12.1 // indirect
 	github.com/fxamacker/cbor/v2 v2.7.0 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
-	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-openapi/errors v0.22.0 // indirect
 	github.com/go-openapi/jsonpointer v0.21.0 // indirect
 	github.com/go-openapi/jsonreference v0.21.0 // indirect
@@ -97,10 +96,6 @@ require (
 	go.etcd.io/etcd/client/pkg/v3 v3.5.16 // indirect
 	go.etcd.io/etcd/client/v3 v3.5.16 // indirect
 	go.mongodb.org/mongo-driver v1.17.1 // indirect
-	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.56.0 // indirect
-	go.opentelemetry.io/otel v1.31.0 // indirect
-	go.opentelemetry.io/otel/metric v1.31.0 // indirect
-	go.opentelemetry.io/otel/trace v1.31.0 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.0 // indirect
