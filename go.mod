@@ -8,7 +8,7 @@ require (
 	github.com/akutz/gosync v0.1.0
 	github.com/apparentlymart/go-cidr v1.1.0
 	github.com/container-storage-interface/spec v1.6.0
-	github.com/dell/csi-metadata-retriever v1.8.0
+	github.com/dell/csi-metadata-retriever v1.9.0
 	github.com/dell/dell-csi-extensions/common v1.6.0
 	github.com/dell/dell-csi-extensions/podmon v1.5.0
 	github.com/dell/dell-csi-extensions/replication v1.8.0
