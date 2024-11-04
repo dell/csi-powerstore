@@ -1,0 +1,15 @@
+name: Release CSI PowerStore
+# Invocable as a reusable workflow
+# Can be manually triggered
+on:
+  workflow_call:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (major, minor, patch)'
+        required: true
+        default: 'none'
+jobs:
+  csm-release:
+    uses: dell/common-github-actions/.github/workflows/csm-release-driver-module.yaml@feature/driver-automation
+    name: Release CSM Drivers and Modules
