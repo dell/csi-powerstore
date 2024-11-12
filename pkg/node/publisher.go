@@ -32,7 +32,7 @@ import (
 // VolumePublisher allows to node publish a volume
 type VolumePublisher interface {
 	Publish(ctx context.Context, logFields log.Fields, fs fs.Interface,
-		cap *csi.VolumeCapability, isRO bool, targetPath string, stagingPath string) (*csi.NodePublishVolumeResponse, error)
+		vc *csi.VolumeCapability, isRO bool, targetPath string, stagingPath string) (*csi.NodePublishVolumeResponse, error)
 }
 
 // SCSIPublisher implementation of NodeVolumePublisher for SCSI based (FC, iSCSI) volumes
@@ -41,7 +41,7 @@ type SCSIPublisher struct {
 }
 
 // Publish publishes volume as either raw block or mount by mounting it to the target path
-func (sp *SCSIPublisher) Publish(ctx context.Context, logFields log.Fields, fs fs.Interface, cap *csi.VolumeCapability, isRO bool, targetPath string, stagingPath string) (*csi.NodePublishVolumeResponse, error) {
+func (sp *SCSIPublisher) Publish(ctx context.Context, logFields log.Fields, fs fs.Interface, vc *csi.VolumeCapability, isRO bool, targetPath string, stagingPath string) (*csi.NodePublishVolumeResponse, error) {
 	published, err := isAlreadyPublished(ctx, targetPath, getRWModeString(isRO), fs)
 	if err != nil {
 		return nil, err
@@ -52,9 +52,9 @@ func (sp *SCSIPublisher) Publish(ctx context.Context, logFields log.Fields, fs f
 	}
 
 	if sp.isBlock {
-		return sp.publishBlock(ctx, logFields, fs, cap, isRO, targetPath, stagingPath)
+		return sp.publishBlock(ctx, logFields, fs, vc, isRO, targetPath, stagingPath)
 	}
-	return sp.publishMount(ctx, logFields, fs, cap, isRO, targetPath, stagingPath)
+	return sp.publishMount(ctx, logFields, fs, vc, isRO, targetPath, stagingPath)
 }
 
 func (sp *SCSIPublisher) publishBlock(ctx context.Context, logFields log.Fields, fs fs.Interface, _ *csi.VolumeCapability, isRO bool, targetPath string, stagingPath string) (*csi.NodePublishVolumeResponse, error) {
@@ -79,21 +79,21 @@ func (sp *SCSIPublisher) publishBlock(ctx context.Context, logFields log.Fields,
 	return &csi.NodePublishVolumeResponse{}, nil
 }
 
-func (sp *SCSIPublisher) publishMount(ctx context.Context, logFields log.Fields, fs fs.Interface, cap *csi.VolumeCapability, isRO bool, targetPath string, stagingPath string) (*csi.NodePublishVolumeResponse, error) {
-	if cap.GetAccessMode().GetMode() == csi.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER {
+func (sp *SCSIPublisher) publishMount(ctx context.Context, logFields log.Fields, fs fs.Interface, vc *csi.VolumeCapability, isRO bool, targetPath string, stagingPath string) (*csi.NodePublishVolumeResponse, error) {
+	if vc.GetAccessMode().GetMode() == csi.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER {
 		// MULTI_WRITER not supported for mount volumes
 		return nil, status.Error(codes.Unimplemented, "Mount volumes do not support AccessMode MULTI_NODE_MULTI_WRITER")
 	}
 
-	if cap.GetAccessMode().GetMode() == csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY {
+	if vc.GetAccessMode().GetMode() == csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY {
 		// Warning in case of MULTI_NODE_READER_ONLY for mount volumes
 		log.Warningf("Mount volume with the AccessMode ReadOnlyMany")
 	}
 
 	var opts []string
-	mountCap := cap.GetMount()
+	mountCap := vc.GetMount()
 	mountFsType := mountCap.GetFsType()
-	mntFlags := common.GetMountFlags(cap)
+	mntFlags := common.GetMountFlags(vc)
 	if mountFsType == "xfs" {
 		mntFlags = append(mntFlags, "nouuid")
 	}
@@ -151,7 +151,7 @@ type NFSPublisher struct{}
 
 // Publish publishes nfs volume by mounting it to the target path
 func (np *NFSPublisher) Publish(ctx context.Context, logFields log.Fields, fs fs.Interface,
-	cap *csi.VolumeCapability, isRO bool, targetPath string, stagingPath string,
+	vc *csi.VolumeCapability, isRO bool, targetPath string, stagingPath string,
 ) (*csi.NodePublishVolumeResponse, error) {
 	published, err := isAlreadyPublished(ctx, targetPath, getRWModeString(isRO), fs)
 	if err != nil {
@@ -168,7 +168,7 @@ func (np *NFSPublisher) Publish(ctx context.Context, logFields log.Fields, fs fs
 	}
 	log.WithFields(logFields).Info("target path successfully created")
 
-	mntFlags := common.GetMountFlags(cap)
+	mntFlags := common.GetMountFlags(vc)
 
 	if isRO {
 		mntFlags = append(mntFlags, "ro")
