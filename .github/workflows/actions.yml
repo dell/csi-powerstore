@@ -6,7 +6,7 @@ on:
     branches: [ main ]
 jobs:
   code-check:
-    name: Check Go formatting, vetting
+    name: Check Go formatting, linting, vetting
     runs-on: ubuntu-latest
     steps:
       - name: Checkout the code
