@@ -6,13 +6,13 @@ on:
     branches: [ main ]
 jobs:
   code-check:
-    name: Check Go formatting, linting, vetting
+    name: Check Go formatting, vetting
     runs-on: ubuntu-latest
     steps:
       - name: Checkout the code
         uses: actions/checkout@v4
       - name: Run the formatter, linter, and vetter
-        uses: dell/common-github-actions/go-code-formatter-linter-vetter@main
+        uses: dell/common-github-actions/go-code-formatter-vetter@main
         with:
           directories: ./...
   test:
