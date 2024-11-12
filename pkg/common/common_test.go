@@ -439,3 +439,51 @@ func TestReachableEndPoint(t *testing.T) {
 		})
 	}
 }
+
+func TestGetMountFlags(t *testing.T) {
+    tests := []struct {
+        name     string
+        vc       *csi.VolumeCapability
+        expected []string
+    }{
+        {
+            name:     "Nil VolumeCapability",
+            vc:       nil,
+            expected: nil,
+        },
+        {
+            name:     "Nil Mount",
+            vc:       &csi.VolumeCapability{},
+            expected: nil,
+        },
+        {
+            name: "With Mount Flags",
+            vc: &csi.VolumeCapability{
+                AccessType: &csi.VolumeCapability_Mount{
+                    Mount: &csi.VolumeCapability_MountVolume{
+                        MountFlags: []string{"ro", "noexec"},
+                    },
+                },
+            },
+            expected: []string{"ro", "noexec"},
+        },
+        {
+            name: "Empty Mount Flags",
+            vc: &csi.VolumeCapability{
+                AccessType: &csi.VolumeCapability_Mount{
+                    Mount: &csi.VolumeCapability_MountVolume{
+                        MountFlags: []string{},
+                    },
+                },
+            },
+            expected: []string{},
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            result := GetMountFlags(tt.vc)
+            assert.Equal(t, tt.expected, result)
+        })
+    }
+}
