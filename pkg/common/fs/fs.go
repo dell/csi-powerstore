@@ -117,8 +117,8 @@ func (fs *Fs) OpenFile(name string, flag int, perm os.FileMode) (*os.File, error
 }
 
 // WriteString is a wrapper of file.WriteString
-func (fs *Fs) WriteString(file *os.File, string string) (int, error) {
-	return file.WriteString(string) // #nosec G304
+func (fs *Fs) WriteString(file *os.File, str string) (int, error) {
+	return file.WriteString(str) // #nosec G304
 }
 
 // Create is a wrapper of os.Create
