@@ -525,3 +525,12 @@ func ReachableEndPoint(endpoint string) bool {
 	}
 	return true
 }
+
+func GetMountFlags(cap *csi.VolumeCapability) []string {
+	if cap != nil {
+		if mountCap := cap.GetMount(); mountCap != nil {
+			return mountCap.GetMountFlags()
+		}
+	}
+	return nil
+}

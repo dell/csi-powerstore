@@ -885,7 +885,9 @@ func (s *Service) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolum
 			return nil, status.Error(codes.Internal,
 				fmt.Sprintf("Failed to find mount info for (%s) with error (%s)", vol.Name, err.Error()))
 		}
-		err = s.Fs.GetUtil().Mount(ctx, disklocation, targetmount, "")
+
+		mntFlags := common.GetMountFlags(req.GetVolumeCapability())
+		err = s.Fs.GetUtil().Mount(ctx, disklocation, targetmount, "", mntFlags...)
 		if err != nil {
 			return nil, status.Error(codes.Internal,
 				fmt.Sprintf("Failed to find mount info for (%s) with error (%s)", vol.Name, err.Error()))
