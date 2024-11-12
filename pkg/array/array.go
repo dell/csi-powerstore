@@ -278,7 +278,7 @@ func GetPowerStoreArrays(fs fs.Interface, filePath string) (map[string]*PowerSto
 // It will do that by querying default powerstore array passed as one of the arguments
 func ParseVolumeID(ctx context.Context, volumeHandle string,
 	defaultArray *PowerStoreArray, /*legacy support*/
-	cap *csi.VolumeCapability, /*legacy support*/
+	vc *csi.VolumeCapability, /*legacy support*/
 ) (localVolumeID, arrayID, protocol, remoteVolumeID, remoteArrayID string, e error) {
 	if volumeHandle == "" {
 		return "", "", "", "", "", status.Errorf(codes.FailedPrecondition,
@@ -305,8 +305,8 @@ func ParseVolumeID(ctx context.Context, volumeHandle string,
 		arrayID = defaultArray.GetGlobalID()
 
 		// If we have volume capability in request we can check FsType
-		if cap != nil && cap.GetMount() != nil {
-			if cap.GetMount().GetFsType() == "nfs" {
+		if vc != nil && vc.GetMount() != nil {
+			if vc.GetMount().GetFsType() == "nfs" {
 				protocol = "nfs"
 			} else {
 				protocol = "scsi"
