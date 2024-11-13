@@ -1437,6 +1437,26 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				}))
 			})
 
+			ginkgo.It("should fail to create volume using Metro snapshot as a source with Metro storage class [Block]", func() {
+				contentSource := &csi.VolumeContentSource{Type: &csi.VolumeContentSource_Snapshot{
+					Snapshot: &csi.VolumeContentSource_SnapshotSource{
+						SnapshotId: validBlockVolumeID,
+					},
+				}}
+
+				req := getTypicalCreateVolumeRequest("my-vol", validVolSize)
+				req.VolumeContentSource = contentSource
+				req.Parameters[common.KeyArrayID] = firstValidID
+				req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationEnabled)] = "true"
+				req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationMode)] = "METRO"
+
+				res, err := ctrlSvc.CreateVolume(context.Background(), req)
+
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err).NotTo(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("Configuring Metro is not supported on clones or volumes created from Metro snapshot"))
+			})
+
 			ginkgo.It("should create volume using snapshot as a source [NFS]", func() {
 				snapID := validNfsVolumeID
 				volName := "my-vol"
@@ -1520,6 +1540,29 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 						ContentSource: contentSource,
 					},
 				}))
+			})
+
+			ginkgo.It("should fail to create volume using Metro volume as a source with Metro storage class [Block]", func() {
+				srcID := validBlockVolumeID
+				volName := "my-vol"
+
+				contentSource := &csi.VolumeContentSource{Type: &csi.VolumeContentSource_Volume{
+					Volume: &csi.VolumeContentSource_VolumeSource{
+						VolumeId: srcID,
+					},
+				}}
+
+				req := getTypicalCreateVolumeRequest(volName, validVolSize)
+				req.VolumeContentSource = contentSource
+				req.Parameters[common.KeyArrayID] = firstValidID
+				req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationEnabled)] = "true"
+				req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationMode)] = "METRO"
+
+				res, err := ctrlSvc.CreateVolume(context.Background(), req)
+
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err).NotTo(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("Configuring Metro is not supported on clones or volumes created from Metro snapshot"))
 			})
 
 			ginkgo.It("should create volume using volume as a source [NFS]", func() {
