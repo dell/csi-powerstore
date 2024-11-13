@@ -885,7 +885,9 @@ func (s *Service) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolum
 			return nil, status.Error(codes.Internal,
 				fmt.Sprintf("Failed to find mount info for (%s) with error (%s)", vol.Name, err.Error()))
 		}
-		err = s.Fs.GetUtil().Mount(ctx, disklocation, targetmount, "")
+
+		mntFlags := common.GetMountFlags(req.GetVolumeCapability())
+		err = s.Fs.GetUtil().Mount(ctx, disklocation, targetmount, "", mntFlags...)
 		if err != nil {
 			return nil, status.Error(codes.Internal,
 				fmt.Sprintf("Failed to find mount info for (%s) with error (%s)", vol.Name, err.Error()))
@@ -1072,11 +1074,11 @@ func (s *Service) nodeExpandRawBlockVolume(ctx context.Context, volumeWWN string
 
 // NodeGetCapabilities returns supported features by the node service
 func (s *Service) NodeGetCapabilities(_ context.Context, _ *csi.NodeGetCapabilitiesRequest) (*csi.NodeGetCapabilitiesResponse, error) {
-	newCap := func(cap csi.NodeServiceCapability_RPC_Type) *csi.NodeServiceCapability {
+	newCap := func(capability csi.NodeServiceCapability_RPC_Type) *csi.NodeServiceCapability {
 		return &csi.NodeServiceCapability{
 			Type: &csi.NodeServiceCapability_Rpc{
 				Rpc: &csi.NodeServiceCapability_RPC{
-					Type: cap,
+					Type: capability,
 				},
 			},
 		}

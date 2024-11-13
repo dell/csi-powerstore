@@ -118,7 +118,8 @@ func (s *SCSIStager) Stage(ctx context.Context, req *csi.NodeStageVolumeRequest,
 	}
 	log.WithFields(logFields).Info("target path successfully created")
 
-	if err := fs.GetUtil().BindMount(ctx, devicePath, stagingPath); err != nil {
+	mntFlags := common.GetMountFlags(req.GetVolumeCapability())
+	if err := fs.GetUtil().BindMount(ctx, devicePath, stagingPath, mntFlags...); err != nil {
 		return nil, status.Errorf(codes.Internal,
 			"error bind disk %s to target path: %s", devicePath, err.Error())
 	}
@@ -177,7 +178,8 @@ func (n *NFSStager) Stage(ctx context.Context, req *csi.NodeStageVolumeRequest,
 	}
 	log.WithFields(logFields).Info("stage path successfully created")
 
-	if err := fs.GetUtil().Mount(ctx, nfsExport, stagingPath, ""); err != nil {
+	mntFlags := common.GetMountFlags(req.GetVolumeCapability())
+	if err := fs.GetUtil().Mount(ctx, nfsExport, stagingPath, "", mntFlags...); err != nil {
 		return nil, status.Errorf(codes.Internal,
 			"error mount nfs share %s to target path: %s", nfsExport, err.Error())
 	}

@@ -312,8 +312,8 @@ func deleteMapping(volID, tmpDir string, fs fs.Interface) error {
 	return err
 }
 
-func isBlock(cap *csi.VolumeCapability) bool {
-	_, isBlock := cap.GetAccessType().(*csi.VolumeCapability_Block)
+func isBlock(vc *csi.VolumeCapability) bool {
+	_, isBlock := vc.GetAccessType().(*csi.VolumeCapability_Block)
 	return isBlock
 }
 
