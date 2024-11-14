@@ -130,7 +130,6 @@ func TestGetISCSITargetsInfoFromStorage(t *testing.T) {
 		iscsiTargetsInfo, err := common.GetISCSITargetsInfoFromStorage(clientMock, "")
 		assert.NotNil(t, iscsiTargetsInfo)
 		assert.NoError(t, err)
-
 	})
 }
 
