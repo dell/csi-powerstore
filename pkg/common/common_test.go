@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2021-2024 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,6 +35,7 @@ import (
 	gopowerstoremock "github.com/dell/gopowerstore/mocks"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 func TestCustomLogger(_ *testing.T) {
@@ -116,6 +117,21 @@ func TestGetISCSITargetsInfoFromStorage(t *testing.T) {
 		_, err := common.GetISCSITargetsInfoFromStorage(clientMock, "A1")
 		assert.EqualError(t, err, e.Error())
 	})
+
+	t.Run("no error", func(t *testing.T) {
+		clientMock := new(gopowerstoremock.Client)
+		clientMock.On("GetStorageISCSITargetAddresses", context.Background()).
+			Return([]gopowerstore.IPPoolAddress{
+				{
+					Address: "192.168.1.1",
+					IPPort:  gopowerstore.IPPortInstance{TargetIqn: "iqn"},
+				},
+			}, nil)
+		iscsiTargetsInfo, err := common.GetISCSITargetsInfoFromStorage(clientMock, "")
+		assert.NotNil(t, iscsiTargetsInfo)
+		assert.NoError(t, err)
+
+	})
 }
 
 func TestGetNVMETCPTargetsInfoFromStorage(t *testing.T) {
@@ -127,6 +143,21 @@ func TestGetNVMETCPTargetsInfoFromStorage(t *testing.T) {
 		_, err := common.GetNVMETCPTargetsInfoFromStorage(clientMock, "A1")
 		assert.EqualError(t, err, e.Error())
 	})
+
+	t.Run("no error", func(t *testing.T) {
+		clientMock := new(gopowerstoremock.Client)
+		clientMock.On("GetCluster", context.Background()).Return(gopowerstore.Cluster{}, nil)
+		clientMock.On("GetStorageNVMETCPTargetAddresses", mock.Anything).
+			Return([]gopowerstore.IPPoolAddress{
+				{
+					Address: "192.168.1.1",
+					IPPort:  gopowerstore.IPPortInstance{TargetIqn: "iqn"},
+				},
+			}, nil)
+		nvmetcpTargetInfo, err := common.GetNVMETCPTargetsInfoFromStorage(clientMock, "")
+		assert.NotNil(t, nvmetcpTargetInfo)
+		assert.NoError(t, err)
+	})
 }
 
 func TestGetFCTargetsInfoFromStorage(t *testing.T) {
@@ -136,6 +167,21 @@ func TestGetFCTargetsInfoFromStorage(t *testing.T) {
 		clientMock.On("GetFCPorts", context.Background()).Return([]gopowerstore.FcPort{}, e)
 		_, err := common.GetFCTargetsInfoFromStorage(clientMock, "A1")
 		assert.EqualError(t, err, e.Error())
+	})
+
+	t.Run("no error", func(t *testing.T) {
+		clientMock := new(gopowerstoremock.Client)
+		clientMock.On("GetFCPorts", mock.Anything).
+			Return([]gopowerstore.FcPort{
+				{
+					Wwn:         "58:cc:f0:93:48:a0:03:a3",
+					ApplianceID: "A1",
+					IsLinkUp:    true,
+				},
+			}, nil)
+		fcTargetInfo, err := common.GetFCTargetsInfoFromStorage(clientMock, "A1")
+		assert.NotNil(t, fcTargetInfo)
+		assert.NoError(t, err)
 	})
 }
 
@@ -147,6 +193,13 @@ func TestIsK8sMetadataSupported(t *testing.T) {
 		version := common.IsK8sMetadataSupported(clientMock)
 		assert.Equal(t, version, false)
 	})
+
+	t.Run("no error", func(t *testing.T) {
+		clientMock := new(gopowerstoremock.Client)
+		clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
+		version := common.IsK8sMetadataSupported(clientMock)
+		assert.Equal(t, version, true)
+	})
 }
 
 func TestGetNVMEFCTargetInfoFromStorage(t *testing.T) {
@@ -157,6 +210,21 @@ func TestGetNVMEFCTargetInfoFromStorage(t *testing.T) {
 		clientMock.On("GetFCPorts", context.Background()).Return([]gopowerstore.FcPort{}, e)
 		_, err := common.GetNVMEFCTargetInfoFromStorage(clientMock, "A1")
 		assert.EqualError(t, err, e.Error())
+	})
+
+	t.Run("no error", func(t *testing.T) {
+		clientMock := new(gopowerstoremock.Client)
+		clientMock.On("GetCluster", context.Background()).Return(gopowerstore.Cluster{}, nil)
+		clientMock.On("GetFCPorts", mock.Anything).
+			Return([]gopowerstore.FcPort{
+				{
+					Wwn:      "58:cc:f0:93:48:a0:03:a3",
+					IsLinkUp: true,
+				},
+			}, nil)
+		nvmefcTargetInfo, err := common.GetNVMEFCTargetInfoFromStorage(clientMock, "")
+		assert.NotNil(t, nvmefcTargetInfo)
+		assert.NoError(t, err)
 	})
 }
 
