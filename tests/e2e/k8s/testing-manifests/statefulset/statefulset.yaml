@@ -17,7 +17,7 @@
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: external-access 
+  name: external-access
 spec:
   replicas: 10
   selector:
@@ -29,19 +29,19 @@ spec:
         app: external-access
     spec:
       containers:
-      - name: busybox
-        image: gcr.io/google_containers/busybox:1.27
-        command: ["/bin/sh", "-c", "sleep 3600"]
-        volumeMounts:
-        - name: www
-          mountPath: /data
+        - name: busybox
+          image: gcr.io/google_containers/busybox:1.27
+          command: ["/bin/sh", "-c", "sleep 3600"]
+          volumeMounts:
+            - name: www
+              mountPath: /data
   volumeClaimTemplates:
-  - metadata:
-      name: www
-      annotations:
-        volume.beta.kubernetes.io/storage-class: external-access-sc
-    spec:
-      accessModes: [ "ReadWriteMany" ]
-      resources:
-        requests:
-          storage: 3Gi
+    - metadata:
+        name: www
+        annotations:
+          volume.beta.kubernetes.io/storage-class: external-access-sc
+      spec:
+        accessModes: ["ReadWriteMany"]
+        resources:
+          requests:
+            storage: 3Gi

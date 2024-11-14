@@ -69,7 +69,7 @@ volumeBindingMode: WaitForFirstConsumer
 # replace "12.34.56.78" with PowerStore endpoint IP or abc.com
 # Optional: true
 allowedTopologies:
-  - matchLabelExpressions: 
+  - matchLabelExpressions:
       - key: "csi-powerstore.dellemc.com/12.34.56.78-iscsi"
         values:
           - "true"

@@ -20,10 +20,10 @@ reclaimPolicy: Delete
 volumeBindingMode: Immediate
 allowVolumeExpansion: true
 parameters:
-  # Indicates whether replication is enabled 
+  # Indicates whether replication is enabled
   # Allowed values:
   #   true: replication is enabled
-  #   false: replication is disabled 
+  #   false: replication is disabled
   # Default value: false
   replication.storage.dell.com/isReplicationEnabled: "true"
 

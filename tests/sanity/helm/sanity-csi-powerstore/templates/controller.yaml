@@ -69,7 +69,7 @@ rules:
     resources: ["dellcsivolumegroupsnapshots","dellcsivolumegroupsnapshots/status"]
     verbs: ["create", "list", "watch", "delete", "update"]
   {{- end }}
-  {{- end }} 
+  {{- end }}
   - apiGroups: ["snapshot.storage.k8s.io"]
     resources: ["volumesnapshotclasses"]
     verbs: ["get", "list", "watch"]
@@ -87,7 +87,7 @@ rules:
   {{- else }}
     verbs: ["get", "list", "watch", "update"]
   {{- end }}
-  {{- end }}    
+  {{- end }}
   - apiGroups: ["storage.k8s.io"]
     resources: ["volumeattachments/status"]
     verbs: ["patch"]
