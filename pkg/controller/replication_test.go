@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2021-2024 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -452,7 +452,107 @@ var _ = ginkgo.Describe("Replication", func() {
 					))
 				})
 			})
+			ginkgo.When("the volume group cannot be found", func() {
+				ginkgo.It("should fail to get the volume group", func() {
+					clientMock.On("GetVolume", mock.Anything, validBaseVolID).
+						Return(gopowerstore.Volume{ID: validBaseVolID}, nil)
+					clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).
+						Return(gopowerstore.VolumeGroups{}, gopowerstore.WrapErr(gopowerstore.NewAPIError()))
+
+					req := &csiext.DeleteLocalVolumeRequest{
+						VolumeHandle: validBaseVolID + "/" + firstValidID + "/" + "iscsi",
+					}
+					res, err := ctrlSvc.DeleteLocalVolume(context.Background(), req)
+
+					gomega.Expect(res).To(gomega.BeNil())
+					gomega.Expect(err).ToNot(gomega.BeNil())
+				})
+			})
+			ginkgo.When("the volume is part of volume group", func() {
+				ginkgo.It("should fail to delete the volume", func() {
+					clientMock.On("GetVolume", mock.Anything, validBaseVolID).
+						Return(gopowerstore.Volume{ID: validBaseVolID}, nil)
+					clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).
+						Return(gopowerstore.VolumeGroups{VolumeGroup: []gopowerstore.VolumeGroup{{ID: validGroupID}}}, nil)
+
+					req := &csiext.DeleteLocalVolumeRequest{
+						VolumeHandle: validBaseVolID + "/" + firstValidID + "/" + "iscsi",
+					}
+					res, err := ctrlSvc.DeleteLocalVolume(context.Background(), req)
+
+					gomega.Expect(res).To(gomega.BeNil())
+					gomega.Expect(err).ToNot(gomega.BeNil())
+					gomega.Expect(err.Error()).To(gomega.ContainSubstring(
+						"Unable to delete volume",
+					))
+				})
+			})
+			ginkgo.When("the volume is still protected", func() {
+				ginkgo.It("should fail to delete the volume", func() {
+					clientMock.On("GetVolume", mock.Anything, validBaseVolID).
+						Return(gopowerstore.Volume{ID: validBaseVolID, ProtectionPolicyID: validPolicyID}, nil)
+					clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).
+						Return(gopowerstore.VolumeGroups{}, nil)
+
+					req := &csiext.DeleteLocalVolumeRequest{
+						VolumeHandle: validBaseVolID + "/" + firstValidID + "/" + "iscsi",
+					}
+					res, err := ctrlSvc.DeleteLocalVolume(context.Background(), req)
+
+					gomega.Expect(res).To(gomega.BeNil())
+					gomega.Expect(err).ToNot(gomega.BeNil())
+					gomega.Expect(err.Error()).To(gomega.ContainSubstring(
+						"Unable to delete volume",
+					))
+				})
+			})
+			ginkgo.When("the delete volume call failed", func() {
+				ginkgo.It("should fail to delete the volume", func() {
+					clientMock.On("GetVolume", mock.Anything, validBaseVolID).
+						Return(gopowerstore.Volume{ID: validBaseVolID}, nil)
+					clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).
+						Return(gopowerstore.VolumeGroups{}, nil)
+					clientMock.On("DeleteVolume",
+						mock.Anything,
+						mock.AnythingOfType("*gopowerstore.VolumeDelete"),
+						validBaseVolID).
+						Return(gopowerstore.EmptyResponse(""), gopowerstore.NewAPIError())
+
+					req := &csiext.DeleteLocalVolumeRequest{
+						VolumeHandle: validBaseVolID + "/" + firstValidID + "/" + "iscsi",
+					}
+					res, err := ctrlSvc.DeleteLocalVolume(context.Background(), req)
+
+					gomega.Expect(res).To(gomega.BeNil())
+					gomega.Expect(err).ToNot(gomega.BeNil())
+					gomega.Expect(err.Error()).To(gomega.ContainSubstring(
+						"Unable to delete volume",
+					))
+				})
+			})
+			ginkgo.When("the delete local volume is requested", func() {
+				ginkgo.It("should succeed to delete the local volume", func() {
+					clientMock.On("GetVolume", mock.Anything, validBaseVolID).
+						Return(gopowerstore.Volume{ID: validBaseVolID}, nil)
+					clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).
+						Return(gopowerstore.VolumeGroups{}, nil)
+					clientMock.On("DeleteVolume",
+						mock.Anything,
+						mock.AnythingOfType("*gopowerstore.VolumeDelete"),
+						validBaseVolID).
+						Return(gopowerstore.EmptyResponse(""), nil)
+
+					req := &csiext.DeleteLocalVolumeRequest{
+						VolumeHandle: validBaseVolID + "/" + firstValidID + "/" + "iscsi",
+					}
+					res, err := ctrlSvc.DeleteLocalVolume(context.Background(), req)
+
+					gomega.Expect(err).To(gomega.BeNil())
+					gomega.Expect(res).ToNot(gomega.BeNil())
+				})
+			})
 		})
+
 		ginkgo.Describe("calling DeleteStorageProtectionGroup()", func() {
 			ginkgo.When("GlobalID is missing", func() {
 				ginkgo.It("should fail", func() {

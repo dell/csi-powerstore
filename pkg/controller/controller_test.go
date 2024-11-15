@@ -2136,6 +2136,21 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			})
 		})
 
+		ginkgo.When("the array ID could not found", func() {
+			ginkgo.It("should return error", func() {
+				req := &csi.CreateSnapshotRequest{
+					SourceVolumeId: "39bb1b5f-5624-490d-9ece-18f7b28a904e/globalvolid123/scsi",
+					Name:           validSnapName,
+				}
+
+				res, err := ctrlSvc.CreateSnapshot(context.Background(), req)
+
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to find array with given ID"))
+			})
+		})
+
 		ginkgo.When("snapshot name already taken", func() {
 			ginkgo.It("should fail [sourceVolumeId != snap.sourceVolumeId]", func() {
 				clientMock.On("GetVolume", mock.Anything, validBaseVolID).Return(
@@ -2326,6 +2341,32 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				_, err := ctrlSvc.DeleteSnapshot(context.Background(), req)
 
 				gomega.Expect(err).To(gomega.BeNil())
+			})
+		})
+
+		ginkgo.When("the request is not valid", func() {
+			ginkgo.It("should return error", func() {
+				req := &csi.DeleteSnapshotRequest{
+					SnapshotId: "",
+				}
+
+				_, err := ctrlSvc.DeleteSnapshot(context.Background(), req)
+
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("snapshot ID to be deleted is required"))
+			})
+		})
+
+		ginkgo.When("the array ID could not found", func() {
+			ginkgo.It("should return error", func() {
+				req := &csi.DeleteSnapshotRequest{
+					SnapshotId: "39bb1b5f-5624-490d-9ece-18f7b28a904e/globalvolid123/scsi",
+				}
+
+				_, err := ctrlSvc.DeleteSnapshot(context.Background(), req)
+
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to find array with given ID"))
 			})
 		})
 	})
@@ -4367,6 +4408,26 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				gomega.Expect(err).ToNot(gomega.BeNil())
 				gomega.Expect(res.Confirmed).To(gomega.BeNil())
 				gomega.Expect(err.Error()).To(gomega.ContainSubstring("access mode cannot be UNKNOWN"))
+			})
+		})
+
+		ginkgo.When("resource ID is null", func() {
+			ginkgo.It("should fail", func() {
+				mount := new(csi.VolumeCapability_MountVolume)
+				accessType := new(csi.VolumeCapability_Mount)
+				accessType.Mount = mount
+				_, err := ctrlSvc.ValidateVolumeCapabilities(context.Background(), &csi.ValidateVolumeCapabilitiesRequest{
+					VolumeId:      "",
+					VolumeContext: nil,
+					VolumeCapabilities: []*csi.VolumeCapability{
+						{
+							AccessMode: &csi.VolumeCapability_AccessMode{Mode: csi.VolumeCapability_AccessMode_UNKNOWN},
+							AccessType: accessType,
+						},
+					},
+				})
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("No such volume"))
 			})
 		})
 	})
