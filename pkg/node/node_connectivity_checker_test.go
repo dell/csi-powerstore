@@ -26,6 +26,8 @@ import (
 	"time"
 
 	"github.com/dell/csi-powerstore/v2/pkg/common"
+	"github.com/dell/gopowerstore"
+	"github.com/stretchr/testify/mock"
 )
 
 func TestApiRouter2(t *testing.T) {
@@ -117,4 +119,31 @@ func TestMarshalSyncMapToJSON(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestPopulateTargetsInCache(t *testing.T) {
+	setVariables()
+
+	t.Run("no error", func(t *testing.T) {
+		arrays := getTestArrays()
+		nodeSvc.SetArrays(arrays)
+		nodeSvc.SetDefaultArray(arrays[firstValidIP])
+		clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).Return([]gopowerstore.IPPoolAddress{
+			{
+				Address: "192.168.1.1",
+				IPPort:  gopowerstore.IPPortInstance{TargetIqn: "iqn"},
+			},
+		}, nil)
+		clientMock.On("GetCluster", mock.Anything).
+			Return(gopowerstore.Cluster{
+				Name:    validClusterName,
+				NVMeNQN: validNVMEInitiators[0],
+			}, nil)
+		// Call the function to populate targets in cache
+		nodeSvc.populateTargetsInCache(arrays[firstValidIP])
+		// Validate the cache content
+		if len(nodeSvc.iscsiTargets[arrays[firstValidIP].GlobalID]) == 0 {
+			t.Errorf("Expected targets to be populated for GlobalID")
+		}
+	})
 }
