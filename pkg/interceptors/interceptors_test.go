@@ -25,6 +25,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/akutz/gosync"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	csictx "github.com/dell/gocsi/context"
 	"github.com/stretchr/testify/assert"
@@ -132,4 +133,50 @@ func TestNewCustomSerialLock(t *testing.T) {
 			&csi.CreateVolumeRequest{Name: validNfsVolumeID})
 		assert.Nil(t, err)
 	})
+}
+
+func TestGetLockWithName(t *testing.T) {
+	// Test case: Requesting a lock for a name that doesn't exist
+	i := &lockProvider{
+		volNameLocks: map[string]gosync.TryLocker{},
+	}
+	lock, err := i.GetLockWithName(context.Background(), "test")
+	if err != nil {
+		t.Errorf("Expected no error, got %v", err)
+	}
+	if lock == nil {
+		t.Error("Expected a lock, got nil")
+	}
+
+	// Test case: Requesting a lock for a name that already exists
+	lock2, err := i.GetLockWithName(context.Background(), "test")
+	if err != nil {
+		t.Errorf("Expected no error, got %v", err)
+	}
+	if lock2 != lock {
+		t.Error("Expected the same lock, got a different lock")
+	}
+}
+
+func TestGetLockWithID(t *testing.T) {
+	// Test case: Get lock for an ID that doesn't exist
+	i := &lockProvider{
+		volIDLocks: map[string]gosync.TryLocker{},
+	}
+	lock, err := i.GetLockWithID(context.Background(), "test")
+	if err != nil {
+		t.Errorf("Expected no error, got %v", err)
+	}
+	if lock == nil {
+		t.Error("Expected a lock, got nil")
+	}
+
+	// Test case: Get lock for an ID that already exists
+	lock2, err := i.GetLockWithID(context.Background(), "test")
+	if err != nil {
+		t.Errorf("Expected no error, got %v", err)
+	}
+	if lock2 != lock {
+		t.Error("Expected the same lock, got a different lock")
+	}
 }

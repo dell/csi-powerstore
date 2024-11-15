@@ -2108,6 +2108,34 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			})
 		})
 
+		ginkgo.When("snapshot name is empty", func() {
+			ginkgo.It("should fail", func() {
+				req := &csi.CreateSnapshotRequest{
+					SourceVolumeId: validBlockVolumeID,
+					Name:           "",
+				}
+
+				res, err := ctrlSvc.CreateSnapshot(context.Background(), req)
+				gomega.Expect(err).To(gomega.HaveOccurred())
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("name cannot be empty"))
+			})
+		})
+
+		ginkgo.When("snapshot volume sourceVolID is empty", func() {
+			ginkgo.It("should fail [sourceVolumeId is empty]", func() {
+				req := &csi.CreateSnapshotRequest{
+					SourceVolumeId: "",
+					Name:           validSnapName,
+				}
+
+				res, err := ctrlSvc.CreateSnapshot(context.Background(), req)
+				gomega.Expect(err).To(gomega.HaveOccurred())
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("volume ID to be snapped is required"))
+			})
+		})
+
 		ginkgo.When("snapshot name already taken", func() {
 			ginkgo.It("should fail [sourceVolumeId != snap.sourceVolumeId]", func() {
 				clientMock.On("GetVolume", mock.Anything, validBaseVolID).Return(
