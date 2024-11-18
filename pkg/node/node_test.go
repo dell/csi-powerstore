@@ -30,6 +30,8 @@ import (
 	"testing"
 
 	"github.com/onsi/ginkgo/reporters"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-powerstore/v2/mocks"
@@ -4364,4 +4366,79 @@ func getNodeVolumeExpandValidRequest(volid string, isBlock bool) *csi.NodeExpand
 		},
 	}
 	return &req
+}
+
+func TestNodeGetVolumeStats(t *testing.T) {
+	setVariables()
+
+	ctx := context.Background()
+
+	tests := []struct {
+		name        string
+		req         *csi.NodeGetVolumeStatsRequest
+		setupMocks  func()
+		expectedErr error
+	}{
+		{
+			name: "missing volume ID",
+			req: &csi.NodeGetVolumeStatsRequest{
+				VolumePath: validTargetPath,
+			},
+			setupMocks:  func() {},
+			expectedErr: status.Error(codes.InvalidArgument, "no volume ID provided"),
+		},
+		{
+			name: "missing volume path",
+			req: &csi.NodeGetVolumeStatsRequest{
+				VolumeId: validBlockVolumeID,
+			},
+			setupMocks:  func() {},
+			expectedErr: status.Error(codes.InvalidArgument, "no volume Path provided"),
+		},
+		{
+			name: "successful volume stats retrieval",
+			req: &csi.NodeGetVolumeStatsRequest{
+				VolumeId:   validBlockVolumeID,
+				VolumePath: validTargetPath,
+			},
+			setupMocks: func() {
+				clientMock.On("GetCluster", mock.Anything).Return(gopowerstore.Cluster{
+					Name:    validClusterName,
+					NVMeNQN: validNVMEInitiators[0],
+				}, nil)
+				clientMock.On("GetVolume", mock.Anything, mock.Anything).Return(gopowerstore.Volume{
+					Description: "",
+					ID:          validBlockVolumeID,
+					Name:        "name",
+					Size:        controller.MaxVolumeSizeBytes / 200,
+				}, nil)
+				clientMock.On("GetHostVolumeMappingByVolumeID", mock.Anything, mock.Anything).Return([]gopowerstore.HostVolumeMapping{
+					{
+						HostGroupID:       "validHostGroupID",
+						HostID:            "validHostID",
+						ID:                "id",
+						LogicalUnitNumber: 0,
+						VolumeID:          "validVolID",
+					},
+				}, nil)
+				clientMock.On("GetHost", mock.Anything, mock.Anything).Return(gopowerstore.Host{
+					Name: "host-name",
+				}, nil)
+			},
+			expectedErr: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.setupMocks()
+			resp, err := nodeSvc.NodeGetVolumeStats(ctx, tt.req)
+			if err != nil && err.Error() != tt.expectedErr.Error() {
+				t.Errorf("expected error %v, got %v", tt.expectedErr, err)
+			}
+			if err == nil && resp == nil {
+				t.Errorf("expected response, got nil")
+			}
+		})
+	}
 }
