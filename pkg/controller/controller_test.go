@@ -879,7 +879,10 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 
 				clientMock.On("ConfigureMetroVolume", mock.Anything, validBaseVolID, configureMetroRequest).
 					Return(gopowerstore.MetroSessionResponse{}, gopowerstore.APIError{
-						ErrorMsg: &api.ErrorMsg{StatusCode: http.StatusBadRequest}})
+						ErrorMsg: &api.ErrorMsg{
+							StatusCode: http.StatusBadRequest,
+						},
+					})
 				clientMock.On("GetVolume", context.Background(), mock.Anything).
 					Return(gopowerstore.Volume{ApplianceID: validApplianceID, MetroReplicationSessionID: validSessionID}, nil)
 				clientMock.On("GetAppliance", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
@@ -4242,7 +4245,8 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 					Return(gopowerstore.Volume{}, gopowerstore.APIError{
 						ErrorMsg: &api.ErrorMsg{
 							StatusCode: http.StatusBadRequest,
-						}})
+						},
+					})
 
 				req := &csi.ListSnapshotsRequest{
 					SnapshotId: validBlockVolumeID,
@@ -4273,7 +4277,8 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 					Return(gopowerstore.FileSystem{}, gopowerstore.APIError{
 						ErrorMsg: &api.ErrorMsg{
 							StatusCode: http.StatusBadRequest,
-						}})
+						},
+					})
 
 				req := &csi.ListSnapshotsRequest{
 					SnapshotId: validNfsVolumeID,
