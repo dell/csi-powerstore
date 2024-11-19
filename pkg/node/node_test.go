@@ -4677,7 +4677,8 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					{
 						Device: validDevName,
 						Path:   validTargetPath,
-					}}, nil)
+					},
+				}, nil)
 
 				req := &csi.NodeGetVolumeStatsRequest{
 					VolumeId:          validBlockVolumeID,
