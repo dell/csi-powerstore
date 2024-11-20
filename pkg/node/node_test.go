@@ -287,7 +287,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 		ginkgo.When("there is no suitable host", func() {
 			ginkgo.It("should create this host", func() {
 				nodeSvc.nodeID = ""
-
+				_ = csictx.Setenv(context.Background(), common.EnvPodmonEnabled, "true")
 				fsMock.On("ReadFile", mock.Anything).Return([]byte("my-host-id"), nil)
 				conn, _ := net.Dial("udp", "127.0.0.1:80")
 				fsMock.On("NetDial", mock.Anything).Return(
@@ -795,6 +795,77 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				gomega.Expect(nodeSvc.useFC[firstGlobalID]).To(gomega.BeFalse())
 				gomega.Expect(nodeSvc.useNVME[secondGlobalID]).To(gomega.BeTrue())
 				gomega.Expect(nodeSvc.useFC[secondGlobalID]).To(gomega.BeTrue())
+			})
+
+			ginkgo.It("should set useNVME/useFC when transport is not set", func() {
+				nodeSvc.useNVME[firstGlobalID] = false
+				nodeSvc.useFC[firstGlobalID] = false
+				nodeSvc.nodeID = ""
+				fsMock.On("ReadFile", mock.Anything).Return([]byte("my-host-id"), nil)
+				conn, _ := net.Dial("udp", "127.0.0.1:80")
+				fsMock.On("NetDial", mock.Anything).Return(conn, nil)
+				iscsiConnectorMock.On("GetInitiatorName", mock.Anything).
+					Return(validISCSIInitiators, nil)
+				nvmeConnectorMock.On("GetInitiatorName", mock.Anything).
+					Return(validNVMEInitiators, nil)
+				fcConnectorMock.On("GetInitiatorPorts", mock.Anything).
+					Return(validFCTargetsWWPN, nil)
+
+				clientMock.On("GetHostByName", mock.Anything, mock.AnythingOfType("string")).
+					Return(gopowerstore.Host{}, gopowerstore.APIError{
+						ErrorMsg: &api.ErrorMsg{
+							StatusCode: http.StatusNotFound,
+						},
+					})
+
+				clientMock.On("GetHosts", mock.Anything).Return(
+					[]gopowerstore.Host{{
+						ID: "host-id",
+						Initiators: []gopowerstore.InitiatorInstance{{
+							PortName: "not-matching-port-name",
+							PortType: gopowerstore.InitiatorProtocolTypeEnumNVME,
+						}},
+						Name: "host-name",
+					}}, nil)
+
+				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+				clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
+				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
+				clientMock.On("CreateHost", mock.Anything, mock.Anything).
+					Return(gopowerstore.CreateResponse{ID: validHostID}, nil)
+				setDefaultNodeLabelsRetrieverMock()
+
+				nodeSvc.Arrays()[firstValidIP].BlockProtocol = "default_protocol"
+
+				err := nodeSvc.Init()
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(nodeSvc.useNVME[firstGlobalID]).To(gomega.BeTrue())
+				gomega.Expect(nodeSvc.useFC[firstGlobalID]).To(gomega.BeTrue())
+			})
+
+		})
+
+		ginkgo.When("using NFS when length of all initiators is 0", func() {
+			ginkgo.It("should probe successfully", func() {
+				nodeSvc.nodeID = ""
+				// setup mocks
+				fsMock.On("ReadFile", mock.Anything).Return([]byte("my-host-id"), nil)
+				conn, _ := net.Dial("udp", "127.0.0.1:80")
+				fsMock.On("NetDial", mock.Anything).Return(conn, nil)
+				iscsiConnectorMock.On("GetInitiatorName", mock.Anything).
+					Return([]string{}, nil)
+				nvmeConnectorMock.On("GetInitiatorName", mock.Anything).
+					Return([]string{}, nil)
+				fcConnectorMock.On("GetInitiatorPorts", mock.Anything).
+					Return([]string{}, nil)
+
+				err := nodeSvc.Init()
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(nodeSvc.useNVME[firstGlobalID]).To(gomega.BeFalse())
+				gomega.Expect(nodeSvc.useFC[firstGlobalID]).To(gomega.BeFalse())
+				gomega.Expect(nodeSvc.useNVME[secondGlobalID]).To(gomega.BeFalse())
+				gomega.Expect(nodeSvc.useFC[secondGlobalID]).To(gomega.BeFalse())
+				gomega.Expect(nodeSvc.useNFS).To(gomega.BeTrue())
 			})
 		})
 	})
