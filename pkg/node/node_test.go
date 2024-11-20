@@ -842,7 +842,6 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				gomega.Expect(nodeSvc.useNVME[firstGlobalID]).To(gomega.BeTrue())
 				gomega.Expect(nodeSvc.useFC[firstGlobalID]).To(gomega.BeTrue())
 			})
-
 		})
 
 		ginkgo.When("using NFS when length of all initiators is 0", func() {
