@@ -287,7 +287,6 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 		ginkgo.When("there is no suitable host", func() {
 			ginkgo.It("should create this host", func() {
 				nodeSvc.nodeID = ""
-				_ = csictx.Setenv(context.Background(), common.EnvPodmonEnabled, "true")
 				fsMock.On("ReadFile", mock.Anything).Return([]byte("my-host-id"), nil)
 				conn, _ := net.Dial("udp", "127.0.0.1:80")
 				fsMock.On("NetDial", mock.Anything).Return(
@@ -1671,6 +1670,24 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				gomega.Expect(err.Error()).To(gomega.ContainSubstring("NVMeFC Targets data must be in publish context"))
 			})
 
+			ginkgo.It("should fail [nvmetcpTargets]", func() {
+				nodeSvc.useNVME[firstGlobalID] = true
+				nodeSvc.useFC[firstGlobalID] = false
+				res, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
+					VolumeId: validBlockVolumeID,
+					PublishContext: map[string]string{
+						common.PublishContextDeviceWWN:  validDeviceWWN,
+						common.PublishContextLUNAddress: validLUNID,
+					},
+					StagingTargetPath: nodeStagePrivateDir,
+					VolumeCapability: getCapabilityWithVoltypeAccessFstype(
+						"mount", "single-writer", "ext4"),
+				})
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("NVMeTCP Targets data must be in publish context"))
+			})
+
 			ginkgo.It("should fail [fcTargets]", func() {
 				nodeSvc.useFC[firstGlobalID] = true
 				res, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
@@ -1735,6 +1752,113 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				gomega.Expect(err).ToNot(gomega.BeNil())
 				gomega.Expect(res).To(gomega.BeNil())
 				gomega.Expect(err.Error()).To(gomega.ContainSubstring("error bind disk"))
+			})
+		})
+
+		ginkgo.When("when mount call fails [NFS]", func() {
+			publishContext := getValidPublishContext()
+			publishContext["NfsExportPath"] = validNfsExportPath
+			var req *csi.NodeStageVolumeRequest
+			ginkgo.BeforeEach(func() {
+				req = &csi.NodeStageVolumeRequest{
+					VolumeId:          validNfsVolumeID,
+					PublishContext:    publishContext,
+					StagingTargetPath: nodeStagePrivateDir,
+					VolumeCapability: getCapabilityWithVoltypeAccessFstype(
+						"mount", "multi-writer", "nfs"),
+				}
+			})
+
+			ginkgo.It("should fail [MkdirAll target folder]", func() {
+				stagingPath := filepath.Join(nodeStagePrivateDir, validBaseVolumeID)
+				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
+				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
+				fsMock.On("MkdirAll", stagingPath, mock.Anything).Return(errors.New("some-error"))
+
+				res, err := nodeSvc.NodeStageVolume(context.Background(), req)
+
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("can't create target folder"))
+			})
+
+			ginkgo.It("should fail [Mount]", func() {
+				stagingPath := filepath.Join(nodeStagePrivateDir, validBaseVolumeID)
+				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
+				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
+				fsMock.On("MkdirAll", stagingPath, mock.Anything).Return(nil).Once()
+				fsMock.On("GetUtil").Return(utilMock)
+				utilMock.On("Mount", mock.Anything, validNfsExportPath, stagingPath, "").Return(errors.New("some-error"))
+
+				res, err := nodeSvc.NodeStageVolume(context.Background(), req)
+
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("error mount nfs share"))
+			})
+
+			ginkgo.It("should fail [MkdirAll common folder]", func() {
+				stagingPath := filepath.Join(nodeStagePrivateDir, validBaseVolumeID)
+				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
+				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
+				fsMock.On("MkdirAll", stagingPath, mock.Anything).Return(nil).Once()
+				fsMock.On("GetUtil").Return(utilMock)
+				utilMock.On("Mount", mock.Anything, validNfsExportPath, stagingPath, "").Return(nil)
+				fsMock.On("MkdirAll", filepath.Join(stagingPath, commonNfsVolumeFolder), mock.Anything).Return(errors.New("some-error"))
+
+				res, err := nodeSvc.NodeStageVolume(context.Background(), req)
+
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("can't create common folder"))
+			})
+
+			ginkgo.It("should fail [Chmod]", func() {
+				stagingPath := filepath.Join(nodeStagePrivateDir, validBaseVolumeID)
+				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
+				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
+				fsMock.On("MkdirAll", stagingPath, mock.Anything).Return(nil).Once()
+				fsMock.On("GetUtil").Return(utilMock)
+				utilMock.On("Mount", mock.Anything, validNfsExportPath, stagingPath, "").Return(nil)
+				fsMock.On("MkdirAll", filepath.Join(stagingPath, commonNfsVolumeFolder), mock.Anything).Return(nil)
+				fsMock.On("Chmod", filepath.Join(stagingPath, commonNfsVolumeFolder), os.ModeSticky|os.ModePerm).Return(errors.New("some-error"))
+
+				res, err := nodeSvc.NodeStageVolume(context.Background(), req)
+
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("can't change permissions of folder"))
+			})
+		})
+
+		ginkgo.When("when ModifyNFSExport call fails [NFS]", func() {
+			ginkgo.It("should fail", func() {
+				stagingPath := filepath.Join(nodeStagePrivateDir, validBaseVolumeID)
+				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
+				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
+				fsMock.On("MkdirAll", stagingPath, mock.Anything).Return(nil).Once()
+				fsMock.On("GetUtil").Return(utilMock)
+				utilMock.On("Mount", mock.Anything, validNfsExportPath, stagingPath, "").Return(nil)
+				fsMock.On("MkdirAll", filepath.Join(stagingPath, commonNfsVolumeFolder), mock.Anything).Return(nil)
+				fsMock.On("Chmod", filepath.Join(stagingPath, commonNfsVolumeFolder), os.ModeSticky|os.ModePerm).Return(nil)
+				clientMock.On("ModifyNFSExport", mock.Anything, mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{}, errors.New("some-error"))
+
+				publishContext := getValidPublishContext()
+				publishContext["NfsExportPath"] = validNfsExportPath
+				publishContext["allowRoot"] = "false"
+				publishContext["NatIP"] = "192.168.1.1"
+				req := &csi.NodeStageVolumeRequest{
+					VolumeId:          validNfsVolumeID,
+					PublishContext:    publishContext,
+					StagingTargetPath: nodeStagePrivateDir,
+					VolumeCapability: getCapabilityWithVoltypeAccessFstype(
+						"mount", "multi-writer", "nfs"),
+				}
+				res, err := nodeSvc.NodeStageVolume(context.Background(), req)
+
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("failure when modifying nfs export"))
 			})
 		})
 	})
@@ -2137,7 +2261,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					PublishContext:    getValidPublishContext(),
 					StagingTargetPath: validStagingPath,
 					TargetPath:        validTargetPath,
-					VolumeCapability:  getCapabilityWithVoltypeAccessFstype("mount", "single-writer", ""),
+					VolumeCapability:  getCapabilityWithVoltypeAccessFstype("mount", "multiple-reader", ""),
 					Readonly:          false,
 				})
 				gomega.Expect(err.Error()).To(gomega.ContainSubstring("can't create target dir"))
@@ -2207,6 +2331,22 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					Readonly:          false,
 				})
 				gomega.Expect(err.Error()).To(gomega.ContainSubstring("can't format staged device"))
+			})
+		})
+		ginkgo.When("publishing block volume as mount with multi-writer", func() {
+			ginkgo.It("should fail", func() {
+				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil)
+				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
+
+				_, err := nodeSvc.NodePublishVolume(context.Background(), &csi.NodePublishVolumeRequest{
+					VolumeId:          validBlockVolumeID,
+					PublishContext:    getValidPublishContext(),
+					StagingTargetPath: validStagingPath,
+					TargetPath:        validTargetPath,
+					VolumeCapability:  getCapabilityWithVoltypeAccessFstype("mount", "multiple-writer", ""),
+					Readonly:          false,
+				})
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("Mount volumes do not support AccessMode MULTI_NODE_MULTI_WRITER"))
 			})
 		})
 		ginkgo.When("publishing block volume as raw block", func() {
@@ -2288,6 +2428,44 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					Readonly:          false,
 				})
 				gomega.Expect(err.Error()).To(gomega.ContainSubstring("error bind disk"))
+			})
+		})
+		ginkgo.When("publishing block and unable to get target mounts", func() {
+			ginkgo.It("should fail", func() {
+				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, errors.New("fail"))
+
+				_, err := nodeSvc.NodePublishVolume(context.Background(), &csi.NodePublishVolumeRequest{
+					VolumeId:          validBlockVolumeID,
+					PublishContext:    getValidPublishContext(),
+					StagingTargetPath: validStagingPath,
+					TargetPath:        validTargetPath,
+					VolumeCapability:  getCapabilityWithVoltypeAccessFstype("block", "single-writer", "ext4"),
+					Readonly:          false,
+				})
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("can't check mounts for path"))
+			})
+		})
+		ginkgo.When("publishing block but volume already mounted with different capabilities", func() {
+			ginkgo.It("should fail", func() {
+				mountInfo := []gofsutil.Info{
+					{
+						Device: validDevName,
+						Path:   validTargetPath,
+						Opts:   []string{"ro"},
+					},
+				}
+				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil)
+				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return(mountInfo, nil)
+
+				_, err := nodeSvc.NodePublishVolume(context.Background(), &csi.NodePublishVolumeRequest{
+					VolumeId:          validBlockVolumeID,
+					PublishContext:    getValidPublishContext(),
+					StagingTargetPath: validStagingPath,
+					TargetPath:        validTargetPath,
+					VolumeCapability:  getCapabilityWithVoltypeAccessFstype("block", "single-writer", "ext4"),
+					Readonly:          false,
+				})
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("volume already mounted but with different capabilities"))
 			})
 		})
 		ginkgo.When("publishing nfs volume", func() {
