@@ -27,6 +27,7 @@ import (
 
 	"github.com/akutz/gosync"
 	"github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/dell/csi-powerstore/v2/pkg/common"
 	csictx "github.com/dell/gocsi/context"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
@@ -178,5 +179,26 @@ func TestGetLockWithID(t *testing.T) {
 	}
 	if lock2 != lock {
 		t.Error("Expected the same lock, got a different lock")
+	}
+}
+
+func TestCreateMetadataRetrieverClient(t *testing.T) {
+	// Create a new interceptor
+	i := &interceptor{
+		opts: opts{
+			MetadataSidecarClient: nil,
+		},
+	}
+
+	// Create a new context with the environment variable set
+	ctx := context.WithValue(context.Background(), csictx.RequestIDKey, "requestID")
+	ctx = csictx.WithEnviron(ctx, []string{fmt.Sprintf("%s=%s", common.EnvMetadataRetrieverEndpoint, "endpoint")})
+
+	// Call the function
+	i.createMetadataRetrieverClient(ctx)
+
+	// Check if the client was created
+	if i.opts.MetadataSidecarClient == nil {
+		t.Error("Expected MetadataSidecarClient to be set, but it was nil")
 	}
 }
