@@ -28,7 +28,7 @@
 #
 # After that you can uninstall the testing PVCs and StatefulSet
 # > kubectl delete -f ./tests/simple/
-# 
+#
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -41,7 +41,7 @@ metadata:
   namespace: testpowerstore
 spec:
   accessModes:
-  - ReadWriteOnce
+    - ReadWriteOnce
   volumeMode: Filesystem
   resources:
     requests:
@@ -55,7 +55,7 @@ metadata:
   namespace: testpowerstore
 spec:
   accessModes:
-  - ReadWriteOnce
+    - ReadWriteOnce
   volumeMode: Filesystem
   resources:
     requests:
@@ -79,44 +79,44 @@ spec:
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-    name: powerstoretest
-    namespace: testpowerstore
+  name: powerstoretest
+  namespace: testpowerstore
 ---
 kind: StatefulSet
 apiVersion: apps/v1
 metadata:
-    name: powerstoretest
-    namespace: testpowerstore
+  name: powerstoretest
+  namespace: testpowerstore
 spec:
-    serviceName: powerstoretest
-    selector:
-        matchLabels:
-          app: powerstoretest
-    template:
-      metadata:
-        labels:
-          app: powerstoretest
-      spec:
-        serviceAccount: powerstoretest
-        hostNetwork: true
-        containers:
-          - name: test
-            image: quay.io/centos/centos:latest
-            command: [ "/bin/sleep", "3600" ]
-            volumeMounts:
-              - mountPath: "/data0"
-                name: pvol0
-              - mountPath: "/data1"
-                name: pvol1
-              - mountPath: "/data2"
-                name: pvol2
-        volumes:
-          - name: pvol0
-            persistentVolumeClaim:
-              claimName: pvol0
-          - name: pvol1
-            persistentVolumeClaim:
-              claimName: pvol1
-          - name: pvol2
-            persistentVolumeClaim:
-              claimName: pvol2
+  serviceName: powerstoretest
+  selector:
+    matchLabels:
+      app: powerstoretest
+  template:
+    metadata:
+      labels:
+        app: powerstoretest
+    spec:
+      serviceAccount: powerstoretest
+      hostNetwork: true
+      containers:
+        - name: test
+          image: quay.io/centos/centos:latest
+          command: ["/bin/sleep", "3600"]
+          volumeMounts:
+            - mountPath: "/data0"
+              name: pvol0
+            - mountPath: "/data1"
+              name: pvol1
+            - mountPath: "/data2"
+              name: pvol2
+      volumes:
+        - name: pvol0
+          persistentVolumeClaim:
+            claimName: pvol0
+        - name: pvol1
+          persistentVolumeClaim:
+            claimName: pvol1
+        - name: pvol2
+          persistentVolumeClaim:
+            claimName: pvol2

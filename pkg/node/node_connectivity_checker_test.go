@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2022-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2022-2024 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,12 +20,15 @@ package node
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/dell/csi-powerstore/v2/pkg/common"
+	"github.com/dell/gopowerstore"
+	"github.com/stretchr/testify/mock"
 )
 
 func TestApiRouter2(t *testing.T) {
@@ -117,4 +120,113 @@ func TestMarshalSyncMapToJSON(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestPopulateTargetsInCache(t *testing.T) {
+	t.Run("PopulateTargetsInCache - iscsiTargets should be populated [iSCSI]", func(t *testing.T) {
+		setVariables()
+
+		clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
+			Return([]gopowerstore.IPPoolAddress{
+				{
+					Address: "192.168.1.1",
+					IPPort:  gopowerstore.IPPortInstance{TargetIqn: "iqn"},
+				},
+			}, nil)
+
+		nodeSvc.populateTargetsInCache(nodeSvc.Arrays()[firstValidIP])
+
+		if len(nodeSvc.iscsiTargets[firstGlobalID]) != 1 {
+			t.Errorf("Expected iscsiTargets to be populated")
+		}
+	})
+
+	t.Run("PopulateTargetsInCache - nvmeTargets should be populated [NVMeTCP]", func(t *testing.T) {
+		setVariables()
+		nodeSvc.useNVME[firstGlobalID] = true
+
+		clientMock.On("GetCluster", mock.Anything).
+			Return(gopowerstore.Cluster{Name: validClusterName}, nil)
+		clientMock.On("GetStorageNVMETCPTargetAddresses", mock.Anything).
+			Return([]gopowerstore.IPPoolAddress{
+				{
+					Address: "192.168.1.1",
+					IPPort:  gopowerstore.IPPortInstance{TargetIqn: "iqn"},
+				},
+			}, nil)
+
+		nodeSvc.populateTargetsInCache(nodeSvc.Arrays()[firstValidIP])
+
+		if len(nodeSvc.nvmeTargets[firstGlobalID]) != 1 {
+			t.Errorf("Expected nvmeTargets to be populated")
+		}
+	})
+
+	t.Run("PopulateTargetsInCache - nvmeTargets should be populated [NVMeFC]", func(t *testing.T) {
+		setVariables()
+		nodeSvc.useNVME[firstGlobalID] = true
+		nodeSvc.useFC[firstGlobalID] = true
+
+		clientMock.On("GetCluster", mock.Anything).
+			Return(gopowerstore.Cluster{Name: validClusterName}, nil)
+		clientMock.On("GetFCPorts", mock.Anything).
+			Return([]gopowerstore.FcPort{
+				{
+					Wwn:      "58:cc:f0:93:48:a0:03:a3",
+					IsLinkUp: true,
+				},
+			}, nil)
+
+		nodeSvc.populateTargetsInCache(nodeSvc.Arrays()[firstValidIP])
+
+		if len(nodeSvc.nvmeTargets[firstGlobalID]) != 1 {
+			t.Errorf("Expected nvmeTargets to be populated")
+		}
+	})
+
+	t.Run("PopulateTargetsInCache - iscsiTargets should not be populated [iSCSI]", func(t *testing.T) {
+		setVariables()
+
+		clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
+			Return([]gopowerstore.IPPoolAddress{}, errors.New("some error"))
+
+		nodeSvc.populateTargetsInCache(nodeSvc.Arrays()[firstValidIP])
+
+		if len(nodeSvc.iscsiTargets[firstGlobalID]) != 0 {
+			t.Errorf("Expected iscsiTargets to be empty upon error")
+		}
+	})
+
+	t.Run("PopulateTargetsInCache - nvmeTargets should not be populated [NVMeTCP]", func(t *testing.T) {
+		setVariables()
+		nodeSvc.useNVME[firstGlobalID] = true
+
+		clientMock.On("GetCluster", mock.Anything).
+			Return(gopowerstore.Cluster{Name: validClusterName}, nil)
+		clientMock.On("GetStorageNVMETCPTargetAddresses", mock.Anything).
+			Return([]gopowerstore.IPPoolAddress{}, errors.New("some error"))
+
+		nodeSvc.populateTargetsInCache(nodeSvc.Arrays()[firstValidIP])
+
+		if len(nodeSvc.nvmeTargets[firstGlobalID]) != 0 {
+			t.Errorf("Expected nvmeTargets to be empty upon error")
+		}
+	})
+
+	t.Run("PopulateTargetsInCache - nvmeTargets should not be populated [NVMeFC]", func(t *testing.T) {
+		setVariables()
+		nodeSvc.useNVME[firstGlobalID] = true
+		nodeSvc.useFC[firstGlobalID] = true
+
+		clientMock.On("GetCluster", mock.Anything).
+			Return(gopowerstore.Cluster{Name: validClusterName}, nil)
+		clientMock.On("GetFCPorts", mock.Anything).
+			Return([]gopowerstore.FcPort{}, errors.New("some error"))
+
+		nodeSvc.populateTargetsInCache(nodeSvc.Arrays()[firstValidIP])
+
+		if len(nodeSvc.nvmeTargets[firstGlobalID]) != 0 {
+			t.Errorf("Expected nvmeTargets to be empty upon error")
+		}
+	})
 }
