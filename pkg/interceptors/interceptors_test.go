@@ -20,6 +20,7 @@ package interceptors
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"testing"
@@ -27,9 +28,13 @@ import (
 
 	"github.com/akutz/gosync"
 	"github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/dell/csi-metadata-retriever/retriever"
 	"github.com/dell/csi-powerstore/v2/pkg/common"
+	controller "github.com/dell/csi-powerstore/v2/pkg/controller"
 	csictx "github.com/dell/gocsi/context"
+	"github.com/dell/gocsi/middleware/serialvolume/types"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 )
@@ -201,4 +206,120 @@ func TestCreateMetadataRetrieverClient(t *testing.T) {
 	if i.opts.MetadataSidecarClient == nil {
 		t.Error("Expected MetadataSidecarClient to be set, but it was nil")
 	}
+}
+
+// Define the options struct
+type options struct {
+	locker                types.VolumeLockerProvider
+	MetadataSidecarClient MetadataSidecarClient
+	timeout               time.Duration
+}
+
+// Define the Locker interface
+type Locker interface {
+	GetLockWithID(ctx context.Context, id string) (gosync.TryLocker, error)
+}
+
+// Define the MetadataSidecarClient interface
+type MetadataSidecarClient interface {
+	GetPVCLabels(ctx context.Context, req *retriever.GetPVCLabelsRequest) (*retriever.GetPVCLabelsResponse, error)
+}
+
+// Mock implementations for dependencies
+type MockLocker struct {
+	mock.Mock
+}
+
+func (m *MockLocker) GetLockWithID(ctx context.Context, id string) (gosync.TryLocker, error) {
+	args := m.Called(ctx, id)
+	return args.Get(0).(gosync.TryLocker), args.Error(1)
+}
+
+func (m *MockLocker) GetLockWithName(ctx context.Context, name string) (gosync.TryLocker, error) {
+	args := m.Called(ctx, name)
+	return args.Get(0).(gosync.TryLocker), args.Error(1)
+}
+
+type MockLock struct {
+	mock.Mock
+}
+
+func (m *MockLock) TryLock(timeout time.Duration) bool {
+	args := m.Called(timeout)
+	return args.Bool(0)
+}
+
+func (m *MockLock) Unlock() {
+	m.Called()
+}
+
+func (m *MockLock) Close() error {
+	args := m.Called()
+	return args.Error(0)
+}
+
+// Add the Lock method to satisfy the gosync.TryLocker interface
+func (m *MockLock) Lock() {
+	m.Called()
+}
+
+type MockMetadataSidecarClient struct {
+	mock.Mock
+}
+
+func (m *MockMetadataSidecarClient) GetPVCLabels(ctx context.Context, req *retriever.GetPVCLabelsRequest) (*retriever.GetPVCLabelsResponse, error) {
+	args := m.Called(ctx, req)
+	return args.Get(0).(*retriever.GetPVCLabelsResponse), args.Error(1)
+}
+
+func TestCreateVolume(t *testing.T) {
+	ctx := context.Background()
+	req := &csi.CreateVolumeRequest{
+		Name: "test-volume",
+		Parameters: map[string]string{
+			controller.KeyCSIPVCName:      "test-pvc",
+			controller.KeyCSIPVCNamespace: "default",
+		},
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return "success", nil
+	}
+
+	mockLocker := new(MockLocker)
+	mockLock := new(MockLock)
+	mockMetadataClient := new(MockMetadataSidecarClient)
+
+	interceptor := &interceptor{
+		opts: opts{
+			locker:                mockLocker,
+			MetadataSidecarClient: mockMetadataClient,
+			timeout:               5 * time.Second,
+		},
+	}
+
+	t.Run("successful volume creation", func(t *testing.T) {
+		mockLocker.On("GetLockWithID", ctx, req.Name).Return(mockLock, nil)
+		mockLock.On("TryLock", interceptor.opts.timeout).Return(true)
+		mockLock.On("Unlock").Return()
+		mockLock.On("Close").Return(nil)
+		mockMetadataClient.On("GetPVCLabels", ctx, mock.Anything).Return(&retriever.GetPVCLabelsResponse{
+			Parameters: map[string]string{"label1": "value1"},
+		}, nil)
+
+		res, err := interceptor.createVolume(ctx, req, nil, handler)
+		assert.NoError(t, err)
+		assert.Equal(t, "success", res)
+	})
+
+	t.Run("metadata retrieval failure", func(t *testing.T) {
+		mockLocker.On("GetLockWithID", ctx, req.Name).Return(mockLock, nil)
+		mockLock.On("TryLock", interceptor.opts.timeout).Return(true)
+		mockLock.On("Unlock").Return()
+		mockLock.On("Close").Return(nil)
+		mockMetadataClient.On("GetPVCLabels", ctx, mock.Anything).Return(nil, errors.New("metadata error"))
+
+		res, err := interceptor.createVolume(ctx, req, nil, handler)
+		assert.NoError(t, err)
+		assert.Equal(t, "success", res)
+	})
 }
