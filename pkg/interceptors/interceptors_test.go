@@ -281,7 +281,7 @@ func TestCreateVolume(t *testing.T) {
 			controller.KeyCSIPVCNamespace: "default",
 		},
 	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(_ context.Context, _ interface{}) (interface{}, error) {
 		return "success", nil
 	}
 
