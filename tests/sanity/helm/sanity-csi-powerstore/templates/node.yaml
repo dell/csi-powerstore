@@ -1,4 +1,5 @@
-#
+# yamllint disable-file
+# This file is not valid YAML because it is a Helm template
 #
 # Copyright © 2020-2024 Dell Inc. or its subsidiaries. All Rights Reserved.
 #

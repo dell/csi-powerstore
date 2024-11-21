@@ -25,10 +25,10 @@ parameters:
   # replicationPrefix paramater in values.yaml must be used as prefix for all replication parameters in storage class
   # for e.g., all replication parameters have prefix: replication.storage.dell.com here
 
-  # replication.storage.dell.com/isReplicationEnabled: 
+  # replication.storage.dell.com/isReplicationEnabled:
   # Allowed values:
   #   true: replication is enabled
-  #   false: replication is disabled 
+  #   false: replication is disabled
   # Optional: true
   # Default value: false
   replication.storage.dell.com/isReplicationEnabled: "true"
@@ -42,14 +42,14 @@ parameters:
   # Default value: "ASYNC"
   replication.storage.dell.com/mode: "ASYNC"
 
-  # replication.storage.dell.com/remoteStorageClassName: 
+  # replication.storage.dell.com/remoteStorageClassName:
   # Allowed values: string
   # Optional: true
   # Default value: None
   replication.storage.dell.com/remoteStorageClassName: "powerstore-replication"
 
   # replication.storage.dell.com/remoteClusterID: point to correct remote cluster id
-  # Allowed values: string 
+  # Allowed values: string
   # Optional: true
   # Default value: None
   replication.storage.dell.com/remoteClusterID: "tgt-cluster-id"
@@ -74,7 +74,7 @@ parameters:
   # Optional: true
   # Default value: None
   replication.storage.dell.com/ignoreNamespaces: "false"
-  
+
   # replication.storage.dell.com/volumeGroupPrefix: volume group prefix
   # Allowed values: string
   # Optional: true

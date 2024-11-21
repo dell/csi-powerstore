@@ -182,10 +182,10 @@ const (
 	SyncMode = "SYNC"
 	// AsyncMode indicats Asynchronous Replication
 	AsyncMode = "ASYNC"
+	// MetroMode indicates Metro Replication
+	MetroMode = "METRO"
 	// Zero indicates value zero for RPO
 	Zero = "Zero"
-	// Metro indicates Metro mode
-	Metro = "METRO"
 
 	contextLogFieldsKey key = iota
 

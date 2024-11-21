@@ -65,24 +65,26 @@ var (
 )
 
 const (
-	validBaseVolumeID   = "39bb1b5f-5624-490d-9ece-18f7b28a904e"
-	validBlockVolumeID  = "39bb1b5f-5624-490d-9ece-18f7b28a904e/gid1/scsi"
-	validClusterName    = "localSystemName"
-	validNfsVolumeID    = "39bb1b5f-5624-490d-9ece-18f7b28a904e/gid2/nfs"
-	validRemoteVolID    = "9f840c56-96e6-4de9-b5a3-27e7c20eaa77"
-	validVolSize        = 16 * 1024 * 1024 * 1024
-	validLUNID          = "3"
-	validLUNIDINT       = 3
-	nodeStagePrivateDir = "test/stage"
-	unimplementedErrMsg = "rpc error: code = Unimplemented desc = "
-	validNodeID         = "csi-node-1a47a1b91c444a8a90193d8066669603-127.0.0.1"
-	validHostID         = "e8f4c5f8-c2fc-4df4-bd99-c292c12b55be"
-	testErrMsg          = "test err"
-	validDeviceWWN      = "68ccf09800e23ab798312a05426acae0"
-	validDevPath        = "/dev/sdag"
-	validDevName        = "sdag"
-	validNfsExportPath  = "/mnt/nfs"
-	validTargetPath     = "/var/lib/kubelet/pods/dac33335-a31d-11e9-b46e-005056917428/" +
+	validBaseVolumeID    = "39bb1b5f-5624-490d-9ece-18f7b28a904e"
+	validBlockVolumeID   = "39bb1b5f-5624-490d-9ece-18f7b28a904e/gid1/scsi"
+	validClusterName     = "localSystemName"
+	validNfsVolumeID     = "39bb1b5f-5624-490d-9ece-18f7b28a904e/gid2/nfs"
+	validRemoteVolID     = "9f840c56-96e6-4de9-b5a3-27e7c20eaa77"
+	invalidBlockVolumeID = "39bb1b5f-5624-490d-9ece-18f7b28a904e/gid3/scsi"
+	validVolSize         = 16 * 1024 * 1024 * 1024
+	validLUNID           = "3"
+	validLUNIDINT        = 3
+	nodeStagePrivateDir  = "test/stage"
+	unimplementedErrMsg  = "rpc error: code = Unimplemented desc = "
+	validNodeID          = "csi-node-1a47a1b91c444a8a90193d8066669603-127.0.0.1"
+	validHostID          = "e8f4c5f8-c2fc-4df4-bd99-c292c12b55be"
+	validHostName        = "csi-node-1a47a1b91c444a8a90193d8066669603"
+	testErrMsg           = "test err"
+	validDeviceWWN       = "68ccf09800e23ab798312a05426acae0"
+	validDevPath         = "/dev/sdag"
+	validDevName         = "sdag"
+	validNfsExportPath   = "/mnt/nfs"
+	validTargetPath      = "/var/lib/kubelet/pods/dac33335-a31d-11e9-b46e-005056917428/" +
 		"volumes/kubernetes.io~csi/csi-d91431aba3/mount"
 	validStagingPath = "/var/lib/kubelet/plugins/kubernetes.io/csi/volumeDevices/" +
 		"staging/csi-44b46e98ae/c875b4f0-172e-4238-aec7-95b379eb55db"
@@ -285,7 +287,6 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 		ginkgo.When("there is no suitable host", func() {
 			ginkgo.It("should create this host", func() {
 				nodeSvc.nodeID = ""
-
 				fsMock.On("ReadFile", mock.Anything).Return([]byte("my-host-id"), nil)
 				conn, _ := net.Dial("udp", "127.0.0.1:80")
 				fsMock.On("NetDial", mock.Anything).Return(
@@ -793,6 +794,76 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				gomega.Expect(nodeSvc.useFC[firstGlobalID]).To(gomega.BeFalse())
 				gomega.Expect(nodeSvc.useNVME[secondGlobalID]).To(gomega.BeTrue())
 				gomega.Expect(nodeSvc.useFC[secondGlobalID]).To(gomega.BeTrue())
+			})
+
+			ginkgo.It("should set useNVME/useFC when transport is not set", func() {
+				nodeSvc.useNVME[firstGlobalID] = false
+				nodeSvc.useFC[firstGlobalID] = false
+				nodeSvc.nodeID = ""
+				fsMock.On("ReadFile", mock.Anything).Return([]byte("my-host-id"), nil)
+				conn, _ := net.Dial("udp", "127.0.0.1:80")
+				fsMock.On("NetDial", mock.Anything).Return(conn, nil)
+				iscsiConnectorMock.On("GetInitiatorName", mock.Anything).
+					Return(validISCSIInitiators, nil)
+				nvmeConnectorMock.On("GetInitiatorName", mock.Anything).
+					Return(validNVMEInitiators, nil)
+				fcConnectorMock.On("GetInitiatorPorts", mock.Anything).
+					Return(validFCTargetsWWPN, nil)
+
+				clientMock.On("GetHostByName", mock.Anything, mock.AnythingOfType("string")).
+					Return(gopowerstore.Host{}, gopowerstore.APIError{
+						ErrorMsg: &api.ErrorMsg{
+							StatusCode: http.StatusNotFound,
+						},
+					})
+
+				clientMock.On("GetHosts", mock.Anything).Return(
+					[]gopowerstore.Host{{
+						ID: "host-id",
+						Initiators: []gopowerstore.InitiatorInstance{{
+							PortName: "not-matching-port-name",
+							PortType: gopowerstore.InitiatorProtocolTypeEnumNVME,
+						}},
+						Name: "host-name",
+					}}, nil)
+
+				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+				clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
+				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
+				clientMock.On("CreateHost", mock.Anything, mock.Anything).
+					Return(gopowerstore.CreateResponse{ID: validHostID}, nil)
+				setDefaultNodeLabelsRetrieverMock()
+
+				nodeSvc.Arrays()[firstValidIP].BlockProtocol = "default_protocol"
+
+				err := nodeSvc.Init()
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(nodeSvc.useNVME[firstGlobalID]).To(gomega.BeTrue())
+				gomega.Expect(nodeSvc.useFC[firstGlobalID]).To(gomega.BeTrue())
+			})
+		})
+
+		ginkgo.When("using NFS when length of all initiators is 0", func() {
+			ginkgo.It("should probe successfully", func() {
+				nodeSvc.nodeID = ""
+				// setup mocks
+				fsMock.On("ReadFile", mock.Anything).Return([]byte("my-host-id"), nil)
+				conn, _ := net.Dial("udp", "127.0.0.1:80")
+				fsMock.On("NetDial", mock.Anything).Return(conn, nil)
+				iscsiConnectorMock.On("GetInitiatorName", mock.Anything).
+					Return([]string{}, nil)
+				nvmeConnectorMock.On("GetInitiatorName", mock.Anything).
+					Return([]string{}, nil)
+				fcConnectorMock.On("GetInitiatorPorts", mock.Anything).
+					Return([]string{}, nil)
+
+				err := nodeSvc.Init()
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(nodeSvc.useNVME[firstGlobalID]).To(gomega.BeFalse())
+				gomega.Expect(nodeSvc.useFC[firstGlobalID]).To(gomega.BeFalse())
+				gomega.Expect(nodeSvc.useNVME[secondGlobalID]).To(gomega.BeFalse())
+				gomega.Expect(nodeSvc.useFC[secondGlobalID]).To(gomega.BeFalse())
+				gomega.Expect(nodeSvc.useNFS).To(gomega.BeTrue())
 			})
 		})
 	})
@@ -1442,6 +1513,21 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 			})
 		})
 
+		ginkgo.When("invalid array ID", func() {
+			ginkgo.It("should fail", func() {
+				req := &csi.NodeStageVolumeRequest{
+					VolumeCapability:  getCapabilityWithVoltypeAccessFstype("mount", "single-writer", "ext4"),
+					StagingTargetPath: nodeStagePrivateDir,
+					VolumeId:          invalidBlockVolumeID,
+				}
+
+				res, err := nodeSvc.NodeStageVolume(context.Background(), req)
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err).NotTo(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("can't find array with ID"))
+			})
+		})
+
 		ginkgo.When("missing volume stage path", func() {
 			ginkgo.It("should fail", func() {
 				req := &csi.NodeStageVolumeRequest{
@@ -1584,6 +1670,24 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				gomega.Expect(err.Error()).To(gomega.ContainSubstring("NVMeFC Targets data must be in publish context"))
 			})
 
+			ginkgo.It("should fail [nvmetcpTargets]", func() {
+				nodeSvc.useNVME[firstGlobalID] = true
+				nodeSvc.useFC[firstGlobalID] = false
+				res, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
+					VolumeId: validBlockVolumeID,
+					PublishContext: map[string]string{
+						common.PublishContextDeviceWWN:  validDeviceWWN,
+						common.PublishContextLUNAddress: validLUNID,
+					},
+					StagingTargetPath: nodeStagePrivateDir,
+					VolumeCapability: getCapabilityWithVoltypeAccessFstype(
+						"mount", "single-writer", "ext4"),
+				})
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("NVMeTCP Targets data must be in publish context"))
+			})
+
 			ginkgo.It("should fail [fcTargets]", func() {
 				nodeSvc.useFC[firstGlobalID] = true
 				res, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
@@ -1650,6 +1754,113 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				gomega.Expect(err.Error()).To(gomega.ContainSubstring("error bind disk"))
 			})
 		})
+
+		ginkgo.When("when mount call fails [NFS]", func() {
+			publishContext := getValidPublishContext()
+			publishContext["NfsExportPath"] = validNfsExportPath
+			var req *csi.NodeStageVolumeRequest
+			ginkgo.BeforeEach(func() {
+				req = &csi.NodeStageVolumeRequest{
+					VolumeId:          validNfsVolumeID,
+					PublishContext:    publishContext,
+					StagingTargetPath: nodeStagePrivateDir,
+					VolumeCapability: getCapabilityWithVoltypeAccessFstype(
+						"mount", "multi-writer", "nfs"),
+				}
+			})
+
+			ginkgo.It("should fail [MkdirAll target folder]", func() {
+				stagingPath := filepath.Join(nodeStagePrivateDir, validBaseVolumeID)
+				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
+				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
+				fsMock.On("MkdirAll", stagingPath, mock.Anything).Return(errors.New("some-error"))
+
+				res, err := nodeSvc.NodeStageVolume(context.Background(), req)
+
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("can't create target folder"))
+			})
+
+			ginkgo.It("should fail [Mount]", func() {
+				stagingPath := filepath.Join(nodeStagePrivateDir, validBaseVolumeID)
+				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
+				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
+				fsMock.On("MkdirAll", stagingPath, mock.Anything).Return(nil).Once()
+				fsMock.On("GetUtil").Return(utilMock)
+				utilMock.On("Mount", mock.Anything, validNfsExportPath, stagingPath, "").Return(errors.New("some-error"))
+
+				res, err := nodeSvc.NodeStageVolume(context.Background(), req)
+
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("error mount nfs share"))
+			})
+
+			ginkgo.It("should fail [MkdirAll common folder]", func() {
+				stagingPath := filepath.Join(nodeStagePrivateDir, validBaseVolumeID)
+				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
+				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
+				fsMock.On("MkdirAll", stagingPath, mock.Anything).Return(nil).Once()
+				fsMock.On("GetUtil").Return(utilMock)
+				utilMock.On("Mount", mock.Anything, validNfsExportPath, stagingPath, "").Return(nil)
+				fsMock.On("MkdirAll", filepath.Join(stagingPath, commonNfsVolumeFolder), mock.Anything).Return(errors.New("some-error"))
+
+				res, err := nodeSvc.NodeStageVolume(context.Background(), req)
+
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("can't create common folder"))
+			})
+
+			ginkgo.It("should fail [Chmod]", func() {
+				stagingPath := filepath.Join(nodeStagePrivateDir, validBaseVolumeID)
+				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
+				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
+				fsMock.On("MkdirAll", stagingPath, mock.Anything).Return(nil).Once()
+				fsMock.On("GetUtil").Return(utilMock)
+				utilMock.On("Mount", mock.Anything, validNfsExportPath, stagingPath, "").Return(nil)
+				fsMock.On("MkdirAll", filepath.Join(stagingPath, commonNfsVolumeFolder), mock.Anything).Return(nil)
+				fsMock.On("Chmod", filepath.Join(stagingPath, commonNfsVolumeFolder), os.ModeSticky|os.ModePerm).Return(errors.New("some-error"))
+
+				res, err := nodeSvc.NodeStageVolume(context.Background(), req)
+
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("can't change permissions of folder"))
+			})
+		})
+
+		ginkgo.When("when ModifyNFSExport call fails [NFS]", func() {
+			ginkgo.It("should fail", func() {
+				stagingPath := filepath.Join(nodeStagePrivateDir, validBaseVolumeID)
+				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
+				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
+				fsMock.On("MkdirAll", stagingPath, mock.Anything).Return(nil).Once()
+				fsMock.On("GetUtil").Return(utilMock)
+				utilMock.On("Mount", mock.Anything, validNfsExportPath, stagingPath, "").Return(nil)
+				fsMock.On("MkdirAll", filepath.Join(stagingPath, commonNfsVolumeFolder), mock.Anything).Return(nil)
+				fsMock.On("Chmod", filepath.Join(stagingPath, commonNfsVolumeFolder), os.ModeSticky|os.ModePerm).Return(nil)
+				clientMock.On("ModifyNFSExport", mock.Anything, mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{}, errors.New("some-error"))
+
+				publishContext := getValidPublishContext()
+				publishContext["NfsExportPath"] = validNfsExportPath
+				publishContext["allowRoot"] = "false"
+				publishContext["NatIP"] = "192.168.1.1"
+				req := &csi.NodeStageVolumeRequest{
+					VolumeId:          validNfsVolumeID,
+					PublishContext:    publishContext,
+					StagingTargetPath: nodeStagePrivateDir,
+					VolumeCapability: getCapabilityWithVoltypeAccessFstype(
+						"mount", "multi-writer", "nfs"),
+				}
+				res, err := nodeSvc.NodeStageVolume(context.Background(), req)
+
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("failure when modifying nfs export"))
+			})
+		})
 	})
 
 	ginkgo.Describe("calling NodeUnstage()", func() {
@@ -1712,6 +1923,13 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					StagingTargetPath: "",
 				})
 				gomega.Expect(err.Error()).To(gomega.ContainSubstring("staging target path is required"))
+			})
+			ginkgo.It("should fail, invalid array ID", func() {
+				_, err := nodeSvc.NodeUnstageVolume(context.Background(), &csi.NodeUnstageVolumeRequest{
+					VolumeId:          invalidBlockVolumeID,
+					StagingTargetPath: nodeStagePrivateDir,
+				})
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("can't find array with ID"))
 			})
 			ginkgo.It("should fail, because no mounts [iSCSI]", func() {
 				mountInfo := []gofsutil.Info{
@@ -2043,7 +2261,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					PublishContext:    getValidPublishContext(),
 					StagingTargetPath: validStagingPath,
 					TargetPath:        validTargetPath,
-					VolumeCapability:  getCapabilityWithVoltypeAccessFstype("mount", "single-writer", ""),
+					VolumeCapability:  getCapabilityWithVoltypeAccessFstype("mount", "multiple-reader", ""),
 					Readonly:          false,
 				})
 				gomega.Expect(err.Error()).To(gomega.ContainSubstring("can't create target dir"))
@@ -2113,6 +2331,22 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					Readonly:          false,
 				})
 				gomega.Expect(err.Error()).To(gomega.ContainSubstring("can't format staged device"))
+			})
+		})
+		ginkgo.When("publishing block volume as mount with multi-writer", func() {
+			ginkgo.It("should fail", func() {
+				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil)
+				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
+
+				_, err := nodeSvc.NodePublishVolume(context.Background(), &csi.NodePublishVolumeRequest{
+					VolumeId:          validBlockVolumeID,
+					PublishContext:    getValidPublishContext(),
+					StagingTargetPath: validStagingPath,
+					TargetPath:        validTargetPath,
+					VolumeCapability:  getCapabilityWithVoltypeAccessFstype("mount", "multiple-writer", ""),
+					Readonly:          false,
+				})
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("Mount volumes do not support AccessMode MULTI_NODE_MULTI_WRITER"))
 			})
 		})
 		ginkgo.When("publishing block volume as raw block", func() {
@@ -2194,6 +2428,44 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					Readonly:          false,
 				})
 				gomega.Expect(err.Error()).To(gomega.ContainSubstring("error bind disk"))
+			})
+		})
+		ginkgo.When("publishing block and unable to get target mounts", func() {
+			ginkgo.It("should fail", func() {
+				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, errors.New("fail"))
+
+				_, err := nodeSvc.NodePublishVolume(context.Background(), &csi.NodePublishVolumeRequest{
+					VolumeId:          validBlockVolumeID,
+					PublishContext:    getValidPublishContext(),
+					StagingTargetPath: validStagingPath,
+					TargetPath:        validTargetPath,
+					VolumeCapability:  getCapabilityWithVoltypeAccessFstype("block", "single-writer", "ext4"),
+					Readonly:          false,
+				})
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("can't check mounts for path"))
+			})
+		})
+		ginkgo.When("publishing block but volume already mounted with different capabilities", func() {
+			ginkgo.It("should fail", func() {
+				mountInfo := []gofsutil.Info{
+					{
+						Device: validDevName,
+						Path:   validTargetPath,
+						Opts:   []string{"ro"},
+					},
+				}
+				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil)
+				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return(mountInfo, nil)
+
+				_, err := nodeSvc.NodePublishVolume(context.Background(), &csi.NodePublishVolumeRequest{
+					VolumeId:          validBlockVolumeID,
+					PublishContext:    getValidPublishContext(),
+					StagingTargetPath: validStagingPath,
+					TargetPath:        validTargetPath,
+					VolumeCapability:  getCapabilityWithVoltypeAccessFstype("block", "single-writer", "ext4"),
+					Readonly:          false,
+				})
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("volume already mounted but with different capabilities"))
 			})
 		})
 		ginkgo.When("publishing nfs volume", func() {
@@ -2643,15 +2915,14 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 		})
 		ginkgo.When("the request is missing the Volume ID", func() {
 			ginkgo.It("should fail", func() {
-				clientMock.On("GetVolume", mock.Anything, mock.Anything).Return(gopowerstore.Volume{
-					Description: "",
-					ID:          validBlockVolumeID,
-					Name:        "name",
-					Size:        controller.MaxVolumeSizeBytes / 200,
-					Wwn:         "naa.6090a038f0cd4e5bdaa8248e6856d4fe:3",
-				}, nil)
 				_, err := nodeSvc.NodeExpandVolume(context.Background(), getNodeVolumeExpandValidRequest("", true))
 				gomega.Ω(err.Error()).To(gomega.ContainSubstring("unable to parse volume handle. volumeHandle is empty"))
+			})
+		})
+		ginkgo.When("the array ID is not valid", func() {
+			ginkgo.It("should fail", func() {
+				_, err := nodeSvc.NodeExpandVolume(context.Background(), getNodeVolumeExpandValidRequest(invalidBlockVolumeID, true))
+				gomega.Ω(err.Error()).To(gomega.ContainSubstring("failed to find array with given ID"))
 			})
 		})
 		ginkgo.When("no target path", func() {
@@ -4276,24 +4547,401 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 			})
 		})
 	})
-	ginkgo.Describe("calling Node Get Volume Stats", func() {
-		ginkgo.When("volume path missing", func() {
+
+	ginkgo.Describe("calling NodeGetVolumeStats()", func() {
+		ginkgo.When("volume ID is missing", func() {
 			ginkgo.It("should fail", func() {
-				clientMock.On("GetVolume", mock.Anything, validBaseVolumeID).
-					Return(gopowerstore.Volume{ID: validBaseVolumeID, State: gopowerstore.VolumeStateEnumReady}, nil)
-
-				clientMock.On("GetFS", mock.Anything, validBaseVolumeID).
-					Return(gopowerstore.FileSystem{ID: validBaseVolumeID}, nil)
-
-				req := &csi.NodeGetVolumeStatsRequest{VolumeId: validBlockVolumeID, VolumePath: ""}
-
+				req := &csi.NodeGetVolumeStatsRequest{VolumeId: "", VolumePath: ""}
 				res, err := nodeSvc.NodeGetVolumeStats(context.Background(), req)
 
 				gomega.Expect(res).To(gomega.BeNil())
 				gomega.Expect(err).ToNot(gomega.BeNil())
-				gomega.Expect(err.Error()).To(
-					gomega.ContainSubstring("no volume Path provided"),
-				)
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("no volume ID provided"))
+			})
+		})
+
+		ginkgo.When("volume path is missing", func() {
+			ginkgo.It("should fail", func() {
+				req := &csi.NodeGetVolumeStatsRequest{VolumeId: validBlockVolumeID, VolumePath: ""}
+				res, err := nodeSvc.NodeGetVolumeStats(context.Background(), req)
+
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("no volume Path provided"))
+			})
+		})
+
+		ginkgo.When("array ID is invalid", func() {
+			ginkgo.It("should fail", func() {
+				req := &csi.NodeGetVolumeStatsRequest{VolumeId: invalidBlockVolumeID, VolumePath: validTargetPath}
+				res, err := nodeSvc.NodeGetVolumeStats(context.Background(), req)
+
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to find array with given ID"))
+			})
+		})
+
+		ginkgo.When("API call fails [block]", func() {
+			ginkgo.It("should fail [GetVolume]", func() {
+				clientMock.On("GetVolume", mock.Anything, validBaseVolumeID).
+					Return(gopowerstore.Volume{}, gopowerstore.APIError{
+						ErrorMsg: &api.ErrorMsg{StatusCode: http.StatusBadRequest},
+					})
+
+				req := &csi.NodeGetVolumeStatsRequest{VolumeId: validBlockVolumeID, VolumePath: validTargetPath}
+				res, err := nodeSvc.NodeGetVolumeStats(context.Background(), req)
+
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to find volume"))
+			})
+
+			ginkgo.It("should fail [GetHostVolumeMappingByVolumeID]", func() {
+				clientMock.On("GetVolume", mock.Anything, validBaseVolumeID).
+					Return(gopowerstore.Volume{ID: validBaseVolumeID, Size: controller.MaxVolumeSizeBytes / 200}, nil)
+				clientMock.On("GetHostVolumeMappingByVolumeID", mock.Anything, validBaseVolumeID).
+					Return([]gopowerstore.HostVolumeMapping{}, gopowerstore.APIError{
+						ErrorMsg: &api.ErrorMsg{StatusCode: http.StatusBadRequest},
+					})
+
+				req := &csi.NodeGetVolumeStatsRequest{VolumeId: validBlockVolumeID, VolumePath: validTargetPath}
+				res, err := nodeSvc.NodeGetVolumeStats(context.Background(), req)
+
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to get host volume mapping for volume"))
+			})
+
+			ginkgo.It("should fail [GetHost]", func() {
+				clientMock.On("GetVolume", mock.Anything, validBaseVolumeID).
+					Return(gopowerstore.Volume{ID: validBaseVolumeID, Size: controller.MaxVolumeSizeBytes / 200}, nil)
+				clientMock.On("GetHostVolumeMappingByVolumeID", mock.Anything, validBaseVolumeID).
+					Return([]gopowerstore.HostVolumeMapping{{HostID: validHostID, LogicalUnitNumber: 1}}, nil)
+				clientMock.On("GetHost", mock.Anything, validHostID).
+					Return(gopowerstore.Host{}, gopowerstore.APIError{
+						ErrorMsg: &api.ErrorMsg{StatusCode: http.StatusBadRequest},
+					})
+
+				req := &csi.NodeGetVolumeStatsRequest{VolumeId: validBlockVolumeID, VolumePath: validTargetPath}
+				res, err := nodeSvc.NodeGetVolumeStats(context.Background(), req)
+
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to get host"))
+			})
+		})
+
+		ginkgo.When("API call fails with not found error [block]", func() {
+			ginkgo.It("should return stats as abnormal [GetVolume]", func() {
+				clientMock.On("GetVolume", mock.Anything, validBaseVolumeID).
+					Return(gopowerstore.Volume{}, gopowerstore.APIError{
+						ErrorMsg: &api.ErrorMsg{StatusCode: http.StatusNotFound},
+					})
+
+				req := &csi.NodeGetVolumeStatsRequest{VolumeId: validBlockVolumeID, VolumePath: validTargetPath}
+				res, err := nodeSvc.NodeGetVolumeStats(context.Background(), req)
+
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.NodeGetVolumeStatsResponse{
+					VolumeCondition: &csi.VolumeCondition{
+						Abnormal: true,
+						Message:  fmt.Sprintf("Volume %s is not found", validBaseVolumeID),
+					},
+				}))
+			})
+
+			ginkgo.It("should return stats as abnormal [GetHost]", func() {
+				clientMock.On("GetVolume", mock.Anything, validBaseVolumeID).
+					Return(gopowerstore.Volume{ID: validBaseVolumeID, Size: controller.MaxVolumeSizeBytes / 200}, nil)
+				clientMock.On("GetHostVolumeMappingByVolumeID", mock.Anything, validBaseVolumeID).
+					Return([]gopowerstore.HostVolumeMapping{{HostID: validHostID, LogicalUnitNumber: 1}}, nil)
+				clientMock.On("GetHost", mock.Anything, validHostID).
+					Return(gopowerstore.Host{}, gopowerstore.APIError{
+						ErrorMsg: &api.ErrorMsg{StatusCode: http.StatusNotFound},
+					})
+
+				req := &csi.NodeGetVolumeStatsRequest{VolumeId: validBlockVolumeID, VolumePath: validTargetPath}
+				res, err := nodeSvc.NodeGetVolumeStats(context.Background(), req)
+
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.NodeGetVolumeStatsResponse{
+					VolumeCondition: &csi.VolumeCondition{
+						Abnormal: true,
+						Message:  fmt.Sprintf("host %s is not attached to volume %s", validNodeID, validBaseVolumeID),
+					},
+				}))
+			})
+		})
+
+		ginkgo.When("host mapping not found as expected [block]", func() {
+			ginkgo.It("should return stats as abnormal [no active initiator]", func() {
+				clientMock.On("GetVolume", mock.Anything, validBaseVolumeID).
+					Return(gopowerstore.Volume{ID: validBaseVolumeID, Size: controller.MaxVolumeSizeBytes / 200}, nil)
+				clientMock.On("GetHostVolumeMappingByVolumeID", mock.Anything, validBaseVolumeID).
+					Return([]gopowerstore.HostVolumeMapping{{HostID: validHostID, LogicalUnitNumber: 1}}, nil)
+				clientMock.On("GetHost", mock.Anything, validHostID).
+					Return(gopowerstore.Host{ID: validHostID, Name: validHostName}, nil)
+
+				req := &csi.NodeGetVolumeStatsRequest{VolumeId: validBlockVolumeID, VolumePath: validTargetPath}
+				res, err := nodeSvc.NodeGetVolumeStats(context.Background(), req)
+
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.NodeGetVolumeStatsResponse{
+					VolumeCondition: &csi.VolumeCondition{
+						Abnormal: true,
+						Message:  fmt.Sprintf("host %s has no active initiator connection", validNodeID),
+					},
+				}))
+			})
+
+			ginkgo.It("should return stats as abnormal [not attached]", func() {
+				clientMock.On("GetVolume", mock.Anything, validBaseVolumeID).
+					Return(gopowerstore.Volume{ID: validBaseVolumeID, Size: controller.MaxVolumeSizeBytes / 200}, nil)
+				clientMock.On("GetHostVolumeMappingByVolumeID", mock.Anything, validBaseVolumeID).
+					Return([]gopowerstore.HostVolumeMapping{{HostID: validHostID, LogicalUnitNumber: 1}}, nil)
+				clientMock.On("GetHost", mock.Anything, validHostID).
+					Return(gopowerstore.Host{
+						ID:   validHostID,
+						Name: validHostName,
+						Initiators: []gopowerstore.InitiatorInstance{
+							{
+								ActiveSessions: []gopowerstore.ActiveSessionInstance{
+									{
+										PortName: validISCSITargets[0],
+									},
+								},
+								PortName: validISCSIPortals[0],
+								PortType: gopowerstore.InitiatorProtocolTypeEnumISCSI,
+							},
+						},
+					}, nil)
+
+				req := &csi.NodeGetVolumeStatsRequest{VolumeId: validBlockVolumeID, VolumePath: validTargetPath}
+				res, err := nodeSvc.NodeGetVolumeStats(context.Background(), req)
+
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.NodeGetVolumeStatsResponse{
+					VolumeCondition: &csi.VolumeCondition{
+						Abnormal: true,
+						Message:  fmt.Sprintf("host %s is not attached to volume %s", validNodeID, validBaseVolumeID),
+					},
+				}))
+			})
+		})
+
+		ginkgo.When("API call fails [NFS]", func() {
+			ginkgo.It("should fail [GetFS]", func() {
+				clientMock.On("GetFS", mock.Anything, validBaseVolumeID).
+					Return(gopowerstore.FileSystem{}, gopowerstore.APIError{
+						ErrorMsg: &api.ErrorMsg{StatusCode: http.StatusBadRequest},
+					})
+
+				req := &csi.NodeGetVolumeStatsRequest{VolumeId: validNfsVolumeID, VolumePath: validTargetPath}
+				res, err := nodeSvc.NodeGetVolumeStats(context.Background(), req)
+
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to find filesystem "))
+			})
+
+			ginkgo.It("should fail [GetNFSExportByFileSystemID]", func() {
+				clientMock.On("GetFS", mock.Anything, validBaseVolumeID).
+					Return(gopowerstore.FileSystem{ID: validBaseVolumeID}, nil)
+				clientMock.On("GetNFSExportByFileSystemID", mock.Anything, validBaseVolumeID).
+					Return(gopowerstore.NFSExport{}, gopowerstore.APIError{
+						ErrorMsg: &api.ErrorMsg{StatusCode: http.StatusBadRequest},
+					})
+
+				req := &csi.NodeGetVolumeStatsRequest{VolumeId: validNfsVolumeID, VolumePath: validTargetPath}
+				res, err := nodeSvc.NodeGetVolumeStats(context.Background(), req)
+
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to find nfs export for filesystem"))
+			})
+		})
+
+		ginkgo.When("API call fails with not found error [NFS]", func() {
+			ginkgo.It("should return stats as abnormal [GetFS]", func() {
+				clientMock.On("GetFS", mock.Anything, validBaseVolumeID).
+					Return(gopowerstore.FileSystem{}, gopowerstore.APIError{
+						ErrorMsg: &api.ErrorMsg{StatusCode: http.StatusNotFound},
+					})
+
+				req := &csi.NodeGetVolumeStatsRequest{VolumeId: validNfsVolumeID, VolumePath: validTargetPath}
+				res, err := nodeSvc.NodeGetVolumeStats(context.Background(), req)
+
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.NodeGetVolumeStatsResponse{
+					VolumeCondition: &csi.VolumeCondition{
+						Abnormal: true,
+						Message:  fmt.Sprintf("Filesystem %s is not found", validBaseVolumeID),
+					},
+				}))
+			})
+
+			ginkgo.It("should return stats as abnormal [GetNFSExportByFileSystemID]", func() {
+				clientMock.On("GetFS", mock.Anything, validBaseVolumeID).
+					Return(gopowerstore.FileSystem{ID: validBaseVolumeID}, nil)
+				clientMock.On("GetNFSExportByFileSystemID", mock.Anything, validBaseVolumeID).
+					Return(gopowerstore.NFSExport{}, gopowerstore.APIError{
+						ErrorMsg: &api.ErrorMsg{StatusCode: http.StatusNotFound},
+					})
+
+				req := &csi.NodeGetVolumeStatsRequest{VolumeId: validNfsVolumeID, VolumePath: validTargetPath}
+				res, err := nodeSvc.NodeGetVolumeStats(context.Background(), req)
+
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.NodeGetVolumeStatsResponse{
+					VolumeCondition: &csi.VolumeCondition{
+						Abnormal: true,
+						Message:  fmt.Sprintf("NFS export for volume %s is not found", validBaseVolumeID),
+					},
+				}))
+			})
+		})
+
+		ginkgo.When("NFS export not found as expected [NFS]", func() {
+			ginkgo.It("should return stats as abnormal [not attached]", func() {
+				clientMock.On("GetFS", mock.Anything, validBaseVolumeID).
+					Return(gopowerstore.FileSystem{ID: validBaseVolumeID}, nil)
+				clientMock.On("GetNFSExportByFileSystemID", mock.Anything, validBaseVolumeID).
+					Return(gopowerstore.NFSExport{
+						ID:      "some-export-id",
+						ROHosts: []string{},
+					}, nil)
+
+				req := &csi.NodeGetVolumeStatsRequest{VolumeId: validNfsVolumeID, VolumePath: validTargetPath}
+				res, err := nodeSvc.NodeGetVolumeStats(context.Background(), req)
+
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.NodeGetVolumeStatsResponse{
+					VolumeCondition: &csi.VolumeCondition{
+						Abnormal: true,
+						Message:  fmt.Sprintf("host %s is not attached to NFS export for filesystem %s", validNodeID, validBaseVolumeID),
+					},
+				}))
+			})
+		})
+
+		ginkgo.When("there are issues with mount paths", func() {
+			ginkgo.BeforeEach(func() {
+				clientMock.On("GetVolume", mock.Anything, validBaseVolumeID).
+					Return(gopowerstore.Volume{ID: validBaseVolumeID, Size: controller.MaxVolumeSizeBytes / 200}, nil)
+				clientMock.On("GetHostVolumeMappingByVolumeID", mock.Anything, validBaseVolumeID).
+					Return([]gopowerstore.HostVolumeMapping{{HostID: validHostID, LogicalUnitNumber: 1}}, nil)
+				clientMock.On("GetHost", mock.Anything, validHostID).
+					Return(gopowerstore.Host{
+						ID:   validHostID,
+						Name: validNodeID,
+						Initiators: []gopowerstore.InitiatorInstance{
+							{
+								ActiveSessions: []gopowerstore.ActiveSessionInstance{
+									{
+										PortName: validISCSITargets[0],
+									},
+								},
+								PortName: validISCSIPortals[0],
+								PortType: gopowerstore.InitiatorProtocolTypeEnumISCSI,
+							},
+						},
+					}, nil)
+			})
+
+			ginkgo.It("should fail for getTargetMount() error [stagingPath]", func() {
+				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, errors.New("fail"))
+
+				req := &csi.NodeGetVolumeStatsRequest{
+					VolumeId:          validBlockVolumeID,
+					VolumePath:        validTargetPath,
+					StagingTargetPath: nodeStagePrivateDir,
+				}
+				res, err := nodeSvc.NodeGetVolumeStats(context.Background(), req)
+
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("can't check mounts for path"))
+			})
+
+			ginkgo.It("should return stats as abnormal for getTargetMount() error [stagingPath]", func() {
+				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil)
+				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
+
+				req := &csi.NodeGetVolumeStatsRequest{
+					VolumeId:          validBlockVolumeID,
+					VolumePath:        validTargetPath,
+					StagingTargetPath: nodeStagePrivateDir,
+				}
+				res, err := nodeSvc.NodeGetVolumeStats(context.Background(), req)
+
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.NodeGetVolumeStatsResponse{
+					VolumeCondition: &csi.VolumeCondition{
+						Abnormal: true,
+						Message:  fmt.Sprintf("staging target path %s not mounted for volume %s", nodeStagePrivateDir, validBaseVolumeID),
+					},
+				}))
+			})
+
+			ginkgo.It("should fail for getTargetMount() error [volumePath]", func() {
+				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, errors.New("fail"))
+
+				req := &csi.NodeGetVolumeStatsRequest{
+					VolumeId:          validBlockVolumeID,
+					VolumePath:        validTargetPath,
+					StagingTargetPath: "",
+				}
+				res, err := nodeSvc.NodeGetVolumeStats(context.Background(), req)
+
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("can't check mounts for path"))
+			})
+
+			ginkgo.It("should return stats as abnormal for getTargetMount() error [volumePath]", func() {
+				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil)
+				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
+
+				req := &csi.NodeGetVolumeStatsRequest{
+					VolumeId:          validBlockVolumeID,
+					VolumePath:        validTargetPath,
+					StagingTargetPath: "",
+				}
+				res, err := nodeSvc.NodeGetVolumeStats(context.Background(), req)
+
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.NodeGetVolumeStatsResponse{
+					VolumeCondition: &csi.VolumeCondition{
+						Abnormal: true,
+						Message:  fmt.Sprintf("volume path %s not mounted for volume %s", validTargetPath, validBaseVolumeID),
+					},
+				}))
+			})
+
+			ginkgo.It("should return stats as abnormal for ReadDir() error", func() {
+				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil)
+				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{
+					{
+						Device: validDevName,
+						Path:   validTargetPath,
+					},
+				}, nil)
+
+				req := &csi.NodeGetVolumeStatsRequest{
+					VolumeId:          validBlockVolumeID,
+					VolumePath:        validTargetPath,
+					StagingTargetPath: "",
+				}
+				res, err := nodeSvc.NodeGetVolumeStats(context.Background(), req)
+
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.NodeGetVolumeStatsResponse{
+					VolumeCondition: &csi.VolumeCondition{
+						Abnormal: true,
+						Message:  fmt.Sprintf("volume path %s not accessible for volume %s", validTargetPath, validBaseVolumeID),
+					},
+				}))
 			})
 		})
 	})

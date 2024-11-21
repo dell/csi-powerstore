@@ -200,10 +200,26 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 		return nil, err
 	}
 
+	replicationEnabled := params[s.WithRP(KeyReplicationEnabled)]
+	repMode := params[s.WithRP(KeyReplicationMode)]
+	// Default to ASYNC for backward compatibility
+	if repMode == "" {
+		repMode = common.AsyncMode
+	}
+	repMode = strings.ToUpper(repMode)
+
 	contentSource := req.GetVolumeContentSource()
 	if contentSource != nil {
 		var volResp *csi.Volume
 		var err error
+		// Configuring Metro is not allowed on clones or volumes created from Metro snapshot.
+		// So, fail the request if the requested volume is to be placed in Metro storage class.
+		// However, one can place the volume in a non-Metro storage class.
+		if replicationEnabled == "true" && repMode == common.MetroMode {
+			return nil, status.Errorf(codes.InvalidArgument,
+				"Configuring Metro is not supported on clones or volumes created from Metro snapshot. Choose a non-Metro storage class.")
+		}
+
 		volumeSource := contentSource.GetVolume()
 		if volumeSource != nil {
 			log.Printf("volume %s specified as volume content source", volumeSource.VolumeId)
@@ -247,12 +263,9 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 
 	var vg gopowerstore.VolumeGroup
 	var remoteSystem gopowerstore.RemoteSystem
-
-	// Check if replication is enabled
-	replicationEnabled := params[s.WithRP(KeyReplicationEnabled)]
 	var remoteSystemName string
 	isMetroVolume := false
-
+	// Check if replication is enabled
 	if replicationEnabled == "true" {
 		if useNFS {
 			return nil, status.Error(codes.InvalidArgument, "replication not supported for NFS")
@@ -264,12 +277,6 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 		if !ok {
 			return nil, status.Error(codes.InvalidArgument, "replication enabled but no remote system specified in storage class")
 		}
-		repMode := params[s.WithRP(KeyReplicationMode)]
-		// Default to ASYNC for backward compatibility
-		if repMode == "" {
-			repMode = common.AsyncMode
-		}
-		repMode = strings.ToUpper(repMode)
 
 		switch repMode {
 		case common.SyncMode, common.AsyncMode:
@@ -369,7 +376,7 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 			if c, ok := creator.(*SCSICreator); ok {
 				c.vg = &vg
 			}
-		case common.Metro:
+		case common.MetroMode:
 			// handle Metro mode where metro is configured directly on the volume
 			// Note: Metro on volume group support is not added
 			log.Info("Metro replication mode requested")

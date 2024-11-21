@@ -383,12 +383,8 @@ var _ = ginkgo.Describe("csi-extension-server", func() {
 	})
 
 	ginkgo.Describe("calling CreateVolumeGroupSnapshot()", func() {
-		ginkgo.When("valid member volumes are present", func() {
-			ginkgo.It("should create volume group snapshot successfully", func() {
-				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).
-					Return(gopowerstore.VolumeGroups{VolumeGroup: []gopowerstore.VolumeGroup{{ID: validGroupID, ProtectionPolicyID: validPolicyID}}}, nil)
-				clientMock.On("CreateVolumeGroupSnapshot", mock.Anything, validGroupID, mock.Anything).
-					Return(gopowerstore.CreateResponse{ID: validGroupID}, nil)
+		ginkgo.When("should create volume group snapshot successfully", func() {
+			ginkgo.It("valid member volumes are present", func() {
 				clientMock.On("GetVolumeGroupByName", mock.Anything, validGroupName).
 					Return(gopowerstore.VolumeGroup{ID: validGroupID, ProtectionPolicyID: validPolicyID}, nil)
 				clientMock.On("AddMembersToVolumeGroup",
@@ -396,6 +392,8 @@ var _ = ginkgo.Describe("csi-extension-server", func() {
 					mock.AnythingOfType("*gopowerstore.VolumeGroupMembers"),
 					validGroupID).
 					Return(gopowerstore.EmptyResponse(""), nil)
+				clientMock.On("CreateVolumeGroupSnapshot", mock.Anything, validGroupID, mock.Anything).
+					Return(gopowerstore.CreateResponse{ID: validGroupID}, nil)
 				clientMock.On("GetVolumeGroup", mock.Anything, validGroupID).
 					Return(gopowerstore.VolumeGroup{
 						ID:                 validGroupID,
@@ -414,34 +412,26 @@ var _ = ginkgo.Describe("csi-extension-server", func() {
 				gomega.Expect(err).To(gomega.BeNil())
 				gomega.Expect(res.SnapshotGroupID).To(gomega.Equal(validGroupID))
 			})
-		})
 
-		ginkgo.When("there is no existing volume group created", func() {
-			ginkgo.It("should create volume group and snapshot successfully", func() {
+			ginkgo.It("there is no existing volume group", func() {
+				clientMock.On("GetVolumeGroupByName", mock.Anything, validGroupName).
+					Return(gopowerstore.VolumeGroup{}, nil)
 				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).
 					Return(gopowerstore.VolumeGroups{}, nil)
-				clientMock.On("GetVolumeGroupByName", mock.Anything, validGroupName).
-					Return(gopowerstore.VolumeGroup{ID: validGroupID, ProtectionPolicyID: validPolicyID}, nil)
-				clientMock.On("CreateVolumeGroupSnapshot", mock.Anything, validGroupID, mock.Anything).
-					Return(gopowerstore.CreateResponse{ID: validGroupID}, nil)
-				clientMock.On("AddMembersToVolumeGroup",
-					mock.Anything,
-					mock.AnythingOfType("*gopowerstore.VolumeGroupMembers"),
-					validGroupID).
-					Return(gopowerstore.EmptyResponse(""), nil)
-				clientMock.On("GetVolumeGroup", mock.Anything, validGroupID).
-					Return(gopowerstore.VolumeGroup{
-						ID:                 validGroupID,
-						ProtectionPolicyID: validPolicyID,
-						Volumes:            []gopowerstore.Volume{{ID: validBaseVolID, State: stateReady}},
-					}, nil)
-
 				createGroupRequest := &gopowerstore.VolumeGroupCreate{
 					Name:      validGroupName,
 					VolumeIDs: []string{validBaseVolID},
 				}
 				clientMock.On("CreateVolumeGroup", mock.Anything, createGroupRequest).
 					Return(gopowerstore.CreateResponse{ID: validGroupID}, nil)
+				clientMock.On("CreateVolumeGroupSnapshot", mock.Anything, validGroupID, mock.Anything).
+					Return(gopowerstore.CreateResponse{ID: validGroupID}, nil)
+				clientMock.On("GetVolumeGroup", mock.Anything, validGroupID).
+					Return(gopowerstore.VolumeGroup{
+						ID:                 validGroupID,
+						ProtectionPolicyID: validPolicyID,
+						Volumes:            []gopowerstore.Volume{{ID: validBaseVolID, State: stateReady}},
+					}, nil)
 
 				var sourceVols []string
 				sourceVols = append(sourceVols, validBaseVolID+"/"+firstValidID+"/scsi")
@@ -456,107 +446,158 @@ var _ = ginkgo.Describe("csi-extension-server", func() {
 			})
 		})
 
-		ginkgo.When("member volumes are not present", func() {
-			ginkgo.It("should not create volume group snapshot successfully", func() {
-				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).
-					Return(gopowerstore.VolumeGroups{VolumeGroup: []gopowerstore.VolumeGroup{{ID: validGroupID, ProtectionPolicyID: validPolicyID}}}, nil)
-				clientMock.On("CreateVolumeGroupSnapshot", mock.Anything, validGroupID, mock.Anything).
-					Return(gopowerstore.CreateResponse{ID: validGroupID}, nil)
-				clientMock.On("GetVolumeGroupByName", mock.Anything, validGroupName).
-					Return(gopowerstore.VolumeGroup{ID: validGroupID, ProtectionPolicyID: validPolicyID}, nil)
-				clientMock.On("GetVolumeGroup", mock.Anything, validGroupID).
-					Return(gopowerstore.VolumeGroup{
-						ID:                 validGroupID,
-						ProtectionPolicyID: validPolicyID,
-						Volumes:            []gopowerstore.Volume{{ID: validBaseVolID, State: stateReady}},
-					}, nil)
-				clientMock.On("AddMembersToVolumeGroup",
-					mock.Anything,
-					mock.AnythingOfType("*gopowerstore.VolumeGroupMembers"),
-					validGroupID).
-					Return(gopowerstore.EmptyResponse(""), nil)
-
-				var sourceVols []string
-				sourceVols = append(sourceVols, validBaseVolID+"/"+firstValidID+"/scsi")
-				req := vgsext.CreateVolumeGroupSnapshotRequest{
-					Name: validGroupName,
-				}
-				res, err := ctrlSvc.CreateVolumeGroupSnapshot(context.Background(), &req)
-
-				gomega.Expect(err).Error()
-				gomega.Expect(res).To(gomega.BeNil())
-			})
-		})
-
-		ginkgo.When("volume group name is empty", func() {
-			ginkgo.It("should not create volume group snapshot successfully", func() {
-				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).
-					Return(gopowerstore.VolumeGroups{VolumeGroup: []gopowerstore.VolumeGroup{{ID: validGroupID, ProtectionPolicyID: validPolicyID}}}, nil)
-				clientMock.On("CreateVolumeGroupSnapshot", mock.Anything, validGroupID, mock.Anything).
-					Return(gopowerstore.CreateResponse{ID: validGroupID}, nil)
-				clientMock.On("AddMembersToVolumeGroup",
-					mock.Anything,
-					mock.AnythingOfType("*gopowerstore.VolumeGroupMembers"),
-					validGroupID).
-					Return(gopowerstore.EmptyResponse(""), nil)
-				clientMock.On("GetVolumeGroup", mock.Anything, validGroupID).
-					Return(gopowerstore.VolumeGroup{
-						ID:                 validGroupID,
-						ProtectionPolicyID: validPolicyID,
-						Volumes:            []gopowerstore.Volume{{ID: validBaseVolID, State: stateReady}},
-					}, nil)
-
-				var sourceVols []string
-				sourceVols = append(sourceVols, validBaseVolID+"/"+firstValidID+"/scsi")
+		ginkgo.When("should not create volume group snapshot with invalid request", func() {
+			ginkgo.It("volume group name is empty in the request", func() {
 				res, err := ctrlSvc.CreateVolumeGroupSnapshot(context.Background(), &vgsext.CreateVolumeGroupSnapshotRequest{})
 
 				gomega.Expect(err).Error()
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("Name to be set"))
 				gomega.Expect(res).To(gomega.BeNil())
 			})
-		})
 
-		ginkgo.When("volume group name length is greater than 27", func() {
-			ginkgo.It("should not create volume group snapshot successfully", func() {
-				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).
-					Return(gopowerstore.VolumeGroups{VolumeGroup: []gopowerstore.VolumeGroup{{ID: validGroupID, ProtectionPolicyID: validPolicyID}}}, nil)
-				clientMock.On("CreateVolumeGroupSnapshot", mock.Anything, validGroupID, mock.Anything).
-					Return(gopowerstore.CreateResponse{ID: validGroupID}, nil)
-				clientMock.On("AddMembersToVolumeGroup",
-					mock.Anything,
-					mock.AnythingOfType("*gopowerstore.VolumeGroupMembers"),
-					validGroupID).
-					Return(gopowerstore.EmptyResponse(""), nil)
-				clientMock.On("GetVolumeGroup", mock.Anything, validGroupID).
-					Return(gopowerstore.VolumeGroup{
-						ID:                 validGroupID,
-						ProtectionPolicyID: validPolicyID,
-						Volumes:            []gopowerstore.Volume{{ID: validBaseVolID, State: stateReady}},
-					}, nil)
-
-				var sourceVols []string
-				sourceVols = append(sourceVols, validBaseVolID+"/"+firstValidID+"/scsi")
+			ginkgo.It("volume group name length is greater than 27 in the request", func() {
 				res, err := ctrlSvc.CreateVolumeGroupSnapshot(context.Background(), &vgsext.CreateVolumeGroupSnapshotRequest{
 					Name: "1234561111111111111111111112",
 				})
 
 				gomega.Expect(err).Error()
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("longer than 27 character max"))
+				gomega.Expect(res).To(gomega.BeNil())
+			})
+
+			ginkgo.It("source volumes are not present in the request", func() {
+				res, err := ctrlSvc.CreateVolumeGroupSnapshot(context.Background(), &vgsext.CreateVolumeGroupSnapshotRequest{
+					Name: validGroupName,
+				})
+
+				gomega.Expect(err).Error()
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("Source volumes are not present"))
 				gomega.Expect(res).To(gomega.BeNil())
 			})
 		})
 
-		ginkgo.When("get volume group fails", func() {
-			ginkgo.It("should not create volume group snapshot successfully", func() {
-				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).
-					Return(gopowerstore.VolumeGroups{VolumeGroup: []gopowerstore.VolumeGroup{{ID: validGroupID, ProtectionPolicyID: validPolicyID}}}, nil)
-				clientMock.On("CreateVolumeGroupSnapshot", mock.Anything, validGroupID, mock.Anything).
-					Return(gopowerstore.CreateResponse{ID: validGroupID}, nil)
+		ginkgo.When("should not create volume group snapshot", func() {
+			ginkgo.It("get volume group by name fails", func() {
+				clientMock.On("GetVolumeGroupByName", mock.Anything, validGroupName).
+					Return(gopowerstore.VolumeGroup{}, gopowerstore.NewAPIError())
+
+				var sourceVols []string
+				sourceVols = append(sourceVols, validBaseVolID+"/"+firstValidID+"/scsi")
+				req := vgsext.CreateVolumeGroupSnapshotRequest{
+					Name:            validGroupName,
+					SourceVolumeIDs: sourceVols,
+				}
+				res, err := ctrlSvc.CreateVolumeGroupSnapshot(context.Background(), &req)
+
+				gomega.Expect(err).Error()
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("Error getting volume group by name"))
+				gomega.Expect(res).To(gomega.BeNil())
+			})
+
+			ginkgo.It("add members to volume group fails", func() {
+				clientMock.On("GetVolumeGroupByName", mock.Anything, validGroupName).
+					Return(gopowerstore.VolumeGroup{ID: validGroupID}, nil)
+				clientMock.On("AddMembersToVolumeGroup",
+					mock.Anything,
+					mock.AnythingOfType("*gopowerstore.VolumeGroupMembers"),
+					validGroupID).
+					Return(gopowerstore.EmptyResponse(""), gopowerstore.NewNotFoundError())
+
+				var sourceVols []string
+				sourceVols = append(sourceVols, validBaseVolID+"/"+firstValidID+"/scsi")
+				req := vgsext.CreateVolumeGroupSnapshotRequest{
+					Name:            validGroupName,
+					SourceVolumeIDs: sourceVols,
+				}
+				res, err := ctrlSvc.CreateVolumeGroupSnapshot(context.Background(), &req)
+
+				gomega.Expect(err).Error()
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("Error adding volume group members"))
+				gomega.Expect(res).To(gomega.BeNil())
+			})
+
+			ginkgo.It("get volume group by ID fails", func() {
 				clientMock.On("GetVolumeGroupByName", mock.Anything, validGroupName).
 					Return(gopowerstore.VolumeGroup{}, nil)
+				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).
+					Return(gopowerstore.VolumeGroups{}, gopowerstore.NewAPIError())
+
+				var sourceVols []string
+				sourceVols = append(sourceVols, validBaseVolID+"/"+firstValidID+"/scsi")
+				req := vgsext.CreateVolumeGroupSnapshotRequest{
+					Name:            validGroupName,
+					SourceVolumeIDs: sourceVols,
+				}
+				res, err := ctrlSvc.CreateVolumeGroupSnapshot(context.Background(), &req)
+
+				gomega.Expect(err).Error()
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("Error getting volume group by volume ID"))
+				gomega.Expect(res).To(gomega.BeNil())
+			})
+
+			ginkgo.It("create volume group fails", func() {
+				clientMock.On("GetVolumeGroupByName", mock.Anything, validGroupName).
+					Return(gopowerstore.VolumeGroup{}, nil)
+				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).
+					Return(gopowerstore.VolumeGroups{}, nil)
+				createGroupRequest := &gopowerstore.VolumeGroupCreate{
+					Name:      validGroupName,
+					VolumeIDs: []string{validBaseVolID},
+				}
+				clientMock.On("CreateVolumeGroup", mock.Anything, createGroupRequest).
+					Return(gopowerstore.CreateResponse{ID: validGroupID}, gopowerstore.NewNotFoundError())
+
+				var sourceVols []string
+				sourceVols = append(sourceVols, validBaseVolID+"/"+firstValidID+"/scsi")
+				req := vgsext.CreateVolumeGroupSnapshotRequest{
+					Name:            validGroupName,
+					SourceVolumeIDs: sourceVols,
+				}
+				res, err := ctrlSvc.CreateVolumeGroupSnapshot(context.Background(), &req)
+
+				gomega.Expect(err).Error()
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("Error creating volume group"))
+				gomega.Expect(res).To(gomega.BeNil())
+			})
+
+			ginkgo.It("create volume group snapshot fails", func() {
+				clientMock.On("GetVolumeGroupByName", mock.Anything, validGroupName).
+					Return(gopowerstore.VolumeGroup{}, nil)
+				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).
+					Return(gopowerstore.VolumeGroups{VolumeGroup: []gopowerstore.VolumeGroup{{ID: validGroupID, ProtectionPolicyID: validPolicyID}}}, nil)
 				clientMock.On("AddMembersToVolumeGroup",
 					mock.Anything,
 					mock.AnythingOfType("*gopowerstore.VolumeGroupMembers"),
 					validGroupID).
 					Return(gopowerstore.EmptyResponse(""), nil)
+				clientMock.On("CreateVolumeGroupSnapshot", mock.Anything, validGroupID, mock.Anything).
+					Return(gopowerstore.CreateResponse{}, gopowerstore.NewNotFoundError())
+
+				var sourceVols []string
+				sourceVols = append(sourceVols, validBaseVolID+"/"+firstValidID+"/scsi")
+				req := vgsext.CreateVolumeGroupSnapshotRequest{
+					Name:            validGroupName,
+					SourceVolumeIDs: sourceVols,
+				}
+				res, err := ctrlSvc.CreateVolumeGroupSnapshot(context.Background(), &req)
+
+				gomega.Expect(err).Error()
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("Error creating volume group snapshot"))
+				gomega.Expect(res).To(gomega.BeNil())
+			})
+
+			ginkgo.It("get volume group fails", func() {
+				clientMock.On("GetVolumeGroupByName", mock.Anything, validGroupName).
+					Return(gopowerstore.VolumeGroup{}, nil)
+				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).
+					Return(gopowerstore.VolumeGroups{VolumeGroup: []gopowerstore.VolumeGroup{{ID: validGroupID, ProtectionPolicyID: validPolicyID}}}, nil)
+				clientMock.On("AddMembersToVolumeGroup",
+					mock.Anything,
+					mock.AnythingOfType("*gopowerstore.VolumeGroupMembers"),
+					validGroupID).
+					Return(gopowerstore.EmptyResponse(""), nil)
+				clientMock.On("CreateVolumeGroupSnapshot", mock.Anything, validGroupID, mock.Anything).
+					Return(gopowerstore.CreateResponse{ID: validGroupID}, nil)
 				clientMock.On("GetVolumeGroup", mock.Anything, validGroupID).
 					Return(gopowerstore.VolumeGroup{}, gopowerstore.NewNotFoundError())
 
@@ -569,6 +610,7 @@ var _ = ginkgo.Describe("csi-extension-server", func() {
 				res, err := ctrlSvc.CreateVolumeGroupSnapshot(context.Background(), &req)
 
 				gomega.Expect(err).Error()
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("Error getting volume group snapshot"))
 				gomega.Expect(res).To(gomega.BeNil())
 			})
 		})

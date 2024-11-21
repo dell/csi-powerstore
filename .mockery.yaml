@@ -14,8 +14,8 @@
 #
 #
 
-quiet: False
-all: True
-inpackage: False
+quiet: false
+all: true
+inpackage: false
 dir: ./pkg
-disable-version-string: True
+disable-version-string: true
