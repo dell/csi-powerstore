@@ -2,7 +2,7 @@ module github.com/dell/csi-powerstore/v2/tests/e2e
 
 go 1.23
 
-toolchain go1.23.2
+toolchain go1.23.3
 
 require (
 	github.com/dell/csi-powerstore/v2 v2.11.0
