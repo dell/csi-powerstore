@@ -1138,6 +1138,7 @@ func (s *Service) ControllerGetCapabilities(_ context.Context, _ *csi.Controller
 	if s.isHealthMonitorEnabled {
 		for _, capability := range []csi.ControllerServiceCapability_RPC_Type{
 			csi.ControllerServiceCapability_RPC_GET_VOLUME,
+			csi.ControllerServiceCapability_RPC_LIST_VOLUMES,
 			csi.ControllerServiceCapability_RPC_LIST_VOLUMES_PUBLISHED_NODES,
 			csi.ControllerServiceCapability_RPC_VOLUME_CONDITION,
 		} {
