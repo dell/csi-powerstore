@@ -33,8 +33,8 @@ require (
 	github.com/stretchr/testify v1.10.0
 	github.com/uber/jaeger-client-go v2.30.0+incompatible
 	github.com/uber/jaeger-lib v2.4.1+incompatible
-	golang.org/x/net v0.30.0
-	google.golang.org/grpc v1.68.0
+	golang.org/x/net v0.32.0
+	google.golang.org/grpc v1.68.1
 	google.golang.org/protobuf v1.35.2
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/apimachinery v0.31.3
@@ -81,7 +81,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/client_golang v1.20.5 // indirect
 	github.com/prometheus/client_model v0.6.1 // indirect
-	github.com/prometheus/common v0.60.1 // indirect
+	github.com/prometheus/common v0.61.0 // indirect
 	github.com/prometheus/procfs v0.15.1 // indirect
 	github.com/sagikazarmark/locafero v0.6.0 // indirect
 	github.com/sagikazarmark/slog-shim v0.1.0 // indirect
@@ -101,10 +101,10 @@ require (
 	go.uber.org/zap v1.27.0 // indirect
 	golang.org/x/exp v0.0.0-20241009180824-f66d83c29e7c // indirect
 	golang.org/x/oauth2 v0.24.0 // indirect
-	golang.org/x/sync v0.9.0 // indirect
-	golang.org/x/sys v0.27.0 // indirect
-	golang.org/x/term v0.26.0 // indirect
-	golang.org/x/text v0.20.0 // indirect
+	golang.org/x/sync v0.10.0 // indirect
+	golang.org/x/sys v0.28.0 // indirect
+	golang.org/x/term v0.27.0 // indirect
+	golang.org/x/text v0.21.0 // indirect
 	golang.org/x/time v0.8.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20241021214115-324edc3d5d38 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20241021214115-324edc3d5d38 // indirect
