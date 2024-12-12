@@ -1,0 +1,21 @@
+name: Release CSI-Powerstore
+# Invocable as a reusable workflow
+# Can be manually triggered
+on:  # yamllint disable-line rule:truthy
+  workflow_call:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (major, minor, patch), Example: 1.x.x'
+        default: '1.1.1'
+        required: true
+      image:
+        description: 'Image name, Example: csi-powerstore'
+        default: 'github-actions-test'
+        required: true
+jobs:
+  csm-release:
+    uses: dell/common-github-actions/.github/workflows/csm-release-driver-module.yaml@driver_module_release
+    name: Release CSM Drivers and Modules
+
+
