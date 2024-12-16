@@ -10,6 +10,7 @@ on:  # yamllint disable-line rule:truthy
         required: true
       image:
         description: 'Image name. Example: csi-powerstore'
+        default: 'csi-powerstore'
         required: true
 jobs:
   csm-release:
