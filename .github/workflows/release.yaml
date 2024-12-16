@@ -7,13 +7,11 @@ on:  # yamllint disable-line rule:truthy
     inputs:
       version:
         description: 'Version to release (major, minor, patch), Example: 1.x.x'
-        default: '1.1.1'
         required: true
       image:
-        description: 'Image name, Example: csi-powerstore'
-        default: 'github-actions-test'
+        description: 'Image name. Example: csi-powerstore'
         required: true
 jobs:
   csm-release:
-    uses: dell/common-github-actions/.github/workflows/csm-release-driver-module.yaml@driver_module_release
+    uses: dell/common-github-actions/.github/workflows/csm-release-driver-module.yaml@main
     name: Release CSM Drivers and Modules
