@@ -1,6 +1,6 @@
 #
 #
-# Copyright © 2020-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
+# Copyright © 2020-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -30,7 +30,7 @@ ifndef MAJOR
     MAJOR=2
 endif
 ifndef MINOR
-    MINOR=12
+    MINOR=13
 endif
 ifndef PATCH
     PATCH=0
