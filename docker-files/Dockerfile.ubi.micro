@@ -35,10 +35,12 @@ FROM $BASEIMAGE
 
 WORKDIR /
 
-LABEL vendor="Dell Inc." \
+LABEL vendor="Dell Technologies" \
+      maintainer="Dell Technologies" \
       name="csi-powerstore" \
       summary="CSI Driver for Dell EMC PowerStore" \
       description="CSI Driver for provisioning persistent storage from Dell EMC PowerStore" \
+      release="1.13.0" \
       version="2.13.0" \
       license="Apache-2.0"
 
