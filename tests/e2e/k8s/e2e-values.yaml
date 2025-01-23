@@ -26,9 +26,9 @@ execCommand: "while true ; do sleep 2 ; done"
 
 # config for externalAccess e2e test suite
 externalAccess:
-  endPoint: "https://10.0.0.1/api/rest" # array's endpoint
+  endPoint: "https://10.0.0.1/api/rest"  # array's endpoint
   userName: "user"
   password: "password"
-  externalAccessIP: "10.0.0.1/25" # IP configured in values.yaml file while installing the driver
+  externalAccessIP: "10.0.0.1/25"  # IP configured in values.yaml file while installing the driver
   NASServer: "nas-server"
-  testStatefulset: true # if wanted to test ExternalAccess with Deployment as well as with Statefulset resource
+  testStatefulset: true  # if wanted to test ExternalAccess with Deployment as well as with Statefulset resource
