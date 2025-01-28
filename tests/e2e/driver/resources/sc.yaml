@@ -15,10 +15,10 @@ kind: StorageClass
 metadata:
   name: powerstore-metro
 parameters:
-  arrayID: "unique" # PowerStore Global ID
+  arrayID: "unique"  # PowerStore Global ID
   replication.storage.dell.com/isReplicationEnabled: "true"
   replication.storage.dell.com/mode: METRO
-  replication.storage.dell.com/remoteSystem: "system-ID" # Remote PowerStore system name
+  replication.storage.dell.com/remoteSystem: "system-ID"  # Remote PowerStore system name
 provisioner: csi-powerstore.dellemc.com
 reclaimPolicy: Delete
 volumeBindingMode: Immediate
