@@ -1,6 +1,4 @@
-#
-#
-# Copyright © 2020-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
+# Copyright © 2023-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,35 +9,37 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
-#
 
-# Dockerfile to build PowerStore CSI Driver
-# based on CentOS
+# some arguments that must be supplied
+ARG GOIMAGE
 ARG BASEIMAGE
 
-FROM $BASEIMAGE AS driver
+# Stage to build the driver
+FROM $GOIMAGE as builder
 
-LABEL vendor="Dell Inc." \
+WORKDIR /workspace
+COPY . .
+
+RUN go generate ./cmd/csi-powerstore
+RUN GOOS=linux CGO_ENABLED=0 go build -o csi-powerstore ./cmd/csi-powerstore
+
+# Stage to build the driver image
+FROM $BASEIMAGE
+WORKDIR /
+LABEL vendor="Dell Technologies" \
+      maintainer="Dell Technologies" \
       name="csi-powerstore" \
       summary="CSI Driver for Dell EMC PowerStore" \
       description="CSI Driver for provisioning persistent storage from Dell EMC PowerStore" \
+      release="1.13.0" \
       version="2.13.0" \
       license="Apache-2.0"
-
 COPY licenses /licenses
-
-# dependencies, following by cleaning the cache
-RUN echo "%_netsharedpath /sys:/proc" >> /etc/rpm/macros.dist && yum update -y && yum install -y e2fsprogs xfsprogs nfs-utils nfs4-acl-tools acl which device-mapper-multipath \
-    && \
-    yum clean all \
-    && \
-    rm -rf /var/cache/run
 
 # validate some cli utilities are found
 RUN which mkfs.ext4
 RUN which mkfs.xfs
 RUN echo "export PATH=$PATH:/sbin:/bin" > /etc/profile.d/ubuntu_path.sh
 
-COPY "csi-powerstore" .
+COPY --from=builder /workspace/csi-powerstore /
 ENTRYPOINT ["/csi-powerstore"]
