@@ -25,6 +25,10 @@ else
 	RELNOTE=
 endif
 
+ifeq ($(IMAGETAG),)
+IMAGETAG=v$(MAJOR).$(MINOR).$(PATCH)$(RELNOTE)
+endif
+
 ifndef DOCKER_REGISTRY
 	DOCKER_REGISTRY=dellemc
 endif
@@ -45,19 +49,22 @@ endif
 
 docker: download-csm-common
 	$(eval include csm-common.mk)
-	@echo "MAJOR $(MAJOR) MINOR $(MINOR) PATCH $(PATCH) RELNOTE $(RELNOTE) SEMVER $(SEMVER)"
-	@echo "$(DOCKER_FILE)"
-	$(BUILDER) build --pull -f $(DOCKER_FILE) -t "$(DOCKER_REGISTRY)/$(DOCKER_IMAGE_NAME):v$(MAJOR).$(MINOR).$(PATCH)$(RELNOTE)" --build-arg GOIMAGE=$(DEFAULT_GOIMAGE) --build-arg BASEIMAGE=$(CSM_BASEIMAGE) .
+	@echo "MAJOR $(MAJOR) MINOR $(MINOR) PATCH $(PATCH) RELNOTE $(RELNOTE) SEMVER $(SEMVER) IMAGETAG $(IMAGETAG)"
+	$(BUILDER) build -t "$(DOCKER_REGISTRY)/$(DOCKER_IMAGE_NAME):$(IMAGETAG)" --build-arg GOIMAGE=$(DEFAULT_GOIMAGE) --build-arg BASEIMAGE=$(CSM_BASEIMAGE) .
 
 docker-no-cache: download-csm-common
 	$(eval include csm-common.mk)
-	@echo "MAJOR $(MAJOR) MINOR $(MINOR) PATCH $(PATCH) RELNOTE $(RELNOTE) SEMVER $(SEMVER)"
-	@echo "$(DOCKER_FILE) --no-cache"
-	$(BUILDER) build --pull --no-cache -f $(DOCKER_FILE) -t "$(DOCKER_REGISTRY)/$(DOCKER_IMAGE_NAME):v$(MAJOR).$(MINOR).$(PATCH)$(RELNOTE)" --build-arg GOIMAGE=$(DEFAULT_GOIMAGE) --build-arg BASEIMAGE=$(CSM_BASEIMAGE) .
+	@echo "MAJOR $(MAJOR) MINOR $(MINOR) PATCH $(PATCH) RELNOTE $(RELNOTE) SEMVER $(SEMVER) IMAGETAG $(IMAGETAG)"
+	$(BUILDER) build --pull --no-cache -t "$(DOCKER_REGISTRY)/$(DOCKER_IMAGE_NAME):$(IMAGETAG)" --build-arg GOIMAGE=$(DEFAULT_GOIMAGE) --build-arg BASEIMAGE=$(CSM_BASEIMAGE) .
 
 push:
 	echo "MAJOR $(MAJOR) MINOR $(MINOR) PATCH $(PATCH) RELNOTE $(RELNOTE) SEMVER $(SEMVER)"
-	$(BUILDER) push "$(DOCKER_REGISTRY)/$(DOCKER_IMAGE_NAME):v$(MAJOR).$(MINOR).$(PATCH)$(RELNOTE)"
+	$(BUILDER) push "$(DOCKER_REGISTRY)/$(DOCKER_IMAGE_NAME):$(IMAGETAG)"
 
 download-csm-common:
 	curl -O -L https://raw.githubusercontent.com/dell/csm/main/config/csm-common.mk
+
+tag:
+	@echo "MAJOR $(MAJOR) MINOR $(MINOR) PATCH $(PATCH) RELNOTE $(RELNOTE) SEMVER $(SEMVER) IMAGETAG $(IMAGETAG) TAGMSG $(TAGMSG)"
+	-git tag -d $(IMAGETAG)
+	git tag -a -m $(TAGMSG) $(IMAGETAG)
