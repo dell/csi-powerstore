@@ -49,22 +49,18 @@ endif
 
 docker: download-csm-common
 	$(eval include csm-common.mk)
-	@echo "MAJOR $(MAJOR) MINOR $(MINOR) PATCH $(PATCH) RELNOTE $(RELNOTE) SEMVER $(SEMVER) IMAGETAG $(IMAGETAG)"
 	$(BUILDER) build -t "$(DOCKER_REGISTRY)/$(DOCKER_IMAGE_NAME):$(IMAGETAG)" --build-arg GOIMAGE=$(DEFAULT_GOIMAGE) --build-arg BASEIMAGE=$(CSM_BASEIMAGE) .
 
 docker-no-cache: download-csm-common
 	$(eval include csm-common.mk)
-	@echo "MAJOR $(MAJOR) MINOR $(MINOR) PATCH $(PATCH) RELNOTE $(RELNOTE) SEMVER $(SEMVER) IMAGETAG $(IMAGETAG)"
 	$(BUILDER) build --pull --no-cache -t "$(DOCKER_REGISTRY)/$(DOCKER_IMAGE_NAME):$(IMAGETAG)" --build-arg GOIMAGE=$(DEFAULT_GOIMAGE) --build-arg BASEIMAGE=$(CSM_BASEIMAGE) .
 
 push:
-	echo "MAJOR $(MAJOR) MINOR $(MINOR) PATCH $(PATCH) RELNOTE $(RELNOTE) SEMVER $(SEMVER)"
 	$(BUILDER) push "$(DOCKER_REGISTRY)/$(DOCKER_IMAGE_NAME):$(IMAGETAG)"
 
 download-csm-common:
 	curl -O -L https://raw.githubusercontent.com/dell/csm/main/config/csm-common.mk
 
 tag:
-	@echo "MAJOR $(MAJOR) MINOR $(MINOR) PATCH $(PATCH) RELNOTE $(RELNOTE) SEMVER $(SEMVER) IMAGETAG $(IMAGETAG) TAGMSG $(TAGMSG)"
 	-git tag -d $(IMAGETAG)
 	git tag -a -m $(TAGMSG) $(IMAGETAG)
