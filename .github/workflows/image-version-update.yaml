@@ -17,7 +17,7 @@ on:  # yamllint disable-line rule:truthy
 jobs:
   # image version update
   image-version-update:
-    uses: dell/common-github-actions/.github/workflows/image-version-update.yaml@main
+    uses: dell/common-github-actions/.github/workflows/image-version-workflow.yaml@main
     with:
       version: "minor"
     secrets: inherit
