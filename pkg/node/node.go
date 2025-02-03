@@ -1240,9 +1240,8 @@ func (s *Service) NodeGetInfo(ctx context.Context, _ *csi.NodeGetInfoRequest) (*
 					if ReachableEndPoint(address.Portal) {
 						// doesn't matter how many portals are present, discovering from any one will list out all targets
 						log.Info("Trying to discover iSCSI target from portal ", address.Portal)
-						//iscsiTargets, err = s.iscsiLib.DiscoverTargets(address.Portal, false)
-						interfaces:= s.iscsiLib.GetInterfaceForTargetIP(address.Portal)
-						iscsiTargets,err = DiscoverTargetsWithInterface(address.Portal,interfaces)
+						ipInterface := s.iscsiLib.GetInterfaceForTargetIP(address.Portal)
+						iscsiTargets, err = s.iscsiLib.DiscoverTargetsWithInterface(address.Portal,ipInterface[address.Portal], false)
 						if err != nil {
 							log.Error("couldn't discover targets")
 							continue
