@@ -34,7 +34,7 @@ func (_m *NodeLabelsModifierInterface) AddNVMeLabels(ctx context.Context, kubeNo
 	ret := _m.Called(ctx, kubeNodeName, labelKey, labelValue)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, []string) (error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, []string) error); ok {
 		return rf(ctx, kubeNodeName, labelKey, labelValue)
 	}
 
@@ -42,7 +42,7 @@ func (_m *NodeLabelsModifierInterface) AddNVMeLabels(ctx context.Context, kubeNo
 		rf(ctx, kubeNodeName, labelKey, labelValue)
 	}
 
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, []string) (error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, []string) error); ok {
 		r0 = rf(ctx, kubeNodeName, labelKey, labelValue)
 	} else {
 		r0 = ret.Error(0)

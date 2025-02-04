@@ -61,7 +61,7 @@ func (_m *NodeLabelsRetrieverInterface) BuildConfigFromFlags(masterURL string, k
 
 // GetNVMeUUIDs provides a mock function with given fields: ctx
 func (_m *NodeLabelsRetrieverInterface) GetNVMeUUIDs(ctx context.Context) (map[string]string, error) {
-	ret := _m.Called( ctx)
+	ret := _m.Called(ctx)
 
 	var r0 map[string]string
 	var r1 error
