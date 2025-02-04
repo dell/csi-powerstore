@@ -30,7 +30,7 @@ type NodeLabelsModifierInterface struct {
 }
 
 // AddNVMeLabels provides a mock function with given fields: ctx, kubeNodeName
-func (_m *NodeLabelsModifierInterface) AddNVMeLabels(ctx context.Context, kubeNodeName string, labelKey string, labelValue []string) (error) {
+func (_m *NodeLabelsModifierInterface) AddNVMeLabels(ctx context.Context, kubeNodeName string, labelKey string, labelValue []string) error {
 	ret := _m.Called(ctx, kubeNodeName, labelKey, labelValue)
 
 	var r0 error
