@@ -51,9 +51,10 @@ func GetMockNodeWithoutLabels() *corev1.Node {
 }
 
 func TestUtilFunctions(t *testing.T) {
+	nodeLabelsRetriever := &k8sutils.NodeLabelsRetrieverImpl{}
+	nodeLabelsModifier := &k8sutils.NodeLabelsModifierImpl{}
 	t.Run("GetNodeLabels", func(t *testing.T) {
 		k8sutils.Clientset = fake.NewClientset(GetMockNodeWithLabels())
-		nodeLabelsRetriever := &k8sutils.NodeLabelsRetrieverImpl{}
 
 		labels, err := nodeLabelsRetriever.GetNodeLabels(context.Background(), "node1")
 
@@ -63,7 +64,6 @@ func TestUtilFunctions(t *testing.T) {
 
 	t.Run("GetNVMeUUIDs", func(t *testing.T) {
 		k8sutils.Clientset = fake.NewClientset(GetMockNodeWithLabels())
-		nodeLabelsRetriever := &k8sutils.NodeLabelsRetrieverImpl{}
 
 		nodeUUIDs, err := nodeLabelsRetriever.GetNVMeUUIDs(context.Background())
 
@@ -73,7 +73,6 @@ func TestUtilFunctions(t *testing.T) {
 
 	t.Run("AddNVMeLabels", func(t *testing.T) {
 		k8sutils.Clientset = fake.NewClientset(GetMockNodeWithoutLabels())
-		nodeLabelsModifier := &k8sutils.NodeLabelsModifierImpl{}
 
 		err := nodeLabelsModifier.AddNVMeLabels(context.Background(), "node1", "hostnqn", []string{"nqn.2025-mm.nvmexpress:uuid:xxxx-yyyy-zzzz"})
 
