@@ -30,28 +30,8 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 )
 
-func TestGetNodeLabels(t *testing.T) {
-	SetK8sClientSetMock()
-	nodeLabelsRetriever := &k8sutils.NodeLabelsRetrieverImpl{}
-
-	labels, err := nodeLabelsRetriever.GetNodeLabels(context.Background(), "node1")
-
-	assert.NoError(t, err)
-	assert.Equal(t, map[string]string{"max-powerstore-volumes-per-node": "2", "hostnqn-uuid": "uuid1"}, labels)
-}
-
-func TestGetNVMeUUIDs(t *testing.T) {
-	SetK8sClientSetMock()
-	nodeLabelsRetriever := &k8sutils.NodeLabelsRetrieverImpl{}
-
-	labels, err := nodeLabelsRetriever.GetNVMeUUIDs(context.Background())
-
-	assert.NoError(t, err)
-	assert.Equal(t, map[string]string{"node1": "uuid1"}, labels)
-}
-
-func SetK8sClientSetMock() {
-	k8sClientset := fake.NewClientset(&corev1.Node{
+func GetMockNodeWithLabels() *corev1.Node {
+	return &corev1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node1",
 			Labels: map[string]string{
@@ -59,90 +39,164 @@ func SetK8sClientSetMock() {
 				"hostnqn-uuid":                    "uuid1",
 			},
 		},
+	}
+}
+
+func GetMockNodeWithoutLabels() *corev1.Node {
+	return &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "node1",
+		},
+	}
+}
+
+func TestUtilFunctions(t *testing.T) {
+	t.Run("GetNodeLabels", func(t *testing.T) {
+		k8sutils.Clientset = fake.NewClientset(GetMockNodeWithLabels())
+		nodeLabelsRetriever := &k8sutils.NodeLabelsRetrieverImpl{}
+
+		labels, err := nodeLabelsRetriever.GetNodeLabels(context.Background(), "node1")
+
+		assert.NoError(t, err)
+		assert.Equal(t, map[string]string{"max-powerstore-volumes-per-node": "2", "hostnqn-uuid": "uuid1"}, labels)
 	})
-	k8sutils.Clientset = k8sClientset
+
+	t.Run("GetNVMeUUIDs", func(t *testing.T) {
+		k8sutils.Clientset = fake.NewClientset(GetMockNodeWithLabels())
+		nodeLabelsRetriever := &k8sutils.NodeLabelsRetrieverImpl{}
+
+		nodeUUIDs, err := nodeLabelsRetriever.GetNVMeUUIDs(context.Background())
+
+		assert.NoError(t, err)
+		assert.Equal(t, map[string]string{"node1": "uuid1"}, nodeUUIDs)
+	})
+
+	t.Run("AddNVMeLabels", func(t *testing.T) {
+		k8sutils.Clientset = fake.NewClientset(GetMockNodeWithoutLabels())
+		nodeLabelsModifier := &k8sutils.NodeLabelsModifierImpl{}
+
+		err := nodeLabelsModifier.AddNVMeLabels(context.Background(), "node1", "hostnqn", []string{"nqn.2025-mm.nvmexpress:uuid:xxxx-yyyy-zzzz"})
+
+		assert.NoError(t, err)
+		// Assert the node labels in the fake client set
+		node, err := k8sutils.Clientset.CoreV1().Nodes().Get(context.Background(), "node1", metav1.GetOptions{})
+		assert.NoError(t, err)
+		assert.Equal(t, map[string]string{"hostnqn": "xxxx-yyyy-zzzz"}, node.Labels)
+	})
 }
 
-func TestGetNodeLabelsRetriever(t *testing.T) {
-	nodeLabelsRetrieverMock := new(mocks.NodeLabelsRetrieverInterface)
-	k8sutils.NodeLabelsRetriever = nodeLabelsRetrieverMock
+func TestUtilFunctions_Error(t *testing.T) {
+	nodeLabelsRetriever := &k8sutils.NodeLabelsRetrieverImpl{}
+	nodeLabelsModifier := &k8sutils.NodeLabelsModifierImpl{}
+	t.Run("GetNodeLabels error", func(t *testing.T) {
+		k8sutils.Clientset = fake.NewClientset()
 
-	nodeLabelsRetrieverMock.On("InClusterConfig", mock.Anything).Return(nil, nil)
-	nodeLabelsRetrieverMock.On("NewForConfig", mock.Anything).Return(nil, nil)
-	nodeLabelsRetrieverMock.On("GetNodeLabels", mock.Anything, mock.Anything, mock.Anything).Return(
-		map[string]string{"max-powerstore-volumes-per-node": "2"}, nil)
+		labels, err := nodeLabelsRetriever.GetNodeLabels(context.Background(), "node1")
 
-	labels, err := k8sutils.GetNodeLabels(context.Background(), "", "test-node")
+		assert.Error(t, err)
+		assert.Nil(t, labels)
+	})
 
-	assert.NoError(t, err)
-	assert.Equal(t, map[string]string{"max-powerstore-volumes-per-node": "2"}, labels)
+	t.Run("GetNVMeUUIDs error", func(t *testing.T) {
+		k8sutils.Clientset = nil
+
+		_, err := nodeLabelsRetriever.GetNVMeUUIDs(context.Background())
+
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "k8sclientset is nil")
+	})
+
+	t.Run("AddNVMeLabels get error", func(t *testing.T) {
+		k8sutils.Clientset = fake.NewClientset()
+
+		err := nodeLabelsModifier.AddNVMeLabels(context.Background(), "node1", "hostnqn", []string{"nqn.2025-mm.nvmexpress:uuid:xxxx-yyyy-zzzz"})
+
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to get node")
+	})
+
+	t.Run("AddNVMeLabels error", func(t *testing.T) {
+		k8sutils.Clientset = nil
+
+		err := nodeLabelsModifier.AddNVMeLabels(context.Background(), "node1", "hostnqn", []string{"nqn.2025-mm.nvmexpress:uuid:xxxx-yyyy-zzzz"})
+
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "k8sclientset is nil")
+	})
 }
 
-func TestGetNodeLabelsRetrieverError(t *testing.T) {
-	nodeLabelsRetrieverMock := new(mocks.NodeLabelsRetrieverInterface)
-	k8sutils.NodeLabelsRetriever = nodeLabelsRetrieverMock
+func TestNodeLabelRetrieverAndModifier(t *testing.T) {
+	retrieverMock := new(mocks.NodeLabelsRetrieverInterface)
+	k8sutils.NodeLabelsRetriever = retrieverMock
+	modifierMock := new(mocks.NodeLabelsModifierInterface)
+	k8sutils.NodeLabelsModifier = modifierMock
 
-	nodeLabelsRetrieverMock.On("InClusterConfig", mock.Anything).Return(nil, errors.New("Unable to create kubeclientset"))
+	retrieverMock.On("InClusterConfig", mock.Anything).Return(nil, nil)
+	retrieverMock.On("BuildConfigFromFlags", mock.Anything, mock.Anything).Return(nil, nil)
+	retrieverMock.On("NewForConfig", mock.Anything).Return(nil, nil)
 
-	_, err := k8sutils.GetNodeLabels(context.Background(), "", "test-node")
+	t.Run("GetNodeLabels", func(t *testing.T) {
+		retrieverMock.On("GetNodeLabels", mock.Anything, mock.Anything, mock.Anything).Return(
+			map[string]string{"max-powerstore-volumes-per-node": "2"}, nil)
 
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "Unable to create kubeclientset")
+		labels, err := k8sutils.GetNodeLabels(context.Background(), "", "test-node")
+
+		assert.NoError(t, err)
+		assert.Equal(t, map[string]string{"max-powerstore-volumes-per-node": "2"}, labels)
+	})
+
+	t.Run("GetNVMeUUIDs", func(t *testing.T) {
+		retrieverMock.On("GetNVMeUUIDs", mock.Anything, mock.Anything).Return(
+			map[string]string{"node1": "uuid1", "node2": "uuid2"}, nil)
+
+		nodeUUIDs, err := k8sutils.GetNVMeUUIDs(context.Background(), "")
+
+		assert.NoError(t, err)
+		assert.Equal(t, map[string]string{"node1": "uuid1", "node2": "uuid2"}, nodeUUIDs)
+	})
+
+	t.Run("AddNVMeLabels", func(t *testing.T) {
+		modifierMock.On("AddNVMeLabels", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
+		err := k8sutils.AddNVMeLabels(context.Background(), "/config/path", "test-node", "max-powerstore-volumes-per-node", []string{"2"})
+
+		assert.NoError(t, err)
+	})
 }
 
-func TestGetNVMeUUIDsRetriever(t *testing.T) {
-	nodeLabelsRetrieverMock := new(mocks.NodeLabelsRetrieverInterface)
-	k8sutils.NodeLabelsRetriever = nodeLabelsRetrieverMock
+func TestNodeLabelRetriever_ConfigError(t *testing.T) {
+	k8sutils.Clientset = nil
+	retrieverMock := new(mocks.NodeLabelsRetrieverInterface)
+	k8sutils.NodeLabelsRetriever = retrieverMock
+	retrieverMock.On("InClusterConfig", mock.Anything).Return(nil, errors.New("Unable to create kubeclientset"))
+	retrieverMock.On("BuildConfigFromFlags", mock.Anything, mock.Anything).Return(nil, errors.New("Unable to build config"))
 
-	nodeLabelsRetrieverMock.On("InClusterConfig", mock.Anything).Return(nil, nil)
-	nodeLabelsRetrieverMock.On("NewForConfig", mock.Anything).Return(nil, nil)
-	nodeLabelsRetrieverMock.On("GetNVMeUUIDs", mock.Anything, mock.Anything).Return(
-		map[string]string{"node1": "uuid1", "node2": "uuid2"}, nil)
+	t.Run("GetNodeLabels error", func(t *testing.T) {
+		_, err := k8sutils.GetNodeLabels(context.Background(), "", "test-node")
 
-	uuids, err := k8sutils.GetNVMeUUIDs(context.Background(), "")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "Unable to create kubeclientset")
+	})
 
-	assert.NoError(t, err)
-	assert.Equal(t, map[string]string{"node1": "uuid1", "node2": "uuid2"}, uuids)
+	t.Run("AddNVMeLabels error", func(t *testing.T) {
+		err := k8sutils.AddNVMeLabels(context.Background(), "/config/path", "test-node", "max-powerstore-volumes-per-node", []string{"2"})
+
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "Unable to build config")
+	})
 }
 
-func TestGetNVMeUUIDsRetrieverError(t *testing.T) {
-	nodeLabelsRetrieverMock := new(mocks.NodeLabelsRetrieverInterface)
-	k8sutils.NodeLabelsRetriever = nodeLabelsRetrieverMock
+func TestNodeLabelRetriever_CreateError(t *testing.T) {
+	k8sutils.Clientset = nil
+	retrieverMock := new(mocks.NodeLabelsRetrieverInterface)
+	k8sutils.NodeLabelsRetriever = retrieverMock
+	retrieverMock.On("InClusterConfig", mock.Anything).Return(nil, nil)
+	retrieverMock.On("NewForConfig", mock.Anything).Return(nil, errors.New("Unable to create kubeclientset"))
 
-	nodeLabelsRetrieverMock.On("InClusterConfig", mock.Anything).Return(nil, nil)
-	nodeLabelsRetrieverMock.On("NewForConfig", mock.Anything).Return(nil, errors.New("Unable to create kubeclientset"))
+	t.Run("GetNVMeUUIDs error", func(t *testing.T) {
+		_, err := k8sutils.GetNVMeUUIDs(context.Background(), "")
 
-	_, err := k8sutils.GetNVMeUUIDs(context.Background(), "")
-
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "Unable to create kubeclientset")
-}
-
-func TestAddNVMeLabelsRetriever(t *testing.T) {
-	nodeLabelsRetrieverMock := new(mocks.NodeLabelsRetrieverInterface)
-	k8sutils.NodeLabelsRetriever = nodeLabelsRetrieverMock
-	nodeLabelsModifierMock := new(mocks.NodeLabelsModifierInterface)
-	k8sutils.NodeLabelsModifier = nodeLabelsModifierMock
-
-	nodeLabelsRetrieverMock.On("BuildConfigFromFlags", mock.Anything, mock.Anything).Return(nil, nil)
-	nodeLabelsRetrieverMock.On("NewForConfig", mock.Anything).Return(nil, nil)
-	nodeLabelsModifierMock.On("AddNVMeLabels", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
-
-	err := k8sutils.AddNVMeLabels(context.Background(), "/config/path", "test-node", "max-powerstore-volumes-per-node", []string{"2"})
-
-	assert.NoError(t, err)
-}
-
-func TestAddNVMeLabelsRetrieverError(t *testing.T) {
-	nodeLabelsRetrieverMock := new(mocks.NodeLabelsRetrieverInterface)
-	k8sutils.NodeLabelsRetriever = nodeLabelsRetrieverMock
-	nodeLabelsModifierMock := new(mocks.NodeLabelsModifierInterface)
-	k8sutils.NodeLabelsModifier = nodeLabelsModifierMock
-
-	nodeLabelsRetrieverMock.On("BuildConfigFromFlags", mock.Anything, mock.Anything).Return(nil, errors.New("Unable to build config"))
-
-	err := k8sutils.AddNVMeLabels(context.Background(), "/config/path", "test-node", "max-powerstore-volumes-per-node", []string{"2"})
-
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "Unable to build config")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "Unable to create kubeclientset")
+	})
 }

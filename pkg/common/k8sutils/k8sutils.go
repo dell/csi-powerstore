@@ -47,14 +47,13 @@ type NodeLabelsRetrieverImpl struct{}
 // NodeLabelsModifierImpl provides the implementation for NodeLabelsModifierInterface
 type NodeLabelsModifierImpl struct{}
 
-// NodeLabelsRetriever is the actual instance of NodeLabelsRetrieverInterface which is used to retrieve the node labels
 var (
+	// NodeLabelsRetriever is the actual instance of NodeLabelsRetrieverInterface which is used to retrieve the node labels
 	NodeLabelsRetriever NodeLabelsRetrieverInterface
 	NodeLabelsModifier  NodeLabelsModifierInterface
+	// Kube Clientset
+	Clientset kubernetes.Interface
 )
-
-// Clientset - Interface to kubernetes
-var Clientset kubernetes.Interface
 
 func init() {
 	NodeLabelsRetriever = new(NodeLabelsRetrieverImpl)
@@ -90,25 +89,27 @@ func (svc *NodeLabelsRetrieverImpl) GetNodeLabels(ctx context.Context, kubeNodeN
 	return nil, nil
 }
 
-// CreateKubeClientSet creates and returns kubeclient set
+// CreateKubeClientSet creates kubeclient set if not created already
 func CreateKubeClientSet(kubeconfig string) error {
-	var config *rest.Config
-	var err error
-	if kubeconfig != "" {
-		config, err = NodeLabelsRetriever.BuildConfigFromFlags("", kubeconfig)
+	if Clientset == nil {
+		var config *rest.Config
+		var err error
+		if kubeconfig != "" {
+			config, err = NodeLabelsRetriever.BuildConfigFromFlags("", kubeconfig)
+			if err != nil {
+				return err
+			}
+		} else {
+			config, err = NodeLabelsRetriever.InClusterConfig()
+			if err != nil {
+				return err
+			}
+		}
+		// create the clientset
+		Clientset, err = NodeLabelsRetriever.NewForConfig(config)
 		if err != nil {
 			return err
 		}
-	} else {
-		config, err = NodeLabelsRetriever.InClusterConfig()
-		if err != nil {
-			return err
-		}
-	}
-	// create the clientset
-	Clientset, err = NodeLabelsRetriever.NewForConfig(config)
-	if err != nil {
-		return err
 	}
 	return nil
 }
