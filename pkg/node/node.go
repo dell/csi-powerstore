@@ -1239,7 +1239,7 @@ func (s *Service) NodeGetInfo(ctx context.Context, _ *csi.NodeGetInfoRequest) (*
 					// first check if this portal is reachable from this machine or not
 					if ReachableEndPoint(address.Portal) {
 						address.Portal = strings.Split(address.Portal, ":")
-						address.Portal := address.Portal[0]
+						address.Portal = address.Portal[0]
 						// doesn't matter how many portals are present, discovering from any one will list out all targets
 						log.Info("Trying to discover iSCSI target from portal ", address.Portal)
 						
