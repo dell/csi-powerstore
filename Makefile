@@ -19,12 +19,6 @@
 
 all: clean build
 
-# Dockerfile defines which base image to use [Dockerfile.centos, Dockerfile.ubi, Dockerfile.ubi.min, Dockerfile.ubi.alt]
-# e.g.:$ make docker DOCKER_FILE=Dockerfile.ubi.alt
-ifndef DOCKER_FILE
-    DOCKER_FILE = Dockerfile.ubi.micro
-endif
-
 # Tag parameters
 ifndef MAJOR
     MAJOR=2
@@ -63,12 +57,12 @@ tag:
 # Generates the docker container (but does not push)
 docker:
 	go run core/semver/semver.go -f mk >semver.mk
-	make -f docker.mk DOCKER_FILE=docker-files/$(DOCKER_FILE) docker
+	make -f docker.mk DOCKER_FILE=Dockerfile docker
 
 # Same as `docker` but without cached layers and will pull latest version of base image
 docker-no-cache:
 	go run core/semver/semver.go -f mk >semver.mk
-	make -f docker.mk DOCKER_FILE=docker-files/$(DOCKER_FILE) docker-no-cache
+	make -f docker.mk DOCKER_FILE=Dockerfile docker-no-cache
 
 # Pushes container to the repository
 push:	docker
@@ -99,3 +93,21 @@ else
 	$(shell gosec -quiet -log gosec.log -out=gosecresults.csv -fmt=csv ./...)
 endif
 	@echo "Logs are stored at gosec.log, Outputfile at gosecresults.csv"
+
+
+.PHONY: actions action-help
+actions: ## Run all GitHub Action checks that run on a pull request creation
+	@echo "Running all GitHub Action checks for pull request events..."
+	@act -l | grep -v ^Stage | grep pull_request | grep -v image_security_scan | awk '{print $$2}' | while read WF; do \
+		echo "Running workflow: $${WF}"; \
+		act pull_request --no-cache-server --platform ubuntu-latest=ghcr.io/catthehacker/ubuntu:act-latest --job "$${WF}"; \
+	done
+
+action-help: ## Echo instructions to run one specific workflow locally
+	@echo "GitHub Workflows can be run locally with the following command:"
+	@echo "act pull_request --no-cache-server --platform ubuntu-latest=ghcr.io/catthehacker/ubuntu:act-latest --job <jobid>"
+	@echo ""
+	@echo "Where '<jobid>' is a Job ID returned by the command:"
+	@echo "act -l"
+	@echo ""
+	@echo "NOTE: if act is not installed, it can be downloaded from https://github.com/nektos/act"
