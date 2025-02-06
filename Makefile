@@ -20,18 +20,6 @@
 all: clean build
 
 # Tag parameters
-ifndef MAJOR
-    MAJOR=2
-endif
-ifndef MINOR
-    MINOR=13
-endif
-ifndef PATCH
-    PATCH=0
-endif
-ifndef NOTES
-	NOTES=
-endif
 ifndef TAGMSG
     TAGMSG="CSI Spec 1.6"
 endif
@@ -51,18 +39,18 @@ install:
 
 # Tags the release with the Tag parameters set above
 tag:
-	-git tag -d v$(MAJOR).$(MINOR).$(PATCH)$(NOTES)
-	git tag -a -m $(TAGMSG) v$(MAJOR).$(MINOR).$(PATCH)$(NOTES)
+	go run core/semver/semver.go -f mk >semver.mk
+	make -f docker.mk tag TAGMSG='$(TAGMSG)'
 
 # Generates the docker container (but does not push)
 docker:
 	go run core/semver/semver.go -f mk >semver.mk
-	make -f docker.mk DOCKER_FILE=Dockerfile docker
+	make -f docker.mk docker
 
 # Same as `docker` but without cached layers and will pull latest version of base image
 docker-no-cache:
 	go run core/semver/semver.go -f mk >semver.mk
-	make -f docker.mk DOCKER_FILE=Dockerfile docker-no-cache
+	make -f docker.mk docker-no-cache
 
 # Pushes container to the repository
 push:	docker
