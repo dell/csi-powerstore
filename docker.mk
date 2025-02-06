@@ -49,7 +49,7 @@ endif
 
 docker: download-csm-common
 	$(eval include csm-common.mk)
-	$(BUILDER) build -t "$(DOCKER_REGISTRY)/$(DOCKER_IMAGE_NAME):$(IMAGETAG)" --build-arg GOIMAGE=$(DEFAULT_GOIMAGE) --build-arg BASEIMAGE=$(CSM_BASEIMAGE) .
+	$(BUILDER) build --pull -t "$(DOCKER_REGISTRY)/$(DOCKER_IMAGE_NAME):$(IMAGETAG)" --build-arg GOIMAGE=$(DEFAULT_GOIMAGE) --build-arg BASEIMAGE=$(CSM_BASEIMAGE) .
 
 docker-no-cache: download-csm-common
 	$(eval include csm-common.mk)
