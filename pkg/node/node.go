@@ -1238,24 +1238,24 @@ func (s *Service) NodeGetInfo(ctx context.Context, _ *csi.NodeGetInfoRequest) (*
 				for _, address := range infoList {
 					// first check if this portal is reachable from this machine or not
 					if ReachableEndPoint(address.Portal) {
-						address.Portal = strings.Split(address.Portal, ":")
-						address.Portal = address.Portal[0]
+						ipAddress := strings.Split(address.Portal, ":")
+						ipAddress = ipAddress.Portal[0]
 						// doesn't matter how many portals are present, discovering from any one will list out all targets
-						log.Info("Trying to discover iSCSI target from portal ", address.Portal)
+						log.Info("Trying to discover iSCSI target from portal ", ipAddress)
 						
-						ipInterface, err := s.iscsiLib.GetInterfaceForTargetIP(address.Portal)
+						ipInterface, err := s.iscsiLib.GetInterfaceForTargetIP(ipAddress)
 						if err != nil {
 							log.Error("couldn't get interface: %s",err.Error())
 							continue
 						}
-						iscsiTargets, err = s.iscsiLib.DiscoverTargetsWithInterface(address.Portal,ipInterface[address.Portal], false)
+						iscsiTargets, err = s.iscsiLib.DiscoverTargetsWithInterface(ipAddress,ipInterface[ipAddress], false)
 						if err != nil {
 							log.Error("couldn't discover targets")
 							continue
 						}
 						break
 					}
-					log.Debugf("Portal %s is not rechable from the node", address.Portal)
+					log.Debugf("Portal %s is not rechable from the node", ipAddress)
 				}
 				// login is also performed as a part of ConnectVolume by using dynamically created chap credentials, In case if it fails here
 				if len(iscsiTargets) > 0 {
