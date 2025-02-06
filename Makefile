@@ -19,12 +19,6 @@
 
 all: clean build
 
-# Dockerfile defines which base image to use [Dockerfile.centos, Dockerfile.ubi, Dockerfile.ubi.min, Dockerfile.ubi.alt]
-# e.g.:$ make docker DOCKER_FILE=Dockerfile.ubi.alt
-ifndef DOCKER_FILE
-    DOCKER_FILE = Dockerfile.ubi.micro
-endif
-
 # Tag parameters
 ifndef MAJOR
     MAJOR=2
@@ -63,12 +57,12 @@ tag:
 # Generates the docker container (but does not push)
 docker:
 	go run core/semver/semver.go -f mk >semver.mk
-	make -f docker.mk DOCKER_FILE=docker-files/$(DOCKER_FILE) docker
+	make -f docker.mk DOCKER_FILE=Dockerfile docker
 
 # Same as `docker` but without cached layers and will pull latest version of base image
 docker-no-cache:
 	go run core/semver/semver.go -f mk >semver.mk
-	make -f docker.mk DOCKER_FILE=docker-files/$(DOCKER_FILE) docker-no-cache
+	make -f docker.mk DOCKER_FILE=Dockerfile docker-no-cache
 
 # Pushes container to the repository
 push:	docker
