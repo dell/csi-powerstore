@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2023 Dell Inc, or its subsidiaries.
+ Copyright (c) 2023-2025 Dell Inc, or its subsidiaries.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -59,25 +59,25 @@ func (_m *NodeLabelsRetrieverInterface) BuildConfigFromFlags(masterURL string, k
 	return r0, r1
 }
 
-// GetNVMeUUIDs provides a mock function with given fields: ctx, k8sclientset
-func (_m *NodeLabelsRetrieverInterface) GetNVMeUUIDs(ctx context.Context, k8sclientset *kubernetes.Clientset) (map[string]string, error) {
-	ret := _m.Called(k8sclientset, ctx)
+// GetNVMeUUIDs provides a mock function with given fields: ctx
+func (_m *NodeLabelsRetrieverInterface) GetNVMeUUIDs(ctx context.Context) (map[string]string, error) {
+	ret := _m.Called(ctx)
 
 	var r0 map[string]string
 	var r1 error
-	if rf, ok := ret.Get(0).(func(*kubernetes.Clientset, context.Context) (map[string]string, error)); ok {
-		return rf(k8sclientset, ctx)
+	if rf, ok := ret.Get(0).(func(context.Context) (map[string]string, error)); ok {
+		return rf(ctx)
 	}
-	if rf, ok := ret.Get(0).(func(*kubernetes.Clientset, context.Context) map[string]string); ok {
-		r0 = rf(k8sclientset, ctx)
+	if rf, ok := ret.Get(0).(func(context.Context) map[string]string); ok {
+		r0 = rf(ctx)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(map[string]string)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(*kubernetes.Clientset, context.Context) error); ok {
-		r1 = rf(k8sclientset, ctx)
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -85,25 +85,25 @@ func (_m *NodeLabelsRetrieverInterface) GetNVMeUUIDs(ctx context.Context, k8scli
 	return r0, r1
 }
 
-// GetNodeLabels provides a mock function with given fields: ctx, k8sclientset, kubeNodeName
-func (_m *NodeLabelsRetrieverInterface) GetNodeLabels(ctx context.Context, k8sclientset *kubernetes.Clientset, kubeNodeName string) (map[string]string, error) {
-	ret := _m.Called(k8sclientset, ctx, kubeNodeName)
+// GetNodeLabels provides a mock function with given fields: ctx, kubeNodeName
+func (_m *NodeLabelsRetrieverInterface) GetNodeLabels(ctx context.Context, kubeNodeName string) (map[string]string, error) {
+	ret := _m.Called(ctx, kubeNodeName)
 
 	var r0 map[string]string
 	var r1 error
-	if rf, ok := ret.Get(0).(func(*kubernetes.Clientset, context.Context, string) (map[string]string, error)); ok {
-		return rf(k8sclientset, ctx, kubeNodeName)
+	if rf, ok := ret.Get(0).(func(context.Context, string) (map[string]string, error)); ok {
+		return rf(ctx, kubeNodeName)
 	}
-	if rf, ok := ret.Get(0).(func(*kubernetes.Clientset, context.Context, string) map[string]string); ok {
-		r0 = rf(k8sclientset, ctx, kubeNodeName)
+	if rf, ok := ret.Get(0).(func(context.Context, string) map[string]string); ok {
+		r0 = rf(ctx, kubeNodeName)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(map[string]string)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(*kubernetes.Clientset, context.Context, string) error); ok {
-		r1 = rf(k8sclientset, ctx, kubeNodeName)
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, kubeNodeName)
 	} else {
 		r1 = ret.Error(1)
 	}
