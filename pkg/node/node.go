@@ -1233,13 +1233,13 @@ func (s *Service) NodeGetInfo(ctx context.Context, _ *csi.NodeGetInfoRequest) (*
 					log.Errorf("couldn't get targets from array: %s", err.Error())
 					continue
 				}
-
+				var ipAddress string
 				var iscsiTargets []goiscsi.ISCSITarget
 				for _, address := range infoList {
 					// first check if this portal is reachable from this machine or not
 					if ReachableEndPoint(address.Portal) {
-						ipAddress := strings.Split(address.Portal, ":")
-						ipAddress = ipAddress.Portal[0]
+						ipAddress = strings.Split(address.Portal, ":")
+						ipAddress = ipAddress[0]
 						// doesn't matter how many portals are present, discovering from any one will list out all targets
 						log.Info("Trying to discover iSCSI target from portal ", ipAddress)
 						
