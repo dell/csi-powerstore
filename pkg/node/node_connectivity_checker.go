@@ -349,10 +349,10 @@ func (s *Service) populateTargetsInCache(array *array.PowerStoreArray) {
 				log.Info("Trying to discover iSCSI target from portal ", ipAddress)
 				ipInterface, err := s.iscsiLib.GetInterfaceForTargetIP(ipAddress)
 				if err != nil {
-					log.Error("couldn't get interface: %s",err.Error())
+					log.Error("couldn't get interface: %s", err.Error())
 					continue
 				}
-				iscsiTargets, err = s.iscsiLib.DiscoverTargetsWithInterface(ipAddress,ipInterface[ipAddress], false)
+				iscsiTargets, err = s.iscsiLib.DiscoverTargetsWithInterface(ipAddress, ipInterface[ipAddress], false)
 				if err != nil {
 					log.Error("couldn't discover targets")
 					continue
