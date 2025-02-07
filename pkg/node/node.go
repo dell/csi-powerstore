@@ -1238,8 +1238,8 @@ func (s *Service) NodeGetInfo(ctx context.Context, _ *csi.NodeGetInfoRequest) (*
 				for _, address := range infoList {
 					// first check if this portal is reachable from this machine or not
 					if ReachableEndPoint(address.Portal) {
-						ipAddress_list := strings.Split(address.Portal, ":")
-						ipAddress = ipAddress_list[0]
+						ipAddressList := strings.Split(address.Portal, ":")
+						ipAddress = ipAddressList[0]
 						// doesn't matter how many portals are present, discovering from any one will list out all targets
 						log.Info("Trying to discover iSCSI target from portal ", ipAddress)
 
