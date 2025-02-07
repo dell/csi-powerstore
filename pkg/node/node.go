@@ -1245,7 +1245,7 @@ func (s *Service) NodeGetInfo(ctx context.Context, _ *csi.NodeGetInfoRequest) (*
 
 						ipInterface, err := s.iscsiLib.GetInterfaceForTargetIP(ipAddress)
 						if err != nil {
-							log.Error("couldn't get interface: %s", err.Error())
+							log.Errorf("couldn't get interface: %s", err.Error())
 							continue
 						}
 						iscsiTargets, err = s.iscsiLib.DiscoverTargetsWithInterface(ipAddress, ipInterface[ipAddress], false)
