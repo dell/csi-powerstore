@@ -363,7 +363,7 @@ func (s *Service) populateTargetsInCache(array *array.PowerStoreArray) {
 				}
 				break
 			}
-			log.Debugf("Portal %s is not rechable from the node", ipAddress)
+			log.Debugf("Portal is not rechable from the node")
 		}
 
 	}

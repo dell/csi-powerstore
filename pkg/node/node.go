@@ -1255,7 +1255,7 @@ func (s *Service) NodeGetInfo(ctx context.Context, _ *csi.NodeGetInfoRequest) (*
 						}
 						break
 					}
-					log.Debugf("Portal %s is not rechable from the node", ipAddress)
+					log.Debugf("Portal is not rechable from the node")
 				}
 				// login is also performed as a part of ConnectVolume by using dynamically created chap credentials, In case if it fails here
 				if len(iscsiTargets) > 0 {
