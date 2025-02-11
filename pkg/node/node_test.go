@@ -3689,8 +3689,8 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					NodeId: nodeSvc.nodeID,
 					AccessibleTopology: &csi.Topology{
 						Segments: map[string]string{
-							common.Name + "/" + firstValidIP + "-nfs":   "true",
-							common.Name + "/" + secondValidIP + "-nfs":  "true",
+							common.Name + "/" + firstValidIP + "-nfs":  "true",
+							common.Name + "/" + secondValidIP + "-nfs": "true",
 						},
 					},
 					MaxVolumesPerNode: 0,
@@ -3727,8 +3727,8 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					NodeId: nodeSvc.nodeID,
 					AccessibleTopology: &csi.Topology{
 						Segments: map[string]string{
-							common.Name + "/" + firstValidIP + "-nfs":   "true",
-							common.Name + "/" + secondValidIP + "-nfs":  "true",
+							common.Name + "/" + firstValidIP + "-nfs":  "true",
+							common.Name + "/" + secondValidIP + "-nfs": "true",
 						},
 					},
 					MaxVolumesPerNode: 2,
@@ -3765,8 +3765,8 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					NodeId: nodeSvc.nodeID,
 					AccessibleTopology: &csi.Topology{
 						Segments: map[string]string{
-							common.Name + "/" + firstValidIP + "-nfs":   "true",
-							common.Name + "/" + secondValidIP + "-nfs":  "true",
+							common.Name + "/" + firstValidIP + "-nfs":  "true",
+							common.Name + "/" + secondValidIP + "-nfs": "true",
 						},
 					},
 					MaxVolumesPerNode: 0,
@@ -3801,8 +3801,8 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					NodeId: nodeSvc.nodeID,
 					AccessibleTopology: &csi.Topology{
 						Segments: map[string]string{
-							common.Name + "/" + firstValidIP + "-nfs":   "true",
-							common.Name + "/" + secondValidIP + "-nfs":  "true",
+							common.Name + "/" + firstValidIP + "-nfs":  "true",
+							common.Name + "/" + secondValidIP + "-nfs": "true",
 						},
 					},
 					MaxVolumesPerNode: 2,
