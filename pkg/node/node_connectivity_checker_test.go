@@ -136,7 +136,7 @@ func TestPopulateTargetsInCache(t *testing.T) {
 
 		nodeSvc.populateTargetsInCache(nodeSvc.Arrays()[firstValidIP])
 
-		if len(nodeSvc.iscsiTargets[firstGlobalID]) != 0 {
+		if len(nodeSvc.iscsiTargets[firstGlobalID]) != 1 {
 			t.Errorf("Expected iscsiTargets to be populated")
 		}
 	})
