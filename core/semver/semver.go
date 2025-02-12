@@ -131,7 +131,11 @@ func main() {
 	// env variable called BUILD_NUMBER
 	buildNumber := os.Getenv("BUILD_NUMBER")
 	if buildNumber == "" {
-		buildNumber = m[5]
+		if len(m) >= 6 {
+			buildNumber = m[5]
+		} else {
+			buildNumber = "0"
+		}
 	}
 	buildType := os.Getenv("BUILD_TYPE")
 	if buildType == "" {
