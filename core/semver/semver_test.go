@@ -95,12 +95,6 @@ func TestMainFunction(t *testing.T) {
 			oldOSExit := OSExit
 			OSExit = func(_ int) {}
 
-			defer func() {
-				if r := recover(); r != nil {
-					t.Errorf("main() panicked: %v", r)
-				}
-			}()
-
 			main()
 
 			// Open the file
