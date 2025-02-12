@@ -131,9 +131,7 @@ func main() {
 	// env variable called BUILD_NUMBER
 	buildNumber := os.Getenv("BUILD_NUMBER")
 	if buildNumber == "" {
-		if len(m) == 0 {
-			buildNumber = ""
-		} else if len(m) >= 6 {
+		if len(m) >= 6 {
 			buildNumber = m[5]
 		} else {
 			buildNumber = "0"
@@ -152,36 +150,36 @@ func main() {
 	if len(m) > 1 {
 		ver.Major = toInt(m[1])
 	} else {
-		ver.Major = 0 // Default value or handle error
+		ver.Major = 0
 	}
 
 	if len(m) > 2 {
 		ver.Minor = toInt(m[2])
 	} else {
-		ver.Minor = 0 // Default value or handle error
+		ver.Minor = 0
 	}
 
 	if len(m) > 3 {
 		ver.Patch = toInt(m[3])
 	} else {
-		ver.Patch = 0 // Default value or handle error
+		ver.Patch = 0
 	}
 	if len(m) > 4 {
 		ver.Notes = m[4]
 	} else {
-		ver.Notes = "" // Default value or handle error
+		ver.Notes = ""
 	}
 
 	if len(m) > 6 {
 		ver.Sha7 = m[6]
 	} else {
-		ver.Sha7 = "" // Default value or handle error
+		ver.Sha7 = ""
 	}
 
 	if len(m) > 7 {
 		ver.Dirty = m[7] != ""
 	} else {
-		ver.Dirty = false // Default value or handle error
+		ver.Dirty = false
 	}
 
 	ver.Sha32 = chkErr(doExec("git", "log", "-n1", `--format=%H`))
