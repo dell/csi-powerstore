@@ -1157,13 +1157,6 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 						},
 						Name: "host-name",
 					}, nil)
-				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
-					Return([]gopowerstore.IPPoolAddress{
-						{
-							Address: "192.168.1.1",
-							IPPort:  gopowerstore.IPPortInstance{TargetIqn: "iqn"},
-						},
-					}, nil)
 				arrays := getTestArrays()
 				nodeSvc.iscsiTargets[firstGlobalID] = []string{"iqn.2015-10.com.dell:dellemc-foobar-123-a-7ceb34a0"}
 				nodeSvc.startNodeToArrayConnectivityCheck(context.Background())
