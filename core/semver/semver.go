@@ -144,18 +144,31 @@ func main() {
 	ver := &semver{
 		GOOS:   goos,
 		GOARCH: goarch,
-		OS:     goosToUname[goos],
-		Arch:   goarchToUname[goarch],
-		Major:  toInt(m[1]),
-		Minor:  toInt(m[2]),
-		Patch:  toInt(m[3]),
-		Notes:  m[4],
-		Type:   buildType,
-		Build:  toInt(buildNumber),
-		Sha7:   m[6],
-		Sha32:  chkErr(doExec("git", "log", "-n1", `--format=%H`)),
-		Dirty:  m[7] != "",
-		Epoch:  toInt64(chkErr(doExec("git", "log", "-n1", `--format=%ct`))),
+	}
+	if len(m) > 1 {
+		ver.Major = toInt(m[1])
+	} else {
+		ver.Major = 0
+	}
+
+	if len(m) > 2 {
+		ver.Minor = toInt(m[2])
+	} else {
+		ver.Minor = 0
+	}
+	ver = &semver{
+		OS:    goosToUname[goos],
+		Arch:  goarchToUname[goarch],
+		Major: toInt(m[1]),
+		Minor: toInt(m[2]),
+		Patch: toInt(m[3]),
+		Notes: m[4],
+		Type:  buildType,
+		Build: toInt(buildNumber),
+		Sha7:  m[6],
+		Sha32: chkErr(doExec("git", "log", "-n1", `--format=%H`)),
+		Dirty: m[7] != "",
+		Epoch: toInt64(chkErr(doExec("git", "log", "-n1", `--format=%ct`))),
 	}
 	ver.SemVer = ver.String()
 	ver.SemVerRPM = ver.RPM()
