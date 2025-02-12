@@ -1157,7 +1157,6 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 						},
 						Name: "host-name",
 					}, nil)
-
 				arrays := getTestArrays()
 				nodeSvc.iscsiTargets[firstGlobalID] = []string{"iqn.2015-10.com.dell:dellemc-foobar-123-a-7ceb34a0"}
 				nodeSvc.startNodeToArrayConnectivityCheck(context.Background())
@@ -4553,6 +4552,17 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				utilMock.On("GetSysBlockDevicesForVolumeWWN", mock.Anything, mock.Anything).Return(
 					[]string{"nvme0n1,nvme0n2"},
 					errors.New("Error"),
+				)
+				_, err := nodeSvc.nodeExpandRawBlockVolume(context.Background(), "")
+				gomega.Expect(err).ToNot(gomega.BeNil())
+			})
+		})
+		ginkgo.When("Devicenames is empty", func() {
+			ginkgo.It("should return error ", func() {
+				fsMock.On("GetUtil").Return(utilMock)
+				utilMock.On("GetSysBlockDevicesForVolumeWWN", mock.Anything, mock.Anything).Return(
+					[]string{},
+					nil,
 				)
 				_, err := nodeSvc.nodeExpandRawBlockVolume(context.Background(), "")
 				gomega.Expect(err).ToNot(gomega.BeNil())
