@@ -37,6 +37,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestRunCSIPlugin(t *testing.T) {
+	testRunCSIPlugin := func() {
+		runCSIPlugin(&gocsi.StoragePlugin{})
+	}
+	assert.NotPanics(t, func() { go testRunCSIPlugin() })
+}
+
 func TestUpdateDriverName(t *testing.T) {
 	tests := []struct {
 		name     string
