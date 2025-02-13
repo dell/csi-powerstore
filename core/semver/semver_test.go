@@ -25,6 +25,12 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestGetExitError(t *testing.T) {
+	err := errors.New("error")
+	_, ok := GetExitError(err)
+	assert.False(t, ok)
+}
+
 func TestMainFunction(t *testing.T) {
 	tests := []struct {
 		name            string
