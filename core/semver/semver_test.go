@@ -25,6 +25,14 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestString(t *testing.T) {
+	s := semver{"", "", "", "", 1, 2, 3, 4, "", "", true, "", "", 64, "", "", "", ""}
+	assert.NotNil(t, s.String())
+
+	s = semver{"", "", "", "", 1, 2, 3, 4, "abc", "", true, "", "", 64, "", "", "", ""}
+	assert.NotNil(t, s.String())
+}
+
 func TestGetExitError(t *testing.T) {
 	err := errors.New("error")
 	_, ok := GetExitError(err)
