@@ -51,14 +51,28 @@ func init() {
 	// Enable X_CSI_REQ_LOGGING and X_CSI_REP_LOGGING to see gRPC request information
 	_ = os.Setenv(gocsi.EnvVarReqLogging, "true")
 	_ = os.Setenv(gocsi.EnvVarRepLogging, "true")
+	
+	updateDriverName()
+	
+	initilizeDriverConfigParams()
+	
+	// If we don't set this env gocsi will overwrite log level with default Info level
+	err := os.Setenv(gocsi.EnvVarLogLevel, log.GetLevel().String())
+	if err != nil {
+		log.WithError(err).Errorf("unable to set env variable %s", gocsi.EnvVarDebug)
+	}
+}
 
+func updateDriverName() {
+	if name, ok := csictx.LookupEnv(context.Background(), common.EnvDriverName); ok {
+		common.Name = name
+	}
+}
+
+func initilizeDriverConfigParams() {
 	paramsPath, ok := csictx.LookupEnv(context.Background(), common.EnvConfigParamsFilePath)
 	if !ok {
 		log.Warnf("config path X_CSI_POWERSTORE_CONFIG_PARAMS_PATH is not specified")
-	}
-
-	if name, ok := csictx.LookupEnv(context.Background(), common.EnvDriverName); ok {
-		common.Name = name
 	}
 
 	paramsViper := viper.New()
@@ -77,12 +91,6 @@ func init() {
 	})
 
 	updateDriverConfigParams(paramsViper)
-
-	// If we don't set this env gocsi will overwrite log level with default Info level
-	err = os.Setenv(gocsi.EnvVarLogLevel, log.GetLevel().String())
-	if err != nil {
-		log.WithError(err).Errorf("unable to set env variable %s", gocsi.EnvVarDebug)
-	}
 }
 
 func main() {

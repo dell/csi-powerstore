@@ -34,17 +34,50 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestMain(t *testing.T) {
+func TestUpdateDriverName(t *testing.T) {
+	tests := []struct {
+		name      string
+		envVar    string
+		expected  string
+	}{
+		{
+			name:     "Environment variable is present",
+			envVar:   "test-driver",
+			expected: "test-driver",
+		},
+		{
+			name:     "Environment variable is not present",
+			envVar:   "",
+			expected: "",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := os.Setenv(common.EnvDriverName, tc.envVar)
+			if err != nil {
+				t.Fatalf("Failed to set environment variable: %v", err)
+			}
+
+			updateDriverName()
+
+			assert.Equal(t, tc.expected, common.Name)
+		})
+	}
+}
+
+func TestMainControllerMode(t *testing.T) {
 	tmpDir := t.TempDir()
-	controllerArrConfig := copyConfigFileToTmpDir(t, "../../pkg/array/testdata/one-arr.yaml", tmpDir)
-	nodeArrConfig := copyConfigFileToTmpDir(t, "../../pkg/array/testdata/one-arr.yaml", tmpDir)
+	config := copyConfigFileToTmpDir(t, "../../pkg/array/testdata/one-arr.yaml", tmpDir)
 
 	// Set required environment variables
-	os.Setenv(common.EnvArrayConfigFilePath, controllerArrConfig)
+	os.Setenv(common.EnvArrayConfigFilePath, config)
 	os.Setenv("CSI_ENDPOINT", "mock_endpoint")
+	os.Setenv(common.EnvDriverName, "test")
 	os.Setenv(common.EnvDebugEnableTracing, "true")
 	os.Setenv("JAEGER_SERVICE_NAME", "controller-test")
-	os.Setenv(common.EnvDriverName, "test")
+	os.Setenv(string(gocsi.EnvVarMode), "controller")
+
 	array2 := `  - endpoint: "https://127.0.0.2/api/rest"
     username: "admin"
     globalID: "gid2"
@@ -53,61 +86,73 @@ func TestMain(t *testing.T) {
     blockProtocol: "auto"
     isDefault: false`
 
-	t.Run("ControllerMode", func(t *testing.T) {
-		os.Setenv(string(gocsi.EnvVarMode), "controller")
+	runCSIPlugin = func(test *gocsi.StoragePlugin) {
+		// Assertions
+		require.NotNil(t, test.Controller)
+		require.NotNil(t, test.Identity)
+		require.Nil(t, test.Node)
+		require.EqualValues(t, 1, len(test.Controller.(*controller.Service).Arrays()))
 
-		runCSIPlugin = func(test *gocsi.StoragePlugin) {
-			// Assertions
-			require.NotNil(t, test.Controller)
-			require.NotNil(t, test.Identity)
-			require.Nil(t, test.Node)
-			require.EqualValues(t, 1, len(test.Controller.(*controller.Service).Arrays()))
-			// Update the config file
-			updateArrConfig(t, controllerArrConfig, array2)
-			time.Sleep(time.Second)
-			// Assertions
-			require.EqualValues(t, 2, len(test.Controller.(*controller.Service).Arrays()))
+		// Update the config file
+		updateArrConfig(t, config, array2)
+		time.Sleep(time.Second)
+
+		// Assertions
+		require.EqualValues(t, 2, len(test.Controller.(*controller.Service).Arrays()))
+	}
+
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("the code panicked with error: %v", r)
 		}
+	}()
 
-		defer func() {
-			if r := recover(); r != nil {
-				t.Fatalf("the code panicked with error: %v", r)
-			}
-		}()
+	main()
+}
 
-		main()
-	})
+func TestMainNodeMode(t *testing.T) {
+	tmpDir := t.TempDir()
+	config := copyConfigFileToTmpDir(t, "../../pkg/array/testdata/one-arr.yaml", tmpDir)
 
-	t.Run("NodeMode", func(t *testing.T) {
-		os.Setenv(common.EnvArrayConfigFilePath, nodeArrConfig)
-		os.Setenv(gocsi.EnvVarMode, "node")
-		os.Setenv(common.EnvDebugEnableTracing, "")
-		tempNodeIDFile, err := os.CreateTemp("", "node-id")
-		require.NoError(t, err)
-		defer os.Remove(tempNodeIDFile.Name())
-		os.Setenv("X_CSI_POWERSTORE_NODE_ID_PATH", tempNodeIDFile.Name())
+	// Set required environment variables
+	os.Setenv(common.EnvArrayConfigFilePath, config)
+	os.Setenv(gocsi.EnvVarMode, "node")
+	os.Setenv(common.EnvDebugEnableTracing, "")
+	tempNodeIDFile, err := os.CreateTemp("", "node-id")
+	require.NoError(t, err)
+	defer os.Remove(tempNodeIDFile.Name())
+	os.Setenv("X_CSI_POWERSTORE_NODE_ID_PATH", tempNodeIDFile.Name())
 
-		runCSIPlugin = func(test *gocsi.StoragePlugin) {
-			// Assertions
-			require.Nil(t, test.Controller)
-			require.NotNil(t, test.Identity)
-			require.NotNil(t, test.Node)
-			require.EqualValues(t, 1, len(test.Node.(*node.Service).Arrays()))
-			// Update the config file
-			updateArrConfig(t, nodeArrConfig, array2)
-			time.Sleep(time.Second)
-			// Assertions
-			require.EqualValues(t, 2, len(test.Node.(*node.Service).Arrays()))
+	array2 := `  - endpoint: "https://127.0.0.2/api/rest"
+    username: "admin"
+    globalID: "gid2"
+    password: "password"
+    skipCertificateValidation: true
+    blockProtocol: "auto"
+    isDefault: false`
+
+	runCSIPlugin = func(test *gocsi.StoragePlugin) {
+		// Assertions
+		require.Nil(t, test.Controller)
+		require.NotNil(t, test.Identity)
+		require.NotNil(t, test.Node)
+		require.EqualValues(t, 1, len(test.Node.(*node.Service).Arrays()))
+
+		// Update the config file
+		updateArrConfig(t, config, array2)
+		time.Sleep(time.Second)
+
+		// Assertions
+		require.EqualValues(t, 2, len(test.Node.(*node.Service).Arrays()))
+	}
+
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("the code panicked with error: %v", r)
 		}
+	}()
 
-		defer func() {
-			if r := recover(); r != nil {
-				t.Fatalf("the code panicked with error: %v", r)
-			}
-		}()
-
-		main()
-	})
+	main()
 }
 
 func copyConfigFileToTmpDir(t *testing.T, src string, tmpDir string) string {
