@@ -17,8 +17,11 @@
 package main
 
 import (
+	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -36,9 +39,9 @@ import (
 
 func TestUpdateDriverName(t *testing.T) {
 	tests := []struct {
-		name      string
-		envVar    string
-		expected  string
+		name     string
+		envVar   string
+		expected string
 	}{
 		{
 			name:     "Environment variable is present",
@@ -64,6 +67,19 @@ func TestUpdateDriverName(t *testing.T) {
 			assert.Equal(t, tc.expected, common.Name)
 		})
 	}
+}
+
+func TestInitilizeDriverConfigParams(t *testing.T) {
+	tmpDir := t.TempDir()
+	content := `CSI_LOG_FORMAT: "JSON"`
+	driverConfigParams := filepath.Join(tmpDir, "driver-config-params.yaml")
+	writeToFile(t, driverConfigParams, content)
+	os.Setenv(common.EnvConfigParamsFilePath, driverConfigParams)
+	initilizeDriverConfigParams()
+	assert.Equal(t, log.DebugLevel, log.GetLevel())
+	writeToFile(t, driverConfigParams, "CSI_LOG_LEVEL: \"info\"")
+	time.Sleep(time.Second)
+	assert.Equal(t, log.InfoLevel, log.GetLevel())
 }
 
 func TestMainControllerMode(t *testing.T) {
@@ -94,7 +110,7 @@ func TestMainControllerMode(t *testing.T) {
 		require.EqualValues(t, 1, len(test.Controller.(*controller.Service).Arrays()))
 
 		// Update the config file
-		updateArrConfig(t, config, array2)
+		writeToFile(t, config, array2)
 		time.Sleep(time.Second)
 
 		// Assertions
@@ -139,7 +155,7 @@ func TestMainNodeMode(t *testing.T) {
 		require.EqualValues(t, 1, len(test.Node.(*node.Service).Arrays()))
 
 		// Update the config file
-		updateArrConfig(t, config, array2)
+		writeToFile(t, config, array2)
 		time.Sleep(time.Second)
 
 		// Assertions
@@ -172,7 +188,7 @@ func copyConfigFileToTmpDir(t *testing.T, src string, tmpDir string) string {
 	return dstF.Name()
 }
 
-func updateArrConfig(t *testing.T, controllerConfigFile string, array2 string) {
+func writeToFile(t *testing.T, controllerConfigFile string, array2 string) {
 	f, err := os.OpenFile(controllerConfigFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		t.Errorf("failed to open confg file %s, err %v", controllerConfigFile, err)
@@ -183,6 +199,10 @@ func updateArrConfig(t *testing.T, controllerConfigFile string, array2 string) {
 			t.Errorf("failed to update confg file %s, err %v", controllerConfigFile, err)
 		}
 	}
+	file, err := os.Open(controllerConfigFile)
+	content, err := ioutil.ReadAll(file)
+	fmt.Println(controllerConfigFile)
+	fmt.Println(string(content))
 }
 
 func TestUpdateDriverConfigParams(t *testing.T) {

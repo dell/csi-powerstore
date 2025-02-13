@@ -51,11 +51,11 @@ func init() {
 	// Enable X_CSI_REQ_LOGGING and X_CSI_REP_LOGGING to see gRPC request information
 	_ = os.Setenv(gocsi.EnvVarReqLogging, "true")
 	_ = os.Setenv(gocsi.EnvVarRepLogging, "true")
-	
+
 	updateDriverName()
-	
+
 	initilizeDriverConfigParams()
-	
+
 	// If we don't set this env gocsi will overwrite log level with default Info level
 	err := os.Setenv(gocsi.EnvVarLogLevel, log.GetLevel().String())
 	if err != nil {
@@ -75,6 +75,7 @@ func initilizeDriverConfigParams() {
 		log.Warnf("config path X_CSI_POWERSTORE_CONFIG_PARAMS_PATH is not specified")
 	}
 
+	fmt.Printf("\nAKSHAY - %v\n", paramsPath)
 	paramsViper := viper.New()
 	paramsViper.SetConfigFile(paramsPath)
 	paramsViper.SetConfigType("yaml")
