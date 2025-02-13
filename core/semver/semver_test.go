@@ -39,6 +39,13 @@ func TestGetExitError(t *testing.T) {
 	assert.False(t, ok)
 }
 
+func TestGetStatusError(t *testing.T) {
+	exitError := &exec.ExitError{
+		ProcessState: &os.ProcessState{},
+	}
+	_, _ = GetStatusError(exitError)
+}
+
 func TestMainFunction(t *testing.T) {
 	tests := []struct {
 		name            string
