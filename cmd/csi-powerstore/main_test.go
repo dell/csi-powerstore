@@ -17,9 +17,7 @@
 package main
 
 import (
-	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -206,10 +204,6 @@ func writeToFile(t *testing.T, controllerConfigFile string, array2 string) {
 			t.Errorf("failed to update confg file %s, err %v", controllerConfigFile, err)
 		}
 	}
-	file, err := os.Open(controllerConfigFile)
-	content, err := ioutil.ReadAll(file)
-	fmt.Println(controllerConfigFile)
-	fmt.Println(string(content))
 }
 
 func TestUpdateDriverConfigParams(t *testing.T) {

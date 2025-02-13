@@ -75,7 +75,6 @@ func initilizeDriverConfigParams() {
 		log.Warnf("config path X_CSI_POWERSTORE_CONFIG_PARAMS_PATH is not specified")
 	}
 
-	fmt.Printf("\nAKSHAY - %v\n", paramsPath)
 	paramsViper := viper.New()
 	paramsViper.SetConfigFile(paramsPath)
 	paramsViper.SetConfigType("yaml")
