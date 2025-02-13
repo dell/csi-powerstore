@@ -17,12 +17,15 @@
 package main
 
 import (
+	"io"
 	"os"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/dell/csi-powerstore/v2/pkg/common"
+	"github.com/dell/csi-powerstore/v2/pkg/controller"
+	"github.com/dell/csi-powerstore/v2/pkg/node"
 	"github.com/dell/gocsi"
 	"github.com/fsnotify/fsnotify"
 	log "github.com/sirupsen/logrus"
@@ -32,12 +35,23 @@ import (
 )
 
 func TestMain(t *testing.T) {
+	tmpDir := t.TempDir()
+	controllerArrConfig := copyConfigFileToTmpDir(t, "../../pkg/array/testdata/one-arr.yaml", tmpDir)
+	nodeArrConfig := copyConfigFileToTmpDir(t, "../../pkg/array/testdata/one-arr.yaml", tmpDir)
+
 	// Set required environment variables
-	os.Setenv("X_CSI_POWERSTORE_CONFIG_PATH", "../../pkg/array/testdata/one-arr.yaml")
+	os.Setenv(common.EnvArrayConfigFilePath, controllerArrConfig)
 	os.Setenv("CSI_ENDPOINT", "mock_endpoint")
 	os.Setenv(common.EnvDebugEnableTracing, "true")
 	os.Setenv("JAEGER_SERVICE_NAME", "controller-test")
 	os.Setenv(common.EnvDriverName, "test")
+	array2 := `  - endpoint: "https://127.0.0.2/api/rest"
+    username: "admin"
+    globalID: "gid2"
+    password: "password"
+    skipCertificateValidation: true
+    blockProtocol: "auto"
+    isDefault: false`
 
 	t.Run("ControllerMode", func(t *testing.T) {
 		os.Setenv(string(gocsi.EnvVarMode), "controller")
@@ -47,6 +61,12 @@ func TestMain(t *testing.T) {
 			require.NotNil(t, test.Controller)
 			require.NotNil(t, test.Identity)
 			require.Nil(t, test.Node)
+			require.EqualValues(t, 1, len(test.Controller.(*controller.Service).Arrays()))
+			// Update the config file
+			updateArrConfig(t, controllerArrConfig, array2)
+			time.Sleep(time.Second)
+			// Assertions
+			require.EqualValues(t, 2, len(test.Controller.(*controller.Service).Arrays()))
 		}
 
 		defer func() {
@@ -59,6 +79,7 @@ func TestMain(t *testing.T) {
 	})
 
 	t.Run("NodeMode", func(t *testing.T) {
+		os.Setenv(common.EnvArrayConfigFilePath, nodeArrConfig)
 		os.Setenv(gocsi.EnvVarMode, "node")
 		os.Setenv(common.EnvDebugEnableTracing, "")
 		tempNodeIDFile, err := os.CreateTemp("", "node-id")
@@ -71,6 +92,12 @@ func TestMain(t *testing.T) {
 			require.Nil(t, test.Controller)
 			require.NotNil(t, test.Identity)
 			require.NotNil(t, test.Node)
+			require.EqualValues(t, 1, len(test.Node.(*node.Service).Arrays()))
+			// Update the config file
+			updateArrConfig(t, nodeArrConfig, array2)
+			time.Sleep(time.Second)
+			// Assertions
+			require.EqualValues(t, 2, len(test.Node.(*node.Service).Arrays()))
 		}
 
 		defer func() {
@@ -81,7 +108,36 @@ func TestMain(t *testing.T) {
 
 		main()
 	})
+}
 
+func copyConfigFileToTmpDir(t *testing.T, src string, tmpDir string) string {
+	t.Helper()
+
+	srcF, err := os.Open(src)
+	require.NoError(t, err)
+	defer srcF.Close()
+
+	dstF, err := os.CreateTemp(tmpDir, "config_*.yaml")
+	require.NoError(t, err)
+	defer dstF.Close()
+
+	_, err = io.Copy(dstF, srcF)
+	require.NoError(t, err)
+
+	return dstF.Name()
+}
+
+func updateArrConfig(t *testing.T, controllerConfigFile string, array2 string) {
+	f, err := os.OpenFile(controllerConfigFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		t.Errorf("failed to open confg file %s, err %v", controllerConfigFile, err)
+	} else {
+		defer f.Close()
+		_, err = f.WriteString(array2 + "\n")
+		if err != nil {
+			t.Errorf("failed to update confg file %s, err %v", controllerConfigFile, err)
+		}
+	}
 }
 
 func TestUpdateDriverConfigParams(t *testing.T) {
