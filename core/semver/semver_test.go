@@ -131,12 +131,6 @@ func TestMainFunction(t *testing.T) {
 			oldOSExit := OSExit
 			OSExit = func(_ int) {}
 
-			defer func() {
-				if r := recover(); r != nil {
-					assert.Contains(t, fmt.Sprintf("%v", r), "error: template failed")
-				}
-			}()
-
 			main()
 
 			// Open the file
