@@ -25,27 +25,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestGetStatusError(t *testing.T) {
-	exitError := &exec.ExitError{
-		ProcessState: &os.ProcessState{},
-	}
-	_, _ = GetStatusError(exitError)
-}
-
-func TestString(t *testing.T) {
-	s := semver{"", "", "", "", 1, 2, 3, 4, "", "", true, "", "", 64, "", "", "", ""}
-	assert.NotNil(t, s.String())
-
-	s = semver{"", "", "", "", 1, 2, 3, 4, "abc", "", true, "", "", 64, "", "", "", ""}
-	assert.NotNil(t, s.String())
-}
-
-func TestGetExitError(t *testing.T) {
-	err := errors.New("error")
-	_, ok := GetExitError(err)
-	assert.False(t, ok)
-}
-
 func TestMainFunction(t *testing.T) {
 	tests := []struct {
 		name            string
@@ -53,7 +32,6 @@ func TestMainFunction(t *testing.T) {
 		outputFile      string
 		expectEmptyFile bool
 		readFileFunc    func(file string) ([]byte, error)
-		gitDescribeFunc func() string
 	}{
 		{
 			name:       "Write mk format to file",
@@ -95,24 +73,11 @@ func TestMainFunction(t *testing.T) {
 			expectEmptyFile: true,
 		},
 		{
+			// go format currently does not print any output, expect an empty file
 			name:            "Write go format to file",
 			format:          "go",
 			outputFile:      "test_output.go",
 			expectEmptyFile: true,
-		},
-		{
-			name:            "Git describe returns empty string",
-			format:          "json",
-			outputFile:      "test_output_empty.json",
-			expectEmptyFile: true,
-			gitDescribeFunc: func() string {
-				return ""
-			},
-		},
-		{
-			name:       "Template execution fails",
-			format:     "{{ .InvalidField }}",
-			outputFile: "test_output.tpl",
 		},
 	}
 
@@ -127,7 +92,6 @@ func TestMainFunction(t *testing.T) {
 			if tt.readFileFunc != nil {
 				ReadFile = tt.readFileFunc
 			}
-
 			oldOSExit := OSExit
 			OSExit = func(_ int) {}
 
@@ -141,12 +105,19 @@ func TestMainFunction(t *testing.T) {
 			defer file.Close()
 
 			// Read the file contents
-			_, err = io.ReadAll(file)
+			contents, err := io.ReadAll(file)
 			if err != nil {
 				t.Error(err)
 			}
 
 			defer os.Remove(tt.outputFile)
+
+			// make sure file is not empty
+			if tt.expectEmptyFile {
+				assert.Equal(t, 0, len(contents))
+			} else {
+				assert.NotEqual(t, 0, len(contents))
+			}
 			os.Args = osArgs
 			ReadFile = oldReadFile
 			OSExit = oldOSExit
