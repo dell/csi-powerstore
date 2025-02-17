@@ -1157,7 +1157,6 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 						},
 						Name: "host-name",
 					}, nil)
-
 				arrays := getTestArrays()
 				nodeSvc.iscsiTargets[firstGlobalID] = []string{"iqn.2015-10.com.dell:dellemc-foobar-123-a-7ceb34a0"}
 				nodeSvc.startNodeToArrayConnectivityCheck(context.Background())
@@ -4550,7 +4549,102 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 			})
 		})
 	})
-
+	ginkgo.Describe("calling NodeExpandRawBlockVolume() offline", func() {
+		ginkgo.When("Error is encountered", func() {
+			ginkgo.It("should return error ", func() {
+				fsMock.On("GetUtil").Return(utilMock)
+				utilMock.On("GetSysBlockDevicesForVolumeWWN", mock.Anything, mock.Anything).Return(
+					[]string{"nvme0n1,nvme0n2"},
+					errors.New("Error"),
+				)
+				_, err := nodeSvc.nodeExpandRawBlockVolume(context.Background(), "")
+				gomega.Expect(err).ToNot(gomega.BeNil())
+			})
+		})
+		ginkgo.When("Devicenames is empty", func() {
+			ginkgo.It("should return error ", func() {
+				fsMock.On("GetUtil").Return(utilMock)
+				utilMock.On("GetSysBlockDevicesForVolumeWWN", mock.Anything, mock.Anything).Return(
+					[]string{},
+					nil,
+				)
+				_, err := nodeSvc.nodeExpandRawBlockVolume(context.Background(), "")
+				gomega.Expect(err).ToNot(gomega.BeNil())
+			})
+		})
+		ginkgo.When("error encountered in getnvmecontroller", func() {
+			ginkgo.It("should return error ", func() {
+				fsMock.On("GetUtil").Return(utilMock)
+				utilMock.On("GetSysBlockDevicesForVolumeWWN", mock.Anything, mock.Anything).Return(
+					[]string{"nvme0n1,nvme0n2"},
+					nil,
+				)
+				utilMock.On("GetNVMeController", mock.Anything).Return(
+					"nvmecontroller-dev1",
+					errors.New("Error"),
+				)
+				_, err := nodeSvc.nodeExpandRawBlockVolume(context.Background(), "")
+				gomega.Expect(err).ToNot(gomega.BeNil())
+			})
+		})
+		ginkgo.When("DeviceRescan fail", func() {
+			ginkgo.It("should return error", func() {
+				fsMock.On("GetUtil").Return(utilMock)
+				utilMock.On("GetSysBlockDevicesForVolumeWWN", mock.Anything, mock.Anything).Return(
+					[]string{"fcnvme0n1,fcnvme0n2"},
+					nil,
+				)
+				utilMock.On("DeviceRescan", mock.Anything, mock.Anything).Return(
+					errors.New("Error"),
+				)
+				utilMock.On("GetMpathNameFromDevice", mock.Anything, mock.Anything).Return(
+					"",
+					errors.New("Error"),
+				)
+				_, err := nodeSvc.nodeExpandRawBlockVolume(context.Background(), "")
+				gomega.Expect(err).ToNot(gomega.BeNil())
+			})
+		})
+		ginkgo.When("GetMpathNameFromDevice fail", func() {
+			ginkgo.It("should return error", func() {
+				fsMock.On("GetUtil").Return(utilMock)
+				utilMock.On("GetSysBlockDevicesForVolumeWWN", mock.Anything, mock.Anything).Return(
+					[]string{"fcnvme0n1,fcnvme0n2"},
+					nil,
+				)
+				utilMock.On("DeviceRescan", mock.Anything, mock.Anything).Return(
+					nil,
+				)
+				utilMock.On("GetMpathNameFromDevice", mock.Anything, mock.Anything).Return(
+					"",
+					errors.New("Error"),
+				)
+				_, err := nodeSvc.nodeExpandRawBlockVolume(context.Background(), "")
+				gomega.Expect(err).ToNot(gomega.BeNil())
+			})
+		})
+		ginkgo.When("ResizeMultipath fail", func() {
+			ginkgo.It("should return error", func() {
+				fsMock.On("GetUtil").Return(utilMock)
+				utilMock.On("GetSysBlockDevicesForVolumeWWN", mock.Anything, mock.Anything).Return(
+					[]string{"fcnvme0n1,fcnvme0n2"},
+					nil,
+				)
+				utilMock.On("DeviceRescan", mock.Anything, mock.Anything).Return(
+					nil,
+				)
+				utilMock.On("GetMpathNameFromDevice", mock.Anything, mock.Anything).Return(
+					"mpath",
+					nil,
+				)
+				utilMock.On("ResizeMultipath", mock.Anything, mock.Anything).Return(
+					errors.New("Error"),
+				)
+				_, err := nodeSvc.nodeExpandRawBlockVolume(context.Background(), "")
+				gomega.Expect(err).ToNot(gomega.BeNil())
+			})
+		})
+	})
 	ginkgo.Describe("calling NodeGetVolumeStats()", func() {
 		ginkgo.When("volume ID is missing", func() {
 			ginkgo.It("should fail", func() {
