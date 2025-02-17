@@ -201,7 +201,7 @@ func main() {
 	}
 }
 
-func doExec(cmd string, args ...string) ([]byte, error) {
+var doExec = func(cmd string, args ...string) ([]byte, error) {
 	c := exec.Command(cmd, args...) // #nosec G204
 	c.Stderr = os.Stderr
 	return c.Output()

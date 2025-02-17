@@ -25,6 +25,27 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestGetStatusError(t *testing.T) {
+	exitError := &exec.ExitError{
+		ProcessState: &os.ProcessState{},
+	}
+	_, _ = GetStatusError(exitError)
+}
+
+func TestString(t *testing.T) {
+	s := semver{"", "", "", "", 1, 2, 3, 4, "", "", true, "", "", 64, "", "", "", ""}
+	assert.NotNil(t, s.String())
+
+	s = semver{"", "", "", "", 1, 2, 3, 4, "abc", "", true, "", "", 64, "", "", "", ""}
+	assert.NotNil(t, s.String())
+}
+
+func TestGetExitError(t *testing.T) {
+	err := errors.New("error")
+	_, ok := GetExitError(err)
+	assert.False(t, ok)
+}
+
 func TestMainFunction(t *testing.T) {
 	tests := []struct {
 		name            string
@@ -95,6 +116,11 @@ func TestMainFunction(t *testing.T) {
 			oldOSExit := OSExit
 			OSExit = func(_ int) {}
 
+			oldDoExec := doExec
+			doExec = func(_ string, _ ...string) ([]byte, error) {
+				return []byte("v2.13.0-77-g38b3a19-dirty"), nil
+			}
+
 			main()
 
 			// Open the file
@@ -121,6 +147,7 @@ func TestMainFunction(t *testing.T) {
 			os.Args = osArgs
 			ReadFile = oldReadFile
 			OSExit = oldOSExit
+			doExec = oldDoExec
 		})
 	}
 }
