@@ -44,6 +44,7 @@ import (
 
 // IPToArray - Store Array IPs
 var IPToArray map[string]string
+var ipToArrayMux sync.Mutex
 
 // Consumer provides methods for safe management of arrays
 type Consumer interface {
@@ -101,6 +102,13 @@ func (s *Locker) SetDefaultArray(array *PowerStoreArray) {
 	s.defaultArray = array
 }
 
+// UpdateIPToArray safely updates the IPToArray matcher.
+func updateIPToArray(matcher map[string]string) {
+	ipToArrayMux.Lock()
+	defer ipToArrayMux.Unlock()
+	IPToArray = matcher
+}
+
 // UpdateArrays updates array info
 func (s *Locker) UpdateArrays(configPath string, fs fs.Interface) error {
 	log.Info("updating array info")
@@ -109,7 +117,7 @@ func (s *Locker) UpdateArrays(configPath string, fs fs.Interface) error {
 		return fmt.Errorf("can't get config for arrays: %s", err.Error())
 	}
 	s.SetArrays(arrays)
-	IPToArray = matcher
+	updateIPToArray(matcher)
 	s.SetDefaultArray(defaultArray)
 	return nil
 }
