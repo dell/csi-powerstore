@@ -1233,21 +1233,29 @@ func (s *Service) NodeGetInfo(ctx context.Context, _ *csi.NodeGetInfoRequest) (*
 					log.Errorf("couldn't get targets from array: %s", err.Error())
 					continue
 				}
-
+				var ipAddress string
 				var iscsiTargets []goiscsi.ISCSITarget
 				for _, address := range infoList {
 					// first check if this portal is reachable from this machine or not
 					if ReachableEndPoint(address.Portal) {
+						ipAddressList := splitIPAddress(address.Portal)
+						ipAddress = ipAddressList[0]
 						// doesn't matter how many portals are present, discovering from any one will list out all targets
-						log.Info("Trying to discover iSCSI target from portal ", address.Portal)
-						iscsiTargets, err = s.iscsiLib.DiscoverTargets(address.Portal, false)
+						log.Info("Trying to discover iSCSI target from portal ", ipAddress)
+
+						ipInterface, err := s.iscsiLib.GetInterfaceForTargetIP(ipAddress)
+						if err != nil {
+							log.Errorf("couldn't get interface: %s", err.Error())
+							continue
+						}
+						iscsiTargets, err = s.iscsiLib.DiscoverTargetsWithInterface(address.Portal, ipInterface[ipAddress], false)
 						if err != nil {
 							log.Error("couldn't discover targets")
 							continue
 						}
 						break
 					}
-					log.Debugf("Portal %s is not rechable from the node", address.Portal)
+					log.Debugf("Portal is not rechable from the node")
 				}
 				// login is also performed as a part of ConnectVolume by using dynamically created chap credentials, In case if it fails here
 				if len(iscsiTargets) > 0 {
@@ -1755,4 +1763,10 @@ func (s *Service) fileExists(filename string) bool {
 		}).Error("Error while checking stat of file")
 	}
 	return false
+}
+
+// splitIPAddress function takes a string in the format "hostname:port"
+// and returns a slice containing the hostname and port.
+func splitIPAddress(address string) []string {
+	return strings.Split(address, ":")
 }
