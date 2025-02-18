@@ -42,9 +42,11 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// IPToArray - Store Array IPs
-var IPToArray map[string]string
-var ipToArrayMux sync.Mutex
+var (
+	// IPToArray - Store Array IPs
+	IPToArray    map[string]string
+	ipToArrayMux sync.Mutex
+)
 
 // Consumer provides methods for safe management of arrays
 type Consumer interface {
