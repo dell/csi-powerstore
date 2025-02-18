@@ -21,6 +21,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -34,6 +35,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// Global mutex for tests
+var testMutex sync.Mutex
 
 func TestUpdateDriverName(t *testing.T) {
 	tests := []struct {
@@ -81,6 +85,8 @@ func TestInitilizeDriverConfigParams(t *testing.T) {
 }
 
 func TestMainControllerMode(t *testing.T) {
+	testMutex.Lock()
+	defer testMutex.Unlock()
 	tmpDir := t.TempDir()
 	config := copyConfigFileToTmpDir(t, "../../pkg/array/testdata/one-arr.yaml", tmpDir)
 
@@ -125,6 +131,8 @@ func TestMainControllerMode(t *testing.T) {
 }
 
 func TestMainNodeMode(t *testing.T) {
+	testMutex.Lock()
+	defer testMutex.Unlock()
 	tmpDir := t.TempDir()
 	config := copyConfigFileToTmpDir(t, "../../pkg/array/testdata/one-arr.yaml", tmpDir)
 
