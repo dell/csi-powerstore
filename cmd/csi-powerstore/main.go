@@ -162,7 +162,7 @@ func main() {
 		}
 	})
 
-	interList := []grpc.UnaryServerInterceptor{
+	InterceptorsList := []grpc.UnaryServerInterceptor{
 		interceptors.NewCustomSerialLock(mode),
 		interceptors.NewRewriteRequestIDInterceptor(),
 	}
@@ -176,13 +176,13 @@ func main() {
 		}
 		defer closer.Close() // #nosec G307
 		opentracing.SetGlobalTracer(t)
-		interList = append(interList, grpc_opentracing.UnaryServerInterceptor(grpc_opentracing.WithTracer(t)))
+		InterceptorsList = append(InterceptorsList, grpc_opentracing.UnaryServerInterceptor(grpc_opentracing.WithTracer(t)))
 	}
 	storageProvider := &gocsi.StoragePlugin{
 		Controller:                controllerService,
 		Identity:                  identityService,
 		Node:                      nodeService,
-		Interceptors:              interList,
+		Interceptors:              InterceptorsList,
 		RegisterAdditionalServers: controllerService.RegisterAdditionalServers,
 
 		EnvVars: []string{

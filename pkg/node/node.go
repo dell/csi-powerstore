@@ -1238,7 +1238,7 @@ func (s *Service) NodeGetInfo(ctx context.Context, _ *csi.NodeGetInfoRequest) (*
 				for _, address := range infoList {
 					// first check if this portal is reachable from this machine or not
 					if ReachableEndPoint(address.Portal) {
-						ipAddressList := strings.Split(address.Portal, ":")
+						ipAddressList := splitIPAddress(address.Portal)
 						ipAddress = ipAddressList[0]
 						// doesn't matter how many portals are present, discovering from any one will list out all targets
 						log.Info("Trying to discover iSCSI target from portal ", ipAddress)
@@ -1763,4 +1763,10 @@ func (s *Service) fileExists(filename string) bool {
 		}).Error("Error while checking stat of file")
 	}
 	return false
+}
+
+// splitIPAddress function takes a string in the format "hostname:port"
+// and returns a slice containing the hostname and port.
+func splitIPAddress(address string) []string {
+	return strings.Split(address, ":")
 }

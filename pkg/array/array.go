@@ -104,8 +104,8 @@ func (s *Locker) SetDefaultArray(array *PowerStoreArray) {
 	s.defaultArray = array
 }
 
-// UpdateIPToArray safely updates the IPToArray matcher.
-func updateIPToArray(matcher map[string]string) {
+// setIPToArray safely updates the IPToArray matcher.
+func setIPToArray(matcher map[string]string) {
 	ipToArrayMux.Lock()
 	defer ipToArrayMux.Unlock()
 	IPToArray = matcher
@@ -119,7 +119,7 @@ func (s *Locker) UpdateArrays(configPath string, fs fs.Interface) error {
 		return fmt.Errorf("can't get config for arrays: %s", err.Error())
 	}
 	s.SetArrays(arrays)
-	updateIPToArray(matcher)
+	setIPToArray(matcher)
 	s.SetDefaultArray(defaultArray)
 	return nil
 }
