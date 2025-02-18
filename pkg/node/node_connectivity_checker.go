@@ -338,14 +338,21 @@ func (s *Service) populateTargetsInCache(array *array.PowerStoreArray) {
 			log.Errorf("couldn't get targets from array: %s", err.Error())
 			return
 		}
-
+		var ipAddress string
 		var iscsiTargets []goiscsi.ISCSITarget
 		for _, address := range infoList {
 			// first check if this portal is reachable from this machine or not
 			if ReachableEndPoint(address.Portal) {
+				ipAddressList := splitIPAddress(address.Portal)
+				ipAddress = ipAddressList[0]
 				// doesn't matter how many portals are present, discovering from any one will list out all targets
-				log.Info("Trying to discover iSCSI target from portal ", address.Portal)
-				iscsiTargets, err = s.iscsiLib.DiscoverTargets(address.Portal, false)
+				log.Info("Trying to discover iSCSI target from portal ", ipAddress)
+				ipInterface, err := s.iscsiLib.GetInterfaceForTargetIP(ipAddress)
+				if err != nil {
+					log.Errorf("couldn't get interface: %s", err.Error())
+					continue
+				}
+				iscsiTargets, err = s.iscsiLib.DiscoverTargetsWithInterface(address.Portal, ipInterface[ipAddress], false)
 				if err != nil {
 					log.Error("couldn't discover targets")
 					continue
@@ -356,7 +363,7 @@ func (s *Service) populateTargetsInCache(array *array.PowerStoreArray) {
 				}
 				break
 			}
-			log.Debugf("Portal %s is not rechable from the node", address.Portal)
+			log.Debugf("Portal is not rechable from the node")
 		}
 
 	}

@@ -16,7 +16,7 @@ require (
 	github.com/dell/gobrick v1.13.1
 	github.com/dell/gocsi v1.13.0
 	github.com/dell/gofsutil v1.18.0
-	github.com/dell/goiscsi v1.11.0
+	github.com/dell/goiscsi v1.11.1-0.20250212115651-d1edf55b1c1d
 	github.com/dell/gonvme v1.10.1
 	github.com/dell/gopowerstore v1.17.0
 	github.com/fsnotify/fsnotify v1.8.0
