@@ -25,7 +25,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestGetStatusError(t *testing.T) {
+func TestGetStatusError(_ *testing.T) {
 	exitError := &exec.ExitError{
 		ProcessState: &os.ProcessState{},
 	}

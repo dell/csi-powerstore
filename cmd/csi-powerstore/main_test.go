@@ -187,7 +187,7 @@ func copyConfigFileToTmpDir(t *testing.T, src string, tmpDir string) string {
 }
 
 func writeToFile(t *testing.T, controllerConfigFile string, array2 string) {
-	f, err := os.OpenFile(controllerConfigFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	f, err := os.OpenFile(controllerConfigFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
 		t.Errorf("failed to open confg file %s, err %v", controllerConfigFile, err)
 	} else {
@@ -207,7 +207,7 @@ func TestUpdateDriverConfigParams(t *testing.T) {
 
 	viperChan := make(chan bool)
 	v.WatchConfig()
-	v.OnConfigChange(func(e fsnotify.Event) {
+	v.OnConfigChange(func(_ fsnotify.Event) {
 		updateDriverConfigParams(v)
 		viperChan <- true
 	})
