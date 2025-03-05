@@ -7,16 +7,16 @@ require (
 	github.com/apparentlymart/go-cidr v1.1.0
 	github.com/container-storage-interface/spec v1.6.0
 	github.com/dell/csi-metadata-retriever v1.10.0
-	github.com/dell/dell-csi-extensions/common v1.7.0
-	github.com/dell/dell-csi-extensions/podmon v1.7.0
-	github.com/dell/dell-csi-extensions/replication v1.10.1
-	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.8.1
+	github.com/dell/dell-csi-extensions/common v1.7.1-0.20250226203203-5dcd46c607b9
+	github.com/dell/dell-csi-extensions/podmon v1.7.1-0.20250226203203-5dcd46c607b9
+	github.com/dell/dell-csi-extensions/replication v1.10.2-0.20250226203203-5dcd46c607b9
+	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.8.2-0.20250226203203-5dcd46c607b9
 	github.com/dell/gobrick v1.13.1
-	github.com/dell/gocsi v1.13.0
+	github.com/dell/gocsi v1.13.1-0.20250226203119-f6c4e42fab09
 	github.com/dell/gofsutil v1.18.0
-	github.com/dell/goiscsi v1.11.1-0.20250212115651-d1edf55b1c1d
-	github.com/dell/gonvme v1.10.1
-	github.com/dell/gopowerstore v1.17.0
+	github.com/dell/goiscsi v1.11.1-0.20250227093735-d591593ee572
+	github.com/dell/gonvme v1.10.2-0.20250226203131-a3942eb04728
+	github.com/dell/gopowerstore v1.17.1-0.20250305180052-2334e8c6f713
 	github.com/fsnotify/fsnotify v1.8.0
 	github.com/go-openapi/strfmt v0.23.0
 	github.com/golang/mock v1.6.0
@@ -87,7 +87,7 @@ require (
 	github.com/sourcegraph/conc v0.3.0 // indirect
 	github.com/spf13/afero v1.12.0 // indirect
 	github.com/spf13/cast v1.7.1 // indirect
-	github.com/spf13/pflag v1.0.5 // indirect
+	github.com/spf13/pflag v1.0.6 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
