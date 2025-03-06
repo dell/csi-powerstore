@@ -14,7 +14,7 @@
 #
 #
 
-FROM golang:1.23
+FROM golang:1.24
 
 RUN git clone https://github.com/kubernetes-csi/csi-test.git && \
     cd csi-test/cmd/csi-sanity && \
