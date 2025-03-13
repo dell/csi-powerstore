@@ -4,7 +4,7 @@ go 1.24
 
 require (
 	github.com/dell/csi-powerstore/v2 v2.11.0
-	github.com/dell/gopowerstore v1.17.0
+	github.com/dell/gopowerstore v1.17.1-0.20250305180052-2334e8c6f713
 	github.com/onsi/ginkgo/v2 v2.22.1
 	github.com/onsi/gomega v1.36.2
 	gopkg.in/yaml.v2 v2.4.0
@@ -42,10 +42,10 @@ require (
 	github.com/cyphar/filepath-securejoin v0.2.4 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/dell/gobrick v1.13.1 // indirect
-	github.com/dell/gocsi v1.13.0 // indirect
+	github.com/dell/gocsi v1.13.1-0.20250226203119-f6c4e42fab09 // indirect
 	github.com/dell/gofsutil v1.18.0 // indirect
-	github.com/dell/goiscsi v1.11.1-0.20250212115651-d1edf55b1c1d // indirect
-	github.com/dell/gonvme v1.10.1 // indirect
+	github.com/dell/goiscsi v1.11.1-0.20250227093735-d591593ee572 // indirect
+	github.com/dell/gonvme v1.10.2-0.20250226203131-a3942eb04728 // indirect
 	github.com/distribution/reference v0.5.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/emicklei/go-restful/v3 v3.12.1 // indirect
@@ -106,8 +106,8 @@ require (
 	github.com/prometheus/procfs v0.15.1 // indirect
 	github.com/seccomp/libseccomp-golang v0.10.0 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
-	github.com/spf13/cobra v1.8.1 // indirect
-	github.com/spf13/pflag v1.0.5 // indirect
+	github.com/spf13/cobra v1.9.1 // indirect
+	github.com/spf13/pflag v1.0.6 // indirect
 	github.com/stoewer/go-strcase v1.2.0 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/stretchr/testify v1.10.0 // indirect
@@ -133,10 +133,10 @@ require (
 	go.opentelemetry.io/proto/otlp v1.3.1 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.0 // indirect
-	golang.org/x/crypto v0.33.0 // indirect
+	golang.org/x/crypto v0.35.0 // indirect
 	golang.org/x/exp v0.0.0-20241009180824-f66d83c29e7c // indirect
 	golang.org/x/mod v0.22.0 // indirect
-	golang.org/x/net v0.35.0 // indirect
+	golang.org/x/net v0.36.0 // indirect
 	golang.org/x/oauth2 v0.25.0 // indirect
 	golang.org/x/sync v0.11.0 // indirect
 	golang.org/x/sys v0.30.0 // indirect
