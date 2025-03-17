@@ -28,7 +28,7 @@ import (
 	"syscall"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/dell/csi-nfs/nfs"
+	"github.com/dell/csm-hbnfs/nfs"
 )
 
 // NodeStageVolume prepares volume to be consumed by node publish by connecting volume to the node

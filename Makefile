@@ -31,7 +31,6 @@ clean:
 
 build:
 	go generate ./cmd/csi-powerstore
-	(cd csi-nfs; make build)
 	GOOS=linux CGO_ENABLED=0 go build ./cmd/csi-powerstore
 
 dev-docker: build
