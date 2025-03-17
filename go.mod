@@ -2,13 +2,15 @@ module github.com/dell/csi-powerstore/v2
 
 go 1.24
 
-replace github.com/dell/csi-nfs => ./csi-nfs
+// // Reintroduce if need to build locally.
+// replace github.com/dell/csm-hbnfs => ./replace/csm-hbnfs
 
 require (
 	github.com/akutz/gosync v0.1.0
 	github.com/apparentlymart/go-cidr v1.1.0
-	github.com/container-storage-interface/spec v1.6.0
+	github.com/container-storage-interface/spec v1.8.0
 	github.com/dell/csi-metadata-retriever v1.10.0
+	github.com/dell/csm-hbnfs v0.0.0-20250321113850-81773795ce88
 	github.com/dell/dell-csi-extensions/common v1.7.1-0.20250321180109-ff9405f3dbef
 	github.com/dell/dell-csi-extensions/podmon v1.7.1-0.20250321180109-ff9405f3dbef
 	github.com/dell/dell-csi-extensions/replication v1.10.2-0.20250321180109-ff9405f3dbef
@@ -37,9 +39,9 @@ require (
 	google.golang.org/grpc v1.71.0
 	google.golang.org/protobuf v1.36.5
 	gopkg.in/yaml.v3 v3.0.1
-	k8s.io/api v0.32.1
-	k8s.io/apimachinery v0.32.1
-	k8s.io/client-go v0.32.1
+	k8s.io/api v0.32.3
+	k8s.io/apimachinery v0.32.3
+	k8s.io/client-go v0.32.3
 )
 
 require (

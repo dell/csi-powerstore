@@ -14,12 +14,12 @@
 package provider
 
 import (
-	"github.com/dell/csi-nfs/nfs"
 	"github.com/dell/csi-powerstore/v2/pkg/common"
 	"github.com/dell/csi-powerstore/v2/pkg/controller"
 	"github.com/dell/csi-powerstore/v2/pkg/identity"
 	"github.com/dell/csi-powerstore/v2/pkg/node"
 	"github.com/dell/csi-powerstore/v2/pkg/service"
+	"github.com/dell/csm-hbnfs/nfs"
 	"github.com/dell/gocsi"
 	logrus "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
