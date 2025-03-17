@@ -22,10 +22,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dell/csi-nfs/nfs"
 	"github.com/dell/csi-powerstore/v2/pkg/common"
 	"github.com/dell/csi-powerstore/v2/pkg/controller"
 	"github.com/dell/csi-powerstore/v2/pkg/node"
+	"github.com/dell/csm-hbnfs/nfs"
 	"github.com/dell/gocsi"
 	csictx "github.com/dell/gocsi/context"
 	"github.com/fsnotify/fsnotify"
