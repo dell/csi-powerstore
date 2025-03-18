@@ -66,7 +66,7 @@ func (s *service) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublis
 // NodeGetVolumeStats returns volume usage stats
 func (s *service) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
 	if nfs.IsNFSVolumeID(req.VolumeId) {
-		req.VolumeId = nfs.NFSToArrayVolumeID(req.VolumeId)
+		req.VolumeId = nfs.ToArrayVolumeID(req.VolumeId)
 	}
 	return nodeSvc.NodeGetVolumeStats(ctx, req)
 }
