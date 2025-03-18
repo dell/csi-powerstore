@@ -364,7 +364,7 @@ func (s *Service) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVol
 	stagingPath := req.GetStagingTargetPath()
 
 	if nfs.IsNFSVolumeID(id) {
-		id = nfs.NFSToArrayVolumeID(id)
+		id = nfs.ToArrayVolumeID(id)
 	} else {
 		// append additional path to be able to do bind mounts
 		stagingPath = getStagingPath(ctx, req.GetStagingTargetPath(), id)
@@ -505,7 +505,7 @@ func (s *Service) NodePublishVolume(ctx context.Context, req *csi.NodePublishVol
 	var ephemeralVolume bool
 	nfsStaging := nfs.IsNFSVolumeID(req.VolumeId)
 	if nfsStaging {
-		req.VolumeId = nfs.NFSToArrayVolumeID(req.VolumeId)
+		req.VolumeId = nfs.ToArrayVolumeID(req.VolumeId)
 	}
 	ephemeral, ok := req.VolumeContext["csi.storage.k8s.io/ephemeral"]
 	if ok {
@@ -861,7 +861,7 @@ func (s *Service) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolum
 
 	isHBN := nfs.IsNFSVolumeID(req.VolumeId)
 	if isHBN {
-		req.VolumeId = nfs.NFSToArrayVolumeID(req.VolumeId)
+		req.VolumeId = nfs.ToArrayVolumeID(req.VolumeId)
 	}
 
 	// Get the VolumeID and validate against the volume
