@@ -56,7 +56,7 @@ func (s *service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 // DeleteVolume deletes either FileSystem or Volume from storage array.
 func (s *service) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
 	if nfs.IsNFSVolumeID(req.VolumeId) {
-		req.VolumeId = nfs.NFSToArrayVolumeID(req.VolumeId)
+		req.VolumeId = nfs.ToArrayVolumeID(req.VolumeId)
 	}
 	return controllerSvc.DeleteVolume(ctx, req)
 }
@@ -104,7 +104,7 @@ func (s *service) ControllerUnpublishVolume(ctx context.Context, req *csi.Contro
 // ValidateVolumeCapabilities checks if capabilities found in request are supported by driver.
 func (s *service) ValidateVolumeCapabilities(ctx context.Context, req *csi.ValidateVolumeCapabilitiesRequest) (*csi.ValidateVolumeCapabilitiesResponse, error) {
 	if nfs.IsNFSVolumeID(req.VolumeId) {
-		req.VolumeId = nfs.NFSToArrayVolumeID(req.VolumeId)
+		req.VolumeId = nfs.ToArrayVolumeID(req.VolumeId)
 	}
 	return controllerSvc.ValidateVolumeCapabilities(ctx, req)
 }
@@ -127,7 +127,7 @@ func (s *service) ControllerGetCapabilities(ctx context.Context, req *csi.Contro
 // CreateSnapshot creates a snapshot of the Volume or FileSystem.
 func (s *service) CreateSnapshot(ctx context.Context, req *csi.CreateSnapshotRequest) (*csi.CreateSnapshotResponse, error) {
 	if nfs.IsNFSVolumeID(req.SourceVolumeId) {
-		req.SourceVolumeId = nfs.NFSToArrayVolumeID(req.SourceVolumeId)
+		req.SourceVolumeId = nfs.ToArrayVolumeID(req.SourceVolumeId)
 	}
 	return controllerSvc.CreateSnapshot(ctx, req)
 }
@@ -140,7 +140,7 @@ func (s *service) DeleteSnapshot(ctx context.Context, req *csi.DeleteSnapshotReq
 // ListSnapshots list all accessible snapshots from the storage array.
 func (s *service) ListSnapshots(ctx context.Context, req *csi.ListSnapshotsRequest) (*csi.ListSnapshotsResponse, error) {
 	if nfs.IsNFSVolumeID(req.SourceVolumeId) {
-		req.SourceVolumeId = nfs.NFSToArrayVolumeID(req.SourceVolumeId)
+		req.SourceVolumeId = nfs.ToArrayVolumeID(req.SourceVolumeId)
 	}
 	return controllerSvc.ListSnapshots(ctx, req)
 }
@@ -148,7 +148,7 @@ func (s *service) ListSnapshots(ctx context.Context, req *csi.ListSnapshotsReque
 // ControllerExpandVolume resizes Volume or FileSystem by increasing available volume capacity in the storage array.
 func (s *service) ControllerExpandVolume(ctx context.Context, req *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
 	if nfs.IsNFSVolumeID(req.GetVolumeId()) {
-		req.VolumeId = nfs.NFSToArrayVolumeID(req.GetVolumeId())
+		req.VolumeId = nfs.ToArrayVolumeID(req.GetVolumeId())
 	}
 	return controllerSvc.ControllerExpandVolume(ctx, req)
 }
@@ -156,7 +156,7 @@ func (s *service) ControllerExpandVolume(ctx context.Context, req *csi.Controlle
 // ControllerGetVolume fetch current information about a volume
 func (s *service) ControllerGetVolume(ctx context.Context, req *csi.ControllerGetVolumeRequest) (*csi.ControllerGetVolumeResponse, error) {
 	if nfs.IsNFSVolumeID(req.VolumeId) {
-		req.VolumeId = nfs.NFSToArrayVolumeID(req.VolumeId)
+		req.VolumeId = nfs.ToArrayVolumeID(req.VolumeId)
 	}
 	return controllerSvc.ControllerGetVolume(ctx, req)
 }

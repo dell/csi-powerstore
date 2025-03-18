@@ -69,7 +69,7 @@ func (s *SCSIStager) Stage(ctx context.Context, req *csi.NodeStageVolumeRequest,
 	stagingPath := req.GetStagingTargetPath()
 
 	if nfs.IsNFSVolumeID(id) {
-		id = nfs.NFSToArrayVolumeID(id)
+		id = nfs.ToArrayVolumeID(id)
 	} else {
 		// append additional path to be able to do bind mounts
 		stagingPath = getStagingPath(ctx, req.GetStagingTargetPath(), id)
@@ -147,7 +147,7 @@ func (n *NFSStager) Stage(ctx context.Context, req *csi.NodeStageVolumeRequest,
 	stagingPath := req.GetStagingTargetPath()
 
 	if nfs.IsNFSVolumeID(id) {
-		id = nfs.NFSToArrayVolumeID(id)
+		id = nfs.ToArrayVolumeID(id)
 	} else {
 		// append additional path to be able to do bind mounts
 		stagingPath = getStagingPath(ctx, req.GetStagingTargetPath(), id)
