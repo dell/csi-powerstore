@@ -101,12 +101,8 @@ github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc h1:U9qPSI2PIWSS1
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/dell/csi-metadata-retriever v1.10.0 h1:OMzbwSJ+CMOTpf4WgcrSbT3j9Ve1txuLmYkfSTkRSBc=
 github.com/dell/csi-metadata-retriever v1.10.0/go.mod h1:ppgtPHlxaRNmNizU+TnxZLz8tNotTAwByZ/Lg32n660=
-github.com/dell/csm-hbnfs v0.0.0-20250313191224-dfc4d9a32919 h1:c22QbCvQ/qxixHNblMx+e4YJClGBsM2mxsrtdEIGcmA=
-github.com/dell/csm-hbnfs v0.0.0-20250313191224-dfc4d9a32919/go.mod h1:WJo0rN53iMaVMWMF+mCqD7vi4yOAwUHfjxcZAzA4tkU=
-github.com/dell/csm-hbnfs v0.0.0-20250314123730-92d00e64c61c h1:FXRufqT3YFaMe2P3p4Bl+zbhZP0/6loROnANDONNY+I=
-github.com/dell/csm-hbnfs v0.0.0-20250314123730-92d00e64c61c/go.mod h1:Pe8qPWAMmZIhqGQ2nIzpdkyreooJLZC5baXQ5Hxy+mM=
-github.com/dell/csm-hbnfs v0.0.0-20250314175749-d72b71ee2c88 h1:SshIIs6O5upDG6vfjurS6DpjqbMt5IXbf3qMkfFfUdg=
-github.com/dell/csm-hbnfs v0.0.0-20250314175749-d72b71ee2c88/go.mod h1:Pe8qPWAMmZIhqGQ2nIzpdkyreooJLZC5baXQ5Hxy+mM=
+github.com/dell/csm-hbnfs v0.0.0-20250319170424-b253bacd6b1d h1:xKev/BWDlWQGAjn0i4vYGnhTZv12ZyVdSoY2fPxap5Y=
+github.com/dell/csm-hbnfs v0.0.0-20250319170424-b253bacd6b1d/go.mod h1:dfG+SeUxL9P9hVo7+Rk6OpzTW4E4PO6b6NW7LRt9GmQ=
 github.com/dell/dell-csi-extensions/common v1.7.1-0.20250226203203-5dcd46c607b9 h1:Dhj/KEHuYE9uQgHzbHkGVB/MoQ+Sv6rvFaEACkD5wYw=
 github.com/dell/dell-csi-extensions/common v1.7.1-0.20250226203203-5dcd46c607b9/go.mod h1:1F9D9nja/HNFj9Fy2gu5NbP4l9J2FJgynmz22bYGdzI=
 github.com/dell/dell-csi-extensions/podmon v1.7.1-0.20250226203203-5dcd46c607b9 h1:IoU3jL51s/R/s4aG52KQhMm3dTuA+M8SJR1rXzuSLnw=
