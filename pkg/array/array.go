@@ -26,9 +26,11 @@ import (
 	"net/http"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-powerstore/v2/core"
@@ -138,8 +140,9 @@ type PowerStoreArray struct {
 	IsDefault     bool                 `yaml:"isDefault"`
 	NfsAcls       string               `yaml:"nfsAcls"`
 
-	Client gopowerstore.Client
-	IP     string
+	Client             gopowerstore.Client
+	IP                 string
+	NASCooldownTracker NASCooldownTracker
 }
 
 // GetNasName is a getter that returns name of configured NAS
@@ -259,6 +262,12 @@ func GetPowerStoreArrays(fs fs.Interface, filePath string) (map[string]*PowerSto
 			defaultArray = array
 			foundDefault = true
 		}
+		array.NASCooldownTracker = &NASCooldown{
+			failedNAS:     make(map[string]int),
+			cooldownStart: make(map[string]time.Time),
+			cooldown:      1 * time.Minute,
+			threshold:     5,
+		}
 	}
 
 	return arrayMap, mapper, defaultArray, nil
@@ -358,4 +367,67 @@ func ParseVolumeID(ctx context.Context, volumeHandle string,
 
 	log.Debugf("id %s arrayID %s proto %s", localVolumeID, arrayID, protocol)
 	return localVolumeID, arrayID, protocol, remoteVolumeID, remoteArrayID, nil
+}
+
+type NASCooldownTracker interface {
+	MarkFailure(nas string)
+	IsInCooldown(nas string) bool
+	ResetFailure(nas string)
+	FallbackRetry(nasList []string) string
+}
+
+type NASCooldown struct {
+	failedNAS     map[string]int
+	cooldownStart map[string]time.Time
+	cooldown      time.Duration
+	threshold     int
+	mu            sync.Mutex
+}
+
+// Mark NAS as failed; only enter cooldown if threshold exceeded
+func (n *NASCooldown) MarkFailure(nas string) {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+
+	n.failedNAS[nas]++
+	if n.failedNAS[nas] >= n.threshold {
+		n.cooldownStart[nas] = time.Now()
+	}
+}
+
+// Check if NAS is in cooldown
+func (n *NASCooldown) IsInCooldown(nas string) bool {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+
+	if start, exists := n.cooldownStart[nas]; exists {
+		if time.Since(start) < n.cooldown {
+			return true
+		}
+		// Cooldown expired - reset failure count
+		delete(n.failedNAS, nas)
+		delete(n.cooldownStart, nas)
+	}
+	return false
+}
+
+// Reset failure count on successful FS creation
+func (n *NASCooldown) ResetFailure(nas string) {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+
+	delete(n.failedNAS, nas)
+	delete(n.cooldownStart, nas)
+}
+
+// Fallback logic - Retry all NAS servers, prioritizing least failed ones
+func (n *NASCooldown) FallbackRetry(nasList []string) string {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+
+	sort.Slice(nasList, func(i, j int) bool {
+		return n.failedNAS[nasList[i]] < n.failedNAS[nasList[j]]
+	})
+
+	return nasList[0] // Pick NAS with least failures
 }
