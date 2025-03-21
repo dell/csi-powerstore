@@ -554,3 +554,135 @@ func TestGetMountFlags(t *testing.T) {
 		})
 	}
 }
+
+func TestGetLeastUsedActiveNAS(t *testing.T) {
+	ctx := context.Background()
+	clientMock := new(gopowerstoremock.Client)
+
+	// Define NAS servers for different test cases
+	validNAS1 := gopowerstore.NAS{
+		Name:              "nasA",
+		OperationalStatus: gopowerstore.Started,
+		HealthDetails:     gopowerstore.HealthDetails{State: gopowerstore.Info},
+		FileSystems:       make([]gopowerstore.FileSystem, 3), // 3 FS
+	}
+
+	validNAS2 := gopowerstore.NAS{
+		Name:              "nasB",
+		OperationalStatus: gopowerstore.Started,
+		HealthDetails:     gopowerstore.HealthDetails{State: gopowerstore.None},
+		FileSystems:       make([]gopowerstore.FileSystem, 2), // 2 FS (should be chosen)
+	}
+
+	validNAS3 := gopowerstore.NAS{
+		Name:              "nasC",
+		OperationalStatus: gopowerstore.Started,
+		HealthDetails:     gopowerstore.HealthDetails{State: gopowerstore.Info},
+		FileSystems:       make([]gopowerstore.FileSystem, 2), // 2 FS, but lexicographically larger
+	}
+
+	validNAS4 := gopowerstore.NAS{
+		Name:              "nasD",
+		OperationalStatus: gopowerstore.Started,
+		HealthDetails:     gopowerstore.HealthDetails{State: gopowerstore.Info},
+		FileSystems:       make([]gopowerstore.FileSystem, 1),
+	}
+
+	invalidNAS1 := gopowerstore.NAS{
+		Name:              "nasX",
+		OperationalStatus: gopowerstore.Stopped, // Inactive NAS
+		HealthDetails:     gopowerstore.HealthDetails{State: gopowerstore.Info},
+		FileSystems:       make([]gopowerstore.FileSystem, 1),
+	}
+
+	invalidNAS2 := gopowerstore.NAS{
+		Name:              "nasY",
+		OperationalStatus: gopowerstore.Started,
+		HealthDetails:     gopowerstore.HealthDetails{State: gopowerstore.Critical}, // Invalid state
+		FileSystems:       make([]gopowerstore.FileSystem, 1),
+	}
+
+	invalidNAS3 := gopowerstore.NAS{
+		Name:              "nasZ",
+		OperationalStatus: gopowerstore.Started,
+		HealthDetails:     gopowerstore.HealthDetails{State: gopowerstore.Info},
+		FileSystems:       make([]gopowerstore.FileSystem, 1),
+	}
+
+	tests := []struct {
+		name               string
+		nasList            []gopowerstore.NAS
+		expectedNAS        *gopowerstore.NAS
+		listOfAvailableNAS []string
+
+		expectedErrMsg string
+	}{
+		{
+			name:               "Valid NAS selection (least FS count wins)",
+			nasList:            []gopowerstore.NAS{validNAS1, validNAS2, validNAS3, validNAS4, invalidNAS1, invalidNAS2},
+			expectedNAS:        &validNAS4, // nasD has the least FS count (1)
+			listOfAvailableNAS: []string{"nasA", "nasD"},
+		},
+		{
+			name:               "NAS not in nasServers map",
+			nasList:            []gopowerstore.NAS{invalidNAS3},
+			expectedErrMsg:     "no suitable NAS server found",
+			listOfAvailableNAS: []string{"nasA", "nasD"},
+		},
+		{
+			name:               "NAS not active",
+			nasList:            []gopowerstore.NAS{invalidNAS1},
+			expectedErrMsg:     "no suitable NAS server found",
+			listOfAvailableNAS: []string{"nasA", "nasD", "nasX"},
+		},
+		{
+			name:               "NAS with invalid health state",
+			nasList:            []gopowerstore.NAS{invalidNAS2},
+			expectedErrMsg:     "no suitable NAS server found",
+			listOfAvailableNAS: []string{"nasA", "nasD", "nasY"},
+		},
+		{
+			name:               "All NAS servers inactive or unhealthy",
+			nasList:            []gopowerstore.NAS{invalidNAS1, invalidNAS2},
+			expectedErrMsg:     "no suitable NAS server found",
+			listOfAvailableNAS: []string{"nasA", "nasB", "nasC", "nasD", "nasX", "nasY", "nasZ"},
+		},
+		{
+			name:           "Empty NAS list",
+			nasList:        []gopowerstore.NAS{},
+			expectedErrMsg: "no suitable NAS server found",
+		},
+		{
+			name:           "Error fetching NAS servers",
+			nasList:        nil,
+			expectedErrMsg: "failed to fetch NAS servers",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			// Setup mock expectations
+			if tc.nasList == nil {
+				clientMock.On("GetNASServers", ctx).Return(nil, errors.New("failed to fetch NAS servers")).Once()
+			} else {
+				clientMock.On("GetNASServers", ctx).Return(tc.nasList, nil).Once()
+			}
+
+			// Call the function
+			result, err := common.GetLeastUsedActiveNAS(ctx, clientMock, tc.listOfAvailableNAS)
+
+			// Assertions
+			if tc.expectedErrMsg != "" {
+				assert.Empty(t, result)
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tc.expectedErrMsg)
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, result)
+				assert.Equal(t, tc.expectedNAS.Name, result)
+			}
+
+			clientMock.AssertExpectations(t)
+		})
+	}
+}
