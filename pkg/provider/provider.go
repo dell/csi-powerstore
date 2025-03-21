@@ -1,4 +1,4 @@
-// Copyright © 2019-2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+// Copyright © 2025 Dell Inc. or its subsidiaries. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -29,7 +29,7 @@ import (
 var Log = logrus.New()
 
 // New returns a new Mock Storage Plug-in Provider.
-func New(controllerSvc *controller.Service, identitySvc *identity.Service, nodeSvc *node.Service, interList []grpc.UnaryServerInterceptor) gocsi.StoragePluginProvider {
+func New(controllerSvc controller.ControllerInterface, identitySvc *identity.Service, nodeSvc node.NodeInterface, interList []grpc.UnaryServerInterceptor) gocsi.StoragePluginProvider {
 	svc := service.New()
 	service.PutControllerService(controllerSvc)
 	service.PutNodeService(nodeSvc)
