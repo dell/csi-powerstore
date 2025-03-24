@@ -178,3 +178,66 @@ func TestNodeStageVolume(t *testing.T) {
 		assert.NotEmpty(t, resp)
 	})
 }
+
+func TestMountVolume(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	mockNode := mocks.NewMockNodeInterface(ctrl)
+	mockNfs := nfsmock.NewMockService(ctrl)
+	svc := service{}
+	ctx := context.Background()
+
+	t.Run("no volume id", func(t *testing.T) {
+		resp, err := svc.MountVolume(ctx, "", "", "", map[string]string{})
+		assert.Empty(t, resp)
+		assert.Equal(t, err.Error(), "MountVolume: volumeId was empty")
+	})
+
+	t.Run("success", func(t *testing.T) {
+		mockNode.EXPECT().NodePublishVolume(gomock.Any(), gomock.Any()).AnyTimes().Return(&csi.NodePublishVolumeResponse{}, nil)
+		mockNfs.EXPECT().NodePublishVolume(gomock.Any(), gomock.Any()).AnyTimes().Return(&csi.NodePublishVolumeResponse{}, nil)
+		mockNode.EXPECT().NodeStageVolume(gomock.Any(), gomock.Any()).AnyTimes().Return(&csi.NodeStageVolumeResponse{}, nil)
+		mockNfs.EXPECT().NodeStageVolume(gomock.Any(), gomock.Any()).AnyTimes().Return(&csi.NodeStageVolumeResponse{}, nil)
+		PutNfsService(mockNfs)
+		PutNodeService(mockNode)
+		resp, err := svc.MountVolume(ctx, "123", "", "test", map[string]string{})
+		assert.Nil(t, err)
+		assert.Contains(t, resp, "test")
+	})
+}
+
+func TestUnmountVolume(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	mockNode := mocks.NewMockNodeInterface(ctrl)
+	///mockNfs := nfsmock.NewMockService(ctrl)
+	svc := service{}
+	ctx := context.Background()
+
+	t.Run("Umount fail", func(t *testing.T) {
+		err := svc.UnmountVolume(ctx, "", "", map[string]string{})
+		assert.Contains(t, err.Error(), "no such file or directory")
+	})
+
+	t.Run("sunccess", func(t *testing.T) {
+		oldRemove := osRemove
+		oldUnmount := sysUnmount
+		defer func() {
+			osRemove = oldRemove
+			sysUnmount = oldUnmount
+		}()
+
+		osRemove = func(name string) error {
+			return nil
+		}
+		sysUnmount = func(target string, flags int) error {
+			return nil
+		}
+
+		mockNode.EXPECT().NodeUnstageVolume(gomock.Any(), gomock.Any()).AnyTimes().Return(&csi.NodeUnstageVolumeResponse{}, nil)
+		PutNodeService(mockNode)
+
+		err := svc.UnmountVolume(ctx, "123", "", map[string]string{})
+		assert.Nil(t, err)
+	})
+}
