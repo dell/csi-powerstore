@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
@@ -182,8 +183,6 @@ func TestNodeStageVolume(t *testing.T) {
 func TestMountVolume(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	mockNode := mocks.NewMockNodeInterface(ctrl)
-	mockNfs := nfsmock.NewMockService(ctrl)
 	svc := service{}
 	ctx := context.Background()
 
@@ -194,6 +193,8 @@ func TestMountVolume(t *testing.T) {
 	})
 
 	t.Run("success", func(t *testing.T) {
+		mockNode := mocks.NewMockNodeInterface(ctrl)
+		mockNfs := nfsmock.NewMockService(ctrl)
 		mockNode.EXPECT().NodePublishVolume(gomock.Any(), gomock.Any()).AnyTimes().Return(&csi.NodePublishVolumeResponse{}, nil)
 		mockNfs.EXPECT().NodePublishVolume(gomock.Any(), gomock.Any()).AnyTimes().Return(&csi.NodePublishVolumeResponse{}, nil)
 		mockNode.EXPECT().NodeStageVolume(gomock.Any(), gomock.Any()).AnyTimes().Return(&csi.NodeStageVolumeResponse{}, nil)
@@ -203,14 +204,43 @@ func TestMountVolume(t *testing.T) {
 		resp, err := svc.MountVolume(ctx, "123", "", "test", map[string]string{})
 		assert.Nil(t, err)
 		assert.Contains(t, resp, "test")
+		resp, err = svc.MountVolume(ctx, "123", "", "", map[string]string{})
+		assert.Nil(t, err)
+		assert.Empty(t, resp)
+	})
+
+	t.Run("stage error", func(t *testing.T) {
+		mockNode := mocks.NewMockNodeInterface(ctrl)
+		mockNfs := nfsmock.NewMockService(ctrl)
+		mockNode.EXPECT().NodePublishVolume(gomock.Any(), gomock.Any()).AnyTimes().Return(&csi.NodePublishVolumeResponse{}, nil)
+		mockNfs.EXPECT().NodePublishVolume(gomock.Any(), gomock.Any()).AnyTimes().Return(&csi.NodePublishVolumeResponse{}, nil)
+		mockNode.EXPECT().NodeStageVolume(gomock.Any(), gomock.Any()).AnyTimes().Return(&csi.NodeStageVolumeResponse{}, errors.New("stage error"))
+		mockNfs.EXPECT().NodeStageVolume(gomock.Any(), gomock.Any()).AnyTimes().Return(&csi.NodeStageVolumeResponse{}, errors.New("stage error"))
+		PutNfsService(mockNfs)
+		PutNodeService(mockNode)
+		resp, err := svc.MountVolume(ctx, "123", "", "", map[string]string{})
+		assert.Empty(t, resp)
+		assert.Contains(t, err.Error(), "stage error")
+	})
+
+	t.Run("publish error", func(t *testing.T) {
+		mockNode := mocks.NewMockNodeInterface(ctrl)
+		mockNfs := nfsmock.NewMockService(ctrl)
+		mockNode.EXPECT().NodePublishVolume(gomock.Any(), gomock.Any()).AnyTimes().Return(&csi.NodePublishVolumeResponse{}, errors.New("publish error"))
+		mockNfs.EXPECT().NodePublishVolume(gomock.Any(), gomock.Any()).AnyTimes().Return(&csi.NodePublishVolumeResponse{}, errors.New("publish error"))
+		mockNode.EXPECT().NodeStageVolume(gomock.Any(), gomock.Any()).AnyTimes().Return(&csi.NodeStageVolumeResponse{}, nil)
+		mockNfs.EXPECT().NodeStageVolume(gomock.Any(), gomock.Any()).AnyTimes().Return(&csi.NodeStageVolumeResponse{}, nil)
+		PutNfsService(mockNfs)
+		PutNodeService(mockNode)
+		resp, err := svc.MountVolume(ctx, "123", "", "", map[string]string{})
+		assert.Empty(t, resp)
+		assert.Contains(t, err.Error(), "could not publish volume")
 	})
 }
 
 func TestUnmountVolume(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	mockNode := mocks.NewMockNodeInterface(ctrl)
-	///mockNfs := nfsmock.NewMockService(ctrl)
 	svc := service{}
 	ctx := context.Background()
 
@@ -220,6 +250,7 @@ func TestUnmountVolume(t *testing.T) {
 	})
 
 	t.Run("sunccess", func(t *testing.T) {
+		mockNode := mocks.NewMockNodeInterface(ctrl)
 		oldRemove := osRemove
 		oldUnmount := sysUnmount
 		defer func() {
@@ -239,5 +270,51 @@ func TestUnmountVolume(t *testing.T) {
 
 		err := svc.UnmountVolume(ctx, "123", "", map[string]string{})
 		assert.Nil(t, err)
+	})
+
+	t.Run("remove fail", func(t *testing.T) {
+		mockNode := mocks.NewMockNodeInterface(ctrl)
+		oldRemove := osRemove
+		oldUnmount := sysUnmount
+		defer func() {
+			osRemove = oldRemove
+			sysUnmount = oldUnmount
+		}()
+
+		osRemove = func(name string) error {
+			return errors.New("remove error")
+		}
+		sysUnmount = func(target string, flags int) error {
+			return nil
+		}
+
+		mockNode.EXPECT().NodeUnstageVolume(gomock.Any(), gomock.Any()).AnyTimes().Return(&csi.NodeUnstageVolumeResponse{}, nil)
+		PutNodeService(mockNode)
+
+		err := svc.UnmountVolume(ctx, "123", "", map[string]string{})
+		assert.Contains(t, err.Error(), "remove error")
+	})
+
+	t.Run("unstage error", func(t *testing.T) {
+		mockNode := mocks.NewMockNodeInterface(ctrl)
+		oldRemove := osRemove
+		oldUnmount := sysUnmount
+		defer func() {
+			osRemove = oldRemove
+			sysUnmount = oldUnmount
+		}()
+
+		osRemove = func(name string) error {
+			return nil
+		}
+		sysUnmount = func(target string, flags int) error {
+			return nil
+		}
+
+		mockNode.EXPECT().NodeUnstageVolume(gomock.Any(), gomock.Any()).AnyTimes().Return(&csi.NodeUnstageVolumeResponse{}, errors.New("unstage error"))
+		PutNodeService(mockNode)
+
+		err := svc.UnmountVolume(ctx, "123", "", map[string]string{})
+		assert.Contains(t, err.Error(), "unstage error")
 	})
 }
