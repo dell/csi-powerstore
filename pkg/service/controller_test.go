@@ -27,6 +27,7 @@ import (
 	nfsmock "github.com/dell/csm-hbnfs/nfs/mocks"
 	commonext "github.com/dell/dell-csi-extensions/common"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"go.uber.org/mock/gomock"
 )
 
@@ -34,12 +35,12 @@ func TestCreateVolume(t *testing.T) {
 	c := gomock.NewController(t)
 	svc := service{}
 	ctx := context.Background()
-	mockController := mocks.NewMockControllerInterface(c)
+	mockController := new(mocks.ControllerInterface)
 	mockNode := mocks.NewMockNodeInterface(c)
 	mockNfs := nfsmock.NewMockService(c)
 
 	t.Run("nfs volume", func(t *testing.T) {
-		mockController.EXPECT().CreateVolume(gomock.Any(), gomock.Any()).AnyTimes().Return(&csi.CreateVolumeResponse{}, nil)
+		mockController.On("CreateVolume", mock.Anything, mock.Anything).Return(&csi.CreateVolumeResponse{}, nil)
 		mockNfs.EXPECT().CreateVolume(gomock.Any(), gomock.Any()).Times(1).Return(&csi.CreateVolumeResponse{}, nil)
 		PutControllerService(mockController)
 		PutNodeService(mockNode)
@@ -54,7 +55,7 @@ func TestCreateVolume(t *testing.T) {
 	})
 
 	t.Run("normal volume", func(t *testing.T) {
-		mockController.EXPECT().CreateVolume(gomock.Any(), gomock.Any()).AnyTimes().Return(&csi.CreateVolumeResponse{}, nil)
+		mockController.On("CreateVolume", mock.Anything, mock.Anything).Return(&csi.CreateVolumeResponse{}, nil)
 		mockNfs.EXPECT().CreateVolume(gomock.Any(), gomock.Any()).AnyTimes().Return(&csi.CreateVolumeResponse{}, nil)
 		PutControllerService(mockController)
 		PutNodeService(mockNode)
@@ -71,12 +72,12 @@ func TestDeleteVolume(t *testing.T) {
 	c := gomock.NewController(t)
 	svc := service{}
 	ctx := context.Background()
-	mockController := mocks.NewMockControllerInterface(c)
+	mockController := new(mocks.ControllerInterface)
 	mockNode := mocks.NewMockNodeInterface(c)
 	mockNfs := nfsmock.NewMockService(c)
 
 	t.Run("nfs volume", func(t *testing.T) {
-		mockController.EXPECT().DeleteVolume(gomock.Any(), gomock.Any()).AnyTimes().Return(&csi.DeleteVolumeResponse{}, nil)
+		mockController.On("DeleteVolume", mock.Anything, mock.Anything).Return(&csi.DeleteVolumeResponse{}, nil)
 		mockNfs.EXPECT().DeleteVolume(gomock.Any(), gomock.Any()).AnyTimes().Return(&csi.DeleteVolumeResponse{}, nil)
 		PutControllerService(mockController)
 		PutNodeService(mockNode)
@@ -92,17 +93,15 @@ func TestDeleteVolume(t *testing.T) {
 }
 
 func TestProbeController(t *testing.T) {
-	c := gomock.NewController(t)
 	svc := service{}
 	ctx := context.Background()
-	mockController := mocks.NewMockControllerInterface(c)
+	mockController := new(mocks.ControllerInterface)
 
 	t.Run("success", func(t *testing.T) {
 		PutControllerService(mockController)
 
 		req := &commonext.ProbeControllerRequest{}
-		mockController.EXPECT().ProbeController(gomock.Any(), gomock.Any()).AnyTimes().
-			Return(&commonext.ProbeControllerResponse{}, nil)
+		mockController.On("ProbeController", mock.Anything, mock.Anything).Return(&commonext.ProbeControllerResponse{}, nil)
 
 		resp, err := svc.ProbeController(ctx, req)
 		assert.Nil(t, err)
@@ -111,10 +110,9 @@ func TestProbeController(t *testing.T) {
 }
 
 func TestControllerGetVolume(t *testing.T) {
-	c := gomock.NewController(t)
 	svc := service{}
 	ctx := context.Background()
-	mockController := mocks.NewMockControllerInterface(c)
+	mockController := new(mocks.ControllerInterface)
 
 	t.Run("success", func(t *testing.T) {
 		PutControllerService(mockController)
@@ -122,7 +120,7 @@ func TestControllerGetVolume(t *testing.T) {
 		req := &csi.ControllerGetVolumeRequest{
 			VolumeId: "nfs-12345",
 		}
-		mockController.EXPECT().ControllerGetVolume(gomock.Any(), gomock.Any()).AnyTimes().
+		mockController.On("ControllerGetVolume", mock.Anything, mock.Anything).
 			Return(&csi.ControllerGetVolumeResponse{}, nil)
 
 		resp, err := svc.ControllerGetVolume(ctx, req)
@@ -134,12 +132,12 @@ func TestControllerGetVolume(t *testing.T) {
 func TestControllerExpandVolume(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	mockController := mocks.NewMockControllerInterface(ctrl)
+	mockController := new(mocks.ControllerInterface)
 	svc := service{}
 	req := &csi.ControllerExpandVolumeRequest{
 		VolumeId: "nfs-volume",
 	}
-	mockController.EXPECT().ControllerExpandVolume(gomock.Any(), req).Return(&csi.ControllerExpandVolumeResponse{}, nil)
+	mockController.On("ControllerExpandVolume", mock.Anything, req).Return(&csi.ControllerExpandVolumeResponse{}, nil)
 	PutControllerService(mockController)
 	resp, err := svc.ControllerExpandVolume(context.Background(), req)
 	assert.Nil(t, err)
@@ -149,12 +147,12 @@ func TestControllerExpandVolume(t *testing.T) {
 func TestControllerListSnapshots(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	mockController := mocks.NewMockControllerInterface(ctrl)
+	mockController := new(mocks.ControllerInterface)
 	svc := service{}
 	req := &csi.ListSnapshotsRequest{
 		SourceVolumeId: "nfs-volume",
 	}
-	mockController.EXPECT().ListSnapshots(gomock.Any(), req).Return(&csi.ListSnapshotsResponse{}, nil)
+	mockController.On("ListSnapshots", mock.Anything, req).Return(&csi.ListSnapshotsResponse{}, nil)
 	PutControllerService(mockController)
 	resp, err := svc.ListSnapshots(context.Background(), req)
 	assert.Nil(t, err)
@@ -164,12 +162,12 @@ func TestControllerListSnapshots(t *testing.T) {
 func TestDeleteSnapshot(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	mockController := mocks.NewMockControllerInterface(ctrl)
+	mockController := new(mocks.ControllerInterface)
 	svc := service{}
 	req := &csi.DeleteSnapshotRequest{
 		SnapshotId: "nfs-snapshot",
 	}
-	mockController.EXPECT().DeleteSnapshot(gomock.Any(), req).Return(&csi.DeleteSnapshotResponse{}, nil)
+	mockController.On("DeleteSnapshot", mock.Anything, req).Return(&csi.DeleteSnapshotResponse{}, nil)
 	PutControllerService(mockController)
 	resp, err := svc.DeleteSnapshot(context.Background(), req)
 	assert.Nil(t, err)
@@ -179,13 +177,13 @@ func TestDeleteSnapshot(t *testing.T) {
 func TestCreateSnapshot(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	mockController := mocks.NewMockControllerInterface(ctrl)
+	mockController := new(mocks.ControllerInterface)
 	svc := service{}
 	req := &csi.CreateSnapshotRequest{
 		SourceVolumeId: "nfs-volume",
 		Name:           "snapshot-name",
 	}
-	mockController.EXPECT().CreateSnapshot(gomock.Any(), req).Return(&csi.CreateSnapshotResponse{
+	mockController.On("CreateSnapshot", mock.Anything, req).Return(&csi.CreateSnapshotResponse{
 		Snapshot: &csi.Snapshot{
 			SnapshotId:     "nfs-snapshot",
 			SourceVolumeId: "nfs-volume",
@@ -207,10 +205,10 @@ func TestCreateSnapshot(t *testing.T) {
 func TestControllerGetCapabilities(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	mockController := mocks.NewMockControllerInterface(ctrl)
+	mockController := new(mocks.ControllerInterface)
 	svc := service{}
 	req := &csi.ControllerGetCapabilitiesRequest{}
-	mockController.EXPECT().ControllerGetCapabilities(gomock.Any(), req).Return(&csi.ControllerGetCapabilitiesResponse{}, nil)
+	mockController.On("ControllerGetCapabilities", mock.Anything, req).Return(&csi.ControllerGetCapabilitiesResponse{}, nil)
 	PutControllerService(mockController)
 	resp, err := svc.ControllerGetCapabilities(context.Background(), req)
 	assert.Nil(t, err)
@@ -220,10 +218,10 @@ func TestControllerGetCapabilities(t *testing.T) {
 func TestControllerGetCapacity(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	mockController := mocks.NewMockControllerInterface(ctrl)
+	mockController := new(mocks.ControllerInterface)
 	svc := service{}
 	req := &csi.GetCapacityRequest{}
-	mockController.EXPECT().GetCapacity(gomock.Any(), req).Return(&csi.GetCapacityResponse{
+	mockController.On("GetCapacity", mock.Anything, req).Return(&csi.GetCapacityResponse{
 		AvailableCapacity: int64(1024),
 	}, nil)
 	PutControllerService(mockController)
@@ -236,10 +234,10 @@ func TestControllerGetCapacity(t *testing.T) {
 func TestControllerListVolumes(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	mockController := mocks.NewMockControllerInterface(ctrl)
+	mockController := new(mocks.ControllerInterface)
 	svc := service{}
 	req := &csi.ListVolumesRequest{}
-	mockController.EXPECT().ListVolumes(gomock.Any(), req).Return(&csi.ListVolumesResponse{
+	mockController.On("ListVolumes", mock.Anything, req).Return(&csi.ListVolumesResponse{
 		Entries: []*csi.ListVolumesResponse_Entry{
 			{
 				Volume: &csi.Volume{
@@ -262,12 +260,12 @@ func TestControllerListVolumes(t *testing.T) {
 func TestControllerValidateVolumeCapabilities(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	mockController := mocks.NewMockControllerInterface(ctrl)
+	mockController := new(mocks.ControllerInterface)
 	svc := service{}
 	req := &csi.ValidateVolumeCapabilitiesRequest{
 		VolumeId: "nfs-123",
 	}
-	mockController.EXPECT().ValidateVolumeCapabilities(gomock.Any(), req).Return(&csi.ValidateVolumeCapabilitiesResponse{}, nil)
+	mockController.On("ValidateVolumeCapabilities", mock.Anything, req).Return(&csi.ValidateVolumeCapabilitiesResponse{}, nil)
 	PutControllerService(mockController)
 	resp, err := svc.ValidateVolumeCapabilities(context.Background(), req)
 	assert.Nil(t, err)
@@ -277,7 +275,7 @@ func TestControllerValidateVolumeCapabilities(t *testing.T) {
 func TestControllerUnpublishVolume(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	mockController := mocks.NewMockControllerInterface(ctrl)
+	mockController := new(mocks.ControllerInterface)
 	mockNfs := nfsmock.NewMockService(ctrl)
 	svc := service{}
 	t.Run("nfs volume", func(t *testing.T) {
@@ -285,7 +283,7 @@ func TestControllerUnpublishVolume(t *testing.T) {
 			VolumeId: "nfs-123",
 			NodeId:   "node-123",
 		}
-		mockController.EXPECT().ControllerUnpublishVolume(gomock.Any(), req).AnyTimes().Return(&csi.ControllerUnpublishVolumeResponse{}, nil)
+		mockController.On("ControllerUnpublishVolume", mock.Anything, req).Return(&csi.ControllerUnpublishVolumeResponse{}, nil)
 		mockNfs.EXPECT().ControllerUnpublishVolume(gomock.Any(), req).AnyTimes().Return(&csi.ControllerUnpublishVolumeResponse{}, nil)
 		PutControllerService(mockController)
 		PutNfsService(mockNfs)
@@ -298,7 +296,7 @@ func TestControllerUnpublishVolume(t *testing.T) {
 			VolumeId: "vid-123",
 			NodeId:   "node-123",
 		}
-		mockController.EXPECT().ControllerUnpublishVolume(gomock.Any(), req).AnyTimes().Return(&csi.ControllerUnpublishVolumeResponse{}, nil)
+		mockController.On("ControllerUnpublishVolume", mock.Anything, req).Return(&csi.ControllerUnpublishVolumeResponse{}, nil)
 		PutControllerService(mockController)
 		resp, err := svc.ControllerUnpublishVolume(context.Background(), req)
 		assert.Nil(t, err)
@@ -309,7 +307,7 @@ func TestControllerUnpublishVolume(t *testing.T) {
 func TestControllerPublishVolume(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	mockController := mocks.NewMockControllerInterface(ctrl)
+	mockController := new(mocks.ControllerInterface)
 	mockNfs := nfsmock.NewMockService(ctrl)
 	svc := service{}
 
@@ -324,7 +322,7 @@ func TestControllerPublishVolume(t *testing.T) {
 	})
 
 	t.Run("nfs volume", func(t *testing.T) {
-		mockController.EXPECT().ControllerPublishVolume(gomock.Any(), gomock.Any()).AnyTimes().Return(&csi.ControllerPublishVolumeResponse{}, nil)
+		mockController.On("ControllerPublishVolume", mock.Anything, mock.Anything).Return(&csi.ControllerPublishVolumeResponse{}, nil)
 		mockNfs.EXPECT().ControllerPublishVolume(gomock.Any(), gomock.Any()).AnyTimes().Return(&csi.ControllerPublishVolumeResponse{}, nil)
 
 		PutControllerService(mockController)
@@ -341,7 +339,7 @@ func TestControllerPublishVolume(t *testing.T) {
 	})
 
 	t.Run("normal volume", func(t *testing.T) {
-		mockController.EXPECT().ControllerPublishVolume(gomock.Any(), gomock.Any()).AnyTimes().Return(&csi.ControllerPublishVolumeResponse{}, nil)
+		mockController.On("ControllerPublishVolume", mock.Anything, mock.Anything).Return(&csi.ControllerPublishVolumeResponse{}, nil)
 		PutControllerService(mockController)
 		req := &csi.ControllerPublishVolumeRequest{
 			VolumeContext: map[string]string{"fsType": "nfs"},
