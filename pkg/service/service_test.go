@@ -16,6 +16,7 @@ package service
 import (
 	"context"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/dell/csi-powerstore/v2/mocks"
@@ -23,6 +24,9 @@ import (
 	nfsmock "github.com/dell/csm-hbnfs/nfs/mocks"
 	"github.com/dell/gocsi"
 	csictx "github.com/dell/gocsi/context"
+	"github.com/fsnotify/fsnotify"
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"go.uber.org/mock/gomock"
@@ -90,4 +94,37 @@ func TestBeforeServe(t *testing.T) {
 func TestProcessMapSecretChange(t *testing.T) {
 	err := New().ProcessMapSecretChange()
 	assert.Nil(t, err)
+}
+
+func TestUpdateDriverConfigParams(t *testing.T) {
+	v := viper.New()
+	v.SetConfigType("yaml")
+	v.SetDefault("CSI_LOG_FORMAT", "text")
+	v.SetDefault("CSI_LOG_LEVEL", "debug")
+
+	viperChan := make(chan bool)
+	v.WatchConfig()
+	v.OnConfigChange(func(_ fsnotify.Event) {
+		updateDriverConfigParams(v)
+		viperChan <- true
+	})
+
+	logFormat := strings.ToLower(v.GetString("CSI_LOG_FORMAT"))
+	assert.Equal(t, "text", logFormat)
+
+	updateDriverConfigParams(v)
+	level := log.GetLevel()
+
+	assert.Equal(t, logrus.DebugLevel, level)
+
+	v.Set("CSI_LOG_FORMAT", "json")
+	v.Set("CSI_LOG_LEVEL", "info")
+	updateDriverConfigParams(v)
+	level = log.GetLevel()
+	assert.Equal(t, logrus.InfoLevel, level)
+
+	v.Set("CSI_LOG_LEVEL", "notalevel")
+	updateDriverConfigParams(v)
+	level = log.GetLevel()
+	assert.Equal(t, logrus.DebugLevel, level)
 }
