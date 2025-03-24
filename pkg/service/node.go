@@ -31,6 +31,11 @@ import (
 	"github.com/dell/csm-hbnfs/nfs"
 )
 
+var (
+	osRemove   = os.Remove
+	sysUnmount = syscall.Unmount
+)
+
 // NodeStageVolume prepares volume to be consumed by node publish by connecting volume to the node
 func (s *service) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
 	if nfs.IsNFSVolumeID(req.GetVolumeId()) {
@@ -158,13 +163,13 @@ func (s *service) UnmountVolume(ctx context.Context, volumeId, exportPath string
 	var err error
 
 	log.Infof("UnmountVolume calling Unmount %s", target)
-	err = syscall.Unmount(target, 0)
+	err = sysUnmount(target, 0)
 	if err != nil && !strings.Contains(err.Error(), "No such file") {
 		log.Errorf("Could not Umount the target path: %s %s %s", volumeId, target, err.Error())
 		return err
 	}
 
-	err = os.Remove(target)
+	err = osRemove(target)
 	if err != nil && !strings.Contains(err.Error(), "No such file") {
 		log.Errorf("UnmountVolume %s could not remove directory %s: %s", volumeId, target, err.Error())
 		return err
@@ -183,7 +188,7 @@ func (s *service) UnmountVolume(ctx context.Context, volumeId, exportPath string
 	log.Infof("NodeUnstage %s %s returned successfully", volumeId, exportPath)
 
 	// Remove the staging path.
-	err = os.Remove(staging)
+	err = osRemove(staging)
 	if err != nil && !strings.Contains(err.Error(), "No such file") {
 		log.Infof("UnmountVolume Remove %s staging path %s failed: %s", volumeId, "/noderoot/"+staging, err)
 	}

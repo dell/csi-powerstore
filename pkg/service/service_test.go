@@ -24,6 +24,7 @@ import (
 	"github.com/dell/gocsi"
 	csictx "github.com/dell/gocsi/context"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"go.uber.org/mock/gomock"
 	"google.golang.org/grpc"
 )
@@ -47,8 +48,8 @@ func TestVolumeIDToArrayID(t *testing.T) {
 func TestRegisterAdditionalServers(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	mockController := mocks.NewMockControllerInterface(ctrl)
-	mockController.EXPECT().RegisterAdditionalServers(gomock.Any()).AnyTimes().Return()
+	mockController := new(mocks.ControllerInterface)
+	mockController.On("RegisterAdditionalServers", mock.Anything).Return()
 	svc := New()
 	PutControllerService(mockController)
 	server := grpc.Server{}

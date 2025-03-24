@@ -49,11 +49,10 @@ import (
 
 // Interface provides most important controller methods.
 // This essentially serves as a wrapper for controller service that is used in ephemeral volumes.
-type Interface interface {
-	CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error)
-	DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error)
-	ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error)
-	ControllerUnpublishVolume(ctx context.Context, req *csi.ControllerUnpublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error)
+type ControllerInterface interface {
+	csi.ControllerServer
+	ProbeController(context.Context, *commonext.ProbeControllerRequest) (*commonext.ProbeControllerResponse, error)
+	RegisterAdditionalServers(*grpc.Server)
 	array.Consumer
 }
 
