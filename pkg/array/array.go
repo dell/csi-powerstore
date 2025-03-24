@@ -126,6 +126,77 @@ func (s *Locker) UpdateArrays(configPath string, fs fs.Interface) error {
 	return nil
 }
 
+type NASCooldownTracker interface {
+	MarkFailure(nas string)
+	IsInCooldown(nas string) bool
+	ResetFailure(nas string)
+	FallbackRetry(nasList []string) string
+}
+
+type NASStatus struct {
+	Failures      int
+	CooldownUntil time.Time
+}
+
+type NASCooldown struct {
+	statusMap      map[string]*NASStatus
+	cooldownPeriod time.Duration
+	threshold      int
+	mu             sync.Mutex
+}
+
+// Mark NAS as failed; only enter cooldown if threshold exceeded
+func (n *NASCooldown) MarkFailure(nas string) {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+
+	status, exists := n.statusMap[nas]
+	if !exists {
+		status = &NASStatus{}
+		n.statusMap[nas] = status
+	}
+
+	status.Failures++
+	if status.Failures >= n.threshold {
+		status.CooldownUntil = time.Now().Add(n.cooldownPeriod)
+	}
+}
+
+// Check if NAS is in cooldown
+func (n *NASCooldown) IsInCooldown(nas string) bool {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+
+	if status, exists := n.statusMap[nas]; exists {
+		if time.Now().Before(status.CooldownUntil) {
+			return true
+		}
+		// Cooldown expired - remove nas status
+		n.ResetFailure(nas)
+	}
+	return false
+}
+
+// Reset failure count on successful FS creation
+func (n *NASCooldown) ResetFailure(nas string) {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+
+	delete(n.statusMap, nas)
+}
+
+// Fallback logic - Retry all NAS servers, prioritizing least failed ones
+func (n *NASCooldown) FallbackRetry(nasList []string) string {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+
+	sort.Slice(nasList, func(i, j int) bool {
+		return n.statusMap[nasList[i]].Failures < n.statusMap[nasList[j]].Failures
+	})
+
+	return nasList[0] // Pick NAS with least failures
+}
+
 // PowerStoreArray is a struct that stores all PowerStore connection information.
 // It stores gopowerstore client that can be directly used to invoke PowerStore API calls.
 // This structure is supposed to be parsed from config and mainly is created by GetPowerStoreArrays function.
@@ -262,11 +333,32 @@ func GetPowerStoreArrays(fs fs.Interface, filePath string) (map[string]*PowerSto
 			defaultArray = array
 			foundDefault = true
 		}
+		failureThreshold := 5
+		if threshold, ok := csictx.LookupEnv(context.Background(), common.EnvMultiNASFailureThreshold); ok {
+			if thresholdInt, err := strconv.Atoi(threshold); err != nil {
+				log.Warnf("can't parse multi NAS failure threshold, using default %d", failureThreshold)
+			} else if thresholdInt <= 0 {
+				log.Warnf("multi NAS filure threshold is 0 or negative, using default %d", failureThreshold)
+			} else {
+				log.Debugf("use multi NAS failure threshold as %d", thresholdInt)
+				failureThreshold = thresholdInt
+			}
+		}
+		cooldownPeriod := 1 * time.Minute
+		if cp, ok := csictx.LookupEnv(context.Background(), common.EnvMultiNASCooldownPeriod); ok {
+			if duration, err := time.ParseDuration(cp); err != nil {
+				log.Warnf("can't parse multi NAS cooldown period, using default %v", cooldownPeriod)
+			} else if duration <= 0 {
+				log.Warnf("multi NAS cooldown period 0 or negative, using default %d", failureThreshold)
+			} else {
+				log.Debugf("use multi NAS cooldown period as %v", duration)
+				cooldownPeriod = duration
+			}
+		}
 		array.NASCooldownTracker = &NASCooldown{
-			failedNAS:     make(map[string]int),
-			cooldownStart: make(map[string]time.Time),
-			cooldown:      1 * time.Minute,
-			threshold:     5,
+			statusMap:      make(map[string]*NASStatus),
+			cooldownPeriod: cooldownPeriod,
+			threshold:      failureThreshold,
 		}
 	}
 
@@ -367,67 +459,4 @@ func ParseVolumeID(ctx context.Context, volumeHandle string,
 
 	log.Debugf("id %s arrayID %s proto %s", localVolumeID, arrayID, protocol)
 	return localVolumeID, arrayID, protocol, remoteVolumeID, remoteArrayID, nil
-}
-
-type NASCooldownTracker interface {
-	MarkFailure(nas string)
-	IsInCooldown(nas string) bool
-	ResetFailure(nas string)
-	FallbackRetry(nasList []string) string
-}
-
-type NASCooldown struct {
-	failedNAS     map[string]int
-	cooldownStart map[string]time.Time
-	cooldown      time.Duration
-	threshold     int
-	mu            sync.Mutex
-}
-
-// Mark NAS as failed; only enter cooldown if threshold exceeded
-func (n *NASCooldown) MarkFailure(nas string) {
-	n.mu.Lock()
-	defer n.mu.Unlock()
-
-	n.failedNAS[nas]++
-	if n.failedNAS[nas] >= n.threshold {
-		n.cooldownStart[nas] = time.Now()
-	}
-}
-
-// Check if NAS is in cooldown
-func (n *NASCooldown) IsInCooldown(nas string) bool {
-	n.mu.Lock()
-	defer n.mu.Unlock()
-
-	if start, exists := n.cooldownStart[nas]; exists {
-		if time.Since(start) < n.cooldown {
-			return true
-		}
-		// Cooldown expired - reset failure count
-		delete(n.failedNAS, nas)
-		delete(n.cooldownStart, nas)
-	}
-	return false
-}
-
-// Reset failure count on successful FS creation
-func (n *NASCooldown) ResetFailure(nas string) {
-	n.mu.Lock()
-	defer n.mu.Unlock()
-
-	delete(n.failedNAS, nas)
-	delete(n.cooldownStart, nas)
-}
-
-// Fallback logic - Retry all NAS servers, prioritizing least failed ones
-func (n *NASCooldown) FallbackRetry(nasList []string) string {
-	n.mu.Lock()
-	defer n.mu.Unlock()
-
-	sort.Slice(nasList, func(i, j int) bool {
-		return n.failedNAS[nasList[i]] < n.failedNAS[nasList[j]]
-	})
-
-	return nasList[0] // Pick NAS with least failures
 }
