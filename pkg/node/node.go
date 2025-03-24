@@ -51,6 +51,12 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+//go:generate mockgen -destination=../../mocks/NodeInterface.go -package=mocks github.com/dell/csi-powerstore/v2/pkg/node NodeInterface
+type NodeInterface interface {
+	csi.NodeServer
+	array.Consumer
+}
+
 // Opts defines service configuration options.
 type Opts struct {
 	NodeIDFilePath        string
@@ -70,7 +76,7 @@ type Opts struct {
 type Service struct {
 	Fs fs.Interface
 
-	ctrlSvc        controller.Interface
+	ctrlSvc        controller.ControllerInterface
 	iscsiConnector ISCSIConnector
 	fcConnector    FcConnector
 	nvmeConnector  NVMEConnector
