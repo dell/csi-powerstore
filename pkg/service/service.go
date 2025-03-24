@@ -84,7 +84,11 @@ func (s *service) BeforeServe(ctx context.Context, sp *gocsi.StoragePlugin, lis 
 		}
 		nfs.NodeRoot = nodeRoot
 	}
-	os.Setenv("X_CSI_NODE_NAME", nodeName)
+	err := os.Setenv("X_CSI_NODE_NAME", nodeName)
+	if err != nil {
+		log.Errorf("failed to set env X_CSI_NODE_NAME. err: %s", err.Error())
+		return err
+	}
 	log.Infof("Setting node name env to %s for NFS", nodeName)
 	return nfssvc.BeforeServe(ctx, sp, lis)
 }
