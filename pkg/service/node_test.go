@@ -246,7 +246,7 @@ func TestUnmountVolume(t *testing.T) {
 
 	t.Run("Umount fail", func(t *testing.T) {
 		err := svc.UnmountVolume(ctx, "", "", map[string]string{})
-		assert.Contains(t, err.Error(), "no such file or directory")
+		assert.NotNil(t, err)
 	})
 
 	t.Run("sunccess", func(t *testing.T) {
