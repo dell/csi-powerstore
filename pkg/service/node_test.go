@@ -15,7 +15,7 @@ import (
 func TestNodeGetInfo(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	mockNode := mocks.NewMockNodeInterface(ctrl)
+	mockNode := mocks.NewMockInterface(ctrl)
 	svc := service{}
 	mockNode.EXPECT().NodeGetInfo(gomock.Any(), gomock.Any()).Return(&csi.NodeGetInfoResponse{}, nil)
 	PutNodeService(mockNode)
@@ -28,7 +28,7 @@ func TestNodeGetInfo(t *testing.T) {
 func TestNodeGetCapabilities(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	mockNode := mocks.NewMockNodeInterface(ctrl)
+	mockNode := mocks.NewMockInterface(ctrl)
 	svc := service{}
 	mockNode.EXPECT().NodeGetCapabilities(gomock.Any(), gomock.Any()).Return(&csi.NodeGetCapabilitiesResponse{}, nil)
 	PutNodeService(mockNode)
@@ -41,7 +41,7 @@ func TestNodeGetCapabilities(t *testing.T) {
 func TestNodeExpandVolume(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	mockNode := mocks.NewMockNodeInterface(ctrl)
+	mockNode := mocks.NewMockInterface(ctrl)
 	svc := service{}
 	mockNode.EXPECT().NodeExpandVolume(gomock.Any(), gomock.Any()).Return(&csi.NodeExpandVolumeResponse{}, nil)
 	PutNodeService(mockNode)
@@ -54,7 +54,7 @@ func TestNodeExpandVolume(t *testing.T) {
 func TestNodeGetVolumeStats(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	mockNode := mocks.NewMockNodeInterface(ctrl)
+	mockNode := mocks.NewMockInterface(ctrl)
 	svc := service{}
 	mockNode.EXPECT().NodeGetVolumeStats(gomock.Any(), gomock.Any()).Return(&csi.NodeGetVolumeStatsResponse{}, nil)
 	PutNodeService(mockNode)
@@ -69,7 +69,7 @@ func TestNodeGetVolumeStats(t *testing.T) {
 func TestNodeUnpublishVolume(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	mockNode := mocks.NewMockNodeInterface(ctrl)
+	mockNode := mocks.NewMockInterface(ctrl)
 	svc := service{}
 	mockNode.EXPECT().NodeUnpublishVolume(gomock.Any(), gomock.Any()).AnyTimes().Return(&csi.NodeUnpublishVolumeResponse{}, nil)
 	PutNodeService(mockNode)
@@ -99,7 +99,7 @@ func TestNodeUnpublishVolume(t *testing.T) {
 func TestNodePublishVolume(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	mockNode := mocks.NewMockNodeInterface(ctrl)
+	mockNode := mocks.NewMockInterface(ctrl)
 	svc := service{}
 	mockNode.EXPECT().NodePublishVolume(gomock.Any(), gomock.Any()).AnyTimes().Return(&csi.NodePublishVolumeResponse{}, nil)
 	PutNodeService(mockNode)
@@ -129,7 +129,7 @@ func TestNodePublishVolume(t *testing.T) {
 func TestNodeUnstageVolume(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	mockNode := mocks.NewMockNodeInterface(ctrl)
+	mockNode := mocks.NewMockInterface(ctrl)
 	svc := service{}
 	mockNode.EXPECT().NodeUnstageVolume(gomock.Any(), gomock.Any()).AnyTimes().Return(&csi.NodeUnstageVolumeResponse{
 		XXX_sizecache: 10,
@@ -155,7 +155,7 @@ func TestNodeUnstageVolume(t *testing.T) {
 func TestNodeStageVolume(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	mockNode := mocks.NewMockNodeInterface(ctrl)
+	mockNode := mocks.NewMockInterface(ctrl)
 	svc := service{}
 	mockNode.EXPECT().NodeStageVolume(gomock.Any(), gomock.Any()).AnyTimes().Return(&csi.NodeStageVolumeResponse{
 		XXX_sizecache: 10,
@@ -193,7 +193,7 @@ func TestMountVolume(t *testing.T) {
 	})
 
 	t.Run("success", func(t *testing.T) {
-		mockNode := mocks.NewMockNodeInterface(ctrl)
+		mockNode := mocks.NewMockInterface(ctrl)
 		mockNfs := nfsmock.NewMockService(ctrl)
 		mockNode.EXPECT().NodePublishVolume(gomock.Any(), gomock.Any()).AnyTimes().Return(&csi.NodePublishVolumeResponse{}, nil)
 		mockNfs.EXPECT().NodePublishVolume(gomock.Any(), gomock.Any()).AnyTimes().Return(&csi.NodePublishVolumeResponse{}, nil)
@@ -210,7 +210,7 @@ func TestMountVolume(t *testing.T) {
 	})
 
 	t.Run("stage error", func(t *testing.T) {
-		mockNode := mocks.NewMockNodeInterface(ctrl)
+		mockNode := mocks.NewMockInterface(ctrl)
 		mockNfs := nfsmock.NewMockService(ctrl)
 		mockNode.EXPECT().NodePublishVolume(gomock.Any(), gomock.Any()).AnyTimes().Return(&csi.NodePublishVolumeResponse{}, nil)
 		mockNfs.EXPECT().NodePublishVolume(gomock.Any(), gomock.Any()).AnyTimes().Return(&csi.NodePublishVolumeResponse{}, nil)
@@ -224,7 +224,7 @@ func TestMountVolume(t *testing.T) {
 	})
 
 	t.Run("publish error", func(t *testing.T) {
-		mockNode := mocks.NewMockNodeInterface(ctrl)
+		mockNode := mocks.NewMockInterface(ctrl)
 		mockNfs := nfsmock.NewMockService(ctrl)
 		mockNode.EXPECT().NodePublishVolume(gomock.Any(), gomock.Any()).AnyTimes().Return(&csi.NodePublishVolumeResponse{}, errors.New("publish error"))
 		mockNfs.EXPECT().NodePublishVolume(gomock.Any(), gomock.Any()).AnyTimes().Return(&csi.NodePublishVolumeResponse{}, errors.New("publish error"))
@@ -250,7 +250,7 @@ func TestUnmountVolume(t *testing.T) {
 	})
 
 	t.Run("sunccess", func(t *testing.T) {
-		mockNode := mocks.NewMockNodeInterface(ctrl)
+		mockNode := mocks.NewMockInterface(ctrl)
 		oldRemove := osRemove
 		oldUnmount := sysUnmount
 		defer func() {
@@ -258,10 +258,10 @@ func TestUnmountVolume(t *testing.T) {
 			sysUnmount = oldUnmount
 		}()
 
-		osRemove = func(name string) error {
+		osRemove = func(_ string) error {
 			return nil
 		}
-		sysUnmount = func(target string, flags int) error {
+		sysUnmount = func(_ string, _ int) error {
 			return nil
 		}
 
@@ -273,7 +273,7 @@ func TestUnmountVolume(t *testing.T) {
 	})
 
 	t.Run("remove fail", func(t *testing.T) {
-		mockNode := mocks.NewMockNodeInterface(ctrl)
+		mockNode := mocks.NewMockInterface(ctrl)
 		oldRemove := osRemove
 		oldUnmount := sysUnmount
 		defer func() {
@@ -281,10 +281,10 @@ func TestUnmountVolume(t *testing.T) {
 			sysUnmount = oldUnmount
 		}()
 
-		osRemove = func(name string) error {
+		osRemove = func(_ string) error {
 			return errors.New("remove error")
 		}
-		sysUnmount = func(target string, flags int) error {
+		sysUnmount = func(_ string, _ int) error {
 			return nil
 		}
 
@@ -296,7 +296,7 @@ func TestUnmountVolume(t *testing.T) {
 	})
 
 	t.Run("unstage error", func(t *testing.T) {
-		mockNode := mocks.NewMockNodeInterface(ctrl)
+		mockNode := mocks.NewMockInterface(ctrl)
 		oldRemove := osRemove
 		oldUnmount := sysUnmount
 		defer func() {
@@ -304,10 +304,10 @@ func TestUnmountVolume(t *testing.T) {
 			sysUnmount = oldUnmount
 		}()
 
-		osRemove = func(name string) error {
+		osRemove = func(_ string) error {
 			return nil
 		}
-		sysUnmount = func(target string, flags int) error {
+		sysUnmount = func(_ string, _ int) error {
 			return nil
 		}
 

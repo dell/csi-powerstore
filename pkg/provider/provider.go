@@ -29,7 +29,7 @@ import (
 var Log = logrus.New()
 
 // New returns a new Mock Storage Plug-in Provider.
-func New(controllerSvc controller.ControllerInterface, identitySvc *identity.Service, nodeSvc node.NodeInterface, interList []grpc.UnaryServerInterceptor) *gocsi.StoragePlugin {
+func New(controllerSvc controller.Interface, identitySvc *identity.Service, nodeSvc node.Interface, interList []grpc.UnaryServerInterceptor) *gocsi.StoragePlugin {
 	svc := service.New()
 	service.PutControllerService(controllerSvc)
 	service.PutNodeService(nodeSvc)
