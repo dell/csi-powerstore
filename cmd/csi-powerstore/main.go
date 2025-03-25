@@ -179,9 +179,17 @@ func main() {
 		opentracing.SetGlobalTracer(t)
 		InterceptorsList = append(InterceptorsList, grpc_opentracing.UnaryServerInterceptor(grpc_opentracing.WithTracer(t)))
 	}
+
+	storageProvider := provider.New(controllerService, identityService, nodeService, InterceptorsList)
+	runCSIPlugin(storageProvider)
+}
+
+var runCSIPlugin = func(storageProvider *gocsi.StoragePlugin) {
 	gocsi.Run(context.Background(), common.Name,
 		"A PowerStore Container Storage Interface (CSI) Driver",
-		usage, provider.New(controllerService, identityService, nodeService, InterceptorsList))
+		usage,
+		storageProvider,
+	)
 }
 
 func updateDriverConfigParams(v *viper.Viper) {
