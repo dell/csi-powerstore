@@ -51,8 +51,8 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-//go:generate mockgen -destination=../../mocks/NodeInterface.go -package=mocks github.com/dell/csi-powerstore/v2/pkg/node NodeInterface
-type NodeInterface interface {
+//go:generate mockgen -destination=../../mocks/NodeInterface.go -package=mocks github.com/dell/csi-powerstore/v2/pkg/node Interface
+type Interface interface {
 	csi.NodeServer
 	array.Consumer
 }
@@ -76,7 +76,7 @@ type Opts struct {
 type Service struct {
 	Fs fs.Interface
 
-	ctrlSvc        controller.ControllerInterface
+	ctrlSvc        controller.Interface
 	iscsiConnector ISCSIConnector
 	fcConnector    FcConnector
 	nvmeConnector  NVMEConnector

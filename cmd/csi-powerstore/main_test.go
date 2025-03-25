@@ -103,14 +103,14 @@ func TestMainControllerMode(t *testing.T) {
 		require.NotNil(t, test.Controller)
 		require.NotNil(t, test.Identity)
 		require.NotNil(t, test.Node)
-		//require.EqualValues(t, 1, len(test.Controller.(*controller.Service).Arrays()))
+		// require.EqualValues(t, 1, len(test.Controller.(*controller.Service).Arrays()))
 
 		// Update the config file
 		writeToFile(t, config, array2)
 		time.Sleep(time.Second)
 
 		// Assertions
-		//require.EqualValues(t, 2, len(test.Controller.(*controller.Service).Arrays()))
+		// require.EqualValues(t, 2, len(test.Controller.(*controller.Service).Arrays()))
 	}
 
 	defer func() {
@@ -148,14 +148,14 @@ func TestMainNodeMode(t *testing.T) {
 		require.NotNil(t, test.Controller)
 		require.NotNil(t, test.Identity)
 		require.NotNil(t, test.Node)
-		//require.EqualValues(t, 1, len(test.Controller.(*controller.Service).Arrays()))
+		// require.EqualValues(t, 1, len(test.Controller.(*controller.Service).Arrays()))
 
 		// Update the config file
 		writeToFile(t, config, array2)
 		time.Sleep(time.Second)
 
 		// Assertions
-		//require.EqualValues(t, 2, len(test.Node.(*node.Service).Arrays()))
+		// require.EqualValues(t, 2, len(test.Node.(*node.Service).Arrays()))
 	}
 
 	defer func() {

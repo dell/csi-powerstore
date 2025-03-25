@@ -45,8 +45,8 @@ var (
 	// DriverSecret driver secret
 	DriverSecret string
 	// Name of the driver
-	controllerSvc controller.ControllerInterface
-	nodeSvc       node.NodeInterface
+	controllerSvc controller.Interface
+	nodeSvc       node.Interface
 	nfssvc        nfs.Service
 
 	mx = sync.Mutex{}
@@ -180,10 +180,10 @@ func PutNfsService(nfs nfs.Service) {
 	nfssvc = nfs
 }
 
-func PutControllerService(ctlSvc controller.ControllerInterface) {
+func PutControllerService(ctlSvc controller.Interface) {
 	controllerSvc = ctlSvc
 }
 
-func PutNodeService(nsSvc node.NodeInterface) {
+func PutNodeService(nsSvc node.Interface) {
 	nodeSvc = nsSvc
 }
