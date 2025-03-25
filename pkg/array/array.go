@@ -172,7 +172,7 @@ func (n *NASCooldown) IsInCooldown(nas string) bool {
 			return true
 		}
 		// Cooldown expired - remove nas status
-		n.ResetFailure(nas)
+		delete(n.statusMap, nas)
 	}
 	return false
 }
@@ -459,4 +459,72 @@ func ParseVolumeID(ctx context.Context, volumeHandle string,
 
 	log.Debugf("id %s arrayID %s proto %s", localVolumeID, arrayID, protocol)
 	return localVolumeID, arrayID, protocol, remoteVolumeID, remoteArrayID, nil
+}
+
+// GetLeastUsedActiveNAS finds the active NAS with the least FS count
+func GetLeastUsedActiveNAS(ctx context.Context, arr *PowerStoreArray, nasServers []string) (string, error) {
+	nasList, err := arr.Client.GetNASServers(ctx)
+	if err != nil {
+		log.Errorf("Failed to fetch NAS servers: %v", err)
+		return "", err
+	}
+	nasMap := make(map[string]bool)
+	for _, nasServer := range nasServers {
+		nasMap[nasServer] = true
+	}
+
+	var leastUsedNAS *gopowerstore.NAS
+
+	for i := range nasList {
+		nas := &nasList[i]
+
+		// Check if NAS is present in nasserver map
+		if !nasMap[nas.Name] {
+			continue
+		}
+
+		// Ignore if NAS is in cooldown
+		if arr.NASCooldownTracker.IsInCooldown(nas.Name) {
+			continue
+		}
+
+		// Ignore non-active NAS servers
+		if nas.OperationalStatus != gopowerstore.Started {
+			continue
+		}
+
+		// Proceed only if at least one of the health states is valid
+		if !(nas.HealthDetails.State == gopowerstore.Info || nas.HealthDetails.State == gopowerstore.None) {
+			continue
+		}
+
+		// If it's the first valid NAS or has fewer FSs, update
+		if leastUsedNAS == nil || len(nas.FileSystems) < len(leastUsedNAS.FileSystems) ||
+			(len(nas.FileSystems) == len(leastUsedNAS.FileSystems) && nas.Name < leastUsedNAS.Name) {
+			leastUsedNAS = nas
+		}
+	}
+
+	if leastUsedNAS == nil {
+		if areAllNASInCooldown(arr, nasServers) {
+			return arr.NASCooldownTracker.FallbackRetry(nasServers), nil
+		}
+		return "", fmt.Errorf("no suitable NAS server found")
+	}
+
+	return leastUsedNAS.Name, nil
+}
+
+// Check if all the NAS are in cooldown
+func areAllNASInCooldown(arr *PowerStoreArray, nasServers []string) bool {
+	if len(nasServers) == 0 {
+		return false
+	}
+	allNASInCooldown := true
+	for _, nas := range nasServers {
+		if !arr.NASCooldownTracker.IsInCooldown(nas) {
+			allNASInCooldown = false
+		}
+	}
+	return allNASInCooldown
 }
