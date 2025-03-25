@@ -41,11 +41,11 @@ func (s *service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 	params := req.GetParameters()
 	if params[CsiNfsParameter] != "" {
 		// Right now no dependence on isRWXAccessMode so can test easily
-		//if isRWXAccessMode(req) {
+		// if isRWXAccessMode(req) {
 		params[CsiNfsParameter] = "RWX"
-		//} else {
-		//params[CsiNfsParameter] = ""
-		//}
+		// } else {
+		// params[CsiNfsParameter] = ""
+		// }
 	}
 	if nfs.IsNFSStorageClass(params) {
 		return nfssvc.CreateVolume(ctx, req)

@@ -49,7 +49,7 @@ import (
 
 // Interface provides most important controller methods.
 // This essentially serves as a wrapper for controller service that is used in ephemeral volumes.
-type ControllerInterface interface {
+type Interface interface {
 	csi.ControllerServer
 	ProbeController(context.Context, *commonext.ProbeControllerRequest) (*commonext.ProbeControllerResponse, error)
 	RegisterAdditionalServers(*grpc.Server)

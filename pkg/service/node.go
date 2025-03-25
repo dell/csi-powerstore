@@ -92,9 +92,9 @@ func (s *service) NodeGetInfo(ctx context.Context, _ *csi.NodeGetInfoRequest) (*
 	return nodeSvc.NodeGetInfo(ctx, nil)
 }
 
-func (s *service) MountVolume(ctx context.Context, volumeId, fsType, nfsExportDirectory string, publishContext map[string]string) (string, error) {
-	log.Infof("MountVolume called volumeId %s", volumeId)
-	if volumeId == "" {
+func (s *service) MountVolume(ctx context.Context, volumeID, fsType, nfsExportDirectory string, publishContext map[string]string) (string, error) {
+	log.Infof("MountVolume called volumeId %s", volumeID)
+	if volumeID == "" {
 		return "", fmt.Errorf("MountVolume: volumeId was empty")
 	}
 
@@ -106,7 +106,7 @@ func (s *service) MountVolume(ctx context.Context, volumeId, fsType, nfsExportDi
 	target := path.Join(nfsExportDirectory, publishContext[nfs.ServiceName])
 
 	nodeStageReq := &csi.NodeStageVolumeRequest{
-		VolumeId: volumeId,
+		VolumeId: volumeID,
 		VolumeCapability: &csi.VolumeCapability{
 			AccessType: &csi.VolumeCapability_Mount{
 				Mount: &csi.VolumeCapability_MountVolume{
@@ -123,13 +123,12 @@ func (s *service) MountVolume(ctx context.Context, volumeId, fsType, nfsExportDi
 
 	log.Infof("MountVolume calling NodeStageVolume:  %+v", nodeStageReq)
 	_, err := nodeSvc.NodeStageVolume(ctx, nodeStageReq)
-
 	if err != nil {
-		return "", fmt.Errorf("MountVolume: could not stage volume volumeId %s: %s", volumeId, err)
+		return "", fmt.Errorf("MountVolume: could not stage volume volumeId %s: %s", volumeID, err)
 	}
 
 	nodePubReq := &csi.NodePublishVolumeRequest{
-		VolumeId: volumeId,
+		VolumeId: volumeID,
 		VolumeCapability: &csi.VolumeCapability{
 			AccessType: &csi.VolumeCapability_Mount{
 				Mount: &csi.VolumeCapability_MountVolume{
@@ -149,15 +148,14 @@ func (s *service) MountVolume(ctx context.Context, volumeId, fsType, nfsExportDi
 
 	log.Infof("MountVolume calling NodePublishVolume %+v", nodePubReq)
 	_, err = nodeSvc.NodePublishVolume(ctx, nodePubReq)
-
 	if err != nil {
-		return "", fmt.Errorf("MountVolume: could not publish volume volumeId %s", volumeId)
+		return "", fmt.Errorf("MountVolume: could not publish volume volumeId %s", volumeID)
 	}
-	log.Infof("MountVolume ALL GOOD volume %s mounted to target %s", volumeId, target)
+	log.Infof("MountVolume ALL GOOD volume %s mounted to target %s", volumeID, target)
 	return target, nil
 }
 
-func (s *service) UnmountVolume(ctx context.Context, volumeId, exportPath string, publishContext map[string]string) error {
+func (s *service) UnmountVolume(ctx context.Context, volumeID, exportPath string, publishContext map[string]string) error {
 	staging := path.Join(exportPath, publishContext[nfs.ServiceName]+"-dev")
 	target := path.Join(exportPath, publishContext[nfs.ServiceName])
 	var err error
@@ -165,33 +163,33 @@ func (s *service) UnmountVolume(ctx context.Context, volumeId, exportPath string
 	log.Infof("UnmountVolume calling Unmount %s", target)
 	err = sysUnmount(target, 0)
 	if err != nil && !strings.Contains(err.Error(), "No such file") {
-		log.Errorf("Could not Umount the target path: %s %s %s", volumeId, target, err.Error())
+		log.Errorf("Could not Umount the target path: %s %s %s", volumeID, target, err.Error())
 		return err
 	}
 
 	err = osRemove(target)
 	if err != nil && !strings.Contains(err.Error(), "No such file") {
-		log.Errorf("UnmountVolume %s could not remove directory %s: %s", volumeId, target, err.Error())
+		log.Errorf("UnmountVolume %s could not remove directory %s: %s", volumeID, target, err.Error())
 		return err
 	}
 
 	nodeUnstageReq := &csi.NodeUnstageVolumeRequest{
-		VolumeId:          volumeId,
+		VolumeId:          volumeID,
 		StagingTargetPath: staging,
 	}
 
 	log.Infof("UnmountVolume calling NodeUnstageVolume %+v", nodeUnstageReq)
 	_, err = nodeSvc.NodeUnstageVolume(ctx, nodeUnstageReq)
 	if err != nil {
-		return fmt.Errorf("UnmountVolume unstaging volume %s failed: %e", volumeId, err)
+		return fmt.Errorf("UnmountVolume unstaging volume %s failed: %e", volumeID, err)
 	}
-	log.Infof("NodeUnstage %s %s returned successfully", volumeId, exportPath)
+	log.Infof("NodeUnstage %s %s returned successfully", volumeID, exportPath)
 
 	// Remove the staging path.
 	err = osRemove(staging)
 	if err != nil && !strings.Contains(err.Error(), "No such file") {
-		log.Infof("UnmountVolume Remove %s staging path %s failed: %s", volumeId, "/noderoot/"+staging, err)
+		log.Infof("UnmountVolume Remove %s staging path %s failed: %s", volumeID, "/noderoot/"+staging, err)
 	}
-	log.Infof("UnmountVolume %s ALL GOOD", volumeId)
+	log.Infof("UnmountVolume %s ALL GOOD", volumeID)
 	return nil
 }

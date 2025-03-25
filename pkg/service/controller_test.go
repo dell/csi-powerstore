@@ -36,7 +36,7 @@ func TestCreateVolume(t *testing.T) {
 	svc := service{}
 	ctx := context.Background()
 	mockController := new(mocks.ControllerInterface)
-	mockNode := mocks.NewMockNodeInterface(c)
+	mockNode := mocks.NewMockInterface(c)
 	mockNfs := nfsmock.NewMockService(c)
 
 	t.Run("nfs volume", func(t *testing.T) {
@@ -73,7 +73,7 @@ func TestDeleteVolume(t *testing.T) {
 	svc := service{}
 	ctx := context.Background()
 	mockController := new(mocks.ControllerInterface)
-	mockNode := mocks.NewMockNodeInterface(c)
+	mockNode := mocks.NewMockInterface(c)
 	mockNfs := nfsmock.NewMockService(c)
 
 	t.Run("nfs volume", func(t *testing.T) {
