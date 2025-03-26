@@ -18,6 +18,17 @@
 # supress ginkgo 2.0 upgrade hints
 export ACK_GINKGO_DEPRECATIONS=1.16.5
 
-# run all tests 
-go test -timeout=100m -v ./ -ginkgo.v=1
+# ./run.sh "Multiple NAS Test"
+# ./run.sh "External Access Test"
+# Default to running all tests if no arguments are provided
+TEST_FOCUS=""
+
+# Check if a specific test focus is passed as an argument
+if [[ ! -z "$1" ]]; then
+    TEST_FOCUS="-ginkgo.focus=\"$1\""
+fi
+
+# Run the tests
+echo "Running tests with focus: $TEST_FOCUS"
+eval "go test -timeout=100m -v ./ -ginkgo.v=1 $TEST_FOCUS"
 
