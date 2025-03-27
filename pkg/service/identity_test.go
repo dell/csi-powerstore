@@ -24,19 +24,19 @@ func TestGetPluginInfo(t *testing.T) {
 	svc := service{}
 	resp, err := svc.GetPluginInfo(context.Background(), nil)
 	assert.Empty(t, resp)
-	assert.Equal(t, err.Error(), "should not reach here")
+	assert.Equal(t, err.Error(), "not implemented")
 }
 
 func TestGetPluginCapabilities(t *testing.T) {
 	svc := service{}
 	resp, err := svc.GetPluginCapabilities(context.Background(), nil)
 	assert.Empty(t, resp)
-	assert.Equal(t, err.Error(), "should not reach here")
+	assert.Equal(t, err.Error(), "not implemented")
 }
 
 func TestProbe(t *testing.T) {
 	svc := service{}
 	resp, err := svc.Probe(context.Background(), nil)
 	assert.Empty(t, resp)
-	assert.Equal(t, err.Error(), "should not reach here")
+	assert.Equal(t, err.Error(), "not implemented")
 }

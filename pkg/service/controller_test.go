@@ -20,6 +20,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
@@ -35,37 +36,59 @@ func TestCreateVolume(t *testing.T) {
 	c := gomock.NewController(t)
 	svc := service{}
 	ctx := context.Background()
-	mockController := new(mocks.ControllerInterface)
-	mockNode := mocks.NewMockInterface(c)
-	mockNfs := nfsmock.NewMockService(c)
 
-	t.Run("nfs volume", func(t *testing.T) {
-		mockController.On("CreateVolume", mock.Anything, mock.Anything).Return(&csi.CreateVolumeResponse{}, nil)
-		mockNfs.EXPECT().CreateVolume(gomock.Any(), gomock.Any()).Times(1).Return(&csi.CreateVolumeResponse{}, nil)
-		PutControllerService(mockController)
-		PutNodeService(mockNode)
-		PutNfsService(mockNfs)
+	type testCase struct {
+		name         string
+		volumeParams map[string]string
+		mockSetup    func(mock *mocks.ControllerInterface, mockNode *mocks.MockInterface, mockNfs *nfsmock.MockService)
+		expectedErr  error
+	}
 
-		req := &csi.CreateVolumeRequest{
-			Parameters: map[string]string{"csi-nfs": "RWXW"},
-		}
-		resp, err := svc.CreateVolume(ctx, req)
-		assert.Nil(t, err)
-		assert.Empty(t, resp)
-	})
+	testCases := []testCase{
+		{
+			name:         "nfs volume",
+			volumeParams: map[string]string{"csi-nfs": "RWXW"},
+			mockSetup: func(mockController *mocks.ControllerInterface, mockNode *mocks.MockInterface, mockNfs *nfsmock.MockService) {
+				mockController.On("CreateVolume", mock.Anything, mock.Anything).Return(&csi.CreateVolumeResponse{}, nil)
+				mockNfs.EXPECT().CreateVolume(gomock.Any(), gomock.Any()).Times(1).Return(&csi.CreateVolumeResponse{}, nil)
+			},
+			expectedErr: nil,
+		},
+		{
+			name: "normal volume",
+			mockSetup: func(mockController *mocks.ControllerInterface, mockNode *mocks.MockInterface, mockNfs *nfsmock.MockService) {
+				mockController.On("CreateVolume", mock.Anything, mock.Anything).Return(&csi.CreateVolumeResponse{}, nil)
+				mockNfs.EXPECT().CreateVolume(gomock.Any(), gomock.Any()).AnyTimes().Return(&csi.CreateVolumeResponse{}, nil)
+			},
+			expectedErr: nil,
+		},
+	}
 
-	t.Run("normal volume", func(t *testing.T) {
-		mockController.On("CreateVolume", mock.Anything, mock.Anything).Return(&csi.CreateVolumeResponse{}, nil)
-		mockNfs.EXPECT().CreateVolume(gomock.Any(), gomock.Any()).AnyTimes().Return(&csi.CreateVolumeResponse{}, nil)
-		PutControllerService(mockController)
-		PutNodeService(mockNode)
-		PutNfsService(mockNfs)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			mockController := new(mocks.ControllerInterface)
+			mockNode := mocks.NewMockInterface(c)
+			mockNfs := nfsmock.NewMockService(c)
 
-		req := &csi.CreateVolumeRequest{}
-		resp, err := svc.CreateVolume(ctx, req)
-		assert.Nil(t, err)
-		assert.Empty(t, resp)
-	})
+			tc.mockSetup(mockController, mockNode, mockNfs)
+
+			PutControllerService(mockController)
+			PutNodeService(mockNode)
+			PutNfsService(mockNfs)
+
+			req := &csi.CreateVolumeRequest{
+				Parameters: tc.volumeParams,
+			}
+			resp, err := svc.CreateVolume(ctx, req)
+
+			if tc.expectedErr == nil {
+				assert.Nil(t, err)
+				assert.Empty(t, resp)
+			} else {
+				assert.Equal(t, tc.expectedErr, err)
+			}
+		})
+	}
 }
 
 func TestDeleteVolume(t *testing.T) {
@@ -307,46 +330,60 @@ func TestControllerUnpublishVolume(t *testing.T) {
 func TestControllerPublishVolume(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	mockController := new(mocks.ControllerInterface)
-	mockNfs := nfsmock.NewMockService(ctrl)
-	svc := service{}
 
-	t.Run("empty volume id", func(t *testing.T) {
-		req := &csi.ControllerPublishVolumeRequest{
-			VolumeContext: map[string]string{"fsType": "nfs"},
-			VolumeId:      "",
-		}
-		resp, err := svc.ControllerPublishVolume(context.Background(), req)
-		assert.Nil(t, resp)
-		assert.Contains(t, err.Error(), "volume ID is required")
-	})
+	tests := []struct {
+		name       string
+		req        *csi.ControllerPublishVolumeRequest
+		expectResp *csi.ControllerPublishVolumeResponse
+		expectErr  error
+	}{
+		{
+			name: "empty volume id",
+			req: &csi.ControllerPublishVolumeRequest{
+				VolumeContext: map[string]string{"fsType": "nfs"},
+				VolumeId:      "",
+			},
+			expectErr: errors.New("volume ID is required"),
+		},
+		{
+			name: "nfs volume",
+			req: &csi.ControllerPublishVolumeRequest{
+				VolumeId: "nfs-123",
+			},
+			expectResp: &csi.ControllerPublishVolumeResponse{},
+		},
+		{
+			name: "normal volume",
+			req: &csi.ControllerPublishVolumeRequest{
+				VolumeId: "vid-123",
+			},
+			expectResp: &csi.ControllerPublishVolumeResponse{},
+		},
+	}
 
-	t.Run("nfs volume", func(t *testing.T) {
-		mockController.On("ControllerPublishVolume", mock.Anything, mock.Anything).Return(&csi.ControllerPublishVolumeResponse{}, nil)
-		mockNfs.EXPECT().ControllerPublishVolume(gomock.Any(), gomock.Any()).AnyTimes().Return(&csi.ControllerPublishVolumeResponse{}, nil)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			mockController := new(mocks.ControllerInterface)
+			mockNfs := nfsmock.NewMockService(ctrl)
+			svc := service{}
 
-		PutControllerService(mockController)
-		PutNfsService(mockNfs)
+			if tc.name == "nfs volume" {
+				mockController.On("ControllerPublishVolume", mock.Anything, tc.req).Return(tc.expectResp, tc.expectErr)
+				mockNfs.EXPECT().ControllerPublishVolume(gomock.Any(), tc.req).AnyTimes().Return(tc.expectResp, tc.expectErr)
 
-		req := &csi.ControllerPublishVolumeRequest{
-			VolumeContext: map[string]string{"fsType": "nfs"},
-			VolumeId:      "nfs-123",
-		}
+				PutControllerService(mockController)
+				PutNfsService(mockNfs)
+			} else {
+				mockController.On("ControllerPublishVolume", mock.Anything, tc.req).Return(tc.expectResp, tc.expectErr)
 
-		resp, err := svc.ControllerPublishVolume(context.Background(), req)
-		assert.Nil(t, err)
-		assert.Empty(t, resp)
-	})
+				PutControllerService(mockController)
+			}
 
-	t.Run("normal volume", func(t *testing.T) {
-		mockController.On("ControllerPublishVolume", mock.Anything, mock.Anything).Return(&csi.ControllerPublishVolumeResponse{}, nil)
-		PutControllerService(mockController)
-		req := &csi.ControllerPublishVolumeRequest{
-			VolumeContext: map[string]string{"fsType": "nfs"},
-			VolumeId:      "vid-123",
-		}
-		resp, err := svc.ControllerPublishVolume(context.Background(), req)
-		assert.Nil(t, err)
-		assert.Empty(t, resp)
-	})
+			resp, err := svc.ControllerPublishVolume(context.Background(), tc.req)
+			assert.Equal(t, tc.expectResp, resp)
+			if tc.expectErr != nil {
+				assert.Contains(t, err.Error(), tc.expectErr.Error())
+			}
+		})
+	}
 }
