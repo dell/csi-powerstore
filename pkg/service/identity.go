@@ -28,15 +28,15 @@ import (
 
 // GetPluginInfo returns general information about plugin (driver) such as name, version and manifest
 func (s *service) GetPluginInfo(_ context.Context, _ *csi.GetPluginInfoRequest) (*csi.GetPluginInfoResponse, error) {
-	return &csi.GetPluginInfoResponse{}, fmt.Errorf("should not reach here")
+	return &csi.GetPluginInfoResponse{}, fmt.Errorf("not implemented")
 }
 
 // GetPluginCapabilities returns capabilities that are supported by the driver
 func (s *service) GetPluginCapabilities(_ context.Context, _ *csi.GetPluginCapabilitiesRequest) (*csi.GetPluginCapabilitiesResponse, error) {
-	return &csi.GetPluginCapabilitiesResponse{}, fmt.Errorf("should not reach here")
+	return &csi.GetPluginCapabilitiesResponse{}, fmt.Errorf("not implemented")
 }
 
 // Probe returns current state of the driver and if it is ready to receive requests
 func (s *service) Probe(_ context.Context, _ *csi.ProbeRequest) (*csi.ProbeResponse, error) {
-	return &csi.ProbeResponse{}, fmt.Errorf("should not reach here")
+	return &csi.ProbeResponse{}, fmt.Errorf("not implemented")
 }
