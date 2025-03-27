@@ -167,7 +167,7 @@ func updateDriverConfigParams(v *viper.Viper) {
 }
 
 // VolumeIDToArrayID returns the array ID for a given volume.
-// Example: 7ad2b6e84ac1c70f-6d6d908a0000000d returns 7ad2b6e84ac1c70f
+// Example: abc-123 returns abc
 func (s *service) VolumeIDToArrayID(volumeID string) string {
 	if volumeID == "" {
 		return ""
