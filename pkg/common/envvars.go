@@ -106,4 +106,10 @@ const (
 
 	// EnvPodmonArrayConnectivityPollRate indicates the polling frequency to check array connectivity
 	EnvPodmonArrayConnectivityPollRate = "X_CSI_PODMON_ARRAY_CONNECTIVITY_POLL_RATE"
+
+	// EnvNFSExportDirectory is the path to the folder where the nfs volumes are mounted
+	EnvNFSExportDirectory = "X_CSI_NFS_EXPORT_DIRECTORY"
+
+	// EnvNFSServerPort is the port on which the NFS server is listening on
+	EnvNFSServerPort = "X_CSI_NFS_SERVER_PORT"
 )
