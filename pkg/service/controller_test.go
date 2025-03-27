@@ -48,7 +48,7 @@ func TestCreateVolume(t *testing.T) {
 		{
 			name:         "nfs volume",
 			volumeParams: map[string]string{"csi-nfs": "RWXW"},
-			mockSetup: func(mockController *mocks.ControllerInterface, mockNode *mocks.MockInterface, mockNfs *nfsmock.MockService) {
+			mockSetup: func(mockController *mocks.ControllerInterface, _ *mocks.MockInterface, mockNfs *nfsmock.MockService) {
 				mockController.On("CreateVolume", mock.Anything, mock.Anything).Return(&csi.CreateVolumeResponse{}, nil)
 				mockNfs.EXPECT().CreateVolume(gomock.Any(), gomock.Any()).Times(1).Return(&csi.CreateVolumeResponse{}, nil)
 			},
@@ -56,7 +56,7 @@ func TestCreateVolume(t *testing.T) {
 		},
 		{
 			name: "normal volume",
-			mockSetup: func(mockController *mocks.ControllerInterface, mockNode *mocks.MockInterface, mockNfs *nfsmock.MockService) {
+			mockSetup: func(mockController *mocks.ControllerInterface, _ *mocks.MockInterface, mockNfs *nfsmock.MockService) {
 				mockController.On("CreateVolume", mock.Anything, mock.Anything).Return(&csi.CreateVolumeResponse{}, nil)
 				mockNfs.EXPECT().CreateVolume(gomock.Any(), gomock.Any()).AnyTimes().Return(&csi.CreateVolumeResponse{}, nil)
 			},
