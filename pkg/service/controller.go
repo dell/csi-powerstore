@@ -40,12 +40,7 @@ const (
 func (s *service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
 	params := req.GetParameters()
 	if params[CsiNfsParameter] != "" {
-		// Right now no dependence on isRWXAccessMode so can test easily
-		// if isRWXAccessMode(req) {
 		params[CsiNfsParameter] = "RWX"
-		// } else {
-		// params[CsiNfsParameter] = ""
-		// }
 	}
 	if nfs.IsNFSStorageClass(params) {
 		return nfssvc.CreateVolume(ctx, req)
@@ -66,9 +61,9 @@ func (s *service) ControllerPublishVolume(ctx context.Context, req *csi.Controll
 	log := getLogger(ctx)
 	volumeContext := req.GetVolumeContext()
 	if volumeContext != nil {
-		log.Printf("VolumeContext:")
+		log.Debugf("VolumeContext:")
 		for key, value := range volumeContext {
-			log.Printf("    [%s]=%s", key, value)
+			log.Debugf("    [%s]=%s", key, value)
 		}
 	}
 
