@@ -14,6 +14,8 @@
 package provider
 
 import (
+	"os"
+
 	"github.com/dell/csi-powerstore/v2/pkg/common"
 	"github.com/dell/csi-powerstore/v2/pkg/controller"
 	"github.com/dell/csi-powerstore/v2/pkg/identity"
@@ -28,8 +30,8 @@ import (
 // Log init
 var Log = logrus.New()
 
-// New returns a new Mock Storage Plug-in Provider.
-func New(controllerSvc controller.Interface, identitySvc *identity.Service, nodeSvc node.Interface, interList []grpc.UnaryServerInterceptor) *gocsi.StoragePlugin {
+// New returns a new gocsi Storage Plug-in Provider.
+func New(controllerSvc *controller.Service, identitySvc *identity.Service, nodeSvc *node.Service, interList []grpc.UnaryServerInterceptor) gocsi.StoragePluginProvider {
 	svc := service.New()
 	service.PutControllerService(controllerSvc)
 	service.PutNodeService(nodeSvc)
@@ -38,7 +40,9 @@ func New(controllerSvc controller.Interface, identitySvc *identity.Service, node
 	nfs.PutVcsiService(svc)
 	nfs.DriverName = common.Name
 	nfs.DriverNamespace = "powerstore"
-	nfs.NfsExportDirectory = "/var/lib/dell/nfs"
+
+	nfs.NfsExportDirectory = os.Getenv(common.EnvNFSExportDirectory)
+	Log.Infof("Setting nfsExportDirectory env to %s", nfs.NfsExportDirectory)
 	return &gocsi.StoragePlugin{
 		Controller:                svc,
 		Identity:                  identitySvc,
