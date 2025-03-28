@@ -1396,12 +1396,11 @@ func (s *Service) ControllerExpandVolume(ctx context.Context, req *csi.Controlle
 		}
 
 		// check for host access if there is any host attached to the volume, if yes set to true else false
-		nodeExpansionRequired := false
-
-		//check here if the volume has 1 or more host access
-		if len(vol) >= 1 { // If the volume has 1 or more host access  then set nodeExpansionRequired as true
-			nodeExpansionRequired = true
+		hostMappings, err := s.Arrays()[arrayID].Client.GetHostVolumeMappingByVolumeID(ctx, id)
+		if err != nil {
+			return nil, status.Errorf(codes.NotFound, "failed to get host volume mapping for volume: %s with error: %v", id, err.Error())
 		}
+		nodeExpansionRequired := len(hostMappings) >= 1 // If the volume has 1 or more host access then set nodeExpansionRequired as true
 
 		if vol.Size < requiredBytes {
 			if isMetro {
