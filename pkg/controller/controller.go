@@ -1395,6 +1395,14 @@ func (s *Service) ControllerExpandVolume(ctx context.Context, req *csi.Controlle
 				"failed to expand the volume %s because the metro replication session ID is empty for metro volume", vol.Name)
 		}
 
+		// check for host access if there is any host attached to the volume, if yes set to true else false
+		nodeExpansionRequired := false
+
+		//check here if the volume has 1 or more host access
+		if len(vol) >= 1 { // If the volume has 1 or more host access  then set nodeExpansionRequired as true
+			nodeExpansionRequired = true
+		}
+
 		if vol.Size < requiredBytes {
 			if isMetro {
 				// must pause metro session before modifying the volume
@@ -1410,7 +1418,8 @@ func (s *Service) ControllerExpandVolume(ctx context.Context, req *csi.Controlle
 			if err != nil {
 				return nil, status.Errorf(codes.Internal, "unable to modify volume size: %s", err.Error())
 			}
-			return &csi.ControllerExpandVolumeResponse{CapacityBytes: requiredBytes, NodeExpansionRequired: true}, nil
+
+			return &csi.ControllerExpandVolumeResponse{CapacityBytes: requiredBytes, NodeExpansionRequired: nodeExpansionRequired}, nil
 		}
 
 		return &csi.ControllerExpandVolumeResponse{}, nil
