@@ -98,7 +98,7 @@ func TestMainControllerMode(t *testing.T) {
     blockProtocol: "auto"
     isDefault: false`
 
-	_ = func(test *gocsi.StoragePlugin) {
+	runCSIPlugin = func(test *gocsi.StoragePlugin) {
 		// Assertions
 		require.NotNil(t, test.Controller)
 		require.NotNil(t, test.Identity)
@@ -142,7 +142,7 @@ func TestMainNodeMode(t *testing.T) {
     blockProtocol: "auto"
     isDefault: false`
 
-	_ = func(test *gocsi.StoragePlugin) {
+	runCSIPlugin = func(test *gocsi.StoragePlugin) {
 		// Assertions
 		require.NotNil(t, test.Controller)
 		require.NotNil(t, test.Identity)
