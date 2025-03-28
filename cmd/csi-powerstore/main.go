@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2021-2024 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2021-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,6 +30,7 @@ import (
 	"github.com/dell/csi-powerstore/v2/pkg/identity"
 	"github.com/dell/csi-powerstore/v2/pkg/interceptors"
 	"github.com/dell/csi-powerstore/v2/pkg/node"
+	"github.com/dell/csi-powerstore/v2/pkg/provider"
 	"github.com/dell/csi-powerstore/v2/pkg/tracer"
 	"github.com/dell/gocsi"
 	csictx "github.com/dell/gocsi/context"
@@ -178,20 +179,8 @@ func main() {
 		opentracing.SetGlobalTracer(t)
 		InterceptorsList = append(InterceptorsList, grpc_opentracing.UnaryServerInterceptor(grpc_opentracing.WithTracer(t)))
 	}
-	storageProvider := &gocsi.StoragePlugin{
-		Controller:                controllerService,
-		Identity:                  identityService,
-		Node:                      nodeService,
-		Interceptors:              InterceptorsList,
-		RegisterAdditionalServers: controllerService.RegisterAdditionalServers,
 
-		EnvVars: []string{
-			// Enable request validation.
-			gocsi.EnvVarSpecReqValidation + "=true",
-			// Enable serial volume access.
-			gocsi.EnvVarSerialVolAccess + "=true",
-		},
-	}
+	storageProvider := provider.New(controllerService, identityService, nodeService, InterceptorsList)
 	runCSIPlugin(storageProvider)
 }
 
