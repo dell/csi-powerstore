@@ -109,7 +109,4 @@ const (
 
 	// EnvNFSExportDirectory is the path to the folder where the nfs volumes are mounted
 	EnvNFSExportDirectory = "X_CSI_NFS_EXPORT_DIRECTORY"
-
-	// EnvNFSServerPort is the port on which the NFS server is listening on
-	EnvNFSServerPort = "X_CSI_NFS_SERVER_PORT"
 )
