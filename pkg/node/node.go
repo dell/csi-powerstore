@@ -509,8 +509,8 @@ func removeRemnantMounts(ctx context.Context, stagingPath string, fs fs.Interfac
 func (s *Service) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
 	logFields := common.GetLogFields(ctx)
 	var ephemeralVolume bool
-	nfsStaging := nfs.IsNFSVolumeID(req.VolumeId)
-	if nfsStaging {
+	isHBN := nfs.IsNFSVolumeID(req.VolumeId)
+	if isHBN {
 		req.VolumeId = nfs.ToArrayVolumeID(req.VolumeId)
 	}
 	ephemeral, ok := req.VolumeContext["csi.storage.k8s.io/ephemeral"]
@@ -544,7 +544,7 @@ func (s *Service) NodePublishVolume(ctx context.Context, req *csi.NodePublishVol
 
 	stagingPath := req.GetStagingTargetPath()
 
-	if !nfsStaging {
+	if !isHBN {
 		// append additional path to be able to do bind mounts
 		stagingPath = getStagingPath(ctx, req.GetStagingTargetPath(), id)
 	}
