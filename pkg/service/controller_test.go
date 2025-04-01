@@ -47,7 +47,7 @@ func TestCreateVolume(t *testing.T) {
 	testCases := []testCase{
 		{
 			name:         "nfs volume",
-			volumeParams: map[string]string{"csi-nfs": "RWXW"},
+			volumeParams: map[string]string{CsiNfsParameter: "RWXW"},
 			mockSetup: func(mockController *mocks.ControllerInterface, _ *mocks.MockInterface, mockNfs *nfsmock.MockService) {
 				mockController.On("CreateVolume", mock.Anything, mock.Anything).Return(&csi.CreateVolumeResponse{}, nil)
 				mockNfs.EXPECT().CreateVolume(gomock.Any(), gomock.Any()).Times(1).Return(&csi.CreateVolumeResponse{}, nil)

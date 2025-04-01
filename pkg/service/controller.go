@@ -32,7 +32,7 @@ import (
 )
 
 const (
-	CsiNfsParameter = "csi-nfs"
+	CsiNfsParameter = nfs.CsiNfsParameter
 	KeyNasName      = "nasName"
 )
 

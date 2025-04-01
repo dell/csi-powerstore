@@ -165,7 +165,7 @@ func (s *service) UnmountVolume(ctx context.Context, volumeID, exportPath string
 	log.Infof("UnmountVolume calling Unmount %s", target)
 	err = sysUnmount(target, 0)
 	if err != nil && !strings.Contains(err.Error(), "No such file") {
-		log.Errorf("Could not Umount the target path: %s %s %s", volumeID, target, err.Error())
+		log.Errorf("could not unmount the target path: %s %s %s", volumeID, target, err.Error())
 		return err
 	}
 
