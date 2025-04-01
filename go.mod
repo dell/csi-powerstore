@@ -16,7 +16,7 @@ require (
 	github.com/dell/gofsutil v1.18.0
 	github.com/dell/goiscsi v1.11.1-0.20250313165902-65cabee40e17
 	github.com/dell/gonvme v1.10.2-0.20250318173615-ad76101d9f2b
-	github.com/dell/gopowerstore v1.17.1-0.20250319154601-af67f09c82c4
+	github.com/dell/gopowerstore v1.18.0
 	github.com/fsnotify/fsnotify v1.8.0
 	github.com/go-openapi/strfmt v0.23.0
 	github.com/golang/mock v1.6.0
@@ -31,7 +31,7 @@ require (
 	github.com/stretchr/testify v1.10.0
 	github.com/uber/jaeger-client-go v2.30.0+incompatible
 	github.com/uber/jaeger-lib v2.4.1+incompatible
-	golang.org/x/net v0.37.0
+	golang.org/x/net v0.38.0
 	google.golang.org/grpc v1.71.0
 	google.golang.org/protobuf v1.36.5
 	gopkg.in/yaml.v3 v3.0.1
