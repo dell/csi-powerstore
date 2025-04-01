@@ -78,16 +78,16 @@ For example, here is the output of a request to build an offline bundle for the 
 *
 * Pulling and saving container images
 
-   quay.io/dell/container-storage-module/csi-isilon:v2.13.0
-   quay.io/dell/container-storage-module/csi-metadata-retriever:v1.9.0
+   quay.io/dell/container-storage-module/csi-isilon:v2.14.0
+   quay.io/dell/container-storage-module/csi-metadata-retriever:v1.10.0
    quay.io/dell/container-storage-module/csipowermax-reverseproxy:v2.11.0
-   quay.io/dell/container-storage-module/csi-powermax:v2.13.0
-   quay.io/dell/container-storage-module/csi-powerstore:v2.13.0
-   quay.io/dell/container-storage-module/csi-unity:v2.13.0
-   quay.io/dell/container-storage-module/csi-vxflexos:v2.13.0
-   quay.io/dell/container-storage-module/csm-authorization-sidecar:v1.12.0
+   quay.io/dell/container-storage-module/csi-powermax:v2.14.0
+   quay.io/dell/container-storage-module/csi-powerstore:v2.14.0
+   quay.io/dell/container-storage-module/csi-unity:v2.14.0
+   quay.io/dell/container-storage-module/csi-vxflexos:v2.14.0
+   quay.io/dell/container-storage-module/csm-authorization-sidecar:v1.14.0
    quay.io/dell/container-storage-module/csm-metrics-powerflex:v1.10.0
-   quay.io/dell/container-storage-module/csm-metrics-powerscale:v1.7.0
+   quay.io/dell/container-storage-module/csm-metrics-powerscale:v1.8.0
    quay.io/dell/container-storage-module/csm-topology:v1.10.0
    quay.io/dell/container-storage-module/dell-csi-replicator:v1.10.0
    quay.io/dell/container-storage-module/dell-replication-controller:v1.10.0
