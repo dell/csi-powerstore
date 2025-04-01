@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2021-2024 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2021-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,6 +31,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/dell/csm-hbnfs/nfs"
 	"github.com/dell/gonvme"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
@@ -49,6 +50,12 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
+
+//go:generate mockgen -destination=../../mocks/NodeInterface.go -package=mocks github.com/dell/csi-powerstore/v2/pkg/node Interface
+type Interface interface {
+	csi.NodeServer
+	array.Consumer
+}
 
 // Opts defines service configuration options.
 type Opts struct {
@@ -321,6 +328,10 @@ func (s *Service) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeR
 
 	if remoteVolumeID != "" { // For Remote Metro volume
 		log.Info("Staging remote metro volume")
+		// need to change the staging path for nfs
+		if nfs.IsNFSVolumeID(req.VolumeId) {
+			req.StagingTargetPath = nfs.NfsExportDirectory
+		}
 		response, err = stager.Stage(ctx, req, logFields, s.Fs, remoteVolumeID, true)
 	}
 
@@ -356,8 +367,9 @@ func (s *Service) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVol
 		return nil, status.Errorf(codes.Internal, "can't find array with ID %s", arrayID)
 	}
 
-	// append additional path to be able to do bind mounts
-	stagingPath := getStagingPath(ctx, req.GetStagingTargetPath(), id)
+	stagingPath := req.GetStagingTargetPath()
+
+	id, stagingPath = getStagingPath(ctx, stagingPath, id)
 
 	device, err := unstageVolume(ctx, stagingPath, id, logFields, err, s.Fs)
 	if err != nil {
@@ -365,7 +377,11 @@ func (s *Service) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVol
 	}
 	if remoteVolumeID != "" { // For Remote Metro volume
 		log.Info("Unstaging remote metro volume")
-		remoteStagingPath := getStagingPath(ctx, req.GetStagingTargetPath(), remoteVolumeID)
+		_, remoteStagingPath := getStagingPath(ctx, req.GetStagingTargetPath(), remoteVolumeID)
+		// need to change the staging path for nfs
+		if nfs.IsNFSVolumeID(req.VolumeId) {
+			_, remoteStagingPath = getStagingPath(ctx, nfs.NfsExportDirectory, remoteVolumeID)
+		}
 		_, err = unstageVolume(ctx, remoteStagingPath, remoteVolumeID, logFields, err, s.Fs)
 		if err != nil {
 			return nil, err
@@ -488,6 +504,10 @@ func removeRemnantMounts(ctx context.Context, stagingPath string, fs fs.Interfac
 func (s *Service) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
 	logFields := common.GetLogFields(ctx)
 	var ephemeralVolume bool
+	isHBN := nfs.IsNFSVolumeID(req.VolumeId)
+	if isHBN {
+		req.VolumeId = nfs.ToArrayVolumeID(req.VolumeId)
+	}
 	ephemeral, ok := req.VolumeContext["csi.storage.k8s.io/ephemeral"]
 	if ok {
 		ephemeralVolume = strings.ToLower(ephemeral) == "true"
@@ -517,8 +537,12 @@ func (s *Service) NodePublishVolume(ctx context.Context, req *csi.NodePublishVol
 
 	id, _, protocol, _, _, _ := array.ParseVolumeID(ctx, id, s.DefaultArray(), req.VolumeCapability)
 
-	// append additional path to be able to do bind mounts
-	stagingPath := getStagingPath(ctx, req.GetStagingTargetPath(), id)
+	stagingPath := req.GetStagingTargetPath()
+
+	if !isHBN {
+		// append additional path to be able to do bind mounts
+		_, stagingPath = getStagingPath(ctx, req.GetStagingTargetPath(), id)
+	}
 
 	isRO := req.GetReadonly()
 	volumeCapability := req.GetVolumeCapability()
@@ -836,6 +860,11 @@ func (s *Service) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolum
 		}
 	}
 
+	isHBN := nfs.IsNFSVolumeID(req.VolumeId)
+	if isHBN {
+		req.VolumeId = nfs.ToArrayVolumeID(req.VolumeId)
+	}
+
 	// Get the VolumeID and validate against the volume
 	id, arrayID, _, _, _, err := array.ParseVolumeID(ctx, req.VolumeId, s.DefaultArray(), nil)
 	if err != nil {
@@ -867,7 +896,12 @@ func (s *Service) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolum
 	// Locate and fetch all (multipath/regular) mounted paths using this volume
 	var devMnt *gofsutil.DeviceMountInfo
 	var targetmount string
-	devMnt, err = s.Fs.GetUtil().GetMountInfoFromDevice(ctx, vol.Name)
+	if isHBN {
+		devMnt, err = s.Fs.GetUtil().GetMountInfoFromDevice(ctx, id)
+	} else {
+		devMnt, err = s.Fs.GetUtil().GetMountInfoFromDevice(ctx, vol.Name)
+	}
+
 	if err != nil {
 		if isBlock {
 			return s.nodeExpandRawBlockVolume(ctx, volumeWWN)

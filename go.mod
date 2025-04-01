@@ -7,6 +7,7 @@ require (
 	github.com/apparentlymart/go-cidr v1.1.0
 	github.com/container-storage-interface/spec v1.6.0
 	github.com/dell/csi-metadata-retriever v1.10.0
+	github.com/dell/csm-hbnfs v0.0.0-20250401143151-95f13808d5cc
 	github.com/dell/dell-csi-extensions/common v1.7.1-0.20250321180109-ff9405f3dbef
 	github.com/dell/dell-csi-extensions/podmon v1.7.1-0.20250321180109-ff9405f3dbef
 	github.com/dell/dell-csi-extensions/replication v1.10.2-0.20250321180109-ff9405f3dbef
@@ -32,12 +33,14 @@ require (
 	github.com/uber/jaeger-client-go v2.30.0+incompatible
 	github.com/uber/jaeger-lib v2.4.1+incompatible
 	golang.org/x/net v0.38.0
+	go.uber.org/mock v0.5.0
+	golang.org/x/net v0.38.0
 	google.golang.org/grpc v1.71.0
 	google.golang.org/protobuf v1.36.5
 	gopkg.in/yaml.v3 v3.0.1
-	k8s.io/api v0.32.1
-	k8s.io/apimachinery v0.32.1
-	k8s.io/client-go v0.32.1
+	k8s.io/api v0.32.3
+	k8s.io/apimachinery v0.32.3
+	k8s.io/client-go v0.32.3
 )
 
 require (
