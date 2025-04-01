@@ -42,7 +42,11 @@ func New(controllerSvc controller.Interface, identitySvc *identity.Service, node
 	nfs.DriverNamespace = "powerstore"
 
 	nfs.NfsExportDirectory = os.Getenv(common.EnvNFSExportDirectory)
-	Log.Infof("Setting nfsExportDirectory env to %s", nfs.NfsExportDirectory)
+	if nfs.NfsExportDirectory == "" {
+		Log.Infof("NFS export directory not set. using default directory")
+		nfs.NfsExportDirectory = "/var/lib/dell/nfs"
+	}
+	Log.Infof("Setting nfsExportDirectory to %s", nfs.NfsExportDirectory)
 	return &gocsi.StoragePlugin{
 		Controller:                svc,
 		Identity:                  identitySvc,
