@@ -103,6 +103,8 @@ github.com/dell/csi-metadata-retriever v1.10.0 h1:OMzbwSJ+CMOTpf4WgcrSbT3j9Ve1tx
 github.com/dell/csi-metadata-retriever v1.10.0/go.mod h1:ppgtPHlxaRNmNizU+TnxZLz8tNotTAwByZ/Lg32n660=
 github.com/dell/csm-hbnfs v0.0.0-20250331150804-9b8e036ea8ea h1:p9l2OxZ+LhtGDDOkE4+0RxJk5100ncqDt097uE24CL0=
 github.com/dell/csm-hbnfs v0.0.0-20250331150804-9b8e036ea8ea/go.mod h1:s0wmTFb45ajEnWcdWA/n/rWbPSKiBE6P7gRIJG5bTv4=
+github.com/dell/csm-hbnfs v0.0.0-20250401143151-95f13808d5cc h1:e3kmwRtopvfEHe2e4NqbXftkgYzLHWHL7amjSDVfWRU=
+github.com/dell/csm-hbnfs v0.0.0-20250401143151-95f13808d5cc/go.mod h1:s0wmTFb45ajEnWcdWA/n/rWbPSKiBE6P7gRIJG5bTv4=
 github.com/dell/dell-csi-extensions/common v1.7.1-0.20250321180109-ff9405f3dbef h1:jY7MGG/q+GRKp+NdhQbGH+5EAEdB/ecmtqP2DcHiRrs=
 github.com/dell/dell-csi-extensions/common v1.7.1-0.20250321180109-ff9405f3dbef/go.mod h1:0cJvgNiPOosCJujd60aV9ZTujsHbRJNXX0ARRMDyjfw=
 github.com/dell/dell-csi-extensions/podmon v1.7.1-0.20250321180109-ff9405f3dbef h1:N+ZHf7+OYxizmgRyNFocBjF5EiAzz+rkAZTMhi1Pgq0=
