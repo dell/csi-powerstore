@@ -32,7 +32,6 @@ import (
 	"github.com/dell/csi-powerstore/v2/pkg/array"
 	"github.com/dell/csi-powerstore/v2/pkg/common"
 	"github.com/dell/csi-powerstore/v2/pkg/common/fs"
-	"github.com/dell/csm-hbnfs/nfs"
 	"github.com/dell/gobrick"
 	"github.com/dell/gopowerstore"
 	log "github.com/sirupsen/logrus"
@@ -67,13 +66,7 @@ func (s *SCSIStager) Stage(ctx context.Context, req *csi.NodeStageVolumeRequest,
 	logFields log.Fields, fs fs.Interface, id string, isRemote bool,
 ) (*csi.NodeStageVolumeResponse, error) {
 	stagingPath := req.GetStagingTargetPath()
-
-	if nfs.IsNFSVolumeID(id) {
-		id = nfs.ToArrayVolumeID(id)
-	} else {
-		// append additional path to be able to do bind mounts
-		stagingPath = getStagingPath(ctx, req.GetStagingTargetPath(), id)
-	}
+	id, stagingPath = getStagingPath(ctx, stagingPath, id)
 
 	publishContext, err := readSCSIInfoFromPublishContext(req.PublishContext, s.useFC, s.useNVME, isRemote)
 	if err != nil {
@@ -146,12 +139,7 @@ func (n *NFSStager) Stage(ctx context.Context, req *csi.NodeStageVolumeRequest,
 ) (*csi.NodeStageVolumeResponse, error) {
 	stagingPath := req.GetStagingTargetPath()
 
-	if nfs.IsNFSVolumeID(id) {
-		id = nfs.ToArrayVolumeID(id)
-	} else {
-		// append additional path to be able to do bind mounts
-		stagingPath = getStagingPath(ctx, req.GetStagingTargetPath(), id)
-	}
+	id, stagingPath = getStagingPath(ctx, stagingPath, id)
 
 	hostIP := req.PublishContext[common.KeyHostIP]
 	exportID := req.PublishContext[common.KeyExportID]

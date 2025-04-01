@@ -369,12 +369,7 @@ func (s *Service) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVol
 
 	stagingPath := req.GetStagingTargetPath()
 
-	if nfs.IsNFSVolumeID(id) {
-		id = nfs.ToArrayVolumeID(id)
-	} else {
-		// append additional path to be able to do bind mounts
-		stagingPath = getStagingPath(ctx, req.GetStagingTargetPath(), id)
-	}
+	id, stagingPath = getStagingPath(ctx, stagingPath, id)
 
 	device, err := unstageVolume(ctx, stagingPath, id, logFields, err, s.Fs)
 	if err != nil {
@@ -382,10 +377,10 @@ func (s *Service) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVol
 	}
 	if remoteVolumeID != "" { // For Remote Metro volume
 		log.Info("Unstaging remote metro volume")
-		remoteStagingPath := getStagingPath(ctx, req.GetStagingTargetPath(), remoteVolumeID)
+		_, remoteStagingPath := getStagingPath(ctx, req.GetStagingTargetPath(), remoteVolumeID)
 		// need to change the staging path for nfs
 		if nfs.IsNFSVolumeID(req.VolumeId) {
-			remoteStagingPath = getStagingPath(ctx, nfs.NfsExportDirectory, remoteVolumeID)
+			_, remoteStagingPath = getStagingPath(ctx, nfs.NfsExportDirectory, remoteVolumeID)
 		}
 		_, err = unstageVolume(ctx, remoteStagingPath, remoteVolumeID, logFields, err, s.Fs)
 		if err != nil {
@@ -546,7 +541,7 @@ func (s *Service) NodePublishVolume(ctx context.Context, req *csi.NodePublishVol
 
 	if !isHBN {
 		// append additional path to be able to do bind mounts
-		stagingPath = getStagingPath(ctx, req.GetStagingTargetPath(), id)
+		_, stagingPath = getStagingPath(ctx, req.GetStagingTargetPath(), id)
 	}
 
 	isRO := req.GetReadonly()

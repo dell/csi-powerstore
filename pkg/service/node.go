@@ -162,13 +162,13 @@ func (s *service) UnmountVolume(ctx context.Context, volumeID, exportPath string
 
 	log.Infof("UnmountVolume calling Unmount %s", target)
 	err = sysUnmount(target, 0)
-	if err != nil && !strings.Contains(err.Error(), "no such file") {
+	if err != nil && !strings.Contains(err.Error(), "No such file") {
 		log.Errorf("Could not Umount the target path: %s %s %s", volumeID, target, err.Error())
 		return err
 	}
 
 	err = osRemove(target)
-	if err != nil && !strings.Contains(err.Error(), "no such file") {
+	if err != nil && !strings.Contains(err.Error(), "No such file") {
 		log.Errorf("UnmountVolume %s could not remove directory %s: %s", volumeID, target, err.Error())
 		return err
 	}
@@ -187,7 +187,7 @@ func (s *service) UnmountVolume(ctx context.Context, volumeID, exportPath string
 
 	// Remove the staging path.
 	err = osRemove(staging)
-	if err != nil && !strings.Contains(err.Error(), "no such file") {
+	if err != nil && !strings.Contains(err.Error(), "No such file") {
 		log.Infof("UnmountVolume Remove %s staging path %s failed: %s", volumeID, "/noderoot/"+staging, err)
 	}
 	log.Infof("UnmountVolume %s ALL GOOD", volumeID)

@@ -32,6 +32,7 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-powerstore/v2/pkg/common"
 	"github.com/dell/csi-powerstore/v2/pkg/common/fs"
+	"github.com/dell/csm-hbnfs/nfs"
 	"github.com/dell/gobrick"
 	csictx "github.com/dell/gocsi/context"
 	"github.com/dell/gofsutil"
@@ -205,14 +206,17 @@ func getStagedDev(ctx context.Context, stagePath string, fs fs.Interface) (strin
 	return sourceDev, nil
 }
 
-func getStagingPath(ctx context.Context, sp string, volID string) string {
+func getStagingPath(ctx context.Context, sp string, volID string) (string, string) {
+	if nfs.IsNFSVolumeID(volID) {
+		return nfs.ToArrayVolumeID(volID), sp
+	}
 	logFields := common.GetLogFields(ctx)
 	if sp == "" || volID == "" {
-		return ""
+		return volID, sp
 	}
 	stagingPath := path.Join(sp, volID)
 	log.WithFields(logFields).Infof("staging path is: %s", stagingPath)
-	return path.Join(sp, volID)
+	return volID, path.Join(sp, volID)
 }
 
 func getRemnantTargetMounts(ctx context.Context, target string, fs fs.Interface) ([]gofsutil.Info, bool, error) {

@@ -43,6 +43,7 @@ func (s *service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 		params[CsiNfsParameter] = "RWX"
 	}
 	if nfs.IsNFSStorageClass(params) {
+		log.Infof("csi-nfs: RWX calling nfssvc.CreateVolume")
 		return nfssvc.CreateVolume(ctx, req)
 	}
 	return controllerSvc.CreateVolume(ctx, req)
