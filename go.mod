@@ -8,16 +8,16 @@ require (
 	github.com/container-storage-interface/spec v1.6.0
 	github.com/dell/csi-metadata-retriever v1.10.0
 	github.com/dell/csm-hbnfs v0.0.0-20250401143151-95f13808d5cc
-	github.com/dell/dell-csi-extensions/common v1.7.1-0.20250321180109-ff9405f3dbef
-	github.com/dell/dell-csi-extensions/podmon v1.7.1-0.20250321180109-ff9405f3dbef
-	github.com/dell/dell-csi-extensions/replication v1.10.2-0.20250321180109-ff9405f3dbef
-	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.8.2-0.20250321180109-ff9405f3dbef
-	github.com/dell/gobrick v1.13.2-0.20250321105337-6d2c638fb6fa
-	github.com/dell/gocsi v1.13.1-0.20250226203119-f6c4e42fab09
-	github.com/dell/gofsutil v1.18.0
-	github.com/dell/goiscsi v1.11.1-0.20250313165902-65cabee40e17
-	github.com/dell/gonvme v1.10.2-0.20250318173615-ad76101d9f2b
-	github.com/dell/gopowerstore v1.18.0
+	github.com/dell/dell-csi-extensions/common v1.7.1-0.20250325135746-bee5d830cdce
+	github.com/dell/dell-csi-extensions/podmon v1.7.1-0.20250325135746-bee5d830cdce
+	github.com/dell/dell-csi-extensions/replication v1.10.2-0.20250325135746-bee5d830cdce
+	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.8.2-0.20250325135746-bee5d830cdce
+	github.com/dell/gobrick v1.13.2-0.20250324100052-8d8c8046d514
+	github.com/dell/gocsi v1.13.1-0.20250327070427-854e59aaa95d
+	github.com/dell/gofsutil v1.18.1-0.20250327105432-7491c13030fd
+	github.com/dell/goiscsi v1.11.1-0.20250327070438-0d5eaba96f39
+	github.com/dell/gonvme v1.10.2-0.20250327070413-9877f9a59ca9
+	github.com/dell/gopowerstore v1.18.1-0.20250327070356-d9ef961a7dbe
 	github.com/fsnotify/fsnotify v1.8.0
 	github.com/go-openapi/strfmt v0.23.0
 	github.com/golang/mock v1.6.0
@@ -32,7 +32,6 @@ require (
 	github.com/stretchr/testify v1.10.0
 	github.com/uber/jaeger-client-go v2.30.0+incompatible
 	github.com/uber/jaeger-lib v2.4.1+incompatible
-	golang.org/x/net v0.38.0
 	go.uber.org/mock v0.5.0
 	golang.org/x/net v0.38.0
 	google.golang.org/grpc v1.71.0
