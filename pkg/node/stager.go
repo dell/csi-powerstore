@@ -65,8 +65,8 @@ type SCSIStager struct {
 func (s *SCSIStager) Stage(ctx context.Context, req *csi.NodeStageVolumeRequest,
 	logFields log.Fields, fs fs.Interface, id string, isRemote bool,
 ) (*csi.NodeStageVolumeResponse, error) {
-	// append additional path to be able to do bind mounts
-	stagingPath := getStagingPath(ctx, req.GetStagingTargetPath(), id)
+	stagingPath := req.GetStagingTargetPath()
+	id, stagingPath = getStagingPath(ctx, stagingPath, id)
 
 	publishContext, err := readSCSIInfoFromPublishContext(req.PublishContext, s.useFC, s.useNVME, isRemote)
 	if err != nil {
@@ -137,8 +137,9 @@ type NFSStager struct {
 func (n *NFSStager) Stage(ctx context.Context, req *csi.NodeStageVolumeRequest,
 	logFields log.Fields, fs fs.Interface, id string, _ bool,
 ) (*csi.NodeStageVolumeResponse, error) {
-	// append additional path to be able to do bind mounts
-	stagingPath := getStagingPath(ctx, req.GetStagingTargetPath(), id)
+	stagingPath := req.GetStagingTargetPath()
+
+	id, stagingPath = getStagingPath(ctx, stagingPath, id)
 
 	hostIP := req.PublishContext[common.KeyHostIP]
 	exportID := req.PublishContext[common.KeyExportID]
