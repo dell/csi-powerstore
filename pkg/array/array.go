@@ -137,6 +137,8 @@ type PowerStoreArray struct {
 	Insecure      bool                 `yaml:"skipCertificateValidation"`
 	IsDefault     bool                 `yaml:"isDefault"`
 	NfsAcls       string               `yaml:"nfsAcls"`
+	MetroTopology string               `yaml:"metroTopology"`
+	Labels        map[string]string    `yaml:"labels"`
 
 	Client gopowerstore.Client
 	IP     string
