@@ -2,10 +2,12 @@ module github.com/dell/csi-powerstore/v2
 
 go 1.24
 
+replace github.com/dell/csm-hbnfs => ./csm-hbnfs
+
 require (
 	github.com/akutz/gosync v0.1.0
 	github.com/apparentlymart/go-cidr v1.1.0
-	github.com/container-storage-interface/spec v1.6.0
+	github.com/container-storage-interface/spec v1.8.0
 	github.com/dell/csi-metadata-retriever v1.10.0
 	github.com/dell/csm-hbnfs v0.0.0-20250401143151-95f13808d5cc
 	github.com/dell/dell-csi-extensions/common v1.7.1-0.20250404130030-01c3966b4bf6

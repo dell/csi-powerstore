@@ -39,7 +39,8 @@ var (
 // NodeStageVolume prepares volume to be consumed by node publish by connecting volume to the node
 func (s *service) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
 	if nfs.IsNFSVolumeID(req.GetVolumeId()) {
-		return &csi.NodeStageVolumeResponse{}, nil
+		return nfssvc.NodeStageVolume(ctx, req)
+		//return &csi.NodeStageVolumeResponse{}, nil
 	}
 	return nodeSvc.NodeStageVolume(ctx, req)
 }
@@ -47,7 +48,8 @@ func (s *service) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeR
 // NodeUnstageVolume reverses steps done in NodeStage by disconnecting volume from the node
 func (s *service) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest) (*csi.NodeUnstageVolumeResponse, error) {
 	if nfs.IsNFSVolumeID(req.GetVolumeId()) {
-		return &csi.NodeUnstageVolumeResponse{}, nil
+		return nfssvc.NodeUnstageVolume(ctx, req)
+		// return &csi.NodeUnstageVolumeResponse{}, nil
 	}
 	return nodeSvc.NodeUnstageVolume(ctx, req)
 }
