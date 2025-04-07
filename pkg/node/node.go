@@ -1501,13 +1501,13 @@ func (s *Service) setupHost(initiators []string, client gopowerstore.Client, arr
 
 	h, err := client.GetHostByName(context.Background(), s.nodeID)
 	if err == nil {
-		err := s.updateHost(context.Background(), initiators, client, h, arrayID, &host.HostConnectivity)
+		err := s.updateHost(context.Background(), initiators, client, h, arrayID, &h.HostConnectivity)
 		if err != nil {
 			return err
 		}
 		if s.opts.EnableCHAP && len(h.Initiators) > 0 && (h.Initiators[0].ChapSingleUsername == "" || h.Initiators[0].ChapSingleUsername == "admin") {
 			log.Debug("CHAP was enabled earlier, modifying credentials")
-			err := s.modifyHostInitiators(context.Background(), h.ID, client, nil, nil, initiators, arrayID, &host.HostConnectivity)
+			err := s.modifyHostInitiators(context.Background(), h.ID, client, nil, nil, initiators, arrayID, &h.HostConnectivity)
 			if err != nil {
 				return fmt.Errorf("can't modify initiators CHAP credentials %s", err.Error())
 			}
