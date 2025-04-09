@@ -1611,52 +1611,138 @@ func (s *Service) updateHost(ctx context.Context, initiators []string, client go
 	return s.modifyHostInitiators(ctx, host.ID, client, initiatorsToAdd, initiatorsToDelete, nil, arrayID)
 }
 
+// getNodeLabels retrieves the kubernetes node object and returns its labels
+func (s *Service) getNodeLabels(nodeName string) (map[string]string, error) {
+	return k8sutils.GetNodeLabels(context.Background(), s.opts.KubeConfigPath, nodeName)
+}
+
 // register host
 func (s *Service) createHost(ctx context.Context, initiators []string, client gopowerstore.Client, arrayID string) (id string, err error) {
+	description := fmt.Sprintf("k8s node: %s", s.opts.KubeNodeName)
+	
+	// get node labels
+	nodeLabels, err := s.getNodeLabels(s.opts.KubeNodeName)
+	if err != nil {
+		log.Errorf("[createHost] Failed to get node labels: %v", err)
+		return "", err
+	}
+	log.Infof("[createHost] Node labels: %v", nodeLabels)
+
+	var colocatedArrays, remoteArrays []string
+	metroEnabled := false
+
+	for _, arr := range s.Arrays() {
+		if arr.MetroTopology != "" {
+			metroEnabled = true
+			match := true
+
+			for key, expectedValue := range arr.Labels {
+				if nodeValue, exists := nodeLabels[key]; !exists || nodeValue != expectedValue {
+					match = false
+					break
+				}
+			}
+
+			if match {
+				colocatedArrays = append(colocatedArrays, arr.GlobalID)
+				log.Infof("[createHost] Found colocated array %s at %v", arr.GlobalID, colocatedArrays)
+			} else {
+				remoteArrays = append(remoteArrays, arr.GlobalID)
+				log.Infof("[createHost] Found Remote array %s at %v", arr.GlobalID, remoteArrays)
+			}
+		}
+	}
+
+	if !metroEnabled {
+		log.Infof("[createHost] MetroTopology not enabled. Using LocalOnly for array %s", arrayID)
+		return s.createOrUpdateHost(ctx, initiators, client, arrayID, description, gopowerstore.HostConnectivityEnumLocalOnly)
+	}
+
+	allColocated := len(colocatedArrays) == len(s.Arrays())
+
+	log.Infof("[createHost] Colocated arrays: %v, Remote arrays: %v, All colocated: %v", colocatedArrays, remoteArrays, allColocated)
+
+	if allColocated {
+		for _, id := range colocatedArrays {
+			_, err := s.createOrUpdateHost(ctx, initiators, client, id, description, gopowerstore.HostConnectivityEnumMetroOptimizeBoth)
+			if err != nil {
+				return "", err
+			}
+		}
+		return colocatedArrays[0], nil
+	}
+
+	for _, id := range colocatedArrays {
+		_, err := s.createOrUpdateHost(ctx, initiators, client, id, description, gopowerstore.HostConnectivityEnumMetroOptimizeLocal)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	for _, id := range remoteArrays {
+		_, err := s.createOrUpdateHost(ctx, initiators, client, id, description, gopowerstore.HostConnectivityEnumMetroOptimizeRemote)
+		if err != nil {
+			if strings.Contains(err.Error(), "already registered with another host") {
+				log.Warnf("[createHost] Skipping remote array %s due to duplicate initiator: %v", id, err)
+				continue
+			}
+			return "", err
+		}
+	}
+
+	if len(colocatedArrays) > 0 {
+		return colocatedArrays[0], nil
+	}
+	if len(remoteArrays) > 0 {
+		return remoteArrays[0], nil
+	}
+	return "", fmt.Errorf("[createHost] No suitable array for host registration")
+}
+
+
+func (s *Service) createOrUpdateHost(ctx context.Context, initiators []string, client gopowerstore.Client, arrayID, description string, connectivity gopowerstore.HostConnectivityEnum) (string, error) {
+	log.Infof("[createOrUpdateHost] Array: %s, Connectivity: %v", arrayID, connectivity)
+
+	// host, err := client.GetHostByName(ctx, s.nodeID)
+	// if err == nil {
+	// 	if host.HostConnectivity != connectivity {
+	// 		_, err = client.DeleteHost(ctx, nil, host.ID)
+	// 		if err != nil {
+	// 			return "", err
+	// 		}
+	// 	} else {
+	// 		return host.ID, nil
+	// 	}
+	// }
+
 	osType := gopowerstore.OSTypeEnumLinux
 	reqInitiators := s.buildInitiatorsArray(initiators, arrayID)
-	description := fmt.Sprintf("k8s node: %s", s.opts.KubeNodeName)
+	createParams := gopowerstore.HostCreate{
+		Name:             &s.nodeID,
+		OsType:           &osType,
+		Initiators:       &reqInitiators,
+		Description:      &description,
+		HostConnectivity: connectivity,
+	}
 
-	var createParams gopowerstore.HostCreate
 	defaultHeaders := client.GetCustomHTTPHeaders()
 	if defaultHeaders == nil {
 		defaultHeaders = make(http.Header)
 	}
-	customHeaders := defaultHeaders
-	k8sMetadataSupported := common.IsK8sMetadataSupported(client)
-	if k8sMetadataSupported {
-		customHeaders.Add("DELL-VISIBILITY", "internal")
-		client.SetCustomHTTPHeaders(customHeaders)
+	defaultHeaders.Add("DELL-VISIBILITY", "internal")
+	client.SetCustomHTTPHeaders(defaultHeaders)
 
-		if s.opts.KubeNodeName == "" {
-			log.Warnf("KubeNodeName value is not set")
-			createParams = gopowerstore.HostCreate{
-				Name: &s.nodeID, OsType: &osType, Initiators: &reqInitiators,
-				Description: &description,
-			}
-		} else {
-			metadata := map[string]string{
-				"k8s_node_name": s.opts.KubeNodeName,
-			}
-			createParams = gopowerstore.HostCreate{
-				Name: &s.nodeID, OsType: &osType, Initiators: &reqInitiators,
-				Description: &description, Metadata: &metadata,
-			}
-		}
-	} else {
-		createParams = gopowerstore.HostCreate{
-			Name: &s.nodeID, OsType: &osType, Initiators: &reqInitiators,
-			Description: &description,
-		}
-	}
 	resp, err := client.CreateHost(ctx, &createParams)
-	// reset custom header
-	customHeaders.Del("DELL-VISIBILITY")
-	client.SetCustomHTTPHeaders(customHeaders)
+
+	log.Infof("[createOrUpdateHost] Response: %v, Error: %v", resp, err)
+	
+	defaultHeaders.Del("DELL-VISIBILITY")
+	client.SetCustomHTTPHeaders(defaultHeaders)
+
 	if err != nil {
-		return id, err
+		return "", err
 	}
-	return resp.ID, err
+	return resp.ID, nil
 }
 
 // add or remove initiators from host
