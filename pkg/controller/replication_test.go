@@ -14,14 +14,13 @@
  *
  */
 
-package controller_test
+package controller
 
 import (
 	"context"
 	"net/http"
 
 	"github.com/dell/csi-powerstore/v2/pkg/array"
-	"github.com/dell/csi-powerstore/v2/pkg/controller"
 	csiext "github.com/dell/dell-csi-extensions/replication"
 	"github.com/dell/gopowerstore"
 	"github.com/dell/gopowerstore/api"
@@ -336,7 +335,7 @@ var _ = ginkgo.Describe("Replication", func() {
 				session := gopowerstore.ReplicationSession{ID: "test", State: "OK"}
 				action := gopowerstore.RsActionResume
 				failoverParams := gopowerstore.FailoverParams{}
-				err := controller.ExecuteAction(&session, clientMock, action, &failoverParams)
+				err := ExecuteAction(&session, clientMock, action, &failoverParams)
 
 				gomega.Expect(err).To(gomega.BeNil())
 			})
@@ -348,7 +347,7 @@ var _ = ginkgo.Describe("Replication", func() {
 				session := gopowerstore.ReplicationSession{ID: "test", State: "OK"}
 				action := gopowerstore.RsActionReprotect
 				failoverParams := gopowerstore.FailoverParams{}
-				err := controller.ExecuteAction(&session, clientMock, action, &failoverParams)
+				err := ExecuteAction(&session, clientMock, action, &failoverParams)
 
 				gomega.Expect(err).To(gomega.BeNil())
 			})
@@ -360,7 +359,7 @@ var _ = ginkgo.Describe("Replication", func() {
 				session := gopowerstore.ReplicationSession{ID: "test", State: "Paused"}
 				action := gopowerstore.RsActionPause
 				failoverParams := gopowerstore.FailoverParams{}
-				err := controller.ExecuteAction(&session, clientMock, action, &failoverParams)
+				err := ExecuteAction(&session, clientMock, action, &failoverParams)
 
 				gomega.Expect(err).To(gomega.BeNil())
 			})
@@ -372,7 +371,7 @@ var _ = ginkgo.Describe("Replication", func() {
 				session := gopowerstore.ReplicationSession{ID: "test", State: "Failing_Over"}
 				action := gopowerstore.RsActionFailover
 				failoverParams := gopowerstore.FailoverParams{}
-				err := controller.ExecuteAction(&session, clientMock, action, &failoverParams)
+				err := ExecuteAction(&session, clientMock, action, &failoverParams)
 
 				gomega.Expect(err).ToNot(gomega.BeNil())
 				gomega.Expect(err.Error()).To(
@@ -386,7 +385,7 @@ var _ = ginkgo.Describe("Replication", func() {
 				session := gopowerstore.ReplicationSession{ID: "test", State: "Failed_Over"}
 				action := gopowerstore.RsActionFailover
 				failoverParams := gopowerstore.FailoverParams{}
-				err := controller.ExecuteAction(&session, clientMock, action, &failoverParams)
+				err := ExecuteAction(&session, clientMock, action, &failoverParams)
 
 				gomega.Expect(err).To(gomega.BeNil())
 			})
