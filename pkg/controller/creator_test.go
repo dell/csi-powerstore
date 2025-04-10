@@ -16,7 +16,7 @@
  *
  */
 
-package controller_test
+package controller
 
 import (
 	"context"
@@ -24,7 +24,6 @@ import (
 	"testing"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/dell/csi-powerstore/v2/pkg/controller"
 	"github.com/dell/gopowerstore"
 	"github.com/dell/gopowerstore/mocks"
 	"github.com/stretchr/testify/assert"
@@ -33,7 +32,7 @@ import (
 
 func TestVolumeCreator_CheckSize(t *testing.T) {
 	t.Run("scsi creator", func(t *testing.T) {
-		sc := &controller.SCSICreator{}
+		sc := &SCSICreator{}
 		t.Run("zeroes", func(t *testing.T) {
 			cr := &csi.CapacityRange{
 				RequiredBytes: 0,
@@ -42,23 +41,23 @@ func TestVolumeCreator_CheckSize(t *testing.T) {
 
 			res, err := sc.CheckSize(context.Background(), cr, false)
 			assert.NoError(t, err)
-			assert.Equal(t, res, int64(controller.MinVolumeSizeBytes))
+			assert.Equal(t, res, int64(MinVolumeSizeBytes))
 		})
 
 		t.Run("mod != 0", func(t *testing.T) {
 			cr := &csi.CapacityRange{
-				RequiredBytes: controller.MinVolumeSizeBytes + 1,
+				RequiredBytes: MinVolumeSizeBytes + 1,
 				LimitBytes:    0,
 			}
 
 			res, err := sc.CheckSize(context.Background(), cr, false)
 			assert.NoError(t, err)
-			assert.Equal(t, res, int64(controller.MinVolumeSizeBytes+controller.VolumeSizeMultiple))
+			assert.Equal(t, res, int64(MinVolumeSizeBytes+VolumeSizeMultiple))
 		})
 	})
 
 	t.Run("nfs creator", func(t *testing.T) {
-		nc := &controller.NfsCreator{}
+		nc := &NfsCreator{}
 		t.Run("zeroes", func(t *testing.T) {
 			cr := &csi.CapacityRange{
 				RequiredBytes: 0,
@@ -67,25 +66,25 @@ func TestVolumeCreator_CheckSize(t *testing.T) {
 
 			res, err := nc.CheckSize(context.Background(), cr, false)
 			assert.NoError(t, err)
-			assert.Equal(t, res, int64(controller.MinVolumeSizeBytes))
+			assert.Equal(t, res, int64(MinVolumeSizeBytes))
 		})
 
 		t.Run("mod != 0", func(t *testing.T) {
 			cr := &csi.CapacityRange{
-				RequiredBytes: controller.MinVolumeSizeBytes + 1,
+				RequiredBytes: MinVolumeSizeBytes + 1,
 				LimitBytes:    0,
 			}
 
 			res, err := nc.CheckSize(context.Background(), cr, false)
 			assert.NoError(t, err)
-			assert.Equal(t, res, int64(controller.MinVolumeSizeBytes+controller.VolumeSizeMultiple))
+			assert.Equal(t, res, int64(MinVolumeSizeBytes+VolumeSizeMultiple))
 		})
 	})
 }
 
 func TestVolumeCreator_CheckIfAlreadyExists(t *testing.T) {
 	t.Run("can't find volume [block]", func(t *testing.T) {
-		sc := &controller.SCSICreator{}
+		sc := &SCSICreator{}
 		name := "test"
 		clientMock := new(mocks.Client)
 		clientMock.On("GetVolumeByName", context.Background(), name).
@@ -97,7 +96,7 @@ func TestVolumeCreator_CheckIfAlreadyExists(t *testing.T) {
 	})
 
 	t.Run("can't find volume [nfs]", func(t *testing.T) {
-		nc := &controller.NfsCreator{}
+		nc := &NfsCreator{}
 		name := "test"
 		clientMock := new(mocks.Client)
 		clientMock.On("GetFSByName", context.Background(), name).
@@ -111,7 +110,7 @@ func TestVolumeCreator_CheckIfAlreadyExists(t *testing.T) {
 
 func TestVolumeCreator_Clone(t *testing.T) {
 	t.Run("scsi creator", func(t *testing.T) {
-		sc := &controller.SCSICreator{}
+		sc := &SCSICreator{}
 		name := "test"
 		t.Run("failed to lookup volume", func(t *testing.T) {
 			clientMock := new(mocks.Client)
@@ -158,7 +157,7 @@ func TestVolumeCreator_Clone(t *testing.T) {
 	})
 
 	t.Run("nfs creator", func(t *testing.T) {
-		nc := &controller.NfsCreator{}
+		nc := &NfsCreator{}
 		name := "test"
 		t.Run("failed to lookup filesystem", func(t *testing.T) {
 			clientMock := new(mocks.Client)
@@ -191,7 +190,7 @@ func TestVolumeCreator_Clone(t *testing.T) {
 			clientMock.On("GetFS", context.Background(), validBaseVolID).
 				Return(gopowerstore.FileSystem{
 					Name:      name,
-					SizeTotal: validVolSize + controller.ReservedSize,
+					SizeTotal: validVolSize + ReservedSize,
 					ID:        validBaseVolID,
 				}, nil)
 			clientMock.On("CloneFS", context.Background(), mock.Anything, validBaseVolID).
@@ -207,7 +206,7 @@ func TestVolumeCreator_Clone(t *testing.T) {
 
 func TestVolumeCreator_CreateFromSnapshot(t *testing.T) {
 	t.Run("scsi creator", func(t *testing.T) {
-		sc := &controller.SCSICreator{}
+		sc := &SCSICreator{}
 		name := "test"
 		t.Run("failed to lookup volume", func(t *testing.T) {
 			clientMock := new(mocks.Client)
@@ -257,7 +256,7 @@ func TestVolumeCreator_CreateFromSnapshot(t *testing.T) {
 	})
 
 	t.Run("nfs creator", func(t *testing.T) {
-		nc := &controller.NfsCreator{}
+		nc := &NfsCreator{}
 		name := "test"
 		t.Run("failed to lookup filesystem snapshot", func(t *testing.T) {
 			clientMock := new(mocks.Client)
@@ -292,7 +291,7 @@ func TestVolumeCreator_CreateFromSnapshot(t *testing.T) {
 			clientMock.On("GetFS", context.Background(), validBaseVolID).
 				Return(gopowerstore.FileSystem{
 					Name:      name,
-					SizeTotal: validVolSize + controller.ReservedSize,
+					SizeTotal: validVolSize + ReservedSize,
 					ID:        validBaseVolID,
 				}, nil)
 			clientMock.On("CreateFsFromSnapshot", context.Background(), mock.Anything, validBaseVolID).
