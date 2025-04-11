@@ -259,7 +259,7 @@ func (s *LegacyParseVolumeTestSuite) TestVolumeCapabilityNFS() {
 	assert.NoError(s.T(), err)
 	assert.Equal(s.T(), id, gotID.LocalUUID)
 	assert.Equal(s.T(), ip, gotID.LocalArrayGlobalID)
-	assert.Equal(s.T(), "nfs", gotID.TransportProtocol)
+	assert.Equal(s.T(), "nfs", gotID.Protocol)
 }
 
 func (s *LegacyParseVolumeTestSuite) TestVolumeCapabilitySCSI() {
@@ -285,7 +285,7 @@ func (s *LegacyParseVolumeTestSuite) TestVolumeCapabilitySCSI() {
 	assert.NoError(s.T(), err)
 	assert.Equal(s.T(), id, gotID.LocalUUID)
 	assert.Equal(s.T(), validGlobalID, gotID.LocalArrayGlobalID)
-	assert.Equal(s.T(), scsi, gotID.TransportProtocol)
+	assert.Equal(s.T(), scsi, gotID.Protocol)
 }
 
 func (s *LegacyParseVolumeTestSuite) TestMissingSCSIProtocol() {
@@ -297,7 +297,7 @@ func (s *LegacyParseVolumeTestSuite) TestMissingSCSIProtocol() {
 	assert.NoError(s.T(), err)
 	assert.Equal(s.T(), validBlockVolumeUUID, gotID.LocalUUID)
 	assert.Equal(s.T(), s.psArray.GlobalID, gotID.LocalArrayGlobalID)
-	assert.Equal(s.T(), scsi, gotID.TransportProtocol)
+	assert.Equal(s.T(), scsi, gotID.Protocol)
 }
 
 func (s *LegacyParseVolumeTestSuite) TestGetNFSProtocolFromAPIClient() {
@@ -311,7 +311,7 @@ func (s *LegacyParseVolumeTestSuite) TestGetNFSProtocolFromAPIClient() {
 	assert.NoError(s.T(), err)
 	assert.Equal(s.T(), validFileSystemUUID, id.LocalUUID)
 	assert.Equal(s.T(), validGlobalID, id.LocalArrayGlobalID)
-	assert.Equal(s.T(), nfs, id.TransportProtocol)
+	assert.Equal(s.T(), nfs, id.Protocol)
 }
 
 func (s *LegacyParseVolumeTestSuite) TestVolumeNotFound() {
@@ -366,7 +366,7 @@ func (s *LegacyParseVolumeTestSuite) TestIPAsArrayID() {
 	assert.NoError(s.T(), err)
 	assert.Equal(s.T(), validBlockVolumeUUID, id.LocalUUID)
 	assert.Equal(s.T(), validGlobalID, id.LocalArrayGlobalID)
-	assert.Equal(s.T(), scsi, id.TransportProtocol)
+	assert.Equal(s.T(), scsi, id.Protocol)
 }
 
 func TestParseVolumeID(t *testing.T) {
@@ -375,7 +375,7 @@ func TestParseVolumeID(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, validBlockVolumeUUID, id.LocalUUID)
 		assert.Equal(t, validGlobalID, id.LocalArrayGlobalID)
-		assert.Equal(t, scsi, id.TransportProtocol)
+		assert.Equal(t, scsi, id.Protocol)
 	})
 
 	t.Run("incorrect volume id", func(t *testing.T) {
@@ -390,7 +390,7 @@ func TestParseVolumeID(t *testing.T) {
 		assert.Equal(t, validRemoteBlockVolumeUUID, id.RemoteUUID)
 		assert.Equal(t, validGlobalID, id.LocalArrayGlobalID)
 		assert.Equal(t, validRemoteGlobalID, id.RemoteArrayGlobalID)
-		assert.Equal(t, scsi, id.TransportProtocol)
+		assert.Equal(t, scsi, id.Protocol)
 	})
 
 	localVolUUID := "aaaaaaaa-0000-bbbb-1111-cccccccccccc"
@@ -422,7 +422,7 @@ func TestParseVolumeID(t *testing.T) {
 				LocalArrayGlobalID:  powerstoreLocalSystemID,
 				RemoteUUID:          "",
 				RemoteArrayGlobalID: "",
-				TransportProtocol:   scsi,
+				Protocol:            scsi,
 			},
 			wantErr: false,
 		},

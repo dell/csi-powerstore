@@ -483,7 +483,7 @@ func (s *Service) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest
 
 	id = volumeHandle.LocalUUID
 	arrayID := volumeHandle.LocalArrayGlobalID
-	protocol := volumeHandle.TransportProtocol
+	protocol := volumeHandle.Protocol
 	remoteVolumeID := volumeHandle.RemoteUUID
 
 	arr, ok := s.Arrays()[arrayID]
@@ -660,7 +660,7 @@ func (s *Service) ControllerPublishVolume(ctx context.Context, req *csi.Controll
 
 	id = volumeHandle.LocalUUID
 	arrayID := volumeHandle.LocalArrayGlobalID
-	protocol := volumeHandle.TransportProtocol
+	protocol := volumeHandle.Protocol
 	remoteVolumeID := volumeHandle.RemoteUUID
 	remoteArrayID := volumeHandle.RemoteArrayGlobalID
 
@@ -743,7 +743,7 @@ func (s *Service) ControllerUnpublishVolume(ctx context.Context, req *csi.Contro
 
 	id = volumeHandle.LocalUUID
 	arrayID := volumeHandle.LocalArrayGlobalID
-	protocol := volumeHandle.TransportProtocol
+	protocol := volumeHandle.Protocol
 	remoteVolumeID := volumeHandle.RemoteUUID
 	remoteArrayID := volumeHandle.RemoteArrayGlobalID
 
@@ -985,7 +985,7 @@ func (s *Service) ValidateVolumeCapabilities(ctx context.Context, req *csi.Valid
 
 	id = volumeHandle.LocalUUID
 	arrayID := volumeHandle.LocalArrayGlobalID
-	proto := volumeHandle.TransportProtocol
+	proto := volumeHandle.Protocol
 
 	if proto == "nfs" {
 		_, err := s.Arrays()[arrayID].Client.GetFS(ctx, id)
@@ -1193,7 +1193,7 @@ func (s *Service) CreateSnapshot(ctx context.Context, req *csi.CreateSnapshotReq
 
 	id := volumeHandle.LocalUUID
 	arrayID := volumeHandle.LocalArrayGlobalID
-	protocol := volumeHandle.TransportProtocol
+	protocol := volumeHandle.Protocol
 
 	arr, ok := s.Arrays()[arrayID]
 	if !ok {
@@ -1273,7 +1273,7 @@ func (s *Service) DeleteSnapshot(ctx context.Context, req *csi.DeleteSnapshotReq
 
 	id := volumeHandle.LocalUUID
 	arrayID := volumeHandle.LocalArrayGlobalID
-	protocol := volumeHandle.TransportProtocol
+	protocol := volumeHandle.Protocol
 
 	arr, ok := s.Arrays()[arrayID]
 	if !ok {
@@ -1404,7 +1404,7 @@ func (s *Service) ControllerExpandVolume(ctx context.Context, req *csi.Controlle
 
 	id := volumeHandle.LocalUUID
 	arrayID := volumeHandle.LocalArrayGlobalID
-	protocol := volumeHandle.TransportProtocol
+	protocol := volumeHandle.Protocol
 	remoteVolumeID := volumeHandle.RemoteUUID
 
 	requiredBytes := req.GetCapacityRange().GetRequiredBytes()
@@ -1472,7 +1472,7 @@ func (s *Service) ControllerGetVolume(ctx context.Context, req *csi.ControllerGe
 
 	id := volumeHandle.LocalUUID
 	arrayID := volumeHandle.LocalArrayGlobalID
-	protocol := volumeHandle.TransportProtocol
+	protocol := volumeHandle.Protocol
 
 	var hosts []string
 	abnormal := false
@@ -1645,7 +1645,7 @@ func (s *Service) listPowerStoreSnapshots(ctx context.Context, startToken, maxEn
 
 		id := volumeHandle.LocalUUID
 		arrayID := volumeHandle.LocalArrayGlobalID
-		protocol := volumeHandle.TransportProtocol
+		protocol := volumeHandle.Protocol
 
 		arr, ok := s.Arrays()[arrayID]
 		if !ok {
@@ -1689,7 +1689,7 @@ func (s *Service) listPowerStoreSnapshots(ctx context.Context, startToken, maxEn
 
 		id := volumeHandle.LocalUUID
 		arrayID := volumeHandle.LocalArrayGlobalID
-		protocol := volumeHandle.TransportProtocol
+		protocol := volumeHandle.Protocol
 
 		arr, ok := s.Arrays()[arrayID]
 		if !ok {

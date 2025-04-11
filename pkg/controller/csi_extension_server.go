@@ -231,7 +231,7 @@ func (s *Service) ValidateVolumeHostConnectivity(ctx context.Context, req *podmo
 				volumeHandle, _ := array.ParseVolumeID(ctx, volID, s.DefaultArray(), nil)
 				id := volumeHandle.LocalUUID
 				globalIDForVol := volumeHandle.LocalArrayGlobalID
-				protocol := volumeHandle.TransportProtocol
+				protocol := volumeHandle.Protocol
 				if globalIDForVol != globalID {
 					log.Errorf("Recived globalId from podman is %s and retrieved from array is %s ", globalID, globalIDForVol)
 					return nil, fmt.Errorf("invalid globalId %s is provided", globalID)
