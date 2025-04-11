@@ -296,10 +296,15 @@ func (s *Service) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeR
 		return nil, status.Error(codes.InvalidArgument, "staging target path is required")
 	}
 
-	id, arrayID, protocol, remoteVolumeID, _, err := array.ParseVolumeID(ctx, id, s.DefaultArray(), req.VolumeCapability)
+	volumeHandle, err := array.ParseVolumeID(ctx, id, s.DefaultArray(), req.VolumeCapability)
 	if err != nil {
 		return nil, err
 	}
+
+	id = volumeHandle.LocalUUID
+	arrayID := volumeHandle.LocalArrayGlobalID
+	protocol := volumeHandle.TransportProtocol
+	remoteVolumeID := volumeHandle.RemoteUUID
 
 	arr, ok := s.Arrays()[arrayID]
 	if !ok {
@@ -352,7 +357,7 @@ func (s *Service) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVol
 		return nil, status.Error(codes.InvalidArgument, "staging target path is required")
 	}
 
-	id, arrayID, protocol, remoteVolumeID, _, err := array.ParseVolumeID(ctx, id, s.DefaultArray(), nil)
+	volumeHandle, err := array.ParseVolumeID(ctx, id, s.DefaultArray(), nil)
 	if err != nil {
 		if apiError, ok := err.(gopowerstore.APIError); ok && apiError.NotFound() {
 			return &csi.NodeUnstageVolumeResponse{}, nil
@@ -361,6 +366,10 @@ func (s *Service) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVol
 			"failure checking volume status for volume node unstage: %s",
 			err.Error())
 	}
+	id = volumeHandle.LocalUUID
+	arrayID := volumeHandle.LocalArrayGlobalID
+	protocol := volumeHandle.TransportProtocol
+	remoteVolumeID := volumeHandle.RemoteUUID
 
 	arr, ok := s.Arrays()[arrayID]
 	if !ok {
@@ -535,7 +544,9 @@ func (s *Service) NodePublishVolume(ctx context.Context, req *csi.NodePublishVol
 		return nil, status.Error(codes.InvalidArgument, "stagingPath is required")
 	}
 
-	id, _, protocol, _, _, _ := array.ParseVolumeID(ctx, id, s.DefaultArray(), req.VolumeCapability)
+	volumeHandle, _ := array.ParseVolumeID(ctx, id, s.DefaultArray(), req.VolumeCapability)
+	id = volumeHandle.LocalUUID
+	protocol := volumeHandle.TransportProtocol
 
 	stagingPath := req.GetStagingTargetPath()
 
@@ -648,13 +659,16 @@ func (s *Service) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolume
 	}
 
 	// parse volume Id
-	id, arrayID, protocol, _, _, err := array.ParseVolumeID(ctx, volumeID, s.DefaultArray(), nil)
+	volumeHandle, err := array.ParseVolumeID(ctx, volumeID, s.DefaultArray(), nil)
 	if err != nil {
 		if apiError, ok := err.(gopowerstore.APIError); ok && apiError.NotFound() {
 			return nil, err
 		}
 		return nil, err
 	}
+	id := volumeHandle.LocalUUID
+	arrayID := volumeHandle.LocalArrayGlobalID
+	protocol := volumeHandle.TransportProtocol
 
 	arr, ok := s.Arrays()[arrayID]
 	if !ok {
@@ -866,13 +880,16 @@ func (s *Service) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolum
 	}
 
 	// Get the VolumeID and validate against the volume
-	id, arrayID, _, _, _, err := array.ParseVolumeID(ctx, req.VolumeId, s.DefaultArray(), nil)
+	volumeHandle, err := array.ParseVolumeID(ctx, req.VolumeId, s.DefaultArray(), nil)
 	if err != nil {
 		if apiError, ok := err.(gopowerstore.APIError); ok && apiError.NotFound() {
 			return nil, err
 		}
 		return nil, err
 	}
+
+	id := volumeHandle.LocalUUID
+	arrayID := volumeHandle.LocalArrayGlobalID
 
 	arr, ok := s.Arrays()[arrayID]
 	if !ok {
