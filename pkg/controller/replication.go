@@ -96,7 +96,10 @@ func (s *Service) CreateRemoteVolume(ctx context.Context,
 		s.replicationContextPrefix + "arrayID":           remoteSystem.SerialNumber,
 		s.replicationContextPrefix + "managementAddress": remoteSystem.ManagementAddress,
 	}
-	remoteVolume := getRemoteCSIVolume(remoteVolumeID+"/"+remoteParams[s.replicationContextPrefix+"arrayID"]+"/"+protocol, vol.Size)
+	remoteVolume := getRemoteCSIVolume(
+		volumeHandle.Prefix+remoteVolumeID+"/"+remoteParams[s.replicationContextPrefix+"arrayID"]+"/"+protocol,
+		vol.Size,
+	)
 	remoteVolume.VolumeContext = remoteParams
 	return &csiext.CreateRemoteVolumeResponse{
 		RemoteVolume: remoteVolume,
