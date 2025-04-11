@@ -303,7 +303,7 @@ func (s *Service) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeR
 
 	id = volumeHandle.LocalUUID
 	arrayID := volumeHandle.LocalArrayGlobalID
-	protocol := volumeHandle.TransportProtocol
+	protocol := volumeHandle.Protocol
 	remoteVolumeID := volumeHandle.RemoteUUID
 
 	arr, ok := s.Arrays()[arrayID]
@@ -368,7 +368,7 @@ func (s *Service) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVol
 	}
 	id = volumeHandle.LocalUUID
 	arrayID := volumeHandle.LocalArrayGlobalID
-	protocol := volumeHandle.TransportProtocol
+	protocol := volumeHandle.Protocol
 	remoteVolumeID := volumeHandle.RemoteUUID
 
 	arr, ok := s.Arrays()[arrayID]
@@ -546,7 +546,7 @@ func (s *Service) NodePublishVolume(ctx context.Context, req *csi.NodePublishVol
 
 	volumeHandle, _ := array.ParseVolumeID(ctx, id, s.DefaultArray(), req.VolumeCapability)
 	id = volumeHandle.LocalUUID
-	protocol := volumeHandle.TransportProtocol
+	protocol := volumeHandle.Protocol
 
 	stagingPath := req.GetStagingTargetPath()
 
@@ -668,7 +668,7 @@ func (s *Service) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolume
 	}
 	id := volumeHandle.LocalUUID
 	arrayID := volumeHandle.LocalArrayGlobalID
-	protocol := volumeHandle.TransportProtocol
+	protocol := volumeHandle.Protocol
 
 	arr, ok := s.Arrays()[arrayID]
 	if !ok {

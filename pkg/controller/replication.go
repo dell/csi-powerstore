@@ -45,7 +45,7 @@ func (s *Service) CreateRemoteVolume(ctx context.Context,
 	}
 	id := volumeHandle.LocalUUID
 	arrayID := volumeHandle.LocalArrayGlobalID
-	protocol := volumeHandle.TransportProtocol
+	protocol := volumeHandle.Protocol
 
 	arr, ok := s.Arrays()[arrayID]
 	if !ok {
@@ -123,7 +123,7 @@ func (s *Service) CreateStorageProtectionGroup(ctx context.Context,
 
 	id := volumeHandle.LocalUUID
 	arrayID := volumeHandle.LocalArrayGlobalID
-	protocol := volumeHandle.TransportProtocol
+	protocol := volumeHandle.Protocol
 
 	arr, ok := s.Arrays()[arrayID]
 	if !ok {
