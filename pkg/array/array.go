@@ -321,6 +321,10 @@ func ParseVolumeID(ctx context.Context, volumeHandle string,
 	// parse the first (potentially only) volume handle
 	localVolumeHandle := strings.Split(volumeHandles[0], "/")
 	volumeID.LocalUUID = localVolumeHandle[0]
+
+	// get the prefix, if any
+	volumeID.Prefix, volumeID.LocalUUID = GetVolumeIDPrefix(volumeID.LocalUUID)
+
 	log.Debugf("vol-id %s", localVolumeHandle)
 
 	if len(localVolumeHandle) == 1 {
@@ -375,4 +379,22 @@ func ParseVolumeID(ctx context.Context, volumeHandle string,
 
 	log.Debugf("id %s arrayID %s proto %s", volumeID.LocalUUID, volumeID.LocalArrayGlobalID, volumeID.TransportProtocol)
 	return volumeID, nil
+}
+
+// GetVolumeIDPrefix returns extracts the prefix, if any exists, from a volume ID with a UUID format.
+// The prefix is assumed to be all characters preceding the volume UUID including separators/delimiters,
+// e.g. '-'. If no prefix is found, or the volume ID is not of the UUID format, the function returns the ID,
+// unmodified, and an empty string as the prefix.
+func GetVolumeIDPrefix(ID string) (prefix, volumeID string) {
+	volumeID = ID
+	matchUUID := regexp.MustCompile(`[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}`)
+
+	// must run the check in case we're parsing a legacy volume ID
+	if matchUUID.FindString(volumeID) != "" {
+		i := matchUUID.FindStringIndex(volumeID)
+		prefix = volumeID[:i[0]]
+		volumeID = volumeID[i[0]:]
+	}
+
+	return prefix, volumeID
 }
