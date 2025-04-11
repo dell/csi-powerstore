@@ -32,12 +32,10 @@ import (
 	"github.com/dell/csi-powerstore/v2/pkg/common"
 	"github.com/dell/csi-powerstore/v2/pkg/common/fs"
 	hbnfs "github.com/dell/csm-hbnfs/nfs"
+	"github.com/dell/gofsutil"
 	"github.com/dell/gopowerstore"
-
 	"github.com/dell/gopowerstore/api"
 	gopowerstoremock "github.com/dell/gopowerstore/mocks"
-
-	"github.com/dell/gofsutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
@@ -462,4 +460,54 @@ func TestLocker_GetOneArray(t *testing.T) {
 	fetched, err = lck.GetOneArray("globalId2")
 	assert.Error(t, err)
 	assert.NotEqual(t, fetched, array)
+}
+
+func Test_getVolumeIDPrefix(t *testing.T) {
+	legacyVolumeID := "1cd254s"
+
+	type args struct {
+		ID string
+	}
+	tests := []struct {
+		name         string
+		args         args
+		wantPrefix   string
+		wantVolumeID string
+	}{
+		{
+			name: "legacy volume ID",
+			args: args{
+				ID: legacyVolumeID,
+			},
+			wantPrefix:   "",
+			wantVolumeID: legacyVolumeID,
+		},
+		{
+			name: "volume UUID with no prefix",
+			args: args{
+				ID: validBlockVolumeUUID,
+			},
+			wantPrefix:   "",
+			wantVolumeID: validBlockVolumeUUID,
+		},
+		{
+			name: "volume UUID with host-based nfs prefix",
+			args: args{
+				ID: hbnfs.CsiNfsPrefixDash + validBlockVolumeUUID,
+			},
+			wantPrefix:   hbnfs.CsiNfsPrefixDash,
+			wantVolumeID: validBlockVolumeUUID,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotPrefix, gotVolumeID := array.GetVolumeIDPrefix(tt.args.ID)
+			if gotPrefix != tt.wantPrefix {
+				t.Errorf("getVolumeIDPrefix() gotPrefix = %v, want %v", gotPrefix, tt.wantPrefix)
+			}
+			if gotVolumeID != tt.wantVolumeID {
+				t.Errorf("getVolumeIDPrefix() gotVolumeID = %v, want %v", gotVolumeID, tt.wantVolumeID)
+			}
+		})
+	}
 }
