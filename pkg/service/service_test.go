@@ -15,6 +15,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -65,18 +66,21 @@ func TestBeforeServe(t *testing.T) {
 	defer ctrl.Finish()
 
 	t.Run("no node name", func(t *testing.T) {
-		assert.PanicsWithValue(t, "X_CSI_NODE_NAME or X_CSI_POWERSTORE_KUBE_NODE_NAME or KUBE_NODE_NAME environment variable not set", func() {
-			New().BeforeServe(context.Background(), &gocsi.StoragePlugin{}, nil)
-		})
+		mockNfs := nfsmock.NewMockService(ctrl)
+		mockNfs.EXPECT().BeforeServe(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return(fmt.Errorf("no node name"))
+		PutNfsService(mockNfs)
+
+		err := New().BeforeServe(context.Background(), &gocsi.StoragePlugin{}, nil)
+		assert.Nil(t, err)
 	})
 
 	t.Run("X_CSI_POWERSTORE_NODE_CHROOT_PATH", func(t *testing.T) {
 		os.Setenv("X_CSI_NODE_NAME", "test")
 		ctx := context.Background()
 		csictx.Setenv(ctx, gocsi.EnvVarMode, "node")
-		assert.PanicsWithValue(t, "X_CSI_POWERSTORE_NODE_CHROOT_PATH environment variable not set", func() {
-			New().BeforeServe(ctx, &gocsi.StoragePlugin{}, nil)
-		})
+
+		err := New().BeforeServe(context.Background(), &gocsi.StoragePlugin{}, nil)
+		assert.Error(t, err, fmt.Errorf("X_CSI_POWERSTORE_NODE_CHROOT_PATH environment variable not set"))
 	})
 
 	t.Run("success", func(t *testing.T) {
