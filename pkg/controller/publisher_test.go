@@ -15,7 +15,7 @@
  * limitations under the License.
  *
  */
-package controller_test
+package controller
 
 import (
 	"context"
@@ -24,7 +24,6 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/dell/csi-powerstore/v2/pkg/controller"
 	"github.com/dell/gopowerstore"
 	"github.com/dell/gopowerstore/api"
 	"github.com/dell/gopowerstore/mocks"
@@ -34,7 +33,7 @@ import (
 
 func TestVolumePublisher_Publish(t *testing.T) {
 	t.Run("scsi publisher", func(t *testing.T) {
-		sp := &controller.SCSIPublisher{}
+		sp := &SCSIPublisher{}
 		getVolumeOK := func(clientMock *mocks.Client) {
 			clientMock.On("GetVolume", mock.Anything, validBaseVolID).
 				Return(gopowerstore.Volume{ID: validBaseVolID, Wwn: "naa.68ccf098003ceb5e4577a20be6d11bf9"}, nil)
@@ -147,7 +146,7 @@ func TestVolumePublisher_Publish(t *testing.T) {
 	})
 
 	t.Run("nfs publisher", func(t *testing.T) {
-		np := &controller.NfsPublisher{}
+		np := &NfsPublisher{}
 
 		getFSOK := func(clientMock *mocks.Client) {
 			clientMock.On("GetFS", mock.Anything, validBaseVolID).
