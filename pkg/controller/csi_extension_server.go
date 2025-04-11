@@ -203,7 +203,8 @@ func (s *Service) ValidateVolumeHostConnectivity(ctx context.Context, req *podmo
 		}
 		// for loop req.GetVolumeIds()
 		for _, volID := range req.GetVolumeIds() {
-			_, globalID, _, _, _, err := array.ParseVolumeID(ctx, volID, s.DefaultArray(), nil)
+			volumeHandle, err := array.ParseVolumeID(ctx, volID, s.DefaultArray(), nil)
+			globalID = volumeHandle.LocalArrayGlobalID
 			if err != nil || globalID == "" {
 				log.Errorf("unable to retrieve array's globalID after parsing volumeID")
 				globalIDs[s.DefaultArray().GlobalID] = true
@@ -227,7 +228,10 @@ func (s *Service) ValidateVolumeHostConnectivity(ctx context.Context, req *podmo
 		if len(req.GetVolumeIds()) > 0 {
 			// Get array config
 			for _, volID := range req.GetVolumeIds() {
-				id, globalIDForVol, protocol, _, _, _ := array.ParseVolumeID(ctx, volID, s.DefaultArray(), nil)
+				volumeHandle, _ := array.ParseVolumeID(ctx, volID, s.DefaultArray(), nil)
+				id := volumeHandle.LocalUUID
+				globalIDForVol := volumeHandle.LocalArrayGlobalID
+				protocol := volumeHandle.TransportProtocol
 				if globalIDForVol != globalID {
 					log.Errorf("Recived globalId from podman is %s and retrieved from array is %s ", globalID, globalIDForVol)
 					return nil, fmt.Errorf("invalid globalId %s is provided", globalID)
