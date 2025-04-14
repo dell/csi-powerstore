@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"github.com/dell/csi-powerstore/v2/pkg/array"
+	"github.com/dell/csm-hbnfs/nfs"
 	csiext "github.com/dell/dell-csi-extensions/replication"
 	"github.com/dell/gopowerstore"
 	log "github.com/sirupsen/logrus"
@@ -37,6 +38,7 @@ func (s *Service) CreateRemoteVolume(ctx context.Context,
 	if volID == "" {
 		return nil, status.Error(codes.InvalidArgument, "volume ID is required")
 	}
+	params := req.GetParameters()
 
 	volumeHandle, err := array.ParseVolumeID(ctx, volID, s.DefaultArray(), nil)
 	if err != nil {
@@ -46,6 +48,16 @@ func (s *Service) CreateRemoteVolume(ctx context.Context,
 	id := volumeHandle.LocalUUID
 	arrayID := volumeHandle.LocalArrayGlobalID
 	protocol := volumeHandle.Protocol
+
+	volPrefix := ""
+	if _, ok := params[nfs.CsiNfsParameter]; ok {
+		// host-based nfs volumes should have the "csi-nfs" parameter
+		// and a "nfs-" prefix in the volume ID that we need to remove
+		// for gopowerstore queries to succeed.
+		// Remove the prefix here and restore when building the response.
+		volPrefix, id = array.GetVolumeIDPrefix(id)
+		id = strings.TrimPrefix(id, volPrefix)
+	}
 
 	arr, ok := s.Arrays()[arrayID]
 	if !ok {
@@ -97,7 +109,7 @@ func (s *Service) CreateRemoteVolume(ctx context.Context,
 		s.replicationContextPrefix + "managementAddress": remoteSystem.ManagementAddress,
 	}
 	remoteVolume := getRemoteCSIVolume(
-		volumeHandle.Prefix+remoteVolumeID+"/"+remoteParams[s.replicationContextPrefix+"arrayID"]+"/"+protocol,
+		volPrefix+remoteVolumeID+"/"+remoteParams[s.replicationContextPrefix+"arrayID"]+"/"+protocol,
 		vol.Size,
 	)
 	remoteVolume.VolumeContext = remoteParams
@@ -114,6 +126,7 @@ func (s *Service) CreateStorageProtectionGroup(ctx context.Context,
 	if volID == "" {
 		return nil, status.Error(codes.InvalidArgument, "volume ID is required")
 	}
+	params := req.GetParameters()
 
 	volumeHandle, err := array.ParseVolumeID(ctx, volID, s.DefaultArray(), nil)
 	if err != nil {
@@ -124,6 +137,15 @@ func (s *Service) CreateStorageProtectionGroup(ctx context.Context,
 	id := volumeHandle.LocalUUID
 	arrayID := volumeHandle.LocalArrayGlobalID
 	protocol := volumeHandle.Protocol
+
+	volPrefix := ""
+	if _, ok := params[nfs.CsiNfsParameter]; ok {
+		// host-based nfs volumes should have the "csi-nfs" parameter
+		// and a "nfs-" prefix in the volume ID that we need to remove
+		// for gopowerstore queries to succeed
+		volPrefix, id = array.GetVolumeIDPrefix(id)
+		id = strings.TrimPrefix(id, volPrefix)
+	}
 
 	arr, ok := s.Arrays()[arrayID]
 	if !ok {

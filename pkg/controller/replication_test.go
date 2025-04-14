@@ -1196,6 +1196,9 @@ func TestService_CreateRemoteVolume(t *testing.T) {
 				context.Background(),
 				&csiext.CreateRemoteVolumeRequest{
 					VolumeHandle: localVolumeID,
+					Parameters: map[string]string{
+						nfs.CsiNfsParameter: "RWX",
+					},
 				},
 			},
 			before: func(s *Service) {

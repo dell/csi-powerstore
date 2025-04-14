@@ -267,9 +267,6 @@ func GetPowerStoreArrays(fs fs.Interface, filePath string) (map[string]*PowerSto
 // VolumeHandle represents the components of a unique csi-powerstore volume identifier and any remote
 // volumes associated with the volume via data replication.
 type VolumeHandle struct {
-	// An optional prefix prepended to the volume handle; currently only used to denote an
-	// NFS volume for Host-Based NFS functionality.
-	Prefix string
 	// The UUID of a volume provisioned by a PowerStore system that is locally managed by this driver.
 	LocalUUID string
 	// The Global ID of the PowerStore system that is locally managed by this driver. The Global ID
@@ -284,14 +281,12 @@ type VolumeHandle struct {
 	Protocol string
 }
 
-// ParseVolumeID parses a volume id from the CO (Kubernetes) and tries to extract local and remote PowerStore volume UUID, Global ID, protocol,
-// any prefix that may exist.
+// ParseVolumeID parses a volume id from the CO (Kubernetes) and tries to extract local and remote PowerStore volume UUID, Global ID, and protocol.
 //
 // Example:
 //
 //	ParseVolumeID("1cd254s/192.168.0.1/scsi") assuming 192.168.0.1 is the IP array PSabc0123def will return
 //		VolumeHandle{
-//			Prefix: "",
 //			LocalUUID: "1cd254s",
 //			LocalArrayGlobalID: "PSabc0123def",
 //			RemoteUUID: "",
@@ -303,7 +298,6 @@ type VolumeHandle struct {
 //
 //	ParseVolumeID("9f840c56-96e6-4de9-b5a3-27e7c20eaa77/PSabcdef0123/scsi:9f840c56-96e6-4de9-b5a3-27e7c20eaa77/PS0123abcdef") returns
 //		VolumeHandle{
-//			Prefix: "",
 //			LocalUUID: "9f840c56-96e6-4de9-b5a3-27e7c20eaa77",
 //			LocalArrayGlobalID: "PSabcdef0123",
 //			RemoteUUID: "9f840c56-96e6-4de9-b5a3-27e7c20eaa77",
@@ -333,9 +327,6 @@ func ParseVolumeID(ctx context.Context, volumeHandleRaw string,
 	localVolumeHandle := strings.Split(volumeHandles[0], "/")
 	volumeHandle.LocalUUID = localVolumeHandle[0]
 	log.Debugf("ParseVolumeID: local volume handle: %s", localVolumeHandle)
-
-	// get the prefix, if any
-	volumeHandle.Prefix, volumeHandle.LocalUUID = GetVolumeIDPrefix(volumeHandle.LocalUUID)
 
 	if len(localVolumeHandle) == 1 {
 		// Legacy support where the volume name consists of only the volume ID.
@@ -390,8 +381,8 @@ func ParseVolumeID(ctx context.Context, volumeHandleRaw string,
 	}
 
 	log.Debugf(
-		"ParseVolumeID: prefix: %s, volumeID: %s, arrayID: %s, protocol: %s, remoteVolumeID: %s, remoteArrayID: %s",
-		volumeHandle.Prefix, volumeHandle.LocalUUID, volumeHandle.LocalArrayGlobalID, volumeHandle.Protocol, volumeHandle.RemoteUUID, volumeHandle.RemoteArrayGlobalID,
+		"ParseVolumeID: volumeID: %s, arrayID: %s, protocol: %s, remoteVolumeID: %s, remoteArrayID: %s",
+		volumeHandle.LocalUUID, volumeHandle.LocalArrayGlobalID, volumeHandle.Protocol, volumeHandle.RemoteUUID, volumeHandle.RemoteArrayGlobalID,
 	)
 	return volumeHandle, nil
 }

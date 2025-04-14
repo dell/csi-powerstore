@@ -417,8 +417,7 @@ func TestParseVolumeID(t *testing.T) {
 				vc:           nil,
 			},
 			want: array.VolumeHandle{
-				Prefix:              hbnfs.CsiNfsPrefixDash,
-				LocalUUID:           localVolUUID,
+				LocalUUID:           hbnfs.CsiNfsPrefixDash + localVolUUID,
 				LocalArrayGlobalID:  powerstoreLocalSystemID,
 				RemoteUUID:          "",
 				RemoteArrayGlobalID: "",
