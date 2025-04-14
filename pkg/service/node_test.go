@@ -261,6 +261,14 @@ func TestUnmountVolume(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("Umount fail", func(t *testing.T) {
+		defaultSysUnmount := sysUnmount
+		sysUnmount = func(_ string, _ int) error {
+			return errors.New("operation not permitted")
+		}
+		defer func() {
+			sysUnmount = defaultSysUnmount
+		}()
+
 		err := svc.UnmountVolume(ctx, "", "", map[string]string{})
 		assert.NotNil(t, err)
 	})
