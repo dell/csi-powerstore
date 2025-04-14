@@ -395,12 +395,17 @@ func GetVolumeIDPrefix(ID string) (prefix, volumeID string) {
 	volumeID = ID
 	matchUUID := regexp.MustCompile(`[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}`)
 
-	// must run the check in case we're parsing a legacy volume ID
-	if matchUUID.FindString(volumeID) != "" {
-		i := matchUUID.FindStringIndex(volumeID)
-		prefix = volumeID[:i[0]]
-		volumeID = volumeID[i[0]:]
+	// if the ID does not contain a UUID, return as-is.
+	if matchUUID.FindString(volumeID) == "" {
+		return prefix, volumeID
 	}
+
+	// get the index of the UUID and use that to split the
+	// separate the volume UUID from any prefixes that may
+	// exist.
+	i := matchUUID.FindStringIndex(volumeID)
+	prefix = volumeID[:i[0]]
+	volumeID = volumeID[i[0]:]
 
 	return prefix, volumeID
 }
