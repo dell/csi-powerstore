@@ -272,10 +272,12 @@ type VolumeHandle struct {
 	// The Global ID of the PowerStore system that is locally managed by this driver. The Global ID
 	// can be found in the PowerStore UI under Settings > Properties
 	LocalArrayGlobalID string
-	// The UUID of a volume provisioned by a PowerStore system that is remotely managed by this driver.
+	// The UUID of a volume provisioned by a PowerStore system that is paired for replication with the
+	// PowerStore system managed by this driver. Currently only used for Metro replicated volume handles.
 	RemoteUUID string
-	// The Global ID of the PowerStore system that is remotely managed by this driver. The Global ID
-	// can be found in the PowerStore UI under Settings > Properties
+	// The Global ID of the PowerStore system that is paired for replication with the PowerStore system
+	// managed by this driver. Currently only used for Metro replicated volume handles.
+	// The Global ID can be found in the PowerStore UI under Settings > Properties
 	RemoteArrayGlobalID string
 	// One of "scsi" or "nfs"
 	Protocol string
@@ -387,25 +389,24 @@ func ParseVolumeID(ctx context.Context, volumeHandleRaw string,
 	return volumeHandle, nil
 }
 
-// GetVolumeIDPrefix returns extracts the prefix, if any exists, from a volume ID with a UUID format.
+// GetVolumeUUIDPrefix extracts the prefix, if any exists, from a volume ID with a UUID format.
 // The prefix is assumed to be all characters preceding the volume UUID including separators/delimiters,
-// e.g. '-'. If no prefix is found, or the volume ID is not of the UUID format, the function returns the ID,
-// unmodified, and an empty string as the prefix.
-func GetVolumeIDPrefix(ID string) (prefix, volumeID string) {
-	volumeID = ID
+// e.g. '-'. If no prefix is found, or the volume ID is not of the UUID format, the function returns an
+// empty string.
+func GetVolumeUUIDPrefix(volumeID string) (prefix string) {
 	matchUUID := regexp.MustCompile(`[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}`)
 
 	// if the ID does not contain a UUID, return as-is.
 	if matchUUID.FindString(volumeID) == "" {
-		return prefix, volumeID
+		return prefix
 	}
 
-	// get the index of the UUID and use that to split the
-	// separate the volume UUID from any prefixes that may
-	// exist.
+	// get the index of the UUID in the volumeID and use that
+	// to extract the prefix.
 	i := matchUUID.FindStringIndex(volumeID)
+	// create a slice from the beginning of the volume ID up to,
+	// but excluding, the UUID. This is the prefix.
 	prefix = volumeID[:i[0]]
-	volumeID = volumeID[i[0]:]
 
-	return prefix, volumeID
+	return prefix
 }

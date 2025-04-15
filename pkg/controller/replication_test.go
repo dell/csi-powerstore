@@ -1142,7 +1142,7 @@ func TestService_CreateRemoteVolume(t *testing.T) {
 	remoteVolUUID := "00000000-aaaa-1111-bbbb-222222222222"
 
 	powerstoreLocalSystemID := "PS000000000001"
-	powerstoreRemoteSystemID := "PS000000000001"
+	powerstoreRemoteSystemID := "PS000000000002"
 
 	localVolumeID := nfs.CsiNfsPrefixDash + localVolUUID + "/" + powerstoreLocalSystemID + "/scsi"
 	remoteVolumeID := nfs.CsiNfsPrefixDash + remoteVolUUID + "/" + powerstoreRemoteSystemID + "/scsi"

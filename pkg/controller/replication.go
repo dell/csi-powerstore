@@ -52,10 +52,11 @@ func (s *Service) CreateRemoteVolume(ctx context.Context,
 	volPrefix := ""
 	if _, ok := params[nfs.CsiNfsParameter]; ok {
 		// host-based nfs volumes should have the "csi-nfs" parameter
-		// and a "nfs-" prefix in the volume ID that we need to remove
+		// and an "nfs-" prefix in the volume ID that we need to remove
 		// for gopowerstore queries to succeed.
-		// Remove the prefix here and restore when building the response.
-		volPrefix, id = array.GetVolumeIDPrefix(id)
+		// Remove the prefix here and restore it when building the volume ID
+		// for the function response.
+		volPrefix = array.GetVolumeUUIDPrefix(id)
 		id = strings.TrimPrefix(id, volPrefix)
 	}
 
@@ -138,12 +139,11 @@ func (s *Service) CreateStorageProtectionGroup(ctx context.Context,
 	arrayID := volumeHandle.LocalArrayGlobalID
 	protocol := volumeHandle.Protocol
 
-	volPrefix := ""
 	if _, ok := params[nfs.CsiNfsParameter]; ok {
 		// host-based nfs volumes should have the "csi-nfs" parameter
 		// and a "nfs-" prefix in the volume ID that we need to remove
 		// for gopowerstore queries to succeed
-		volPrefix, id = array.GetVolumeIDPrefix(id)
+		volPrefix := array.GetVolumeUUIDPrefix(id)
 		id = strings.TrimPrefix(id, volPrefix)
 	}
 

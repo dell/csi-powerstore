@@ -468,44 +468,37 @@ func Test_getVolumeIDPrefix(t *testing.T) {
 		ID string
 	}
 	tests := []struct {
-		name         string
-		args         args
-		wantPrefix   string
-		wantVolumeID string
+		name       string
+		args       args
+		wantPrefix string
 	}{
 		{
 			name: "legacy volume ID",
 			args: args{
 				ID: legacyVolumeID,
 			},
-			wantPrefix:   "",
-			wantVolumeID: legacyVolumeID,
+			wantPrefix: "",
 		},
 		{
 			name: "volume UUID with no prefix",
 			args: args{
 				ID: validBlockVolumeUUID,
 			},
-			wantPrefix:   "",
-			wantVolumeID: validBlockVolumeUUID,
+			wantPrefix: "",
 		},
 		{
 			name: "volume UUID with host-based nfs prefix",
 			args: args{
 				ID: hbnfs.CsiNfsPrefixDash + validBlockVolumeUUID,
 			},
-			wantPrefix:   hbnfs.CsiNfsPrefixDash,
-			wantVolumeID: validBlockVolumeUUID,
+			wantPrefix: hbnfs.CsiNfsPrefixDash,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotPrefix, gotVolumeID := array.GetVolumeIDPrefix(tt.args.ID)
+			gotPrefix := array.GetVolumeUUIDPrefix(tt.args.ID)
 			if gotPrefix != tt.wantPrefix {
 				t.Errorf("getVolumeIDPrefix() gotPrefix = %v, want %v", gotPrefix, tt.wantPrefix)
-			}
-			if gotVolumeID != tt.wantVolumeID {
-				t.Errorf("getVolumeIDPrefix() gotVolumeID = %v, want %v", gotVolumeID, tt.wantVolumeID)
 			}
 		})
 	}
