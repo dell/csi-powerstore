@@ -398,7 +398,7 @@ func GetVolumeUUIDPrefix(volumeID string) (prefix string) {
 
 	// if the ID does not contain a UUID, return as-is.
 	if matchUUID.FindString(volumeID) == "" {
-		return prefix
+		return ""
 	}
 
 	// get the index of the UUID in the volumeID and use that
