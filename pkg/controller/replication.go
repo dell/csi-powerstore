@@ -50,7 +50,7 @@ func (s *Service) CreateRemoteVolume(ctx context.Context,
 	protocol := volumeHandle.Protocol
 
 	volPrefix := ""
-	if _, ok := params[nfs.CsiNfsParameter]; ok {
+	if accessMode, ok := params[nfs.CsiNfsParameter]; ok && accessMode != "" {
 		// host-based nfs volumes should have the "csi-nfs" parameter
 		// and an "nfs-" prefix in the volume ID that we need to remove
 		// for gopowerstore queries to succeed.
@@ -139,7 +139,7 @@ func (s *Service) CreateStorageProtectionGroup(ctx context.Context,
 	arrayID := volumeHandle.LocalArrayGlobalID
 	protocol := volumeHandle.Protocol
 
-	if _, ok := params[nfs.CsiNfsParameter]; ok {
+	if accessMode, ok := params[nfs.CsiNfsParameter]; ok && accessMode != "" {
 		// host-based nfs volumes should have the "csi-nfs" parameter
 		// and a "nfs-" prefix in the volume ID that we need to remove
 		// for gopowerstore queries to succeed
