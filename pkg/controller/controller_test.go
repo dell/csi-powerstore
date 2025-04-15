@@ -26,6 +26,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/dell/csm-hbnfs/nfs"
 	csiext "github.com/dell/dell-csi-extensions/replication"
 
 	"github.com/dell/csi-powerstore/v2/mocks"
@@ -4958,6 +4959,52 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 
 				req := &csiext.CreateStorageProtectionGroupRequest{
 					VolumeHandle: validBaseVolID + "/" + firstValidID + "/" + "iscsi",
+				}
+
+				res, err := ctrlSvc.CreateStorageProtectionGroup(context.Background(), req)
+
+				localParams, remoteParams := getLocalAndRemoteParams(validClusterName, firstValidID,
+					validRemoteSystemName, secondValidID, validRemoteSystemGlobalID, validVolumeGroupName)
+
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csiext.CreateStorageProtectionGroupResponse{
+					LocalProtectionGroupId:          validGroupID,
+					RemoteProtectionGroupId:         validRemoteGroupID,
+					LocalProtectionGroupAttributes:  localParams,
+					RemoteProtectionGroupAttributes: remoteParams,
+				}))
+			})
+
+			ginkgo.It("should successfully discover protection group of a host-based nfs volume", func() {
+				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).
+					Return(gopowerstore.VolumeGroups{VolumeGroup: []gopowerstore.VolumeGroup{{ID: validGroupID, Name: validVolumeGroupName}}}, nil)
+
+				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, validGroupID).
+					Return(gopowerstore.ReplicationSession{
+						RemoteSystemID:   validRemoteSystemID,
+						LocalResourceID:  validGroupID,
+						RemoteResourceID: validRemoteGroupID,
+						StorageElementPairs: []gopowerstore.StorageElementPair{{
+							LocalStorageElementID:  validBaseVolID,
+							RemoteStorageElementID: validRemoteVolID,
+						}},
+					}, nil)
+
+				clientMock.On("GetCluster", mock.Anything).
+					Return(gopowerstore.Cluster{Name: validClusterName, ManagementAddress: firstValidID}, nil)
+
+				clientMock.On("GetRemoteSystem", mock.Anything, validRemoteSystemID).
+					Return(gopowerstore.RemoteSystem{
+						Name:              validRemoteSystemName,
+						ManagementAddress: secondValidID,
+						SerialNumber:      validRemoteSystemGlobalID,
+					}, nil)
+
+				req := &csiext.CreateStorageProtectionGroupRequest{
+					VolumeHandle: nfs.CsiNfsPrefixDash + validBaseVolID + "/" + firstValidID + "/" + "iscsi",
+					Parameters: map[string]string{
+						nfs.CsiNfsParameter: "RWX",
+					},
 				}
 
 				res, err := ctrlSvc.CreateStorageProtectionGroup(context.Background(), req)
