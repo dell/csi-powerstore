@@ -21,6 +21,7 @@ package service
 
 import (
 	"context"
+	"strings"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csm-hbnfs/nfs"
@@ -43,10 +44,52 @@ func (s *service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 		params[CsiNfsParameter] = "RWX"
 	}
 	if nfs.IsNFSStorageClass(params) {
-		log.Infof("csi-nfs: RWX calling nfssvc.CreateVolume")
-		return nfssvc.CreateVolume(ctx, req)
+		return createHostBasedNFSVolume(ctx, req)
 	}
+
 	return controllerSvc.CreateVolume(ctx, req)
+}
+
+func createHostBasedNFSVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
+	if contentSource := req.GetVolumeContentSource(); contentSource != nil {
+		// remove the nfs- prefix when cloning a host-based nfs volume,
+		// otherwise parsing the ID in the driver may fail to remove the prefix,
+		// and subsequent calls to the storage system API will fail because of a
+		// malformed volume UUID.
+		log.Info("creating host-based NFS volume from an existing source")
+		err := removeNFSPrefixFromSourceID(contentSource)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	log.Infof("csi-nfs: RWX calling nfssvc.CreateVolume")
+	return nfssvc.CreateVolume(ctx, req)
+}
+
+// removeNFSPrefixFromSourceID removes the nfs- prefix from a volume ID when a
+// volume is specified as the volume content source of a CreateVolume request.
+func removeNFSPrefixFromSourceID(source *csi.VolumeContentSource) error {
+	// if a volume is specified as volume content source, remove the nfs- prefix
+	if volume := source.GetVolume(); volume != nil {
+		if volume.VolumeId == "" {
+			return status.Error(codes.InvalidArgument,
+				"the volume ID of the volume to be cloned cannot be empty")
+		}
+		if !strings.HasPrefix(volume.VolumeId, nfs.CsiNfsPrefixDash) {
+			return status.Error(codes.InvalidArgument,
+				"the volume ID of the volume to be cloned must be of the host-based NFS type")
+		}
+		log.Infof("volume, %s, specified as volume content source", volume.VolumeId)
+		log.Debug("removing \"nfs-\" prefix from volume ID")
+		volume.VolumeId = nfs.ToArrayVolumeID(volume.VolumeId)
+	}
+	// snapshots should have been created without the "nfs-" prefix
+	if snapshot := source.GetSnapshot(); snapshot != nil {
+		log.Infof("snapshot, %s, specified as volume content source", snapshot.SnapshotId)
+	}
+
+	return nil
 }
 
 // DeleteVolume deletes either FileSystem or Volume from storage array.

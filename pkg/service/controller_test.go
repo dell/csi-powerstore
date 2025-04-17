@@ -25,29 +25,45 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-powerstore/v2/mocks"
+	"github.com/dell/csm-hbnfs/nfs"
 	nfsmock "github.com/dell/csm-hbnfs/nfs/mocks"
 	commonext "github.com/dell/dell-csi-extensions/common"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"go.uber.org/mock/gomock"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func TestCreateVolume(t *testing.T) {
 	c := gomock.NewController(t)
 	svc := service{}
-	ctx := context.Background()
+	volumeUUID := uuid.New().String()
+	arrayGlobalID := "PS000000000001"
+	volumeHandle := volumeUUID + "/" + arrayGlobalID + "/scsi"
+	nfsVolumeHandle := nfs.CsiNfsPrefixDash + volumeHandle
 
+	type args struct {
+		ctx context.Context
+		req *csi.CreateVolumeRequest
+	}
 	type testCase struct {
-		name         string
-		volumeParams map[string]string
-		mockSetup    func(mock *mocks.ControllerInterface, mockNode *mocks.MockInterface, mockNfs *nfsmock.MockService)
-		expectedErr  error
+		name        string
+		args        args
+		mockSetup   func(mock *mocks.ControllerInterface, mockNode *mocks.MockInterface, mockNfs *nfsmock.MockService)
+		expectedErr error
 	}
 
 	testCases := []testCase{
 		{
-			name:         "nfs volume",
-			volumeParams: map[string]string{CsiNfsParameter: "RWXW"},
+			name: "nfs volume",
+			args: args{
+				ctx: context.Background(),
+				req: &csi.CreateVolumeRequest{
+					Parameters: map[string]string{CsiNfsParameter: "RWX"},
+				},
+			},
 			mockSetup: func(mockController *mocks.ControllerInterface, _ *mocks.MockInterface, mockNfs *nfsmock.MockService) {
 				mockController.On("CreateVolume", mock.Anything, mock.Anything).Return(&csi.CreateVolumeResponse{}, nil)
 				mockNfs.EXPECT().CreateVolume(gomock.Any(), gomock.Any()).Times(1).Return(&csi.CreateVolumeResponse{}, nil)
@@ -56,11 +72,59 @@ func TestCreateVolume(t *testing.T) {
 		},
 		{
 			name: "normal volume",
+			args: args{
+				ctx: context.Background(),
+				req: &csi.CreateVolumeRequest{},
+			},
 			mockSetup: func(mockController *mocks.ControllerInterface, _ *mocks.MockInterface, mockNfs *nfsmock.MockService) {
 				mockController.On("CreateVolume", mock.Anything, mock.Anything).Return(&csi.CreateVolumeResponse{}, nil)
 				mockNfs.EXPECT().CreateVolume(gomock.Any(), gomock.Any()).AnyTimes().Return(&csi.CreateVolumeResponse{}, nil)
 			},
 			expectedErr: nil,
+		},
+		{
+			name: "clone a host-based NFS volume",
+			args: args{
+				ctx: context.Background(),
+				req: &csi.CreateVolumeRequest{
+					Parameters: map[string]string{CsiNfsParameter: "RWX"},
+					// provide a host-based nfs volume as content source, signifying a clone request
+					VolumeContentSource: &csi.VolumeContentSource{
+						Type: &csi.VolumeContentSource_Volume{
+							Volume: &csi.VolumeContentSource_VolumeSource{
+								VolumeId: nfsVolumeHandle,
+							},
+						},
+					},
+				},
+			},
+			mockSetup: func(mockController *mocks.ControllerInterface, _ *mocks.MockInterface, mockNfs *nfsmock.MockService) {
+				mockController.On("CreateVolume", mock.Anything, mock.Anything).Return(&csi.CreateVolumeResponse{}, nil)
+				mockNfs.EXPECT().CreateVolume(gomock.Any(), gomock.Any()).Times(1).Return(&csi.CreateVolumeResponse{}, nil)
+			},
+			expectedErr: nil,
+		},
+		{
+			name: "clone a raw block volume with host-based NFS storage class",
+			args: args{
+				ctx: context.Background(),
+				req: &csi.CreateVolumeRequest{
+					// CsiNfsParameter denotes a host-based NFS storage class
+					Parameters: map[string]string{CsiNfsParameter: "RWX"},
+					// provide a regular volume ID as content source
+					VolumeContentSource: &csi.VolumeContentSource{
+						Type: &csi.VolumeContentSource_Volume{
+							Volume: &csi.VolumeContentSource_VolumeSource{
+								VolumeId: volumeHandle,
+							},
+						},
+					},
+				},
+			},
+			mockSetup: func(mockController *mocks.ControllerInterface, _ *mocks.MockInterface, mockNfs *nfsmock.MockService) {
+			},
+			expectedErr: status.Error(codes.InvalidArgument,
+				"the volume ID of the volume to be cloned must be of the host-based NFS type"),
 		},
 	}
 
@@ -76,10 +140,7 @@ func TestCreateVolume(t *testing.T) {
 			PutNodeService(mockNode)
 			PutNfsService(mockNfs)
 
-			req := &csi.CreateVolumeRequest{
-				Parameters: tc.volumeParams,
-			}
-			resp, err := svc.CreateVolume(ctx, req)
+			resp, err := svc.CreateVolume(tc.args.ctx, tc.args.req)
 
 			if tc.expectedErr == nil {
 				assert.Nil(t, err)
@@ -384,6 +445,119 @@ func TestControllerPublishVolume(t *testing.T) {
 			if tc.expectErr != nil {
 				assert.Contains(t, err.Error(), tc.expectErr.Error())
 			}
+		})
+	}
+}
+
+func Test_removeNFSPrefixFromSourceID(t *testing.T) {
+	arrayGlobalID := "PS000000000001"
+	volumeUUID := uuid.New().String()
+	volumeHandle := volumeUUID + "/" + arrayGlobalID + "/scsi"
+	nfsVolumeHandle := nfs.CsiNfsPrefixDash + volumeHandle
+
+	type args struct {
+		source *csi.VolumeContentSource
+	}
+	tests := []struct {
+		name    string
+		args    args
+		expect  *csi.VolumeContentSource
+		wantErr bool
+		errMsg  string
+	}{
+		{
+			name: "remove the nfs prefix from a host-based nfs source volume",
+			args: args{
+				source: &csi.VolumeContentSource{
+					Type: &csi.VolumeContentSource_Volume{
+						Volume: &csi.VolumeContentSource_VolumeSource{
+							VolumeId: nfsVolumeHandle,
+						},
+					},
+				},
+			},
+			expect: &csi.VolumeContentSource{
+				Type: &csi.VolumeContentSource_Volume{
+					Volume: &csi.VolumeContentSource_VolumeSource{
+						VolumeId: volumeHandle,
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "snapshots are not affected",
+			args: args{
+				source: &csi.VolumeContentSource{
+					Type: &csi.VolumeContentSource_Snapshot{
+						Snapshot: &csi.VolumeContentSource_SnapshotSource{
+							SnapshotId: volumeUUID,
+						},
+					},
+				},
+			},
+			expect: &csi.VolumeContentSource{
+				Type: &csi.VolumeContentSource_Snapshot{
+					Snapshot: &csi.VolumeContentSource_SnapshotSource{
+						SnapshotId: volumeUUID,
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "source volume ID is empty",
+			args: args{
+				source: &csi.VolumeContentSource{
+					Type: &csi.VolumeContentSource_Volume{
+						Volume: &csi.VolumeContentSource_VolumeSource{
+							VolumeId: "",
+						},
+					},
+				},
+			},
+			expect: &csi.VolumeContentSource{
+				Type: &csi.VolumeContentSource_Volume{
+					Volume: &csi.VolumeContentSource_VolumeSource{
+						VolumeId: "",
+					},
+				},
+			},
+			wantErr: true,
+			errMsg:  "the volume ID of the volume to be cloned cannot be empty",
+		},
+		{
+			name: "source volume is not a host-based NFS volume",
+			args: args{
+				source: &csi.VolumeContentSource{
+					Type: &csi.VolumeContentSource_Volume{
+						Volume: &csi.VolumeContentSource_VolumeSource{
+							VolumeId: volumeHandle,
+						},
+					},
+				},
+			},
+			expect: &csi.VolumeContentSource{
+				Type: &csi.VolumeContentSource_Volume{
+					Volume: &csi.VolumeContentSource_VolumeSource{
+						VolumeId: volumeHandle,
+					},
+				},
+			},
+			wantErr: true,
+			errMsg:  "the volume ID of the volume to be cloned must be of the host-based NFS type",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := removeNFSPrefixFromSourceID(tt.args.source)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("removeNFSPrefixFromSourceID() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if tt.wantErr {
+				assert.Contains(t, err.Error(), tt.errMsg)
+			}
+			assert.Equal(t, *tt.expect, *tt.args.source)
 		})
 	}
 }
