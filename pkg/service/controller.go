@@ -21,7 +21,6 @@ package service
 
 import (
 	"context"
-	"strings"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csm-hbnfs/nfs"
@@ -76,7 +75,7 @@ func removeNFSPrefixFromSourceID(source *csi.VolumeContentSource) error {
 			return status.Error(codes.InvalidArgument,
 				"the volume ID of the volume to be cloned cannot be empty")
 		}
-		if !strings.HasPrefix(volume.VolumeId, nfs.CsiNfsPrefixDash) {
+		if !nfs.IsNFSVolumeID(volume.VolumeId) {
 			return status.Error(codes.InvalidArgument,
 				"the volume ID of the volume to be cloned must be of the host-based NFS type")
 		}
