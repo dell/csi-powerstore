@@ -121,7 +121,7 @@ func TestCreateVolume(t *testing.T) {
 					},
 				},
 			},
-			mockSetup: func(mockController *mocks.ControllerInterface, _ *mocks.MockInterface, mockNfs *nfsmock.MockService) {
+			mockSetup: func(_ *mocks.ControllerInterface, _ *mocks.MockInterface, _ *nfsmock.MockService) {
 			},
 			expectedErr: status.Error(codes.InvalidArgument,
 				"the volume ID of the volume to be cloned must be of the host-based NFS type"),
