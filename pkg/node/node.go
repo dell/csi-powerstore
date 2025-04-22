@@ -1519,7 +1519,7 @@ func (s *Service) setupHost(initiators []string, client gopowerstore.Client, arr
 
 	if existingHost == nil {
 		log.Infof("Creating host %s on array %s", s.nodeID, arrayID)
-		_, err := s.createHost(context.Background(), initiators, client, arrayID)
+		_, err := s.createHost(context.Background(), initiators)
 		if err != nil {
 			return err
 		}
@@ -1601,8 +1601,6 @@ func (s *Service) getNodeLabels(nodeName string) (map[string]string, error) {
 func (s *Service) createHost(
 	ctx context.Context,
 	initiators []string,
-	client gopowerstore.Client,
-	arrayID string,
 ) (string, error) {
 	nodeLabels, err := s.getNodeLabels(s.opts.KubeNodeName)
 	if err != nil {
