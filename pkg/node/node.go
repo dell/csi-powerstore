@@ -1598,8 +1598,12 @@ func (s *Service) getNodeLabels(nodeName string) (map[string]string, error) {
 }
 
 // register host
-
-func (s *Service) createHost(ctx context.Context, initiators []string, client gopowerstore.Client, arrayID string) (string, error) {
+func (s *Service) createHost(
+	ctx context.Context,
+	initiators []string,
+	client gopowerstore.Client,
+	arrayID string,
+) (string, error) {
 	nodeLabels, err := s.getNodeLabels(s.opts.KubeNodeName)
 	if err != nil {
 		return "", fmt.Errorf("failed to get node labels for node %s: %v", s.opts.KubeNodeName, err)
@@ -1607,192 +1611,356 @@ func (s *Service) createHost(ctx context.Context, initiators []string, client go
 	log.Infof("[createHost] Node Labels: %+v", nodeLabels)
 
 	var primaryArrayID string
-	anyLabelMatched := false
 
-	// Determine if any node label matches any array label
+	// Step 1: Check if this node matches at least one labeled Metro array
+	anyLabelMatch := false
 	for _, arr := range s.Arrays() {
-		if labelsMatch(arr.Labels, nodeLabels) {
-			anyLabelMatched = true
-			break
+		if strings.ToLower(arr.MetroTopology) == "uniform" && len(arr.Labels) == 1 {
+			if labelsMatch(arr.Labels, nodeLabels) {
+				anyLabelMatch = true
+				break
+			}
 		}
 	}
 
 	for _, arr := range s.Arrays() {
 		log.Infof("[createHost] Processing array %s (%s)", arr.GlobalID, arr.IP)
 
-		if len(arr.Labels) > 1 {
-			log.Infof("[createHost] Skipping array %s as it has more than one label", arr.GlobalID)
-			return "", fmt.Errorf("Skipping remote array %s - more than one label", arr.GlobalID)
-		}
-
+		// 1) Skip if already registered
 		if s.isHostAlreadyRegistered(ctx, arr.GetClient(), initiators) {
-			log.Infof("[createHost] Host already registered on array %s, skipping", arr.GlobalID)
+			log.Infof("[createHost] Already registered on %s, skipping", arr.GlobalID)
 			if primaryArrayID == "" {
 				primaryArrayID = arr.GlobalID
 			}
 			continue
 		}
 
-		isMetro := strings.ToLower(arr.MetroTopology) == "uniform"
-
-		if !isMetro {
-			if len(arr.Labels) == 0 && !anyLabelMatched {
-				log.Infof("[createHost] No labels on array %s and no matching node labels - registering as LocalOnly", arr.GlobalID)
-				if err := s.registerHost(ctx, arr.GetClient(), arr.GlobalID, initiators, gopowerstore.HostConnectivityEnumLocalOnly); err != nil {
-					return "", fmt.Errorf("failed to create host on array %s: %v", arr.GlobalID, err)
-				}
-				if primaryArrayID == "" {
-					primaryArrayID = arr.GlobalID
-				}
-			} else {
-				log.Infof("[createHost] Skipping non-Metro array %s due to label mismatch", arr.GlobalID)
+		// 2) Metro vs Non‑Metro
+		if strings.ToLower(arr.MetroTopology) != "uniform" {
+			log.Infof("[createHost] Non‑Metro array %s → registering LocalOnly", arr.GlobalID)
+			if err := s.registerHost(
+				ctx, arr.GetClient(), arr.GlobalID, initiators,
+				gopowerstore.HostConnectivityEnumLocalOnly,
+			); err != nil {
+				return "", fmt.Errorf("failed LocalOnly on %s: %v", arr.GlobalID, err)
+			}
+			if primaryArrayID == "" {
+				primaryArrayID = arr.GlobalID
 			}
 			continue
 		}
 
+		if len(arr.Labels) > 1 {
+			log.Infof("[createHost] Skipping Metro array %s: more than one label", arr.GlobalID)
+			continue
+		}
+
+		// 4) Skip Metro arrays if this node doesn’t match any Metro array label
+		if !anyLabelMatch {
+			log.Infof("[createHost] Node does not match any Metro array labels — skipping Metro registration for %s", arr.GlobalID)
+			continue
+		}
+
+		// 5) Metro: now dispatch to label-match vs no-label-match
 		arrayAddedList := make(map[string]bool)
-		coLocated := false
-		isLabelMatch := labelsMatch(arr.Labels, nodeLabels)
-		if isLabelMatch {
-			log.Infof("[createHost] Labels match on array %s - checking remote systems", arr.GlobalID)
-			remoteSystems, err := arr.GetClient().GetAllRemoteSystems(ctx)
-			skipRemoteArray := false
+
+		if labelsMatch(arr.Labels, nodeLabels) {
+			// 4a) Labels match
+			log.Infof("[createHost] Metro & label match on %s", arr.GlobalID)
+			coLocated, err := s.handleLabelMatchRegistration(ctx, arr, initiators, nodeLabels, arrayAddedList)
 			if err != nil {
-				log.Warnf("[createHost] Failed to get remote systems for array %s: %v", arr.GlobalID, err)
-			} else {
-				for _, remote := range remoteSystems {
-					if remote.Name == "" || arrayAddedList[remote.SerialNumber] {
-						continue
-					}
-					log.Infof("[createHost] Processing remote 1667 array %s (%s)", remote.SerialNumber, remote.Name)
-					for _, remoteArr := range s.Arrays() {
-						skipRemoteArray = false
-						log.Infof("[createHost] Processing remote 1670 array %s (%s)", remoteArr.GlobalID, remoteArr.IP)
-						if remoteArr.GlobalID != remote.SerialNumber {
-							skipRemoteArray = true
-							log.Infof("[createHost] Skipping remoteArr.GlobalID != remote.SerialNumber", remoteArr.GlobalID)
-							continue
-						}
-
-						if len(remoteArr.Labels) > 1 {
-							log.Infof("[createHost] Skipping remote array %s - more than one label", remoteArr.GlobalID)
-							skipRemoteArray = true
-							return "", fmt.Errorf("Skipping remote array %s - more than one label", remoteArr.GlobalID)
-						}
-
-						remoteClient := remoteArr.GetClient()
-
-						if s.isHostAlreadyRegistered(ctx, remoteClient, initiators) {
-							log.Infof("[createHost] Host already registered on remote array %s", remoteArr.GlobalID)
-							arrayAddedList[remoteArr.GlobalID] = true
-							skipRemoteArray = true
-							continue
-						}
-
-						if labelsMatch(remoteArr.Labels, arr.Labels) {
-							log.Infof("[createHost] Full label match - registering on remote array %s as MetroOptimizeBoth", remoteArr.GlobalID)
-							if err := s.registerHost(ctx, remoteClient, remoteArr.GlobalID, initiators, gopowerstore.HostConnectivityEnumMetroOptimizeBoth); err != nil {
-								return "", fmt.Errorf("failed to create host on remote array %s: %v", remoteArr.GlobalID, err)
-							}
-							coLocated = true
-						} else {
-							log.Infof("[createHost] Label mismatch - registering on remote array %s as MetroOptimizeRemote", remoteArr.GlobalID)
-							if err := s.registerHost(ctx, remoteClient, remoteArr.GlobalID, initiators, gopowerstore.HostConnectivityEnumMetroOptimizeRemote); err != nil {
-								return "", fmt.Errorf("failed to create host on remote array %s: %v", remoteArr.GlobalID, err)
-							}
-						}
-						arrayAddedList[remoteArr.GlobalID] = true
-					}
-
-					log.Infof("[createHost] SkipRemoteArray: %v", skipRemoteArray)
-				}
+				return "", err
 			}
-
-
-			if skipRemoteArray {
-				log.Infof("[createHost] Skipping array %s as Remote array is not registered", arr.GlobalID)
-				continue
-			} 
-			
-			connectivity := gopowerstore.HostConnectivityEnumMetroOptimizeLocal
+			conn := gopowerstore.HostConnectivityEnumMetroOptimizeLocal
 			if coLocated {
-				connectivity = gopowerstore.HostConnectivityEnumMetroOptimizeBoth
+				conn = gopowerstore.HostConnectivityEnumMetroOptimizeBoth
 			}
-			log.Infof("[createHost] Registering host on array %s as %s", arr.GlobalID, connectivity)
-
-			if err := s.registerHost(ctx, arr.GetClient(), arr.GlobalID, initiators, connectivity); err != nil {
-				return "", fmt.Errorf("failed to create host on array %s: %v", arr.GlobalID, err)
+			log.Infof("[createHost] Registering %s as %s", arr.GlobalID, conn)
+			if err := s.registerHost(
+				ctx, arr.GetClient(), arr.GlobalID, initiators, conn,
+			); err != nil {
+				return "", fmt.Errorf("failed on %s: %v", arr.GlobalID, err)
 			}
 			if primaryArrayID == "" {
 				primaryArrayID = arr.GlobalID
 			}
 		} else {
-			log.Infof("[createHost] Labels do not match on array %s - checking for remote registration", arr.GlobalID)
-			remoteSystems, err := arr.GetClient().GetAllRemoteSystems(ctx)
+			// 4b) Labels don’t match
+			log.Infof("[createHost] Metro & no label match on %s", arr.GlobalID)
+			coLocated, err := s.handleNoLabelMatchRegistration(
+				ctx, arr, initiators, nodeLabels, arrayAddedList,
+			)
 			if err != nil {
-				log.Warnf("[createHost] Failed to get remote systems: %v", err)
-			} else {
-				registeredOnRemote := false
-				for _, remote := range remoteSystems {
-					if remote.Name == "" || arrayAddedList[remote.SerialNumber] {
-						continue
-					}
-					for _, remoteArr := range s.Arrays() {
-						if remoteArr.GlobalID != remote.SerialNumber {
-							continue
-						}
+				return "", err
+			}
+			conn := gopowerstore.HostConnectivityEnumMetroOptimizeRemote
+			if coLocated {
+				conn = gopowerstore.HostConnectivityEnumMetroOptimizeBoth
+			}
 
-						if len(remoteArr.Labels) > 1 {
-							log.Infof("[createHost] Skipping remote array %s due to multiple labels", remoteArr.GlobalID)
-							return "", fmt.Errorf("Skipping remote array %s - more than one label", remoteArr.GlobalID)
-						}
-
-						remoteClient := remoteArr.GetClient()
-
-						if s.isHostAlreadyRegistered(ctx, remoteClient, initiators) {
-							log.Infof("[createHost] Host already registered on remote array %s", remoteArr.GlobalID)
-							arrayAddedList[remoteArr.GlobalID] = true
-							continue
-						}
-
-						if labelsMatch(remoteArr.Labels, nodeLabels) {
-							log.Infof("[createHost] Registering on remote array %s as MetroOptimizeLocal", remoteArr.GlobalID)
-							err := s.registerHost(ctx, remoteClient, remoteArr.GlobalID, initiators, gopowerstore.HostConnectivityEnumMetroOptimizeLocal)
-							if err != nil {
-								return "", fmt.Errorf("failed to create host on remote array %s: %v", remoteArr.GlobalID, err)
-							}
-							registeredOnRemote = true
-						} else {
-							log.Infof("[createHost] Registering on remote array %s as MetroOptimizeRemote", remoteArr.GlobalID)
-							err := s.registerHost(ctx, remoteClient, remoteArr.GlobalID, initiators, gopowerstore.HostConnectivityEnumMetroOptimizeRemote)
-							if err != nil {
-								return "", fmt.Errorf("failed to create host on remote array %s: %v", remoteArr.GlobalID, err)
-							}
-						}
-						arrayAddedList[remoteArr.GlobalID] = true
-					}
-				}
-
-				if registeredOnRemote {
-					log.Infof("[createHost] Registering on local array %s as MetroOptimizeRemote", arr.GlobalID)
-					if err := s.registerHost(ctx, arr.GetClient(), arr.GlobalID, initiators, gopowerstore.HostConnectivityEnumMetroOptimizeRemote); err != nil {
-						return "", fmt.Errorf("failed to create host on array %s: %v", arr.GlobalID, err)
-					}
-					arrayAddedList[arr.GlobalID] = true
-					if primaryArrayID == "" {
-						primaryArrayID = arr.GlobalID
-					}
-				}
+			log.Infof("[createHost] Registering %s as %s", arr.GlobalID, conn)
+			if err := s.registerHost(
+				ctx, arr.GetClient(), arr.GlobalID, initiators, conn,
+			); err != nil {
+				return "", fmt.Errorf("failed on %s: %v", arr.GlobalID, err)
+			}
+			if primaryArrayID == "" {
+				primaryArrayID = arr.GlobalID
 			}
 		}
 	}
 
 	if primaryArrayID != "" {
-		log.Infof("[createHost] Host successfully registered. Primary array: %s", primaryArrayID)
+		log.Infof("[createHost] Success. Primary array: %s", primaryArrayID)
 		return primaryArrayID, nil
 	}
-
 	return "", fmt.Errorf("[createHost] Failed to register host on any array")
+}
+
+
+
+
+func (s *Service) handleLabelMatchRegistration(
+	ctx context.Context,
+	arr *array.PowerStoreArray,
+	initiators []string,
+	nodeLabels map[string]string,
+	arrayAddedList map[string]bool,
+) (bool, error) {
+	// Early exit if no array labels match the node labels
+	anyLabelMatch := false
+	for _, configuredArr := range s.Arrays() {
+		if labelsMatch(configuredArr.Labels, nodeLabels) {
+			anyLabelMatch = true
+			break
+		}
+	}
+	if !anyLabelMatch {
+		log.Infof("[handleLabelMatch] No arrays match node labels — skipping registration for %s", arr.GlobalID)
+		return false, nil
+	}
+
+	remoteSystems, err := arr.GetClient().GetAllRemoteSystems(ctx)
+	if err != nil {
+		log.Warnf("[handleLabelMatch] failed to get remotes for %s: %v", arr.GlobalID, err)
+		return false, err
+	}
+
+	coLocated := false
+
+	// 1) Determine this array's connectivity based on its label vs. the node's labels
+	var arrayConn gopowerstore.HostConnectivityEnum
+	if labelsMatch(arr.Labels, nodeLabels) {
+		arrayConn = gopowerstore.HostConnectivityEnumMetroOptimizeLocal
+	} else {
+		arrayConn = gopowerstore.HostConnectivityEnumMetroOptimizeRemote
+	}
+
+	for _, remote := range remoteSystems {
+		if remote.Name == "" || arrayAddedList[remote.SerialNumber] {
+			continue
+		}
+
+		for _, remoteArr := range s.Arrays() {
+			if remoteArr.GlobalID != remote.SerialNumber {
+				continue
+			}
+			if len(remoteArr.Labels) > 1 {
+				return false, fmt.Errorf("skipping remote array %s – more than one label", remoteArr.GlobalID)
+			}
+
+			// 2) Mutual-remote check
+			if !s.isRemoteToOtherArray(ctx, arr, remoteArr) {
+				log.Infof("[handleLabelMatch] skipping %s↔%s: not mutually remote",
+					arr.GlobalID, remoteArr.GlobalID)
+				continue
+			}
+
+			clientB := remoteArr.GetClient()
+			if s.isHostAlreadyRegistered(ctx, clientB, initiators) {
+				arrayAddedList[remoteArr.GlobalID] = true
+				continue
+			}
+
+			if !labelsMatch(remoteArr.Labels, arr.Labels) && labelsMatch(remoteArr.Labels, nodeLabels) && labelsMatch(arr.Labels, nodeLabels) {
+				log.Info("skipping registration as the node is having all the array labels")
+				return false, fmt.Errorf("skipping registration as the node matching all the array labels node label: %s, arr label: %s, remote label: %s", nodeLabels, arr.Labels, remoteArr.Labels)
+			}
+
+			// 3) Determine remote's connectivity
+			var remoteConn gopowerstore.HostConnectivityEnum
+			if labelsMatch(remoteArr.Labels, arr.Labels) {
+				remoteConn = gopowerstore.HostConnectivityEnumMetroOptimizeBoth
+			} else if labelsMatch(remoteArr.Labels, nodeLabels) {
+				remoteConn = gopowerstore.HostConnectivityEnumMetroOptimizeLocal
+			} else {
+				remoteConn = gopowerstore.HostConnectivityEnumMetroOptimizeRemote
+			}
+
+			// 4) Guard: skip if both would end up with the same non‑Both connectivity
+			if arrayConn == remoteConn && remoteConn != gopowerstore.HostConnectivityEnumMetroOptimizeBoth {
+				log.Infof("[handleLabelMatch] skipping %s: both arrays would be %s",
+					arr.GlobalID, arrayConn)
+				continue
+			}
+
+			// 5) Register
+			if remoteConn == gopowerstore.HostConnectivityEnumMetroOptimizeBoth {
+				log.Infof("[handleLabelMatch] Full match → MetroOptimizeBoth on %s", remoteArr.GlobalID)
+			} else {
+				log.Infof("[handleLabelMatch] Partial match → MetroOptimizeRemote on %s", remoteArr.GlobalID)
+			}
+			if err := s.registerHost(ctx, clientB, remoteArr.GlobalID, initiators, remoteConn); err != nil {
+				return false, err
+			}
+			arrayAddedList[remoteArr.GlobalID] = true
+
+			if remoteConn == gopowerstore.HostConnectivityEnumMetroOptimizeBoth {
+				coLocated = true
+			}
+		}
+	}
+	return coLocated, nil
+}
+
+func (s *Service) handleNoLabelMatchRegistration(
+	ctx context.Context,
+	arr *array.PowerStoreArray,
+	initiators []string,
+	nodeLabels map[string]string,
+	arrayAddedList map[string]bool,
+) (bool, error) {
+
+	// Early exit if no array labels match the node labels
+	anyLabelMatch := false
+	for _, configuredArr := range s.Arrays() {
+		if labelsMatch(configuredArr.Labels, nodeLabels) {
+			anyLabelMatch = true
+			break
+		}
+	}
+	if !anyLabelMatch {
+		log.Infof("[handleLabelMatch] No arrays match node labels — skipping registration for %s", arr.GlobalID)
+		return false, nil
+	}
+
+	remoteSystems, err := arr.GetClient().GetAllRemoteSystems(ctx)
+	if err != nil {
+		log.Warnf("[handleNoLabelMatch] failed to get remotes for %s: %v", arr.GlobalID, err)
+		return false, err
+	}
+
+	coLocated := false
+	// 1) Determine this array's connectivity based on its label vs. the node's labels
+	var arrayConn gopowerstore.HostConnectivityEnum
+	if labelsMatch(arr.Labels, nodeLabels) {
+		arrayConn = gopowerstore.HostConnectivityEnumMetroOptimizeLocal
+	} else {
+		arrayConn = gopowerstore.HostConnectivityEnumMetroOptimizeRemote
+	}
+
+	for _, remote := range remoteSystems {
+		if remote.Name == "" || arrayAddedList[remote.SerialNumber] {
+			continue
+		}
+
+		for _, remoteArr := range s.Arrays() {
+			if remoteArr.GlobalID != remote.SerialNumber {
+				continue
+			}
+			if len(remoteArr.Labels) > 1 {
+				return false, fmt.Errorf("skipping remote array %s – more than one label", remoteArr.GlobalID)
+			}
+
+			// Mutual remote check
+			if !s.isRemoteToOtherArray(ctx, arr, remoteArr) {
+				log.Infof("[handleNoLabelMatch] skipping %s↔%s: not mutually remote",
+					arr.GlobalID, remoteArr.GlobalID)
+				continue
+			}
+
+			clientB := remoteArr.GetClient()
+			if s.isHostAlreadyRegistered(ctx, clientB, initiators) {
+				arrayAddedList[remoteArr.GlobalID] = true
+				continue
+			}
+
+			if !labelsMatch(remoteArr.Labels, arr.Labels) && labelsMatch(remoteArr.Labels, nodeLabels) && labelsMatch(arr.Labels, nodeLabels) {
+				log.Info("skipping registration as the node is having all the array labels")
+				return false, fmt.Errorf("skipping registration as the node matching all the array labels node label: %s, arr label: %s, remote label: %s", nodeLabels, arr.Labels, remoteArr.Labels)
+			}
+
+			// Determine remote's connectivity
+			var remoteConn gopowerstore.HostConnectivityEnum
+			if labelsMatch(remoteArr.Labels, arr.Labels) {
+				remoteConn = gopowerstore.HostConnectivityEnumMetroOptimizeBoth
+			} else if labelsMatch(remoteArr.Labels, nodeLabels) {
+				remoteConn = gopowerstore.HostConnectivityEnumMetroOptimizeLocal
+			} else {
+				remoteConn = gopowerstore.HostConnectivityEnumMetroOptimizeRemote
+			}
+
+			// Guard: skip if both would end up with the same non-Both connectivity
+			if arrayConn == remoteConn && remoteConn != gopowerstore.HostConnectivityEnumMetroOptimizeBoth {
+				log.Infof("[handleNoLabelMatch] skipping %s: both arrays would be %s",
+					arr.GlobalID, arrayConn)
+				continue
+			}
+
+			// Register
+			if remoteConn == gopowerstore.HostConnectivityEnumMetroOptimizeBoth {
+				log.Infof("[handleNoLabelMatch] Full match → MetroOptimizeBoth on %s", remoteArr.GlobalID)
+			} else {
+				log.Infof("[handleNoLabelMatch] Partial match → MetroOptimizeRemote on %s", remoteArr.GlobalID)
+			}
+			if err := s.registerHost(ctx, clientB, remoteArr.GlobalID, initiators, remoteConn); err != nil {
+				return false, err
+			}
+			arrayAddedList[remoteArr.GlobalID] = true
+
+			if remoteConn == gopowerstore.HostConnectivityEnumMetroOptimizeBoth {
+				coLocated = true
+			}
+		}
+	}
+	return coLocated, nil
+}
+
+// isRemoteToOtherArray returns true if arrA and arrB are mutually remote to each other.
+func (s *Service) isRemoteToOtherArray(
+	ctx context.Context,
+	arrA, arrB *array.PowerStoreArray,
+) bool {
+	// fetch arrA’s remotes
+	remotesA, err := arrA.GetClient().GetAllRemoteSystems(ctx)
+	if err != nil {
+		log.Warnf("[isRemoteToOtherArray] failed to get remotes for %s: %v", arrA.GlobalID, err)
+		return false
+	}
+	// fetch arrB’s remotes
+	remotesB, err := arrB.GetClient().GetAllRemoteSystems(ctx)
+	if err != nil {
+		log.Warnf("[isRemoteToOtherArray] failed to get remotes for %s: %v", arrB.GlobalID, err)
+		return false
+	}
+
+	foundAtoB := false
+	for _, r := range remotesA {
+		if r.SerialNumber == arrB.GlobalID {
+			foundAtoB = true
+			break
+		}
+	}
+	if !foundAtoB {
+		return false
+	}
+
+	for _, r := range remotesB {
+		if r.SerialNumber == arrA.GlobalID {
+			return true
+		}
+	}
+	return false
 }
 
 // Checks if host with given initiators already exists
@@ -1862,7 +2030,7 @@ func (s *Service) registerHost(
 	}
 	log.Infof("[registerHost] Host successfully registered on array %s with ID: %s", arrayID, resp.ID)
 	return nil
-}
+} 	
 
 func labelsMatch(arrayLabels, nodeLabels map[string]string) bool {
 	for key, val := range arrayLabels {
