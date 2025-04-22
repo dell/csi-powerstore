@@ -1715,9 +1715,6 @@ func (s *Service) createHost(
 	return "", fmt.Errorf("[createHost] Failed to register host on any array")
 }
 
-
-
-
 func (s *Service) handleLabelMatchRegistration(
 	ctx context.Context,
 	arr *array.PowerStoreArray,
@@ -2028,7 +2025,7 @@ func (s *Service) registerHost(
 	}
 	log.Infof("[registerHost] Host successfully registered on array %s with ID: %s", arrayID, resp.ID)
 	return nil
-} 	
+}
 
 func labelsMatch(arrayLabels, nodeLabels map[string]string) bool {
 	for key, val := range arrayLabels {
