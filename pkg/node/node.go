@@ -1825,7 +1825,6 @@ func (s *Service) handleNoLabelMatchRegistration(
 	nodeLabels map[string]string,
 	arrayAddedList map[string]bool,
 ) (bool, error) {
-
 	// Early exit if no array labels match the node labels
 	anyLabelMatch := false
 	for _, configuredArr := range s.Arrays() {
