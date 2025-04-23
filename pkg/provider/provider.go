@@ -30,6 +30,8 @@ import (
 // Log init
 var Log = logrus.New()
 
+const namespaceFile = "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
+
 // New returns a new gocsi Storage Plug-in Provider.
 func New(controllerSvc controller.Interface, identitySvc *identity.Service, nodeSvc node.Interface, interList []grpc.UnaryServerInterceptor) *gocsi.StoragePlugin {
 	svc := service.New()
@@ -39,7 +41,14 @@ func New(controllerSvc controller.Interface, identitySvc *identity.Service, node
 	service.PutNfsService(nfssvc)
 	nfs.PutVcsiService(svc)
 	nfs.DriverName = common.Name
-	nfs.DriverNamespace = "powerstore"
+
+	driverNamespace, err := os.ReadFile(namespaceFile)
+	if err == nil && string(driverNamespace) != "" {
+		nfs.DriverNamespace = string(driverNamespace)
+	} else {
+		Log.Infof("Getting the driver namespace from the Environment Variable")
+		nfs.DriverNamespace = os.Getenv(common.EnvDriverNamespace)
+	}
 
 	nfs.NfsExportDirectory = os.Getenv(common.EnvNFSExportDirectory)
 	if nfs.NfsExportDirectory == "" {
