@@ -33,8 +33,8 @@ func TestNew(t *testing.T) {
 		deleteNamespaceFile func()
 	}{
 		{
-			name:   "X_CSI_DRIVER_NAMESPACE environment variable is not set",
-			setEnv: func() {},
+			name:     "X_CSI_DRIVER_NAMESPACE environment variable is not set",
+			setEnv:   func() {},
 			unsetEnv: func() {},
 			createNamespaceFile: func() {
 				err := os.MkdirAll("/var/run/secrets/kubernetes.io/serviceaccount", 0o755)
