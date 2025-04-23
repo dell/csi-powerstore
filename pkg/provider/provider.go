@@ -15,6 +15,7 @@ package provider
 
 import (
 	"os"
+	"strings"
 
 	"github.com/dell/csi-powerstore/v2/pkg/common"
 	"github.com/dell/csi-powerstore/v2/pkg/controller"
@@ -42,12 +43,18 @@ func New(controllerSvc controller.Interface, identitySvc *identity.Service, node
 	nfs.PutVcsiService(svc)
 	nfs.DriverName = common.Name
 
-	driverNamespace, err := os.ReadFile(namespaceFile)
-	if err == nil && string(driverNamespace) != "" {
-		nfs.DriverNamespace = string(driverNamespace)
+	driverNamespace := os.Getenv(common.EnvDriverNamespace)
+	if driverNamespace != "" {
+		nfs.DriverNamespace = driverNamespace
 	} else {
-		Log.Infof("Getting the driver namespace from the Environment Variable")
-		nfs.DriverNamespace = os.Getenv(common.EnvDriverNamespace)
+		// Read the namespace associated with the service account
+		namespaceData, err := os.ReadFile(namespaceFile)
+		if err == nil {
+			if driverNamespace = strings.TrimSpace(string(namespaceData)); len(driverNamespace) > 0 {
+				Log.Infof("Driver Namespace not set, reading from the associated service account")
+				nfs.DriverNamespace = driverNamespace
+			}
+		}
 	}
 
 	nfs.NfsExportDirectory = os.Getenv(common.EnvNFSExportDirectory)
