@@ -45,6 +45,7 @@ func New(controllerSvc controller.Interface, identitySvc *identity.Service, node
 
 	driverNamespace := os.Getenv(common.EnvDriverNamespace)
 	if driverNamespace != "" {
+		Log.Infof("Reading driver namespace from env variable %s", common.EnvDriverNamespace)
 		nfs.DriverNamespace = driverNamespace
 	} else {
 		// Read the namespace associated with the service account
