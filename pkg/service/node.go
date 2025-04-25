@@ -21,13 +21,19 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path"
+	"path/filepath"
+	"strings"
 	"syscall"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
+	commonFs "github.com/dell/csi-powerstore/v2/pkg/common/fs"
 	"github.com/dell/csm-hbnfs/nfs"
+	"github.com/dell/gofsutil"
 )
 
 var (
@@ -63,9 +69,10 @@ func (s *service) NodePublishVolume(ctx context.Context, req *csi.NodePublishVol
 // NodeUnpublishVolume unpublishes volume from the node by unmounting it from the target path
 func (s *service) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) {
 	if nfs.IsNFSVolumeID(req.GetVolumeId()) {
-		log.Infof("csi-nfs: RWX calling nfssvc.NodeUnpublishVolume")
-		return nfssvc.NodeUnpublishVolume(ctx, req)
+		log.Infof("[FERNANDO] csi-nfs: RWX calling nfssvc.NodeUnpublishVolume")
+		// return nfssvc.NodeUnpublishVolume(ctx, req)
 	}
+
 	return nodeSvc.NodeUnpublishVolume(ctx, req)
 }
 
@@ -161,11 +168,40 @@ func (s *service) UnmountVolume(ctx context.Context, volumeID, exportPath string
 	target := path.Join(exportPath, publishContext[nfs.ServiceName])
 	var err error
 
-	log.Infof("UnmountVolume calling Unmount %s", target)
-	err = sysUnmount(target, 0)
-	if err != nil && !os.IsNotExist(err) {
-		log.Errorf("Could not Umount the target path: %s %s %s", volumeID, target, err.Error())
-		return err
+	log.Infof("[FERNANDO] Cleaning the following paths - target: %s, staging: %s", target, staging)
+	target = filepath.Clean(target)
+	staging = filepath.Clean(staging)
+
+	f := &commonFs.Fs{Util: &gofsutil.FS{}}
+
+	mounts, err := f.Util.GetMounts(context.Background())
+	if err != nil {
+		log.Errorf("[FERNANDO] could not get mounts: %s", err.Error())
+	}
+
+	found := false
+	for _, mount := range mounts {
+		if mount.Path == target {
+			log.Info("[Fernando] Found mount, will try to unmount...")
+			found = true
+			break
+		}
+	}
+
+	if found {
+		log.Infof("UnmountVolume calling Unmount %s", target)
+		err = sysUnmount(target, syscall.MNT_FORCE)
+		if err != nil {
+			if errors.Is(err, fs.ErrNotExist) {
+				log.Info("[Fernando] Does not exists...")
+			}
+
+			log.Errorf("Could not Umount the target path: %s %s %s", volumeID, target, err.Error())
+			if !strings.Contains(err.Error(), "no such file") {
+				// log.Errorf("Could not Umount the target path: %s %s %s", volumeID, target, err.Error())
+				return err
+			}
+		}
 	}
 
 	err = osRemove(target)
