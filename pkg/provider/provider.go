@@ -15,6 +15,7 @@ package provider
 
 import (
 	"os"
+	"strings"
 
 	"github.com/dell/csi-powerstore/v2/pkg/common"
 	"github.com/dell/csi-powerstore/v2/pkg/controller"
@@ -30,6 +31,8 @@ import (
 // Log init
 var Log = logrus.New()
 
+const namespaceFile = "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
+
 // New returns a new gocsi Storage Plug-in Provider.
 func New(controllerSvc controller.Interface, identitySvc *identity.Service, nodeSvc node.Interface, interList []grpc.UnaryServerInterceptor) *gocsi.StoragePlugin {
 	svc := service.New()
@@ -39,7 +42,21 @@ func New(controllerSvc controller.Interface, identitySvc *identity.Service, node
 	service.PutNfsService(nfssvc)
 	nfs.PutVcsiService(svc)
 	nfs.DriverName = common.Name
-	nfs.DriverNamespace = "powerstore"
+
+	driverNamespace := os.Getenv(common.EnvDriverNamespace)
+	if driverNamespace != "" {
+		Log.Infof("Reading driver namespace from env variable %s", common.EnvDriverNamespace)
+		nfs.DriverNamespace = driverNamespace
+	} else {
+		// Read the namespace associated with the service account
+		namespaceData, err := os.ReadFile(namespaceFile)
+		if err == nil {
+			if driverNamespace = strings.TrimSpace(string(namespaceData)); len(driverNamespace) > 0 {
+				Log.Infof("Driver Namespace not set, reading from the associated service account")
+				nfs.DriverNamespace = driverNamespace
+			}
+		}
+	}
 
 	nfs.NfsExportDirectory = os.Getenv(common.EnvNFSExportDirectory)
 	if nfs.NfsExportDirectory == "" {
