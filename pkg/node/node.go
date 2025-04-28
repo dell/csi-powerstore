@@ -1585,8 +1585,6 @@ func (s *Service) buildInitiatorsArray(initiators []string, arrayID string) []go
 
 // create or update host on PowerStore array
 func (s *Service) updateHost(ctx context.Context, initiators []string, client gopowerstore.Client, host gopowerstore.Host, arrayID string, connectivity *gopowerstore.HostConnectivityEnum) error {
-	log.Infof("Inside updateHost: %+v", host)
-
 	initiatorsToAdd, initiatorsToDelete := checkIQNS(initiators, host)
 
 	return s.modifyHostInitiators(ctx, host.ID, client, initiatorsToAdd, initiatorsToDelete, nil, arrayID, connectivity)
@@ -1597,22 +1595,54 @@ func (s *Service) getNodeLabels(nodeName string) (map[string]string, error) {
 	return k8sutils.GetNodeLabels(context.Background(), s.opts.KubeConfigPath, nodeName)
 }
 
-// register host
+var(
+	getNodeLabelsfn = func(s *Service, kubeNodeName string) (map[string]string, error) {
+		return s.getNodeLabels(kubeNodeName)
+	}
+
+	getArrayfn = func(s *Service) map[string]*array.PowerStoreArray{
+		return s.Arrays()
+	}
+
+	getIsHostAlreadyRegistered = func(s *Service, ctx context.Context, client gopowerstore.Client, initiators []string) bool{
+		return s.isHostAlreadyRegistered(ctx, client, initiators)
+	}
+
+	getAllRemoteSystemsFunc = func(arr *array.PowerStoreArray, ctx context.Context)  ([]gopowerstore.RemoteSystem, error) {
+
+		return arr.GetClient().GetAllRemoteSystems(ctx)
+	}
+
+	getIsRemoteToOtherArray = func(s *Service, ctx context.Context, arr, remoteArr *array.PowerStoreArray) bool {
+
+		return s.isRemoteToOtherArray(ctx, arr, remoteArr)
+	}
+
+	CreateHostfunc = func(client gopowerstore.Client, ctx context.Context, createParams *gopowerstore.HostCreate)(gopowerstore.CreateResponse, error){
+
+		return client.CreateHost(ctx, createParams)
+	}
+
+	SetCustomHTTPHeadersFunc = func(client gopowerstore.Client, headers http.Header){
+
+		client.SetCustomHTTPHeaders(headers)
+	}
+)
+
+// register host 
 func (s *Service) createHost(
 	ctx context.Context,
 	initiators []string,
 ) (string, error) {
-	nodeLabels, err := s.getNodeLabels(s.opts.KubeNodeName)
+	nodeLabels, err := getNodeLabelsfn(s, s.opts.KubeNodeName)
 	if err != nil {
 		return "", fmt.Errorf("failed to get node labels for node %s: %v", s.opts.KubeNodeName, err)
 	}
-	log.Infof("[createHost] Node Labels: %+v", nodeLabels)
-
 	var primaryArrayID string
 
 	// Step 1: Check if this node matches at least one labeled Metro array
 	anyLabelMatch := false
-	for _, arr := range s.Arrays() {
+	for _, arr := range getArrayfn(s) {
 		if strings.ToLower(arr.MetroTopology) == "uniform" && len(arr.Labels) == 1 {
 			if labelsMatch(arr.Labels, nodeLabels) {
 				anyLabelMatch = true
@@ -1621,11 +1651,12 @@ func (s *Service) createHost(
 		}
 	}
 
-	for _, arr := range s.Arrays() {
-		log.Infof("[createHost] Processing array %s (%s)", arr.GlobalID, arr.IP)
 
+	for _, arr := range getArrayfn(s) {
+		
+		log.Infof("[createHost] Processing array %s (%s)", arr.GlobalID, arr.IP)
 		// 1) Skip if already registered
-		if s.isHostAlreadyRegistered(ctx, arr.GetClient(), initiators) {
+		if getIsHostAlreadyRegistered(s, ctx, arr.GetClient(), initiators) {
 			log.Infof("[createHost] Already registered on %s, skipping", arr.GlobalID)
 			if primaryArrayID == "" {
 				primaryArrayID = arr.GlobalID
@@ -1724,18 +1755,18 @@ func (s *Service) handleLabelMatchRegistration(
 ) (bool, error) {
 	// Early exit if no array labels match the node labels
 	anyLabelMatch := false
-	for _, configuredArr := range s.Arrays() {
+	for _, configuredArr := range getArrayfn(s) {
 		if labelsMatch(configuredArr.Labels, nodeLabels) {
 			anyLabelMatch = true
 			break
 		}
 	}
 	if !anyLabelMatch {
-		log.Infof("[handleLabelMatch] No arrays match node labels — skipping registration for %s", arr.GlobalID)
+		log.Infof("[handleLabelMatch] No arrays match node labels — skipping registration")
 		return false, nil
 	}
-
-	remoteSystems, err := arr.GetClient().GetAllRemoteSystems(ctx)
+	
+	remoteSystems, err := getAllRemoteSystemsFunc(arr, ctx)
 	if err != nil {
 		log.Warnf("[handleLabelMatch] failed to get remotes for %s: %v", arr.GlobalID, err)
 		return false, err
@@ -1756,7 +1787,7 @@ func (s *Service) handleLabelMatchRegistration(
 			continue
 		}
 
-		for _, remoteArr := range s.Arrays() {
+		for _, remoteArr := range getArrayfn(s) {
 			if remoteArr.GlobalID != remote.SerialNumber {
 				continue
 			}
@@ -1765,14 +1796,14 @@ func (s *Service) handleLabelMatchRegistration(
 			}
 
 			// 2) Mutual-remote check
-			if !s.isRemoteToOtherArray(ctx, arr, remoteArr) {
+			if !getIsRemoteToOtherArray(s, ctx, arr, remoteArr) {
 				log.Infof("[handleLabelMatch] skipping %s↔%s: not mutually remote",
 					arr.GlobalID, remoteArr.GlobalID)
 				continue
 			}
 
 			clientB := remoteArr.GetClient()
-			if s.isHostAlreadyRegistered(ctx, clientB, initiators) {
+			if getIsHostAlreadyRegistered(s, ctx, clientB, initiators) {
 				arrayAddedList[remoteArr.GlobalID] = true
 				continue
 			}
@@ -1827,18 +1858,18 @@ func (s *Service) handleNoLabelMatchRegistration(
 ) (bool, error) {
 	// Early exit if no array labels match the node labels
 	anyLabelMatch := false
-	for _, configuredArr := range s.Arrays() {
+	for _, configuredArr := range getArrayfn(s) {
 		if labelsMatch(configuredArr.Labels, nodeLabels) {
 			anyLabelMatch = true
 			break
 		}
 	}
 	if !anyLabelMatch {
-		log.Infof("[handleLabelMatch] No arrays match node labels — skipping registration for %s", arr.GlobalID)
+		log.Infof("[handleNoLabelMatch] No arrays match node labels — skipping registration for %s", arr.GlobalID)
 		return false, nil
 	}
 
-	remoteSystems, err := arr.GetClient().GetAllRemoteSystems(ctx)
+	remoteSystems, err := getAllRemoteSystemsFunc(arr,ctx)
 	if err != nil {
 		log.Warnf("[handleNoLabelMatch] failed to get remotes for %s: %v", arr.GlobalID, err)
 		return false, err
@@ -1858,7 +1889,7 @@ func (s *Service) handleNoLabelMatchRegistration(
 			continue
 		}
 
-		for _, remoteArr := range s.Arrays() {
+		for _, remoteArr := range getArrayfn(s) {
 			if remoteArr.GlobalID != remote.SerialNumber {
 				continue
 			}
@@ -1867,14 +1898,14 @@ func (s *Service) handleNoLabelMatchRegistration(
 			}
 
 			// Mutual remote check
-			if !s.isRemoteToOtherArray(ctx, arr, remoteArr) {
+			if !getIsRemoteToOtherArray(s, ctx, arr, remoteArr) {
 				log.Infof("[handleNoLabelMatch] skipping %s↔%s: not mutually remote",
 					arr.GlobalID, remoteArr.GlobalID)
 				continue
 			}
 
 			clientB := remoteArr.GetClient()
-			if s.isHostAlreadyRegistered(ctx, clientB, initiators) {
+			if getIsHostAlreadyRegistered(s, ctx, clientB, initiators) {
 				arrayAddedList[remoteArr.GlobalID] = true
 				continue
 			}
@@ -1926,13 +1957,13 @@ func (s *Service) isRemoteToOtherArray(
 	arrA, arrB *array.PowerStoreArray,
 ) bool {
 	// fetch arrA’s remotes
-	remotesA, err := arrA.GetClient().GetAllRemoteSystems(ctx)
+	remotesA, err := getAllRemoteSystemsFunc(arrA, ctx)
 	if err != nil {
 		log.Warnf("[isRemoteToOtherArray] failed to get remotes for %s: %v", arrA.GlobalID, err)
 		return false
 	}
 	// fetch arrB’s remotes
-	remotesB, err := arrB.GetClient().GetAllRemoteSystems(ctx)
+	remotesB, err := getAllRemoteSystemsFunc(arrB, ctx)
 	if err != nil {
 		log.Warnf("[isRemoteToOtherArray] failed to get remotes for %s: %v", arrB.GlobalID, err)
 		return false
@@ -2010,8 +2041,8 @@ func (s *Service) registerHost(
 	}
 
 	log.Infof("[registerHost] Creating host on array %s with connectivity: %s", arrayID, connType)
-	resp, err := client.CreateHost(ctx, &createParams)
-	client.SetCustomHTTPHeaders(nil)
+	resp, err := CreateHostfunc(client, ctx, &createParams)
+	SetCustomHTTPHeadersFunc(client, nil)
 
 	if err != nil {
 		if connType == gopowerstore.HostConnectivityEnumMetroOptimizeRemote &&
