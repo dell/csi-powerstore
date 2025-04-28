@@ -70,7 +70,7 @@ func (s *service) NodePublishVolume(ctx context.Context, req *csi.NodePublishVol
 func (s *service) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) {
 	if nfs.IsNFSVolumeID(req.GetVolumeId()) {
 		log.Infof("[FERNANDO] csi-nfs: RWX calling nfssvc.NodeUnpublishVolume")
-		// return nfssvc.NodeUnpublishVolume(ctx, req)
+		return nfssvc.NodeUnpublishVolume(ctx, req)
 	}
 
 	return nodeSvc.NodeUnpublishVolume(ctx, req)
