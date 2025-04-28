@@ -37,7 +37,7 @@ import (
 )
 
 var (
-	osRemove   = os.Remove
+	osRemove   = os.RemoveAll
 	sysUnmount = syscall.Unmount
 )
 
