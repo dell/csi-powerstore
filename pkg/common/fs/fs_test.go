@@ -35,7 +35,7 @@ type FsTestSuite struct {
 }
 
 func (suite *FsTestSuite) SetupSuite() {
-	suite.fs = &Fs{Util: &gofsutil.FS{SysBlockDir: "/sys/block"}}
+	suite.fs = &Fs{Util: &gofsutil.FS{}}
 	suite.tmp = "./tmp"
 	err := os.Mkdir(suite.tmp, 0o750)
 	if err != nil {
