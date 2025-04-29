@@ -7102,7 +7102,6 @@ func TestService_createHost(t *testing.T) {
 							Capabilities:        []string{"Synchronous_Block_Replication"},
 						},
 					}, nil
-
 				}
 
 				getIsHostAlreadyRegistered = func(_ *Service, _ context.Context, _ gopowerstore.Client, _ []string) bool {
