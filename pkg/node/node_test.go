@@ -5118,8 +5118,110 @@ type MockService struct {
 	*Service
 }
 
-// Unit test for createHost
-func TestService_createHost(t *testing.T) {
+func TestIsRemoteToOtherArray(t *testing.T) {
+
+	originalGetAllRemoteSystemsFunc := getAllRemoteSystemsFunc
+
+	defer func() {
+		getAllRemoteSystemsFunc = originalGetAllRemoteSystemsFunc
+	}()
+	tests := []struct {
+		name       string
+		s          *Service
+		arrA       *array.PowerStoreArray
+		arrB       *array.PowerStoreArray
+		setupMocks func()
+		wantErr    bool
+		want       bool
+	}{
+		{
+			name: "Array B is not remote to Array A",
+			arrA: &array.PowerStoreArray{GlobalID: "arrayA"},
+			arrB: &array.PowerStoreArray{GlobalID: "arrayB"},
+			setupMocks: func() {
+				getAllRemoteSystemsFunc = func(arr *array.PowerStoreArray, _ context.Context) ([]gopowerstore.RemoteSystem, error) {
+					if arr.GlobalID == "arrayA" {
+						return []gopowerstore.RemoteSystem{
+							{
+								ID:                  "arrayid1",
+								Name:                "Pstore1",
+								Description:         "",
+								SerialNumber:        "arrayC",
+								ManagementAddress:   "10.198.0.1",
+								DataConnectionState: "OK",
+								Capabilities:        []string{"Synchronous_Block_Replication"},
+							},
+						}, nil
+					}
+
+					return []gopowerstore.RemoteSystem{
+						{
+							ID:                  "arrayid2",
+							Name:                "Pstore2",
+							Description:         "",
+							SerialNumber:        "arrayD",
+							ManagementAddress:   "10.198.0.2",
+							DataConnectionState: "OK",
+							Capabilities:        []string{"Synchronous_Block_Replication"},
+						},
+					}, nil
+				}
+			},
+			wantErr: false,
+			want:    false,
+		},
+		{
+			name: "Error fetching remotes for Array A",
+			arrA: &array.PowerStoreArray{GlobalID: "arrayA"},
+			arrB: &array.PowerStoreArray{GlobalID: "arrayB"},
+			setupMocks: func() {
+				getAllRemoteSystemsFunc = func(arr *array.PowerStoreArray, _ context.Context) ([]gopowerstore.RemoteSystem, error) {
+					if arr.GlobalID == "arrayA" {
+						return nil, fmt.Errorf("failed to get remoteSystem")
+					}
+
+					return nil, nil
+				}
+			},
+			wantErr: true,
+			want:    false,
+		},
+		{
+			name: "Error fetching remotes for Array B",
+			arrA: &array.PowerStoreArray{GlobalID: "arrayA"},
+			arrB: &array.PowerStoreArray{GlobalID: "arrayB"},
+			setupMocks: func() {
+				getAllRemoteSystemsFunc = func(arr *array.PowerStoreArray, _ context.Context) ([]gopowerstore.RemoteSystem, error) {
+					if arr.GlobalID == "arrayB" {
+						return nil, fmt.Errorf("failed to get remoteSystem")
+					}
+
+					return nil, nil
+				}
+			},
+			wantErr: true,
+			want:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.setupMocks()
+
+			log.Infof("Test")
+			got := tt.s.isRemoteToOtherArray(context.Background(), tt.arrA, tt.arrB)
+
+			if got == tt.want {
+				log.Info("Success")
+			} else {
+				t.Errorf("Service.isRemoteToOtherArray() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestHandleNoLabelMatchRegistration(t *testing.T) {
+
 	originalGetNodeLabelsfn := getNodeLabelsfn
 	originalGetArrayfn := getArrayfn
 	originalGetIsHostAlreadyRegistered := getIsHostAlreadyRegistered
@@ -5127,6 +5229,7 @@ func TestService_createHost(t *testing.T) {
 	originalGetIsRemoteToOtherArray := getIsRemoteToOtherArray
 	originalCreateHostfunc := CreateHostfunc
 	orginalSetCustomHTTPHeadersFunc := SetCustomHTTPHeadersFunc
+	originalRegisterHostFunc := registerHostFunc
 
 	defer func() {
 		getNodeLabelsfn = originalGetNodeLabelsfn
@@ -5136,6 +5239,1009 @@ func TestService_createHost(t *testing.T) {
 		getIsRemoteToOtherArray = originalGetIsRemoteToOtherArray
 		CreateHostfunc = originalCreateHostfunc
 		SetCustomHTTPHeadersFunc = orginalSetCustomHTTPHeadersFunc
+		registerHostFunc = originalRegisterHostFunc
+	}()
+
+	tests := []struct {
+		s              *MockService
+		name           string
+		initiators     []string
+		nodeLabels     map[string]string
+		arrayAddedList map[string]bool
+		arr            *array.PowerStoreArray
+		setupMocks     func()
+		wantErr        bool
+		want           bool
+	}{
+		{
+			name:           "No array labels match node labels",
+			initiators:     []string{"init1"},
+			nodeLabels:     map[string]string{"topology.kubernetes.io/zone1": "zone1"},
+			arrayAddedList: map[string]bool{},
+			arr: &array.PowerStoreArray{
+				Endpoint:      "https://10.198.0.1/api/rest",
+				GlobalID:      "Array1",
+				Username:      "admin",
+				Password:      "Password123!",
+				Insecure:      true,
+				BlockProtocol: "auto",
+				MetroTopology: "Uniform",
+				Labels:        map[string]string{"topology.kubernetes.io/zone2": "zone2"},
+				IP:            "10.198.0.1",
+			},
+			setupMocks: func() {
+				getArrayfn = func(_ *Service) map[string]*array.PowerStoreArray {
+					log.Infof("InsideGetArray")
+
+					return map[string]*array.PowerStoreArray{
+						"Array1": {
+							Endpoint:      "https://10.198.0.1/api/rest",
+							GlobalID:      "Array1",
+							Username:      "admin",
+							Password:      "Password123!",
+							Insecure:      true,
+							BlockProtocol: "auto",
+							MetroTopology: "Uniform",
+							Labels:        map[string]string{"topology.kubernetes.io/zone1": "zone2"},
+							IP:            "10.198.0.1",
+						},
+						"Array2": {
+							Endpoint:      "https://10.198.0.2/api/rest",
+							GlobalID:      "Array2",
+							Username:      "admin",
+							Password:      "Password123!",
+							Insecure:      true,
+							BlockProtocol: "auto",
+							MetroTopology: "Uniform",
+							Labels:        map[string]string{"topology.kubernetes.io/zone1": "zone2"},
+							IP:            "10.198.0.2",
+						},
+					}
+				}
+
+				getIsHostAlreadyRegistered = func(_ *Service, _ context.Context, _ gopowerstore.Client, _ []string) bool {
+					return false
+				}
+
+				getIsRemoteToOtherArray = func(_ *Service, _ context.Context, _, _ *array.PowerStoreArray) bool {
+
+					return true
+				}
+
+				CreateHostfunc = func(_ gopowerstore.Client, _ context.Context, _ *gopowerstore.HostCreate) (gopowerstore.CreateResponse, error) {
+					defaultResponse := gopowerstore.CreateResponse{
+						ID: "id-1",
+					}
+					return defaultResponse, nil
+				}
+			},
+			wantErr: false,
+			want:    true,
+		},
+		{
+			name:           "Success Host Registration",
+			initiators:     []string{"init1"},
+			nodeLabels:     map[string]string{"topology.kubernetes.io/zone1": "zone1", "topology.kubernetes.io/zone2": "zone2"},
+			arrayAddedList: map[string]bool{},
+			arr: &array.PowerStoreArray{
+				Endpoint:      "https://10.198.0.1/api/rest",
+				GlobalID:      "Array1",
+				Username:      "admin",
+				Password:      "Password123!",
+				Insecure:      true,
+				BlockProtocol: "auto",
+				MetroTopology: "Uniform",
+				Labels:        map[string]string{"topology.kubernetes.io/zone1": "zone3"},
+				IP:            "10.198.0.1",
+			},
+			setupMocks: func() {
+				getArrayfn = func(_ *Service) map[string]*array.PowerStoreArray {
+					log.Infof("InsideGetArray")
+
+					return map[string]*array.PowerStoreArray{
+						"Array1": {
+							Endpoint:      "https://10.198.0.1/api/rest",
+							GlobalID:      "Array1",
+							Username:      "admin",
+							Password:      "Password123!",
+							Insecure:      true,
+							BlockProtocol: "auto",
+							MetroTopology: "Uniform",
+							Labels:        map[string]string{"topology.kubernetes.io/zone1": "zone1"},
+							IP:            "10.198.0.1",
+						},
+						"Array2": {
+							Endpoint:      "https://10.198.0.2/api/rest",
+							GlobalID:      "Array2",
+							Username:      "admin",
+							Password:      "Password123!",
+							Insecure:      true,
+							BlockProtocol: "auto",
+							MetroTopology: "Uniform",
+							Labels:        map[string]string{"topology.kubernetes.io/zone2": "zone2"},
+							IP:            "10.198.0.2",
+						},
+					}
+				}
+
+				getAllRemoteSystemsFunc = func(arr *array.PowerStoreArray, _ context.Context) ([]gopowerstore.RemoteSystem, error) {
+					if arr.GlobalID == "Array2" {
+						return []gopowerstore.RemoteSystem{
+							{
+								ID:                  "arrayid1",
+								Name:                "Pstore1",
+								Description:         "",
+								SerialNumber:        "Array1",
+								ManagementAddress:   "10.198.0.1",
+								DataConnectionState: "OK",
+								Capabilities:        []string{"Synchronous_Block_Replication"},
+							},
+						}, nil
+					}
+
+					return []gopowerstore.RemoteSystem{
+						{
+							ID:                  "arrayid2",
+							Name:                "Pstore2",
+							Description:         "",
+							SerialNumber:        "Array2",
+							ManagementAddress:   "10.198.0.2",
+							DataConnectionState: "OK",
+							Capabilities:        []string{"Synchronous_Block_Replication"},
+						},
+					}, nil
+				}
+
+				getIsHostAlreadyRegistered = func(_ *Service, _ context.Context, _ gopowerstore.Client, _ []string) bool {
+					return false
+				}
+
+				getIsRemoteToOtherArray = func(_ *Service, _ context.Context, _, _ *array.PowerStoreArray) bool {
+
+					return true
+				}
+
+				CreateHostfunc = func(_ gopowerstore.Client, _ context.Context, _ *gopowerstore.HostCreate) (gopowerstore.CreateResponse, error) {
+					defaultResponse := gopowerstore.CreateResponse{
+						ID: "id-1",
+					}
+					return defaultResponse, nil
+				}
+
+				registerHostFunc = func(_ *Service, _ context.Context, _ gopowerstore.Client, _ string, _ []string, _ gopowerstore.HostConnectivityEnum) error {
+					log.Infof("Inside RegisterHost")
+					return nil
+				}
+			},
+			wantErr: false,
+			want:    true,
+		},
+		{
+			name:           "Host Already register",
+			initiators:     []string{"init1"},
+			nodeLabels:     map[string]string{"topology.kubernetes.io/zone1": "zone1", "topology.kubernetes.io/zone2": "zone2"},
+			arrayAddedList: map[string]bool{},
+			arr: &array.PowerStoreArray{
+				Endpoint:      "https://10.198.0.1/api/rest",
+				GlobalID:      "Array1",
+				Username:      "admin",
+				Password:      "Password123!",
+				Insecure:      true,
+				BlockProtocol: "auto",
+				MetroTopology: "Uniform",
+				Labels:        map[string]string{"topology.kubernetes.io/zone1": "zone3"},
+				IP:            "10.198.0.1",
+			},
+			setupMocks: func() {
+				getArrayfn = func(_ *Service) map[string]*array.PowerStoreArray {
+					log.Infof("InsideGetArray")
+
+					return map[string]*array.PowerStoreArray{
+						"Array1": {
+							Endpoint:      "https://10.198.0.1/api/rest",
+							GlobalID:      "Array1",
+							Username:      "admin",
+							Password:      "Password123!",
+							Insecure:      true,
+							BlockProtocol: "auto",
+							MetroTopology: "Uniform",
+							Labels:        map[string]string{"topology.kubernetes.io/zone1": "zone1"},
+							IP:            "10.198.0.1",
+						},
+						"Array2": {
+							Endpoint:      "https://10.198.0.2/api/rest",
+							GlobalID:      "Array2",
+							Username:      "admin",
+							Password:      "Password123!",
+							Insecure:      true,
+							BlockProtocol: "auto",
+							MetroTopology: "Uniform",
+							Labels:        map[string]string{"topology.kubernetes.io/zone2": "zone2"},
+							IP:            "10.198.0.2",
+						},
+					}
+				}
+
+				getAllRemoteSystemsFunc = func(arr *array.PowerStoreArray, _ context.Context) ([]gopowerstore.RemoteSystem, error) {
+					if arr.GlobalID == "Array2" {
+						return []gopowerstore.RemoteSystem{
+							{
+								ID:                  "arrayid1",
+								Name:                "Pstore1",
+								Description:         "",
+								SerialNumber:        "Array1",
+								ManagementAddress:   "10.198.0.1",
+								DataConnectionState: "OK",
+								Capabilities:        []string{"Synchronous_Block_Replication"},
+							},
+						}, nil
+					}
+
+					return []gopowerstore.RemoteSystem{
+						{
+							ID:                  "arrayid2",
+							Name:                "Pstore2",
+							Description:         "",
+							SerialNumber:        "Array2",
+							ManagementAddress:   "10.198.0.2",
+							DataConnectionState: "OK",
+							Capabilities:        []string{"Synchronous_Block_Replication"},
+						},
+					}, nil
+				}
+
+				getIsHostAlreadyRegistered = func(_ *Service, _ context.Context, _ gopowerstore.Client, _ []string) bool {
+					return true
+				}
+
+				getIsRemoteToOtherArray = func(_ *Service, _ context.Context, _, _ *array.PowerStoreArray) bool {
+					return true
+				}
+
+				CreateHostfunc = func(_ gopowerstore.Client, _ context.Context, _ *gopowerstore.HostCreate) (gopowerstore.CreateResponse, error) {
+					defaultResponse := gopowerstore.CreateResponse{
+						ID: "id-1",
+					}
+					return defaultResponse, nil
+				}
+
+				registerHostFunc = func(_ *Service, _ context.Context, _ gopowerstore.Client, _ string, _ []string, _ gopowerstore.HostConnectivityEnum) error {
+					log.Infof("Inside RegisterHost")
+					return nil
+				}
+			},
+			wantErr: false,
+			want:    true,
+		},
+		{
+			name:           "Local connectivity",
+			initiators:     []string{"init1"},
+			nodeLabels:     map[string]string{"topology.kubernetes.io/zone1": "zone1", "topology.kubernetes.io/zone2": "zone2"},
+			arrayAddedList: map[string]bool{},
+			arr: &array.PowerStoreArray{
+				Endpoint:      "https://10.198.0.1/api/rest",
+				GlobalID:      "Array1",
+				Username:      "admin",
+				Password:      "Password123!",
+				Insecure:      true,
+				BlockProtocol: "auto",
+				MetroTopology: "Uniform",
+				Labels:        map[string]string{"topology.kubernetes.io/zone1": "zone1"},
+				IP:            "10.198.0.1",
+			},
+			setupMocks: func() {
+				getArrayfn = func(_ *Service) map[string]*array.PowerStoreArray {
+					log.Infof("InsideGetArray")
+
+					return map[string]*array.PowerStoreArray{
+						"Array1": {
+							Endpoint:      "https://10.198.0.1/api/rest",
+							GlobalID:      "Array1",
+							Username:      "admin",
+							Password:      "Password123!",
+							Insecure:      true,
+							BlockProtocol: "auto",
+							MetroTopology: "Uniform",
+							Labels:        map[string]string{"topology.kubernetes.io/zone1": "zone1"},
+							IP:            "10.198.0.1",
+						},
+						"Array2": {
+							Endpoint:      "https://10.198.0.2/api/rest",
+							GlobalID:      "Array2",
+							Username:      "admin",
+							Password:      "Password123!",
+							Insecure:      true,
+							BlockProtocol: "auto",
+							MetroTopology: "Uniform",
+							Labels:        map[string]string{"topology.kubernetes.io/zone1": "zone1"},
+							IP:            "10.198.0.2",
+						},
+					}
+				}
+
+				getAllRemoteSystemsFunc = func(arr *array.PowerStoreArray, _ context.Context) ([]gopowerstore.RemoteSystem, error) {
+					if arr.GlobalID == "Array2" {
+						return []gopowerstore.RemoteSystem{
+							{
+								ID:                  "arrayid1",
+								Name:                "Pstore1",
+								Description:         "",
+								SerialNumber:        "Array1",
+								ManagementAddress:   "10.198.0.1",
+								DataConnectionState: "OK",
+								Capabilities:        []string{"Synchronous_Block_Replication"},
+							},
+						}, nil
+					}
+
+					return []gopowerstore.RemoteSystem{
+						{
+							ID:                  "arrayid2",
+							Name:                "Pstore2",
+							Description:         "",
+							SerialNumber:        "Array2",
+							ManagementAddress:   "10.198.0.2",
+							DataConnectionState: "OK",
+							Capabilities:        []string{"Synchronous_Block_Replication"},
+						},
+					}, nil
+				}
+
+				getIsHostAlreadyRegistered = func(_ *Service, _ context.Context, _ gopowerstore.Client, _ []string) bool {
+					return false
+				}
+
+				getIsRemoteToOtherArray = func(_ *Service, _ context.Context, _, _ *array.PowerStoreArray) bool {
+
+					return true
+				}
+
+				CreateHostfunc = func(_ gopowerstore.Client, _ context.Context, _ *gopowerstore.HostCreate) (gopowerstore.CreateResponse, error) {
+					defaultResponse := gopowerstore.CreateResponse{
+						ID: "id-1",
+					}
+					return defaultResponse, nil
+				}
+
+				registerHostFunc = func(_ *Service, _ context.Context, _ gopowerstore.Client, _ string, _ []string, _ gopowerstore.HostConnectivityEnum) error {
+					log.Infof("Inside RegisterHost")
+					return nil
+				}
+			},
+			wantErr: false,
+			want:    true,
+		},
+		{
+			name:           "Failed to Register host",
+			initiators:     []string{"init1"},
+			nodeLabels:     map[string]string{"topology.kubernetes.io/zone1": "zone1", "topology.kubernetes.io/zone2": "zone2"},
+			arrayAddedList: map[string]bool{},
+			arr: &array.PowerStoreArray{
+				Endpoint:      "https://10.198.0.1/api/rest",
+				GlobalID:      "Array1",
+				Username:      "admin",
+				Password:      "Password123!",
+				Insecure:      true,
+				BlockProtocol: "auto",
+				MetroTopology: "Uniform",
+				Labels:        map[string]string{"topology.kubernetes.io/zone1": "zone1"},
+				IP:            "10.198.0.1",
+			},
+			setupMocks: func() {
+				getArrayfn = func(_ *Service) map[string]*array.PowerStoreArray {
+					log.Infof("InsideGetArray")
+
+					return map[string]*array.PowerStoreArray{
+						"Array1": {
+							Endpoint:      "https://10.198.0.1/api/rest",
+							GlobalID:      "Array1",
+							Username:      "admin",
+							Password:      "Password123!",
+							Insecure:      true,
+							BlockProtocol: "auto",
+							MetroTopology: "Uniform",
+							Labels:        map[string]string{"topology.kubernetes.io/zone1": "zone1"},
+							IP:            "10.198.0.1",
+						},
+						"Array2": {
+							Endpoint:      "https://10.198.0.2/api/rest",
+							GlobalID:      "Array2",
+							Username:      "admin",
+							Password:      "Password123!",
+							Insecure:      true,
+							BlockProtocol: "auto",
+							MetroTopology: "Uniform",
+							Labels:        map[string]string{"topology.kubernetes.io/zone2": "zone2"},
+							IP:            "10.198.0.2",
+						},
+					}
+				}
+
+				getAllRemoteSystemsFunc = func(arr *array.PowerStoreArray, _ context.Context) ([]gopowerstore.RemoteSystem, error) {
+					if arr.GlobalID == "Array2" {
+						return []gopowerstore.RemoteSystem{
+							{
+								ID:                  "arrayid1",
+								Name:                "Pstore1",
+								Description:         "",
+								SerialNumber:        "Array1",
+								ManagementAddress:   "10.198.0.1",
+								DataConnectionState: "OK",
+								Capabilities:        []string{"Synchronous_Block_Replication"},
+							},
+						}, nil
+					}
+
+					return []gopowerstore.RemoteSystem{
+						{
+							ID:                  "arrayid2",
+							Name:                "Pstore2",
+							Description:         "",
+							SerialNumber:        "Array2",
+							ManagementAddress:   "10.198.0.2",
+							DataConnectionState: "OK",
+							Capabilities:        []string{"Synchronous_Block_Replication"},
+						},
+					}, nil
+				}
+
+				getIsHostAlreadyRegistered = func(_ *Service, _ context.Context, _ gopowerstore.Client, _ []string) bool {
+					return false
+				}
+
+				getIsRemoteToOtherArray = func(_ *Service, _ context.Context, _, _ *array.PowerStoreArray) bool {
+
+					return true
+				}
+
+				CreateHostfunc = func(_ gopowerstore.Client, _ context.Context, _ *gopowerstore.HostCreate) (gopowerstore.CreateResponse, error) {
+					defaultResponse := gopowerstore.CreateResponse{
+						ID: "id-1",
+					}
+					return defaultResponse, nil
+				}
+
+				registerHostFunc = func(_ *Service, _ context.Context, _ gopowerstore.Client, _ string, _ []string, _ gopowerstore.HostConnectivityEnum) error {
+					log.Infof("Inside RegisterHost")
+					return fmt.Errorf("failed to registerHost")
+				}
+			},
+			wantErr: true,
+			want:    false,
+		},
+		{
+			name:           "Fail to get remote system",
+			initiators:     []string{"init1"},
+			nodeLabels:     map[string]string{"topology.kubernetes.io/zone1": "zone1", "topology.kubernetes.io/zone2": "zone2"},
+			arrayAddedList: map[string]bool{},
+			arr: &array.PowerStoreArray{
+				Endpoint:      "https://10.198.0.1/api/rest",
+				GlobalID:      "Array1",
+				Username:      "admin",
+				Password:      "Password123!",
+				Insecure:      true,
+				BlockProtocol: "auto",
+				MetroTopology: "Uniform",
+				Labels:        map[string]string{"topology.kubernetes.io/zone1": "zone1"},
+				IP:            "10.198.0.1",
+			},
+			setupMocks: func() {
+				getArrayfn = func(_ *Service) map[string]*array.PowerStoreArray {
+					log.Infof("InsideGetArray")
+
+					return map[string]*array.PowerStoreArray{
+						"Array1": {
+							Endpoint:      "https://10.198.0.1/api/rest",
+							GlobalID:      "Array1",
+							Username:      "admin",
+							Password:      "Password123!",
+							Insecure:      true,
+							BlockProtocol: "auto",
+							MetroTopology: "Uniform",
+							Labels:        map[string]string{"topology.kubernetes.io/zone1": "zone1"},
+							IP:            "10.198.0.1",
+						},
+						"Array2": {
+							Endpoint:      "https://10.198.0.2/api/rest",
+							GlobalID:      "Array2",
+							Username:      "admin",
+							Password:      "Password123!",
+							Insecure:      true,
+							BlockProtocol: "auto",
+							MetroTopology: "Uniform",
+							Labels:        map[string]string{"topology.kubernetes.io/zone2": "zone2"},
+							IP:            "10.198.0.2",
+						},
+					}
+				}
+
+				getAllRemoteSystemsFunc = func(arr *array.PowerStoreArray, _ context.Context) ([]gopowerstore.RemoteSystem, error) {
+					log.Infof("Inside Remote Systems")
+					return nil, fmt.Errorf("failed to get remoteSystem")
+				}
+
+				getIsHostAlreadyRegistered = func(_ *Service, _ context.Context, _ gopowerstore.Client, _ []string) bool {
+					return false
+				}
+
+				getIsRemoteToOtherArray = func(_ *Service, _ context.Context, _, _ *array.PowerStoreArray) bool {
+
+					return true
+				}
+
+				CreateHostfunc = func(_ gopowerstore.Client, _ context.Context, _ *gopowerstore.HostCreate) (gopowerstore.CreateResponse, error) {
+					defaultResponse := gopowerstore.CreateResponse{
+						ID: "id-1",
+					}
+					return defaultResponse, nil
+				}
+
+				registerHostFunc = func(_ *Service, _ context.Context, _ gopowerstore.Client, _ string, _ []string, _ gopowerstore.HostConnectivityEnum) error {
+					log.Infof("Inside RegisterHost")
+					return fmt.Errorf("failed to registerHost")
+				}
+			},
+			wantErr: true,
+			want:    false,
+		},
+		// Add more test cases here
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockService := new(MockService)
+			tt.setupMocks()
+
+			log.Infof("Test")
+			got, err := mockService.handleNoLabelMatchRegistration(context.Background(), tt.arr, tt.initiators, tt.nodeLabels, tt.arrayAddedList)
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Service.handleLabelMatchRegistration() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			if got == tt.want {
+				log.Info("Success")
+			}
+		})
+	}
+}
+
+func TestHandleLabelMatchRegistration(t *testing.T) {
+
+	originalGetNodeLabelsfn := getNodeLabelsfn
+	originalGetArrayfn := getArrayfn
+	originalGetIsHostAlreadyRegistered := getIsHostAlreadyRegistered
+	originalGetAllRemoteSystemsFunc := getAllRemoteSystemsFunc
+	originalGetIsRemoteToOtherArray := getIsRemoteToOtherArray
+	originalCreateHostfunc := CreateHostfunc
+	orginalSetCustomHTTPHeadersFunc := SetCustomHTTPHeadersFunc
+	originalRegisterHostFunc := registerHostFunc
+
+	defer func() {
+		getNodeLabelsfn = originalGetNodeLabelsfn
+		getArrayfn = originalGetArrayfn
+		getIsHostAlreadyRegistered = originalGetIsHostAlreadyRegistered
+		getAllRemoteSystemsFunc = originalGetAllRemoteSystemsFunc
+		getIsRemoteToOtherArray = originalGetIsRemoteToOtherArray
+		CreateHostfunc = originalCreateHostfunc
+		SetCustomHTTPHeadersFunc = orginalSetCustomHTTPHeadersFunc
+		registerHostFunc = originalRegisterHostFunc
+	}()
+
+	tests := []struct {
+		s              *MockService
+		name           string
+		initiators     []string
+		nodeLabels     map[string]string
+		arrayAddedList map[string]bool
+		arr            *array.PowerStoreArray
+		setupMocks     func()
+		wantErr        bool
+		want           bool
+	}{
+		{
+			name:           "No array labels match node labels",
+			initiators:     []string{"init1"},
+			nodeLabels:     map[string]string{"topology.kubernetes.io/zone1": "zone1"},
+			arrayAddedList: map[string]bool{},
+			arr: &array.PowerStoreArray{
+				Endpoint:      "https://10.198.0.1/api/rest",
+				GlobalID:      "Array1",
+				Username:      "admin",
+				Password:      "Password123!",
+				Insecure:      true,
+				BlockProtocol: "auto",
+				MetroTopology: "Uniform",
+				Labels:        map[string]string{"topology.kubernetes.io/zone2": "zone2"},
+				IP:            "10.198.0.1",
+			},
+			setupMocks: func() {
+				getArrayfn = func(_ *Service) map[string]*array.PowerStoreArray {
+					log.Infof("InsideGetArray")
+
+					return map[string]*array.PowerStoreArray{
+						"Array1": {
+							Endpoint:      "https://10.198.0.1/api/rest",
+							GlobalID:      "Array1",
+							Username:      "admin",
+							Password:      "Password123!",
+							Insecure:      true,
+							BlockProtocol: "auto",
+							MetroTopology: "Uniform",
+							Labels:        map[string]string{"topology.kubernetes.io/zone1": "zone2"},
+							IP:            "10.198.0.1",
+						},
+						"Array2": {
+							Endpoint:      "https://10.198.0.2/api/rest",
+							GlobalID:      "Array2",
+							Username:      "admin",
+							Password:      "Password123!",
+							Insecure:      true,
+							BlockProtocol: "auto",
+							MetroTopology: "Uniform",
+							Labels:        map[string]string{"topology.kubernetes.io/zone1": "zone2"},
+							IP:            "10.198.0.2",
+						},
+					}
+				}
+
+				getIsHostAlreadyRegistered = func(_ *Service, _ context.Context, _ gopowerstore.Client, _ []string) bool {
+					return false
+				}
+
+				getIsRemoteToOtherArray = func(_ *Service, _ context.Context, _, _ *array.PowerStoreArray) bool {
+
+					return true
+				}
+
+				CreateHostfunc = func(_ gopowerstore.Client, _ context.Context, _ *gopowerstore.HostCreate) (gopowerstore.CreateResponse, error) {
+					defaultResponse := gopowerstore.CreateResponse{
+						ID: "id-1",
+					}
+					return defaultResponse, nil
+				}
+			},
+			wantErr: false,
+			want:    false,
+		},
+		{
+			name:           "No array labels match node labels -2",
+			initiators:     []string{"init1"},
+			nodeLabels:     map[string]string{"topology.kubernetes.io/zone1": "zone1", "topology.kubernetes.io/zone2": "zone2"},
+			arrayAddedList: map[string]bool{},
+			arr: &array.PowerStoreArray{
+				Endpoint:      "https://10.198.0.1/api/rest",
+				GlobalID:      "Array1",
+				Username:      "admin",
+				Password:      "Password123!",
+				Insecure:      true,
+				BlockProtocol: "auto",
+				MetroTopology: "Uniform",
+				Labels:        map[string]string{"topology.kubernetes.io/zone1": "zone3"},
+				IP:            "10.198.0.1",
+			},
+			setupMocks: func() {
+				getArrayfn = func(_ *Service) map[string]*array.PowerStoreArray {
+					log.Infof("InsideGetArray")
+
+					return map[string]*array.PowerStoreArray{
+						"Array1": {
+							Endpoint:      "https://10.198.0.1/api/rest",
+							GlobalID:      "Array1",
+							Username:      "admin",
+							Password:      "Password123!",
+							Insecure:      true,
+							BlockProtocol: "auto",
+							MetroTopology: "Uniform",
+							Labels:        map[string]string{"topology.kubernetes.io/zone1": "zone1"},
+							IP:            "10.198.0.1",
+						},
+						"Array2": {
+							Endpoint:      "https://10.198.0.2/api/rest",
+							GlobalID:      "Array2",
+							Username:      "admin",
+							Password:      "Password123!",
+							Insecure:      true,
+							BlockProtocol: "auto",
+							MetroTopology: "Uniform",
+							Labels:        map[string]string{"topology.kubernetes.io/zone2": "zone2"},
+							IP:            "10.198.0.2",
+						},
+					}
+				}
+
+				getAllRemoteSystemsFunc = func(arr *array.PowerStoreArray, _ context.Context) ([]gopowerstore.RemoteSystem, error) {
+					if arr.GlobalID == "Array2" {
+						return []gopowerstore.RemoteSystem{
+							{
+								ID:                  "arrayid1",
+								Name:                "Pstore1",
+								Description:         "",
+								SerialNumber:        "Array1",
+								ManagementAddress:   "10.198.0.1",
+								DataConnectionState: "OK",
+								Capabilities:        []string{"Synchronous_Block_Replication"},
+							},
+						}, nil
+					}
+
+					return []gopowerstore.RemoteSystem{
+						{
+							ID:                  "arrayid2",
+							Name:                "Pstore2",
+							Description:         "",
+							SerialNumber:        "Array2",
+							ManagementAddress:   "10.198.0.2",
+							DataConnectionState: "OK",
+							Capabilities:        []string{"Synchronous_Block_Replication"},
+						},
+					}, nil
+				}
+
+				getIsHostAlreadyRegistered = func(_ *Service, _ context.Context, _ gopowerstore.Client, _ []string) bool {
+					return false
+				}
+
+				getIsRemoteToOtherArray = func(_ *Service, _ context.Context, _, _ *array.PowerStoreArray) bool {
+
+					return true
+				}
+
+				CreateHostfunc = func(_ gopowerstore.Client, _ context.Context, _ *gopowerstore.HostCreate) (gopowerstore.CreateResponse, error) {
+					defaultResponse := gopowerstore.CreateResponse{
+						ID: "id-1",
+					}
+					return defaultResponse, nil
+				}
+
+				registerHostFunc = func(_ *Service, _ context.Context, _ gopowerstore.Client, _ string, _ []string, _ gopowerstore.HostConnectivityEnum) error {
+					log.Infof("Inside RegisterHost")
+					return nil
+				}
+			},
+			wantErr: false,
+			want:    false,
+		},
+		{
+			name:           "No array labels match node labels - 3",
+			initiators:     []string{"init1"},
+			nodeLabels:     map[string]string{"topology.kubernetes.io/zone1": "zone1", "topology.kubernetes.io/zone2": "zone2"},
+			arrayAddedList: map[string]bool{},
+			arr: &array.PowerStoreArray{
+				Endpoint:      "https://10.198.0.1/api/rest",
+				GlobalID:      "Array1",
+				Username:      "admin",
+				Password:      "Password123!",
+				Insecure:      true,
+				BlockProtocol: "auto",
+				MetroTopology: "Uniform",
+				Labels:        map[string]string{"topology.kubernetes.io/zone1": "zone3"},
+				IP:            "10.198.0.1",
+			},
+			setupMocks: func() {
+				getArrayfn = func(_ *Service) map[string]*array.PowerStoreArray {
+					log.Infof("InsideGetArray")
+
+					return map[string]*array.PowerStoreArray{
+						"Array1": {
+							Endpoint:      "https://10.198.0.1/api/rest",
+							GlobalID:      "Array1",
+							Username:      "admin",
+							Password:      "Password123!",
+							Insecure:      true,
+							BlockProtocol: "auto",
+							MetroTopology: "Uniform",
+							Labels:        map[string]string{"topology.kubernetes.io/zone1": "zone1"},
+							IP:            "10.198.0.1",
+						},
+						"Array2": {
+							Endpoint:      "https://10.198.0.2/api/rest",
+							GlobalID:      "Array2",
+							Username:      "admin",
+							Password:      "Password123!",
+							Insecure:      true,
+							BlockProtocol: "auto",
+							MetroTopology: "Uniform",
+							Labels:        map[string]string{"topology.kubernetes.io/zone2": "zone2"},
+							IP:            "10.198.0.2",
+						},
+					}
+				}
+
+				getAllRemoteSystemsFunc = func(arr *array.PowerStoreArray, _ context.Context) ([]gopowerstore.RemoteSystem, error) {
+					if arr.GlobalID == "Array2" {
+						return []gopowerstore.RemoteSystem{
+							{
+								ID:                  "arrayid1",
+								Name:                "Pstore1",
+								Description:         "",
+								SerialNumber:        "Array1",
+								ManagementAddress:   "10.198.0.1",
+								DataConnectionState: "OK",
+								Capabilities:        []string{"Synchronous_Block_Replication"},
+							},
+						}, nil
+					}
+
+					return []gopowerstore.RemoteSystem{
+						{
+							ID:                  "arrayid2",
+							Name:                "Pstore2",
+							Description:         "",
+							SerialNumber:        "Array2",
+							ManagementAddress:   "10.198.0.2",
+							DataConnectionState: "OK",
+							Capabilities:        []string{"Synchronous_Block_Replication"},
+						},
+					}, nil
+				}
+
+				getIsHostAlreadyRegistered = func(_ *Service, _ context.Context, _ gopowerstore.Client, _ []string) bool {
+					return false
+				}
+
+				getIsRemoteToOtherArray = func(_ *Service, _ context.Context, _, _ *array.PowerStoreArray) bool {
+
+					return true
+				}
+
+				CreateHostfunc = func(_ gopowerstore.Client, _ context.Context, _ *gopowerstore.HostCreate) (gopowerstore.CreateResponse, error) {
+					defaultResponse := gopowerstore.CreateResponse{
+						ID: "id-1",
+					}
+					return defaultResponse, nil
+				}
+
+				registerHostFunc = func(_ *Service, _ context.Context, _ gopowerstore.Client, _ string, _ []string, _ gopowerstore.HostConnectivityEnum) error {
+					log.Infof("Inside RegisterHost")
+					return fmt.Errorf("failed to registerHost")
+				}
+			},
+			wantErr: true,
+			want:    true,
+		},
+		{
+			name:           "Host Already Registered",
+			initiators:     []string{"init1"},
+			nodeLabels:     map[string]string{"topology.kubernetes.io/zone1": "zone1"},
+			arrayAddedList: map[string]bool{},
+			arr: &array.PowerStoreArray{
+				Endpoint:      "https://10.198.0.1/api/rest",
+				GlobalID:      "Array1",
+				Username:      "admin",
+				Password:      "Password123!",
+				Insecure:      true,
+				BlockProtocol: "auto",
+				MetroTopology: "Uniform",
+				Labels:        map[string]string{"topology.kubernetes.io/zone1": "zone1"},
+				IP:            "10.198.0.1",
+			},
+			setupMocks: func() {
+				getArrayfn = func(_ *Service) map[string]*array.PowerStoreArray {
+					log.Infof("InsideGetArray")
+
+					return map[string]*array.PowerStoreArray{
+						"Array1": {
+							Endpoint:      "https://10.198.0.1/api/rest",
+							GlobalID:      "Array1",
+							Username:      "admin",
+							Password:      "Password123!",
+							Insecure:      true,
+							BlockProtocol: "auto",
+							MetroTopology: "Uniform",
+							Labels:        map[string]string{"topology.kubernetes.io/zone1": "zone1"},
+							IP:            "10.198.0.1",
+						},
+						"Array2": {
+							Endpoint:      "https://10.198.0.2/api/rest",
+							GlobalID:      "Array2",
+							Username:      "admin",
+							Password:      "Password123!",
+							Insecure:      true,
+							BlockProtocol: "auto",
+							MetroTopology: "Uniform",
+							Labels:        map[string]string{"topology.kubernetes.io/zone1": "zone1"},
+							IP:            "10.198.0.2",
+						},
+					}
+				}
+
+				getAllRemoteSystemsFunc = func(arr *array.PowerStoreArray, _ context.Context) ([]gopowerstore.RemoteSystem, error) {
+					if arr.GlobalID == "Array2" {
+						return []gopowerstore.RemoteSystem{
+							{
+								ID:                  "arrayid1",
+								Name:                "Pstore1",
+								Description:         "",
+								SerialNumber:        "Array1",
+								ManagementAddress:   "10.198.0.1",
+								DataConnectionState: "OK",
+								Capabilities:        []string{"Synchronous_Block_Replication"},
+							},
+						}, nil
+					}
+
+					return []gopowerstore.RemoteSystem{
+						{
+							ID:                  "arrayid2",
+							Name:                "Pstore2",
+							Description:         "",
+							SerialNumber:        "Array2",
+							ManagementAddress:   "10.198.0.2",
+							DataConnectionState: "OK",
+							Capabilities:        []string{"Synchronous_Block_Replication"},
+						},
+					}, nil
+				}
+
+				getIsHostAlreadyRegistered = func(_ *Service, _ context.Context, _ gopowerstore.Client, _ []string) bool {
+					return true
+				}
+
+				getIsRemoteToOtherArray = func(_ *Service, _ context.Context, _, _ *array.PowerStoreArray) bool {
+
+					return true
+				}
+
+				CreateHostfunc = func(_ gopowerstore.Client, _ context.Context, _ *gopowerstore.HostCreate) (gopowerstore.CreateResponse, error) {
+					defaultResponse := gopowerstore.CreateResponse{
+						ID: "id-1",
+					}
+					return defaultResponse, nil
+				}
+
+				registerHostFunc = func(_ *Service, _ context.Context, _ gopowerstore.Client, _ string, _ []string, _ gopowerstore.HostConnectivityEnum) error {
+					log.Infof("Inside RegisterHost")
+					return fmt.Errorf("failed to registerHost")
+				}
+			},
+			wantErr: false,
+			want:    false,
+		},
+		// Add more test cases here
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockService := new(MockService)
+			tt.setupMocks()
+
+			log.Infof("Test")
+			got, err := mockService.handleLabelMatchRegistration(context.Background(), tt.arr, tt.initiators, tt.nodeLabels, tt.arrayAddedList)
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Service.handleLabelMatchRegistration() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			if got == tt.want {
+				log.Infof("Test passed")
+			}
+		})
+	}
+}
+
+// Unit test for createHost
+func TestService_createHost(t *testing.T) {
+	originalGetNodeLabelsfn := getNodeLabelsfn
+	originalGetArrayfn := getArrayfn
+	originalGetIsHostAlreadyRegistered := getIsHostAlreadyRegistered
+	originalGetAllRemoteSystemsFunc := getAllRemoteSystemsFunc
+	originalGetIsRemoteToOtherArray := getIsRemoteToOtherArray
+	originalCreateHostfunc := CreateHostfunc
+	orginalSetCustomHTTPHeadersFunc := SetCustomHTTPHeadersFunc
+	originalRegisterHostFunc := registerHostFunc
+
+	defer func() {
+		getNodeLabelsfn = originalGetNodeLabelsfn
+		getArrayfn = originalGetArrayfn
+		getIsHostAlreadyRegistered = originalGetIsHostAlreadyRegistered
+		getAllRemoteSystemsFunc = originalGetAllRemoteSystemsFunc
+		getIsRemoteToOtherArray = originalGetIsRemoteToOtherArray
+		CreateHostfunc = originalCreateHostfunc
+		SetCustomHTTPHeadersFunc = orginalSetCustomHTTPHeadersFunc
+		registerHostFunc = originalRegisterHostFunc
 	}()
 
 	getIsHostAlreadyRegistered = func(_ *Service, _ context.Context, _ gopowerstore.Client, _ []string) bool {
@@ -6055,6 +7161,94 @@ func TestService_createHost(t *testing.T) {
 			},
 			want:    []string{"Array1", "Array2"},
 			wantErr: false,
+		},
+		{
+			name: "Host Registration Failure - Register Host fail",
+			s: &MockService{
+				Service: &Service{},
+			},
+			args: args{
+				ctx:        context.TODO(),
+				initiators: []string{"initiator1", "initiator2"},
+			},
+			setup: func() {
+				log.Infof("Inside Setup - Failure")
+				getNodeLabelsfn = func(_ *Service, _ string) (map[string]string, error) {
+					log.Infof("InsidegetNode")
+					return map[string]string{"topology.kubernetes.io/zone1": "zone1"}, nil
+				}
+
+				getArrayfn = func(_ *Service) map[string]*array.PowerStoreArray {
+					log.Infof("InsideGetArray")
+
+					return map[string]*array.PowerStoreArray{
+						"Array1": {
+							Endpoint:      "https://10.198.0.1/api/rest",
+							GlobalID:      "Array1",
+							Username:      "admin",
+							Password:      "Password123!",
+							Insecure:      true,
+							BlockProtocol: "auto",
+							MetroTopology: "Uniform",
+							Labels:        map[string]string{"topology.kubernetes.io/zone1": "zone2"},
+							IP:            "10.198.0.1",
+						},
+						"Array2": {
+							Endpoint:      "https://10.198.0.2/api/rest",
+							GlobalID:      "Array2",
+							Username:      "admin",
+							Password:      "Password123!",
+							Insecure:      true,
+							BlockProtocol: "auto",
+							MetroTopology: "Uniform",
+							Labels:        map[string]string{"topology.kubernetes.io/zone1": "zone1"},
+							IP:            "10.198.0.2",
+						},
+					}
+				}
+
+				getAllRemoteSystemsFunc = func(arr *array.PowerStoreArray, _ context.Context) ([]gopowerstore.RemoteSystem, error) {
+					if arr.GlobalID == "Array2" {
+						return []gopowerstore.RemoteSystem{
+							{
+								ID:                  "arrayid1",
+								Name:                "Pstore1",
+								Description:         "",
+								SerialNumber:        "Array1",
+								ManagementAddress:   "10.198.0.1",
+								DataConnectionState: "OK",
+								Capabilities:        []string{"Synchronous_Block_Replication"},
+							},
+						}, nil
+					}
+					return []gopowerstore.RemoteSystem{
+						{
+							ID:                  "arrayid2",
+							Name:                "Pstore2",
+							Description:         "",
+							SerialNumber:        "Array2",
+							ManagementAddress:   "10.198.0.2",
+							DataConnectionState: "OK",
+							Capabilities:        []string{"Synchronous_Block_Replication"},
+						},
+					}, nil
+				}
+
+				getIsHostAlreadyRegistered = func(_ *Service, _ context.Context, _ gopowerstore.Client, _ []string) bool {
+					return false
+				}
+
+				CreateHostfunc = func(_ gopowerstore.Client, _ context.Context, _ *gopowerstore.HostCreate) (gopowerstore.CreateResponse, error) {
+					return gopowerstore.CreateResponse{}, fmt.Errorf("failed to create host")
+				}
+				
+				registerHostFunc = func(_ *Service, _ context.Context, _ gopowerstore.Client, _ string, _ []string, _ gopowerstore.HostConnectivityEnum) error {
+					log.Infof("Inside RegisterHost")
+					return fmt.Errorf("failed to registerHost")
+				}
+			},
+			want:    []string{},
+			wantErr: true,
 		},
 		// Add more test cases as needed
 	}

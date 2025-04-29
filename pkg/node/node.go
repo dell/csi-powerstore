@@ -1584,9 +1584,11 @@ func (s *Service) setupHost(initiators []string, client gopowerstore.Client, arr
 			}
 		}
 
-		err := s.modifyHostName(context.Background(), client, s.nodeID, existingHost.ID)
-		if err != nil {
-			return fmt.Errorf("failed to update host name: %v", err)
+		if s.nodeID != existingHost.ID {
+			err := s.modifyHostName(context.Background(), client, s.nodeID, existingHost.ID)
+			if err != nil {
+			   return fmt.Errorf("failed to update host name: %v", err)
+			}
 		}
 		s.reusedHost = true
 	}
@@ -1675,6 +1677,10 @@ var (
 	SetCustomHTTPHeadersFunc = func(client gopowerstore.Client, headers http.Header) {
 		client.SetCustomHTTPHeaders(headers)
 	}
+
+	registerHostFunc = func(s *Service, ctx context.Context, client gopowerstore.Client, arrayID string, initiators []string, connType gopowerstore.HostConnectivityEnum) error {
+		return s.registerHost(ctx, client, arrayID, initiators, connType)
+	}
 )
 
 // register host
@@ -1751,9 +1757,7 @@ func (s *Service) createHost(
 				conn = gopowerstore.HostConnectivityEnumMetroOptimizeBoth
 			}
 			log.Infof("[createHost] Registering %s as %s", arr.GlobalID, conn)
-			if err := s.registerHost(
-				ctx, arr.GetClient(), arr.GlobalID, initiators, conn,
-			); err != nil {
+			if err := registerHostFunc(s, ctx, arr.GetClient(), arr.GlobalID, initiators, conn); err != nil {
 				return "", fmt.Errorf("failed on %s: %v", arr.GlobalID, err)
 			}
 			if primaryArrayID == "" {
@@ -1882,7 +1886,7 @@ func (s *Service) handleLabelMatchRegistration(
 			} else {
 				log.Infof("[handleLabelMatch] Partial match → MetroOptimizeRemote on %s", remoteArr.GlobalID)
 			}
-			if err := s.registerHost(ctx, clientB, remoteArr.GlobalID, initiators, remoteConn); err != nil {
+			if err := registerHostFunc(s, ctx, clientB, remoteArr.GlobalID, initiators, remoteConn); err != nil {
 				return false, err
 			}
 			arrayAddedList[remoteArr.GlobalID] = true
@@ -1980,7 +1984,7 @@ func (s *Service) handleNoLabelMatchRegistration(
 			} else {
 				log.Infof("[handleNoLabelMatch] Partial match → MetroOptimizeRemote on %s", remoteArr.GlobalID)
 			}
-			if err := s.registerHost(ctx, clientB, remoteArr.GlobalID, initiators, remoteConn); err != nil {
+			if err := registerHostFunc(s, ctx, clientB, remoteArr.GlobalID, initiators, remoteConn); err != nil {
 				return false, err
 			}
 			arrayAddedList[remoteArr.GlobalID] = true
