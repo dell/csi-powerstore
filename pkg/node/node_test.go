@@ -5707,7 +5707,7 @@ func TestService_createHost(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "Successful Host Registration with Co-Local and Co-remote", //need clarity on this table
+			name: "Successful Host Registration with Co-Local and Co-remote",
 			s: &MockService{
 				Service: &Service{},
 			},
@@ -6022,8 +6022,8 @@ func TestService_createHost(t *testing.T) {
 								Capabilities:        []string{"Synchronous_Block_Replication"},
 							},
 						}, nil
-					} 
-					
+					}
+
 					return []gopowerstore.RemoteSystem{
 						{
 							ID:                  "arrayid2",
@@ -6035,7 +6035,7 @@ func TestService_createHost(t *testing.T) {
 							Capabilities:        []string{"Synchronous_Block_Replication"},
 						},
 					}, nil
-					
+
 				}
 
 				getIsHostAlreadyRegistered = func(_ *Service, _ context.Context, _ gopowerstore.Client, _ []string) bool {
