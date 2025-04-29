@@ -7241,7 +7241,7 @@ func TestService_createHost(t *testing.T) {
 				CreateHostfunc = func(_ gopowerstore.Client, _ context.Context, _ *gopowerstore.HostCreate) (gopowerstore.CreateResponse, error) {
 					return gopowerstore.CreateResponse{}, fmt.Errorf("failed to create host")
 				}
-				
+
 				registerHostFunc = func(_ *Service, _ context.Context, _ gopowerstore.Client, _ string, _ []string, _ gopowerstore.HostConnectivityEnum) error {
 					log.Infof("Inside RegisterHost")
 					return fmt.Errorf("failed to registerHost")
@@ -7281,4 +7281,96 @@ func TestService_createHost(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCheckIQNS(t *testing.T) {
+	tests := []struct {
+		name       string
+		IQNs       []string
+		host       gopowerstore.Host
+		wantAdd    []string
+		wantDelete []string
+	}{
+		{
+			name: "IQNs to add and delete",
+			IQNs: []string{"iqn1", "iqn2", "iqn3"},
+			host: gopowerstore.Host{
+				Initiators: []gopowerstore.InitiatorInstance{
+					{PortName: "iqn2"},
+					{PortName: "iqn4"},
+				},
+			},
+			wantAdd:    []string{"iqn1", "iqn3"},
+			wantDelete: []string{"iqn4"},
+		},
+		{
+			name: "No IQNs to add or delete",
+			IQNs: []string{"iqn1", "iqn2"},
+			host: gopowerstore.Host{
+				Initiators: []gopowerstore.InitiatorInstance{
+					{PortName: "iqn1"},
+					{PortName: "iqn2"},
+				},
+			},
+			wantAdd:    []string{},
+			wantDelete: []string{},
+		},
+		{
+			name: "All IQNs to add",
+			IQNs: []string{"iqn1", "iqn2"},
+			host: gopowerstore.Host{
+				Initiators: []gopowerstore.InitiatorInstance{},
+			},
+			wantAdd:    []string{"iqn1", "iqn2"},
+			wantDelete: []string{},
+		},
+		{
+			name: "All IQNs to delete",
+			IQNs: []string{},
+			host: gopowerstore.Host{
+				Initiators: []gopowerstore.InitiatorInstance{
+					{PortName: "iqn1"},
+					{PortName: "iqn2"},
+				},
+			},
+			wantAdd:    []string{},
+			wantDelete: []string{"iqn1", "iqn2"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			log.Infof("Test: %s", tt.name)
+			gotAdd, gotDelete := checkIQNS(tt.IQNs, tt.host)
+
+			if !elementsMatch(gotAdd, tt.wantAdd) {
+				t.Errorf("checkIQNS() = gotAdd %v, wantAdd %v", gotAdd, tt.wantAdd)
+			}
+
+			if !elementsMatch(gotDelete, tt.wantDelete) {
+				t.Errorf("checkIQNS() = gotDelete %v, wantDelete %v", gotDelete, tt.wantDelete)
+			}
+
+			if elementsMatch(gotAdd, tt.wantAdd) && elementsMatch(gotDelete, tt.wantDelete) {
+				log.Info("Success")
+			}
+		})
+	}
+}
+
+func elementsMatch(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	m := make(map[string]int)
+	for _, v := range a {
+		m[v]++
+	}
+	for _, v := range b {
+		if m[v] == 0 {
+			return false
+		}
+		m[v]--
+	}
+	return true
 }

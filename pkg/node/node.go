@@ -1587,7 +1587,7 @@ func (s *Service) setupHost(initiators []string, client gopowerstore.Client, arr
 		if s.nodeID != existingHost.ID {
 			err := s.modifyHostName(context.Background(), client, s.nodeID, existingHost.ID)
 			if err != nil {
-			   return fmt.Errorf("failed to update host name: %v", err)
+				return fmt.Errorf("failed to update host name: %v", err)
 			}
 		}
 		s.reusedHost = true
