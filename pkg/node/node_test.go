@@ -5682,7 +5682,6 @@ func TestHandleNoLabelMatchRegistration(t *testing.T) {
 				}
 
 				getIsRemoteToOtherArray = func(_ *Service, _ context.Context, _, _ *array.PowerStoreArray) bool {
-
 					return true
 				}
 
@@ -5757,7 +5756,6 @@ func TestHandleNoLabelMatchRegistration(t *testing.T) {
 				}
 
 				getIsRemoteToOtherArray = func(_ *Service, _ context.Context, _, _ *array.PowerStoreArray) bool {
-
 					return true
 				}
 
@@ -5883,7 +5881,6 @@ func TestHandleLabelMatchRegistration(t *testing.T) {
 				}
 
 				getIsRemoteToOtherArray = func(_ *Service, _ context.Context, _, _ *array.PowerStoreArray) bool {
-
 					return true
 				}
 
@@ -5976,7 +5973,6 @@ func TestHandleLabelMatchRegistration(t *testing.T) {
 				}
 
 				getIsRemoteToOtherArray = func(_ *Service, _ context.Context, _, _ *array.PowerStoreArray) bool {
-
 					return true
 				}
 
@@ -6074,7 +6070,6 @@ func TestHandleLabelMatchRegistration(t *testing.T) {
 				}
 
 				getIsRemoteToOtherArray = func(_ *Service, _ context.Context, _, _ *array.PowerStoreArray) bool {
-
 					return true
 				}
 
@@ -6172,7 +6167,6 @@ func TestHandleLabelMatchRegistration(t *testing.T) {
 				}
 
 				getIsRemoteToOtherArray = func(_ *Service, _ context.Context, _, _ *array.PowerStoreArray) bool {
-
 					return true
 				}
 
