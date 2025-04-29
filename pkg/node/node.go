@@ -1534,6 +1534,7 @@ func (s *Service) readFCPortsFilterFile() ([]string, error) {
 
 func (s *Service) setupHost(initiators []string, client gopowerstore.Client, arrayIP, arrayID string) error {
 	log.Infof("setting up host on %s", arrayIP)
+	defer log.Infof("finished setting up host on %s", arrayIP)
 
 	if s.nodeID == "" {
 		return fmt.Errorf("nodeID not set")
@@ -1548,7 +1549,7 @@ func (s *Service) setupHost(initiators []string, client gopowerstore.Client, arr
 
 	hosts, err := client.GetHosts(context.Background())
 	if err != nil {
-		return err
+		return fmt.Errorf("failed getting hosts on %s", arrayIP)
 	}
 
 	for i := range hosts {
@@ -1646,41 +1647,37 @@ func (s *Service) getNodeLabels(nodeName string) (map[string]string, error) {
 	return k8sutils.GetNodeLabels(context.Background(), s.opts.KubeConfigPath, nodeName)
 }
 
-var(
+var (
 	getNodeLabelsfn = func(s *Service, kubeNodeName string) (map[string]string, error) {
 		return s.getNodeLabels(kubeNodeName)
 	}
 
-	getArrayfn = func(s *Service) map[string]*array.PowerStoreArray{
+	getArrayfn = func(s *Service) map[string]*array.PowerStoreArray {
 		return s.Arrays()
 	}
 
-	getIsHostAlreadyRegistered = func(s *Service, ctx context.Context, client gopowerstore.Client, initiators []string) bool{
+	getIsHostAlreadyRegistered = func(s *Service, ctx context.Context, client gopowerstore.Client, initiators []string) bool {
 		return s.isHostAlreadyRegistered(ctx, client, initiators)
 	}
 
-	getAllRemoteSystemsFunc = func(arr *array.PowerStoreArray, ctx context.Context)  ([]gopowerstore.RemoteSystem, error) {
-
+	getAllRemoteSystemsFunc = func(arr *array.PowerStoreArray, ctx context.Context) ([]gopowerstore.RemoteSystem, error) {
 		return arr.GetClient().GetAllRemoteSystems(ctx)
 	}
 
 	getIsRemoteToOtherArray = func(s *Service, ctx context.Context, arr, remoteArr *array.PowerStoreArray) bool {
-
 		return s.isRemoteToOtherArray(ctx, arr, remoteArr)
 	}
 
-	CreateHostfunc = func(client gopowerstore.Client, ctx context.Context, createParams *gopowerstore.HostCreate)(gopowerstore.CreateResponse, error){
-
+	CreateHostfunc = func(client gopowerstore.Client, ctx context.Context, createParams *gopowerstore.HostCreate) (gopowerstore.CreateResponse, error) {
 		return client.CreateHost(ctx, createParams)
 	}
 
-	SetCustomHTTPHeadersFunc = func(client gopowerstore.Client, headers http.Header){
-
+	SetCustomHTTPHeadersFunc = func(client gopowerstore.Client, headers http.Header) {
 		client.SetCustomHTTPHeaders(headers)
 	}
 )
 
-// register host 
+// register host
 func (s *Service) createHost(
 	ctx context.Context,
 	initiators []string,
@@ -1702,9 +1699,7 @@ func (s *Service) createHost(
 		}
 	}
 
-
 	for _, arr := range getArrayfn(s) {
-		
 		log.Infof("[createHost] Processing array %s (%s)", arr.GlobalID, arr.IP)
 		// 1) Skip if already registered
 		if getIsHostAlreadyRegistered(s, ctx, arr.GetClient(), initiators) {
@@ -1816,7 +1811,7 @@ func (s *Service) handleLabelMatchRegistration(
 		log.Infof("[handleLabelMatch] No arrays match node labels — skipping registration")
 		return false, nil
 	}
-	
+
 	remoteSystems, err := getAllRemoteSystemsFunc(arr, ctx)
 	if err != nil {
 		log.Warnf("[handleLabelMatch] failed to get remotes for %s: %v", arr.GlobalID, err)
@@ -1920,7 +1915,7 @@ func (s *Service) handleNoLabelMatchRegistration(
 		return false, nil
 	}
 
-	remoteSystems, err := getAllRemoteSystemsFunc(arr,ctx)
+	remoteSystems, err := getAllRemoteSystemsFunc(arr, ctx)
 	if err != nil {
 		log.Warnf("[handleNoLabelMatch] failed to get remotes for %s: %v", arr.GlobalID, err)
 		return false, err
@@ -1944,10 +1939,6 @@ func (s *Service) handleNoLabelMatchRegistration(
 			if remoteArr.GlobalID != remote.SerialNumber {
 				continue
 			}
-			if len(remoteArr.Labels) > 1 {
-				return false, fmt.Errorf("skipping remote array %s – more than one label", remoteArr.GlobalID)
-			}
-
 			// Mutual remote check
 			if !getIsRemoteToOtherArray(s, ctx, arr, remoteArr) {
 				log.Infof("[handleNoLabelMatch] skipping %s↔%s: not mutually remote",
