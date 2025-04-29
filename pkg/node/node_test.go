@@ -5981,7 +5981,7 @@ type MockService struct {
 			wantErr: true,
 		},
 		{
-			name: "Host Registration Failure - One Array has more than one label",
+			name: "Host Registration Failure - getIsRemoteToOtherArray",
 			s: &MockService{
 				Service: &Service{},
 			},
@@ -6019,7 +6019,7 @@ type MockService struct {
 							Insecure: true,
 							BlockProtocol: "auto",
 							MetroTopology: "Uniform",
-							Labels: map[string]string{"topology.kubernetes.io/zone1": "zone1", "topology.kubernetes.io/zone2": "zone2"},
+							Labels: map[string]string{"topology.kubernetes.io/zone1": "zone1"},
 							IP:"10.198.0.2",
 						},
 					}
@@ -6065,10 +6065,13 @@ type MockService struct {
 					}
 					return defaultResponse, nil
 				}
+				getIsRemoteToOtherArray = func(_ *Service, _ context.Context, _, _ *array.PowerStoreArray) bool {
 
+					return false
+				}
 			},
-			want: []string{},
-			wantErr: true,
+			want: []string{"Array1","Array2"},
+			wantErr: false,
 		},
 		// Add more test cases as needed
 		}
