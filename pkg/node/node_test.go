@@ -5955,7 +5955,7 @@ func TestService_createHost(t *testing.T) {
 					return false
 				}
 
-				CreateHostfunc = func(client gopowerstore.Client, ctx context.Context, createParams *gopowerstore.HostCreate) (gopowerstore.CreateResponse, error) {
+				CreateHostfunc = func(_ gopowerstore.Client, _ context.Context, _ *gopowerstore.HostCreate) (gopowerstore.CreateResponse, error) {
 					return gopowerstore.CreateResponse{}, fmt.Errorf("failed to create host")
 				}
 
@@ -6022,26 +6022,27 @@ func TestService_createHost(t *testing.T) {
 								Capabilities:        []string{"Synchronous_Block_Replication"},
 							},
 						}, nil
-					} else {
-						return []gopowerstore.RemoteSystem{
-							{
-								ID:                  "arrayid2",
-								Name:                "Pstore2",
-								Description:         "",
-								SerialNumber:        "Array2",
-								ManagementAddress:   "10.198.0.2",
-								DataConnectionState: "OK",
-								Capabilities:        []string{"Synchronous_Block_Replication"},
-							},
-						}, nil
-					}
+					} 
+					
+					return []gopowerstore.RemoteSystem{
+						{
+							ID:                  "arrayid2",
+							Name:                "Pstore2",
+							Description:         "",
+							SerialNumber:        "Array2",
+							ManagementAddress:   "10.198.0.2",
+							DataConnectionState: "OK",
+							Capabilities:        []string{"Synchronous_Block_Replication"},
+						},
+					}, nil
+					
 				}
 
 				getIsHostAlreadyRegistered = func(_ *Service, _ context.Context, _ gopowerstore.Client, _ []string) bool {
 					return false
 				}
 
-				CreateHostfunc = func(client gopowerstore.Client, ctx context.Context, createParams *gopowerstore.HostCreate) (gopowerstore.CreateResponse, error) {
+				CreateHostfunc = func(_ gopowerstore.Client, _ context.Context, _ *gopowerstore.HostCreate) (gopowerstore.CreateResponse, error) {
 
 					defaultResponse := gopowerstore.CreateResponse{
 						ID: "id-1",
