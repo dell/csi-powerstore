@@ -5958,7 +5958,6 @@ func TestService_createHost(t *testing.T) {
 				CreateHostfunc = func(_ gopowerstore.Client, _ context.Context, _ *gopowerstore.HostCreate) (gopowerstore.CreateResponse, error) {
 					return gopowerstore.CreateResponse{}, fmt.Errorf("failed to create host")
 				}
-
 			},
 			want:    []string{},
 			wantErr: true,
