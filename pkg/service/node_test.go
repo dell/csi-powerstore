@@ -257,15 +257,13 @@ func TestMountVolume(t *testing.T) {
 
 func TestUnmountVolume(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	utilMock := new(mocks.UtilInterface)
-	fsMock := new(mocks.FsInterface)
 	defer ctrl.Finish()
-	svc := service{
-		fs: fsMock,
-	}
 	ctx := context.Background()
 
 	t.Run("Umount fail", func(t *testing.T) {
+		utilMock := new(mocks.UtilInterface)
+		fsMock := new(mocks.FsInterface)
+
 		defaultSysUnmount := sysUnmount
 		sysUnmount = func(_ string, _ int) error {
 			return errors.New("operation not permitted")
@@ -281,6 +279,10 @@ func TestUnmountVolume(t *testing.T) {
 		}, nil)
 		fsMock.On("GetUtil").Return(utilMock)
 
+		svc := service{
+			fs: fsMock,
+		}
+
 		err := svc.UnmountVolume(ctx, "", "/var/lib/dell/nfs/", map[string]string{
 			"ServiceName": "myNfsMount",
 		})
@@ -288,6 +290,9 @@ func TestUnmountVolume(t *testing.T) {
 	})
 
 	t.Run("success", func(t *testing.T) {
+		utilMock := new(mocks.UtilInterface)
+		fsMock := new(mocks.FsInterface)
+
 		mockNode := mocks.NewMockInterface(ctrl)
 		oldRemove := osRemove
 		oldUnmount := sysUnmount
@@ -313,6 +318,10 @@ func TestUnmountVolume(t *testing.T) {
 		mockNode.EXPECT().NodeUnstageVolume(gomock.Any(), gomock.Any()).AnyTimes().Return(&csi.NodeUnstageVolumeResponse{}, nil)
 		PutNodeService(mockNode)
 
+		svc := service{
+			fs: fsMock,
+		}
+
 		err := svc.UnmountVolume(ctx, "123", "/var/lib/dell/nfs/", map[string]string{
 			"ServiceName": "myNfsMount",
 		})
@@ -320,6 +329,9 @@ func TestUnmountVolume(t *testing.T) {
 	})
 
 	t.Run("remove fail", func(t *testing.T) {
+		utilMock := new(mocks.UtilInterface)
+		fsMock := new(mocks.FsInterface)
+
 		mockNode := mocks.NewMockInterface(ctrl)
 		oldRemove := osRemove
 		oldUnmount := sysUnmount
@@ -345,6 +357,10 @@ func TestUnmountVolume(t *testing.T) {
 		mockNode.EXPECT().NodeUnstageVolume(gomock.Any(), gomock.Any()).AnyTimes().Return(&csi.NodeUnstageVolumeResponse{}, nil)
 		PutNodeService(mockNode)
 
+		svc := service{
+			fs: fsMock,
+		}
+
 		err := svc.UnmountVolume(ctx, "123", "/var/lib/dell/nfs/", map[string]string{
 			"ServiceName": "myNfsMount",
 		})
@@ -352,6 +368,9 @@ func TestUnmountVolume(t *testing.T) {
 	})
 
 	t.Run("unstage error", func(t *testing.T) {
+		utilMock := new(mocks.UtilInterface)
+		fsMock := new(mocks.FsInterface)
+
 		mockNode := mocks.NewMockInterface(ctrl)
 		oldRemove := osRemove
 		oldUnmount := sysUnmount
@@ -377,6 +396,10 @@ func TestUnmountVolume(t *testing.T) {
 		mockNode.EXPECT().NodeUnstageVolume(gomock.Any(), gomock.Any()).AnyTimes().Return(&csi.NodeUnstageVolumeResponse{}, errors.New("unstage error"))
 		PutNodeService(mockNode)
 
+		svc := service{
+			fs: fsMock,
+		}
+
 		err := svc.UnmountVolume(ctx, "123", "/var/lib/dell/nfs/", map[string]string{
 			"ServiceName": "myNfsMount",
 		})
@@ -384,6 +407,9 @@ func TestUnmountVolume(t *testing.T) {
 	})
 
 	t.Run("unable to determine mounts", func(t *testing.T) {
+		utilMock := new(mocks.UtilInterface)
+		fsMock := new(mocks.FsInterface)
+
 		oldRemove := osRemove
 		oldUnmount := sysUnmount
 		defer func() {
@@ -399,6 +425,10 @@ func TestUnmountVolume(t *testing.T) {
 		}
 		sysUnmount = func(_ string, _ int) error {
 			return nil
+		}
+
+		svc := service{
+			fs: fsMock,
 		}
 
 		err := svc.UnmountVolume(ctx, "123", "/var/lib/dell/nfs/", map[string]string{
