@@ -5207,8 +5207,6 @@ func TestIsRemoteToOtherArray(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.setupMocks()
-
-			log.Infof("Test")
 			got := tt.s.isRemoteToOtherArray(context.Background(), tt.arrA, tt.arrB)
 
 			if got == tt.want {
@@ -5755,7 +5753,7 @@ func TestHandleNoLabelMatchRegistration(t *testing.T) {
 					}
 				}
 
-				getAllRemoteSystemsFunc = func(arr *array.PowerStoreArray, _ context.Context) ([]gopowerstore.RemoteSystem, error) {
+				getAllRemoteSystemsFunc = func(_ *array.PowerStoreArray, _ context.Context) ([]gopowerstore.RemoteSystem, error) {
 					log.Infof("Inside Remote Systems")
 					return nil, fmt.Errorf("failed to get remoteSystem")
 				}
