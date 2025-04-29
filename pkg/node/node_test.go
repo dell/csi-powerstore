@@ -5798,7 +5798,6 @@ func TestHandleNoLabelMatchRegistration(t *testing.T) {
 }
 
 func TestHandleLabelMatchRegistration(t *testing.T) {
-
 	originalGetNodeLabelsfn := getNodeLabelsfn
 	originalGetArrayfn := getArrayfn
 	originalGetIsHostAlreadyRegistered := getIsHostAlreadyRegistered
@@ -7078,7 +7077,6 @@ func TestService_createHost(t *testing.T) {
 				}
 
 				getAllRemoteSystemsFunc = func(arr *array.PowerStoreArray, _ context.Context) ([]gopowerstore.RemoteSystem, error) {
-
 					if arr.GlobalID == "Array2" {
 						return []gopowerstore.RemoteSystem{
 							{
@@ -7112,7 +7110,6 @@ func TestService_createHost(t *testing.T) {
 				}
 
 				CreateHostfunc = func(_ gopowerstore.Client, _ context.Context, _ *gopowerstore.HostCreate) (gopowerstore.CreateResponse, error) {
-
 					defaultResponse := gopowerstore.CreateResponse{
 						ID: "id-1",
 					}
