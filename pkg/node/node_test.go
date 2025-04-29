@@ -7132,9 +7132,7 @@ func TestService_createHost(t *testing.T) {
 				initiators: []string{"initiator1", "initiator2"},
 			},
 			setup: func() {
-				log.Infof("Inside Setup - Failure")
 				getNodeLabelsfn = func(_ *Service, _ string) (map[string]string, error) {
-					log.Infof("InsidegetNode")
 					return map[string]string{"topology.kubernetes.io/zone1": "zone1"}, nil
 				}
 
@@ -7203,7 +7201,6 @@ func TestService_createHost(t *testing.T) {
 				}
 
 				registerHostFunc = func(_ *Service, _ context.Context, _ gopowerstore.Client, _ string, _ []string, _ gopowerstore.HostConnectivityEnum) error {
-					log.Infof("Inside RegisterHost")
 					return fmt.Errorf("failed to registerHost")
 				}
 			},
