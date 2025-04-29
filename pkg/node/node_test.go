@@ -5217,7 +5217,6 @@ func TestIsRemoteToOtherArray(t *testing.T) {
 }
 
 func TestHandleNoLabelMatchRegistration(t *testing.T) {
-
 	originalGetNodeLabelsfn := getNodeLabelsfn
 	originalGetArrayfn := getArrayfn
 	originalGetIsHostAlreadyRegistered := getIsHostAlreadyRegistered
