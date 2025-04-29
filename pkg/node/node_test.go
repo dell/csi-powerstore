@@ -5524,7 +5524,7 @@ func TestService_createHost(t *testing.T) {
 					}
 				}
 
-				getAllRemoteSystemsFunc = func(arr *array.PowerStoreArray, _ context.Context) ([]gopowerstore.RemoteSystem, error) {
+				getAllRemoteSystemsFunc = func(_ *array.PowerStoreArray, _ context.Context) ([]gopowerstore.RemoteSystem, error) {
 					return nil, fmt.Errorf("failed to get remote systems")
 				}
 			},
