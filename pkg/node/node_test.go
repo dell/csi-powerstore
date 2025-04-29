@@ -5170,14 +5170,14 @@ func TestService_createHost(t *testing.T) {
 		}, nil
 	}
 
-	CreateHostfunc = func(_ gopowerstore.Client, ctx context.Context, createParams *gopowerstore.HostCreate) (gopowerstore.CreateResponse, error) {
+	CreateHostfunc = func(_ gopowerstore.Client, _ context.Context, _ *gopowerstore.HostCreate) (gopowerstore.CreateResponse, error) {
 		defaultResponse := gopowerstore.CreateResponse{
 			ID: "id-1",
 		}
 		return defaultResponse, nil
 	}
 
-	SetCustomHTTPHeadersFunc = func(_ gopowerstore.Client, headers http.Header) {
+	SetCustomHTTPHeadersFunc = func(_ gopowerstore.Client, _ http.Header) {
 		// do nothing
 	}
 
@@ -5655,7 +5655,6 @@ func TestService_createHost(t *testing.T) {
 						},
 					}, nil
 				}
-
 			},
 			want:    []string{},
 			wantErr: true,
@@ -5731,7 +5730,6 @@ func TestService_createHost(t *testing.T) {
 						},
 					}, nil
 				}
-
 			},
 			want:    []string{"Array1", "Array2"},
 			wantErr: false,
@@ -5868,7 +5866,7 @@ func TestService_createHost(t *testing.T) {
 					return false
 				}
 
-				CreateHostfunc = func(_ gopowerstore.Client, ctx context.Context, createParams *gopowerstore.HostCreate) (gopowerstore.CreateResponse, error) {
+				CreateHostfunc = func(_ gopowerstore.Client, _ context.Context, _ *gopowerstore.HostCreate) (gopowerstore.CreateResponse, error) {
 					return gopowerstore.CreateResponse{}, fmt.Errorf("failed to create host")
 				}
 			},

@@ -1939,10 +1939,6 @@ func (s *Service) handleNoLabelMatchRegistration(
 			if remoteArr.GlobalID != remote.SerialNumber {
 				continue
 			}
-			if len(remoteArr.Labels) > 1 {
-				return false, fmt.Errorf("skipping remote array %s – more than one label", remoteArr.GlobalID)
-			}
-
 			// Mutual remote check
 			if !getIsRemoteToOtherArray(s, ctx, arr, remoteArr) {
 				log.Infof("[handleNoLabelMatch] skipping %s↔%s: not mutually remote",
