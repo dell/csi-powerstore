@@ -5119,9 +5119,7 @@ type MockService struct {
 }
 
 func TestIsRemoteToOtherArray(t *testing.T) {
-
 	originalGetAllRemoteSystemsFunc := getAllRemoteSystemsFunc
-
 	defer func() {
 		getAllRemoteSystemsFunc = originalGetAllRemoteSystemsFunc
 	}()
