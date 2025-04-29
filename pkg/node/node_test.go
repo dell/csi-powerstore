@@ -5299,7 +5299,6 @@ func TestHandleNoLabelMatchRegistration(t *testing.T) {
 				}
 
 				getIsRemoteToOtherArray = func(_ *Service, _ context.Context, _, _ *array.PowerStoreArray) bool {
-
 					return true
 				}
 
@@ -5392,7 +5391,6 @@ func TestHandleNoLabelMatchRegistration(t *testing.T) {
 				}
 
 				getIsRemoteToOtherArray = func(_ *Service, _ context.Context, _, _ *array.PowerStoreArray) bool {
-
 					return true
 				}
 
@@ -5587,7 +5585,6 @@ func TestHandleNoLabelMatchRegistration(t *testing.T) {
 				}
 
 				getIsRemoteToOtherArray = func(_ *Service, _ context.Context, _, _ *array.PowerStoreArray) bool {
-
 					return true
 				}
 
@@ -6305,14 +6302,10 @@ func TestService_createHost(t *testing.T) {
 				initiators: []string{"initiator1", "initiator2"},
 			},
 			setup: func() {
-				log.Infof("Inside Setup - success")
 				getNodeLabelsfn = func(_ *Service, _ string) (map[string]string, error) {
-					log.Infof("InsidegetNode")
 					return map[string]string{"topology.kubernetes.io/zone1": "zone1"}, nil
 				}
 				getArrayfn = func(_ *Service) map[string]*array.PowerStoreArray {
-					log.Infof("InsideGetArray")
-
 					return map[string]*array.PowerStoreArray{
 						"Array1": {
 							Endpoint:      "https://10.198.0.1/api/rest",
@@ -6399,9 +6392,7 @@ func TestService_createHost(t *testing.T) {
 				initiators: []string{"initiator1", "initiator2"},
 			},
 			setup: func() {
-				log.Infof("Inside Setup - success")
 				getNodeLabelsfn = func(_ *Service, _ string) (map[string]string, error) {
-					log.Infof("InsidegetNode")
 					return map[string]string{"topology.kubernetes.io/zone1": "zone1"}, nil
 				}
 				getArrayfn = func(_ *Service) map[string]*array.PowerStoreArray {
@@ -6446,7 +6437,6 @@ func TestService_createHost(t *testing.T) {
 				initiators: []string{"initiator1", "initiator2"},
 			},
 			setup: func() {
-				log.Infof("Inside Setup - success")
 				getNodeLabelsfn = func(_ *Service, _ string) (map[string]string, error) {
 					log.Infof("InsidegetNode")
 					return map[string]string{"topology.kubernetes.io/zone1": "zone1"}, nil
@@ -6500,8 +6490,6 @@ func TestService_createHost(t *testing.T) {
 				}
 
 				getArrayfn = func(_ *Service) map[string]*array.PowerStoreArray {
-					log.Infof("InsideGetArray")
-
 					return map[string]*array.PowerStoreArray{
 						"Array1": {
 							Endpoint:      "https://10.198.0.1/api/rest",
@@ -6543,13 +6531,10 @@ func TestService_createHost(t *testing.T) {
 			setup: func() {
 				log.Infof("Inside Setup - Failure")
 				getNodeLabelsfn = func(_ *Service, _ string) (map[string]string, error) {
-					log.Infof("InsidegetNode")
 					return map[string]string{"topology.kubernetes.io/zone1": "zone1"}, nil
 				}
 
 				getArrayfn = func(_ *Service) map[string]*array.PowerStoreArray {
-					log.Infof("InsideGetArray")
-
 					return map[string]*array.PowerStoreArray{
 						"Array1": {
 							Endpoint:      "https://10.198.0.1/api/rest",
@@ -6591,7 +6576,6 @@ func TestService_createHost(t *testing.T) {
 			setup: func() {
 				log.Infof("Inside Setup - Failure")
 				getNodeLabelsfn = func(_ *Service, _ string) (map[string]string, error) {
-					log.Infof("InsidegetNode")
 					return map[string]string{"topology.kubernetes.io/zone1": "zone1"}, nil
 				}
 
@@ -6639,13 +6623,10 @@ func TestService_createHost(t *testing.T) {
 			setup: func() {
 				log.Infof("Inside Setup - Failure")
 				getNodeLabelsfn = func(_ *Service, _ string) (map[string]string, error) {
-					log.Infof("InsidegetNode")
 					return map[string]string{"topology.kubernetes.io/zone1": "zone1"}, nil
 				}
 
 				getArrayfn = func(_ *Service) map[string]*array.PowerStoreArray {
-					log.Infof("InsideGetArray")
-
 					return map[string]*array.PowerStoreArray{
 						"Array1": {
 							Endpoint:      "https://10.198.0.1/api/rest",
@@ -6691,13 +6672,10 @@ func TestService_createHost(t *testing.T) {
 			setup: func() {
 				log.Infof("Inside Setup - Failure")
 				getNodeLabelsfn = func(_ *Service, _ string) (map[string]string, error) {
-					log.Infof("InsidegetNode")
 					return map[string]string{"topology.kubernetes.io/zone1": "zone1"}, nil
 				}
 
 				getArrayfn = func(_ *Service) map[string]*array.PowerStoreArray {
-					log.Infof("InsideGetArray")
-
 					return map[string]*array.PowerStoreArray{
 						"Array1": {
 							Endpoint:      "https://10.198.0.1/api/rest",
@@ -6743,13 +6721,10 @@ func TestService_createHost(t *testing.T) {
 			setup: func() {
 				log.Infof("Inside Setup - Failure")
 				getNodeLabelsfn = func(_ *Service, _ string) (map[string]string, error) {
-					log.Infof("InsidegetNode")
 					return map[string]string{"topology.kubernetes.io/zone1": "zone1", "topology.kubernetes.io/zone2": "zone2"}, nil
 				}
 
 				getArrayfn = func(_ *Service) map[string]*array.PowerStoreArray {
-					log.Infof("InsideGetArray")
-
 					return map[string]*array.PowerStoreArray{
 						"Array1": {
 							Endpoint:      "https://10.198.0.1/api/rest",
@@ -7150,7 +7125,6 @@ func TestService_createHost(t *testing.T) {
 					return defaultResponse, nil
 				}
 				getIsRemoteToOtherArray = func(_ *Service, _ context.Context, _, _ *array.PowerStoreArray) bool {
-
 					return false
 				}
 			},
