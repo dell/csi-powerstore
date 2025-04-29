@@ -5119,7 +5119,8 @@ type MockService struct {
 	*Service
 }
 	// Unit test for createHost
-func TestService_createHost(t *testing.T) {
+
+	func TestService_createHost(t *testing.T) {
 
 	originalGetNodeLabelsfn := getNodeLabelsfn 
 	originalGetArrayfn := getArrayfn
@@ -5245,6 +5246,53 @@ func TestService_createHost(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "Successful host creation 2",
+			s: &MockService{
+				Service: &Service{},
+				},
+			args: args{
+				ctx: context.TODO(),
+				initiators: []string{"initiator1", "initiator2"},
+			},
+			setup: func() {
+				log.Infof("Inside Setup - success")
+				getNodeLabelsfn = func(_ *Service, _ string) (map[string]string, error) {
+					log.Infof("InsidegetNode")
+					return  map[string]string{"topology.kubernetes.io/zone1": "zone1"}, nil
+				}
+				getArrayfn  = func(_ *Service) map[string]*array.PowerStoreArray {
+					log.Infof("InsideGetArray")
+		
+					return map[string]*array.PowerStoreArray{
+						"Array1": {
+							Endpoint: "https://10.198.0.1/api/rest",
+							GlobalID: "Array1",
+							Username: "admin",
+							Password: "Password123!",
+							Insecure: true,
+							BlockProtocol: "auto",
+							MetroTopology: "Uniform",
+							Labels: map[string]string{"topology.kubernetes.io/zone1": "zone1"},
+							IP:"10.198.0.1",
+						},
+						"Array2":{
+							Endpoint: "https://10.198.0.2/api/rest",
+							GlobalID: "Array2",
+							Username: "admin",
+							Password: "Password123!",
+							Insecure: true,
+							BlockProtocol: "auto",
+							MetroTopology: "Uniform",
+							Labels: map[string]string{"topology.kubernetes.io/zone1": "zone2"},
+							IP:"10.198.0.2",
+						},
+					}
+				}	
+			},
+			want: []string{"Array1","Array2"},
+			wantErr: false,
+		},
+		{
 			name: "Successful host creation 3",
 			s: &MockService{
 				Service: &Service{},
@@ -5292,7 +5340,7 @@ func TestService_createHost(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "Successful host creation 4",
+			name: "Failure host creation - Label don't match",
 			s: &MockService{
 				Service: &Service{},
 				},
@@ -5387,7 +5435,7 @@ func TestService_createHost(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "Failed: more than one labels",
+			name: "Host Registration Failure: Both array more than one labels",
 			s: &MockService{
 				Service: &Service{},
 			},
@@ -5435,7 +5483,7 @@ func TestService_createHost(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "Failed: more than one labels",
+			name: "Host Registration Failure: One array has more than one labels",
 			s: &MockService{
 				Service: &Service{},
 			},
@@ -5591,7 +5639,7 @@ func TestService_createHost(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "Failed: Wrong Labels",
+			name: "Host Registration Failure - Array belongs to different zones",
 			s: &MockService{
 				Service: &Service{},
 			},
@@ -5669,7 +5717,7 @@ func TestService_createHost(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "Failed: Wrong Labels 2", //need clarity on this table
+			name: "Successful Host Registration with Co-Local and Co-remote", //need clarity on this table
 			s: &MockService{
 				Service: &Service{},
 			},
@@ -5747,7 +5795,7 @@ func TestService_createHost(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "Host Already registerd",
+			name: "Host Registration Failure - Host Already registerd",
 			s: &MockService{
 				Service: &Service{},
 			},
@@ -5804,7 +5852,7 @@ func TestService_createHost(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "Host Registration Failure",
+			name: "Host Registration Failure - Create Host API fail",
 			s: &MockService{
 				Service: &Service{},
 			},
@@ -5889,7 +5937,139 @@ func TestService_createHost(t *testing.T) {
 			want: []string{},
 			wantErr: true,
 		},
+		{
+			name: "Host Registration Failure with Local only",
+			s: &MockService{
+				Service: &Service{},
+			},
+			args: args{
+				ctx: context.TODO(),
+				initiators: []string{"initiator1", "initiator2"},
+			},
+			setup: func() {
+				log.Infof("Inside Setup - Failure")
+				getNodeLabelsfn = func(_ *Service, _ string) (map[string]string, error) {
+						log.Infof("InsidegetNode")
+						return  map[string]string{"topology.kubernetes.io/zone1": "zone1"}, nil
+					}
+
+				getArrayfn  = func(_ *Service) map[string]*array.PowerStoreArray {
+					log.Infof("InsideGetArray")
 		
+					return map[string]*array.PowerStoreArray{
+						"Array1": {
+							Endpoint: "https://10.198.0.1/api/rest",
+							GlobalID: "Array1",
+							Username: "admin",
+							Password: "Password123!",
+							Insecure: true,
+							BlockProtocol: "auto",
+							},
+					}
+				}
+
+				getIsHostAlreadyRegistered = func(_ *Service, _ context.Context, _ gopowerstore.Client, _ []string) bool{
+					return false
+				}
+				
+				CreateHostfunc = func(client gopowerstore.Client, ctx context.Context, createParams *gopowerstore.HostCreate)(gopowerstore.CreateResponse, error){
+					return gopowerstore.CreateResponse{}, fmt.Errorf("failed to create host")
+				}
+
+			},
+			want: []string{},
+			wantErr: true,
+		},
+		{
+			name: "Host Registration Failure - One Array has more than one label",
+			s: &MockService{
+				Service: &Service{},
+			},
+			args: args{
+				ctx: context.TODO(),
+				initiators: []string{"initiator1", "initiator2"},
+			},
+			setup: func() {
+				log.Infof("Inside Setup - Failure")
+				getNodeLabelsfn = func(_ *Service, _ string) (map[string]string, error) {
+						log.Infof("InsidegetNode")
+						return  map[string]string{"topology.kubernetes.io/zone1": "zone1",}, nil
+					}
+
+				getArrayfn  = func(_ *Service) map[string]*array.PowerStoreArray {
+					log.Infof("InsideGetArray")
+		
+					return map[string]*array.PowerStoreArray{
+						"Array1": {
+							Endpoint: "https://10.198.0.1/api/rest",
+							GlobalID: "Array1",
+							Username: "admin",
+							Password: "Password123!",
+							Insecure: true,
+							BlockProtocol: "auto",
+							MetroTopology: "Uniform",
+							Labels: map[string]string{"topology.kubernetes.io/zone1": "zone2"},
+							IP:"10.198.0.1",
+							},
+						"Array2":{
+							Endpoint: "https://10.198.0.2/api/rest",
+							GlobalID: "Array2",
+							Username: "admin",
+							Password: "Password123!",
+							Insecure: true,
+							BlockProtocol: "auto",
+							MetroTopology: "Uniform",
+							Labels: map[string]string{"topology.kubernetes.io/zone1": "zone1", "topology.kubernetes.io/zone2": "zone2"},
+							IP:"10.198.0.2",
+						},
+					}
+				}
+
+				getAllRemoteSystemsFunc = func(arr *array.PowerStoreArray, _ context.Context) ([]gopowerstore.RemoteSystem, error) {
+		
+					if(arr.GlobalID == "Array2") {
+						return []gopowerstore.RemoteSystem{
+							{
+								ID: "arrayid1",
+								Name: "Pstore1",
+								Description: "",
+								SerialNumber: "Array1",
+								ManagementAddress: "10.198.0.1",
+								DataConnectionState: "OK",
+								Capabilities: []string{"Synchronous_Block_Replication"},
+							},
+						}, nil
+					} else {
+						return []gopowerstore.RemoteSystem{
+							{
+								ID: "arrayid2",
+								Name: "Pstore2",
+								Description: "",
+								SerialNumber: "Array2",
+								ManagementAddress: "10.198.0.2",
+								DataConnectionState: "OK",
+								Capabilities: []string{"Synchronous_Block_Replication"},
+							},
+						}, nil
+					}
+				}
+
+				getIsHostAlreadyRegistered = func(_ *Service, _ context.Context, _ gopowerstore.Client, _ []string) bool{
+					return false
+				}
+				
+				CreateHostfunc = func(client gopowerstore.Client, ctx context.Context, createParams *gopowerstore.HostCreate) (gopowerstore.CreateResponse, error) {
+
+					defaultResponse := gopowerstore.CreateResponse{
+						ID: "id-1",
+					}
+					return defaultResponse, nil
+				}
+
+			},
+			want: []string{},
+			wantErr: true,
+		},
 		// Add more test cases as needed
 		}
 		for _, tt := range tests {
