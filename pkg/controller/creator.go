@@ -22,8 +22,10 @@ import (
 	"context"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/dell/csi-powerstore/v2/pkg/common"
+	"github.com/dell/gopowerstore/api"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/gopowerstore"
@@ -210,9 +212,17 @@ func (*SCSICreator) CheckName(_ context.Context, name string) error {
 
 // CheckIfAlreadyExists queries storage array if Volume with given name exists
 func (*SCSICreator) CheckIfAlreadyExists(ctx context.Context, name string, sizeInBytes int64, client gopowerstore.Client) (*csi.Volume, error) {
-	alreadyExistVolume, err := client.GetVolumeByName(ctx, name)
+	var alreadyExistVolume gopowerstore.Volume
+	var err error
+	for i := range 5 {
+		alreadyExistVolume, err = client.GetVolumeByName(ctx, name)
+		if err != nil {
+			log.Printf("Attempt to fetch volume %v failed: %v. Retrying..%d\n", name, err, i)
+			time.Sleep(2 * time.Second)
+		}
+	}
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "can't find volume '%s': %s", name, err.Error())
+		return nil, status.Errorf(codes.Internal, "can't find volume after multiple retries '%s': %s", name, err.Error())
 	}
 
 	if alreadyExistVolume.Size < sizeInBytes {
@@ -235,7 +245,7 @@ func (sc *SCSICreator) Create(ctx context.Context, req *csi.CreateVolumeRequest,
 	var reqParams *gopowerstore.VolumeCreate
 	defaultHeaders := client.GetCustomHTTPHeaders()
 	if defaultHeaders == nil {
-		defaultHeaders = make(http.Header)
+		defaultHeaders = api.NewSafeHeader().GetHeader()
 	}
 	customHeaders := defaultHeaders
 	k8sMetadataSupported := common.IsK8sMetadataSupported(client)

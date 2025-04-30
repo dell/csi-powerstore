@@ -4,6 +4,8 @@ go 1.24.0
 
 toolchain go1.24.1
 
+replace github.com/dell/csm-hbnfs => ./csm-hbnfs
+
 require (
 	github.com/akutz/gosync v0.1.0
 	github.com/apparentlymart/go-cidr v1.1.0
@@ -15,11 +17,11 @@ require (
 	github.com/dell/dell-csi-extensions/replication v1.10.2-0.20250417144221-6fcddedebf59
 	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.8.2-0.20250417144221-6fcddedebf59
 	github.com/dell/gobrick v1.13.2-0.20250421073258-7cd497fd44fe
-	github.com/dell/gocsi v1.13.1-0.20250423132914-5966abd5770a
+	github.com/dell/gocsi v1.13.1-0.20250429154519-0eb3df82ce85
 	github.com/dell/gofsutil v1.18.1-0.20250424071242-3e01ce487273
 	github.com/dell/goiscsi v1.11.1-0.20250414073142-a69a338c4871
 	github.com/dell/gonvme v1.10.2-0.20250414072949-5654e72314ec
-	github.com/dell/gopowerstore v1.18.1-0.20250411160922-a4e8cc4e5545
+	github.com/dell/gopowerstore v1.18.1-0.20250430180651-56753aa6eae4
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/go-openapi/strfmt v0.23.0
 	github.com/golang/mock v1.6.0

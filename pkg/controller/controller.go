@@ -23,7 +23,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/http"
 	"sort"
 	"strconv"
 	"strings"
@@ -40,6 +39,7 @@ import (
 	vgsext "github.com/dell/dell-csi-extensions/volumeGroupSnapshot"
 	csictx "github.com/dell/gocsi/context"
 	"github.com/dell/gopowerstore"
+	"github.com/dell/gopowerstore/api"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -398,6 +398,7 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 	resp, err := creator.Create(ctx, req, sizeInBytes, arr.GetClient())
 	if err != nil {
 		if apiError, ok := err.(gopowerstore.APIError); ok && (apiError.VolumeNameIsAlreadyUse() || apiError.FSNameIsAlreadyUse()) {
+			log.Infof("Creator.Create - error code returned = %+v", apiError)
 			volumeResponse, err = creator.CheckIfAlreadyExists(ctx, req.GetName(), sizeInBytes, arr.GetClient())
 			if err != nil {
 				return nil, err
@@ -1096,7 +1097,7 @@ func getMaximumVolumeSize(ctx context.Context, arr *array.PowerStoreArray) int64
 	if !found || valueInCache < 0 {
 		defaultHeaders := arr.Client.GetCustomHTTPHeaders()
 		if defaultHeaders == nil {
-			defaultHeaders = make(http.Header)
+			defaultHeaders = api.NewSafeHeader().GetHeader()
 		}
 		customHeaders := defaultHeaders
 		customHeaders.Add("DELL-VISIBILITY", "internal")
