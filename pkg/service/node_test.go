@@ -23,7 +23,7 @@ import (
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-powerstore/v2/mocks"
-	nfsmock "github.com/dell/csm-hbnfs/nfs/mocks"
+	nfsmock "github.com/dell/csm-sharednfs/nfs/mocks"
 	"github.com/dell/gofsutil"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"

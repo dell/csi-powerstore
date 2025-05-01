@@ -22,7 +22,7 @@ import (
 
 	"github.com/dell/csi-powerstore/v2/mocks"
 	"github.com/dell/csi-powerstore/v2/pkg/common"
-	nfsmock "github.com/dell/csm-hbnfs/nfs/mocks"
+	nfsmock "github.com/dell/csm-sharednfs/nfs/mocks"
 	"github.com/dell/gocsi"
 	csictx "github.com/dell/gocsi/context"
 	"github.com/fsnotify/fsnotify"

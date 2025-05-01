@@ -23,7 +23,7 @@ import (
 	"context"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/dell/csm-hbnfs/nfs"
+	"github.com/dell/csm-sharednfs/nfs"
 	commonext "github.com/dell/dell-csi-extensions/common"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"

@@ -22,7 +22,7 @@ import (
 	"github.com/dell/csi-powerstore/v2/pkg/identity"
 	"github.com/dell/csi-powerstore/v2/pkg/node"
 	"github.com/dell/csi-powerstore/v2/pkg/service"
-	"github.com/dell/csm-hbnfs/nfs"
+	"github.com/dell/csm-sharednfs/nfs"
 	"github.com/dell/gocsi"
 	logrus "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
