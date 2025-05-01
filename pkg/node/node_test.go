@@ -5223,8 +5223,6 @@ func TestHandleNoLabelMatchRegistration(t *testing.T) {
 	originalGetIsRemoteToOtherArray := getIsRemoteToOtherArray
 	orginalSetCustomHTTPHeadersFunc := SetCustomHTTPHeadersFunc
 	originalRegisterHostFunc := registerHostFunc
-	clientMock = new(gopowerstoremock.Client)
-	clientMock.On("CreateHost", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validHostID}, nil)
 
 	defer func() {
 		getArrayfn = originalGetArrayfn
@@ -5299,7 +5297,6 @@ func TestHandleNoLabelMatchRegistration(t *testing.T) {
 				getIsRemoteToOtherArray = func(_ *Service, _ context.Context, _, _ *array.PowerStoreArray) bool {
 					return true
 				}
-
 			},
 			wantErr: false,
 			want:    true,
@@ -5838,12 +5835,6 @@ func TestHandleLabelMatchRegistration(t *testing.T) {
 					return true
 				}
 
-				CreateHostfunc = func(_ gopowerstore.Client, _ context.Context, _ *gopowerstore.HostCreate) (gopowerstore.CreateResponse, error) {
-					defaultResponse := gopowerstore.CreateResponse{
-						ID: "id-1",
-					}
-					return defaultResponse, nil
-				}
 			},
 			wantErr: false,
 			want:    false,
@@ -5928,13 +5919,6 @@ func TestHandleLabelMatchRegistration(t *testing.T) {
 
 				getIsRemoteToOtherArray = func(_ *Service, _ context.Context, _, _ *array.PowerStoreArray) bool {
 					return true
-				}
-
-				CreateHostfunc = func(_ gopowerstore.Client, _ context.Context, _ *gopowerstore.HostCreate) (gopowerstore.CreateResponse, error) {
-					defaultResponse := gopowerstore.CreateResponse{
-						ID: "id-1",
-					}
-					return defaultResponse, nil
 				}
 
 				registerHostFunc = func(_ *Service, _ context.Context, _ gopowerstore.Client, _ string, _ []string, _ gopowerstore.HostConnectivityEnum) error {
@@ -6027,13 +6011,6 @@ func TestHandleLabelMatchRegistration(t *testing.T) {
 					return true
 				}
 
-				CreateHostfunc = func(_ gopowerstore.Client, _ context.Context, _ *gopowerstore.HostCreate) (gopowerstore.CreateResponse, error) {
-					defaultResponse := gopowerstore.CreateResponse{
-						ID: "id-1",
-					}
-					return defaultResponse, nil
-				}
-
 				registerHostFunc = func(_ *Service, _ context.Context, _ gopowerstore.Client, _ string, _ []string, _ gopowerstore.HostConnectivityEnum) error {
 					log.Infof("Inside RegisterHost")
 					return fmt.Errorf("failed to registerHost")
@@ -6122,13 +6099,6 @@ func TestHandleLabelMatchRegistration(t *testing.T) {
 
 				getIsRemoteToOtherArray = func(_ *Service, _ context.Context, _, _ *array.PowerStoreArray) bool {
 					return true
-				}
-
-				CreateHostfunc = func(_ gopowerstore.Client, _ context.Context, _ *gopowerstore.HostCreate) (gopowerstore.CreateResponse, error) {
-					defaultResponse := gopowerstore.CreateResponse{
-						ID: "id-1",
-					}
-					return defaultResponse, nil
 				}
 
 				registerHostFunc = func(_ *Service, _ context.Context, _ gopowerstore.Client, _ string, _ []string, _ gopowerstore.HostConnectivityEnum) error {
