@@ -1650,9 +1650,6 @@ func (s *Service) getNodeLabels(nodeName string) (map[string]string, error) {
 }
 
 var (
-	getNodeLabelsfn = func(s *Service, kubeNodeName string) (map[string]string, error) {
-		return s.getNodeLabels(kubeNodeName)
-	}
 
 	getArrayfn = func(s *Service) map[string]*array.PowerStoreArray {
 		return s.Arrays()
@@ -1688,7 +1685,7 @@ func (s *Service) createHost(
 	ctx context.Context,
 	initiators []string,
 ) (string, error) {
-	nodeLabels, err := getNodeLabelsfn(s, s.opts.KubeNodeName)
+	nodeLabels, err := s.getNodeLabels(s.opts.KubeNodeName)
 	if err != nil {
 		return "", fmt.Errorf("failed to get node labels for node %s: %v", s.opts.KubeNodeName, err)
 	}

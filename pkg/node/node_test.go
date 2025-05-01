@@ -5217,7 +5217,6 @@ func TestIsRemoteToOtherArray(t *testing.T) {
 }
 
 func TestHandleNoLabelMatchRegistration(t *testing.T) {
-	originalGetNodeLabelsfn := getNodeLabelsfn
 	originalGetArrayfn := getArrayfn
 	originalGetIsHostAlreadyRegistered := getIsHostAlreadyRegistered
 	originalGetAllRemoteSystemsFunc := getAllRemoteSystemsFunc
@@ -5227,7 +5226,6 @@ func TestHandleNoLabelMatchRegistration(t *testing.T) {
 	originalRegisterHostFunc := registerHostFunc
 
 	defer func() {
-		getNodeLabelsfn = originalGetNodeLabelsfn
 		getArrayfn = originalGetArrayfn
 		getIsHostAlreadyRegistered = originalGetIsHostAlreadyRegistered
 		getAllRemoteSystemsFunc = originalGetAllRemoteSystemsFunc
@@ -5798,7 +5796,6 @@ func TestHandleNoLabelMatchRegistration(t *testing.T) {
 }
 
 func TestHandleLabelMatchRegistration(t *testing.T) {
-	originalGetNodeLabelsfn := getNodeLabelsfn
 	originalGetArrayfn := getArrayfn
 	originalGetIsHostAlreadyRegistered := getIsHostAlreadyRegistered
 	originalGetAllRemoteSystemsFunc := getAllRemoteSystemsFunc
@@ -5808,7 +5805,6 @@ func TestHandleLabelMatchRegistration(t *testing.T) {
 	originalRegisterHostFunc := registerHostFunc
 
 	defer func() {
-		getNodeLabelsfn = originalGetNodeLabelsfn
 		getArrayfn = originalGetArrayfn
 		getIsHostAlreadyRegistered = originalGetIsHostAlreadyRegistered
 		getAllRemoteSystemsFunc = originalGetAllRemoteSystemsFunc
@@ -6209,7 +6205,6 @@ func TestHandleLabelMatchRegistration(t *testing.T) {
 
 // Unit test for createHost
 func TestService_createHost(t *testing.T) {
-	originalGetNodeLabelsfn := getNodeLabelsfn
 	originalGetArrayfn := getArrayfn
 	originalGetIsHostAlreadyRegistered := getIsHostAlreadyRegistered
 	originalGetAllRemoteSystemsFunc := getAllRemoteSystemsFunc
@@ -6217,9 +6212,13 @@ func TestService_createHost(t *testing.T) {
 	originalCreateHostfunc := CreateHostfunc
 	orginalSetCustomHTTPHeadersFunc := SetCustomHTTPHeadersFunc
 	originalRegisterHostFunc := registerHostFunc
+	nodeLabelsRetrieverMock = new(mocks.NodeLabelsRetrieverInterface)
+	k8sutils.NodeLabelsRetriever = nodeLabelsRetrieverMock
+	nodeLabelsRetrieverMock.On("GetNodeLabels", mock.Anything, mock.Anything).Return(map[string]string{"topology.kubernetes.io/zone1": "zone1"}, nil)
+	nodeLabelsRetrieverMock.On("InClusterConfig", mock.Anything).Return(nil, nil)
+	nodeLabelsRetrieverMock.On("NewForConfig", mock.Anything).Return(nil, nil)
 
 	defer func() {
-		getNodeLabelsfn = originalGetNodeLabelsfn
 		getArrayfn = originalGetArrayfn
 		getIsHostAlreadyRegistered = originalGetIsHostAlreadyRegistered
 		getAllRemoteSystemsFunc = originalGetAllRemoteSystemsFunc
@@ -6295,9 +6294,6 @@ func TestService_createHost(t *testing.T) {
 				initiators: []string{"initiator1", "initiator2"},
 			},
 			setup: func() {
-				getNodeLabelsfn = func(_ *Service, _ string) (map[string]string, error) {
-					return map[string]string{"topology.kubernetes.io/zone1": "zone1"}, nil
-				}
 				getArrayfn = func(_ *Service) map[string]*array.PowerStoreArray {
 					return map[string]*array.PowerStoreArray{
 						"Array1": {
@@ -6338,11 +6334,6 @@ func TestService_createHost(t *testing.T) {
 				initiators: []string{"initiator1", "initiator2"},
 			},
 			setup: func() {
-				log.Infof("Inside Setup - success")
-				getNodeLabelsfn = func(_ *Service, _ string) (map[string]string, error) {
-					log.Infof("InsidegetNode")
-					return map[string]string{"topology.kubernetes.io/zone1": "zone1"}, nil
-				}
 				getArrayfn = func(_ *Service) map[string]*array.PowerStoreArray {
 					log.Infof("InsideGetArray")
 
@@ -6385,9 +6376,6 @@ func TestService_createHost(t *testing.T) {
 				initiators: []string{"initiator1", "initiator2"},
 			},
 			setup: func() {
-				getNodeLabelsfn = func(_ *Service, _ string) (map[string]string, error) {
-					return map[string]string{"topology.kubernetes.io/zone1": "zone1"}, nil
-				}
 				getArrayfn = func(_ *Service) map[string]*array.PowerStoreArray {
 					log.Infof("InsideGetArray")
 
@@ -6430,11 +6418,6 @@ func TestService_createHost(t *testing.T) {
 				initiators: []string{"initiator1", "initiator2"},
 			},
 			setup: func() {
-				getNodeLabelsfn = func(_ *Service, _ string) (map[string]string, error) {
-					log.Infof("InsidegetNode")
-					return map[string]string{"topology.kubernetes.io/zone1": "zone1"}, nil
-				}
-
 				getArrayfn = func(_ *Service) map[string]*array.PowerStoreArray {
 					log.Infof("InsideGetArray")
 
@@ -6477,10 +6460,11 @@ func TestService_createHost(t *testing.T) {
 				initiators: []string{"initiator1", "initiator2"},
 			},
 			setup: func() {
-				log.Infof("Inside Setup - Failure")
-				getNodeLabelsfn = func(_ *Service, _ string) (map[string]string, error) {
-					return nil, fmt.Errorf("failed to get node labels")
-				}
+				nodeLabelsRetrieverMock = new(mocks.NodeLabelsRetrieverInterface)
+				k8sutils.NodeLabelsRetriever = nodeLabelsRetrieverMock
+				nodeLabelsRetrieverMock.On("GetNodeLabels", mock.Anything, mock.Anything).Return(nil, fmt.Errorf("failed to get node labels"))
+				nodeLabelsRetrieverMock.On("InClusterConfig", mock.Anything).Return(nil, nil)
+				nodeLabelsRetrieverMock.On("NewForConfig", mock.Anything).Return(nil, nil)
 
 				getArrayfn = func(_ *Service) map[string]*array.PowerStoreArray {
 					return map[string]*array.PowerStoreArray{
@@ -6522,10 +6506,12 @@ func TestService_createHost(t *testing.T) {
 				initiators: []string{"initiator1", "initiator2"},
 			},
 			setup: func() {
-				log.Infof("Inside Setup - Failure")
-				getNodeLabelsfn = func(_ *Service, _ string) (map[string]string, error) {
-					return map[string]string{"topology.kubernetes.io/zone1": "zone1"}, nil
-				}
+
+				nodeLabelsRetrieverMock = new(mocks.NodeLabelsRetrieverInterface)
+				k8sutils.NodeLabelsRetriever = nodeLabelsRetrieverMock
+				nodeLabelsRetrieverMock.On("GetNodeLabels", mock.Anything, mock.Anything).Return(map[string]string{"topology.kubernetes.io/zone1": "zone1"}, nil)
+				nodeLabelsRetrieverMock.On("InClusterConfig", mock.Anything).Return(nil, nil)
+				nodeLabelsRetrieverMock.On("NewForConfig", mock.Anything).Return(nil, nil)
 
 				getArrayfn = func(_ *Service) map[string]*array.PowerStoreArray {
 					return map[string]*array.PowerStoreArray{
@@ -6567,11 +6553,6 @@ func TestService_createHost(t *testing.T) {
 				initiators: []string{"initiator1", "initiator2"},
 			},
 			setup: func() {
-				log.Infof("Inside Setup - Failure")
-				getNodeLabelsfn = func(_ *Service, _ string) (map[string]string, error) {
-					return map[string]string{"topology.kubernetes.io/zone1": "zone1"}, nil
-				}
-
 				getArrayfn = func(_ *Service) map[string]*array.PowerStoreArray {
 					log.Infof("InsideGetArray")
 
@@ -6614,10 +6595,6 @@ func TestService_createHost(t *testing.T) {
 				initiators: []string{"initiator1", "initiator2"},
 			},
 			setup: func() {
-				log.Infof("Inside Setup - Failure")
-				getNodeLabelsfn = func(_ *Service, _ string) (map[string]string, error) {
-					return map[string]string{"topology.kubernetes.io/zone1": "zone1"}, nil
-				}
 
 				getArrayfn = func(_ *Service) map[string]*array.PowerStoreArray {
 					return map[string]*array.PowerStoreArray{
@@ -6663,10 +6640,6 @@ func TestService_createHost(t *testing.T) {
 				initiators: []string{"initiator1", "initiator2"},
 			},
 			setup: func() {
-				log.Infof("Inside Setup - Failure")
-				getNodeLabelsfn = func(_ *Service, _ string) (map[string]string, error) {
-					return map[string]string{"topology.kubernetes.io/zone1": "zone1"}, nil
-				}
 
 				getArrayfn = func(_ *Service) map[string]*array.PowerStoreArray {
 					return map[string]*array.PowerStoreArray{
@@ -6712,10 +6685,12 @@ func TestService_createHost(t *testing.T) {
 				initiators: []string{"initiator1", "initiator2"},
 			},
 			setup: func() {
-				log.Infof("Inside Setup - Failure")
-				getNodeLabelsfn = func(_ *Service, _ string) (map[string]string, error) {
-					return map[string]string{"topology.kubernetes.io/zone1": "zone1", "topology.kubernetes.io/zone2": "zone2"}, nil
-				}
+
+				nodeLabelsRetrieverMock = new(mocks.NodeLabelsRetrieverInterface)
+				k8sutils.NodeLabelsRetriever = nodeLabelsRetrieverMock
+				nodeLabelsRetrieverMock.On("GetNodeLabels", mock.Anything, mock.Anything).Return(map[string]string{"topology.kubernetes.io/zone1": "zone1", "topology.kubernetes.io/zone2": "zone2"}, nil)
+				nodeLabelsRetrieverMock.On("InClusterConfig", mock.Anything).Return(nil, nil)
+				nodeLabelsRetrieverMock.On("NewForConfig", mock.Anything).Return(nil, nil)
 
 				getArrayfn = func(_ *Service) map[string]*array.PowerStoreArray {
 					return map[string]*array.PowerStoreArray{
@@ -6785,12 +6760,12 @@ func TestService_createHost(t *testing.T) {
 				initiators: []string{"initiator1", "initiator2"},
 			},
 			setup: func() {
-				log.Infof("Inside Setup - Failure")
-				getNodeLabelsfn = func(_ *Service, _ string) (map[string]string, error) {
-					log.Infof("InsidegetNode")
-					return map[string]string{"topology.kubernetes.io/zone2": "zone2"}, nil
-				}
 
+				nodeLabelsRetrieverMock = new(mocks.NodeLabelsRetrieverInterface)
+				k8sutils.NodeLabelsRetriever = nodeLabelsRetrieverMock
+				nodeLabelsRetrieverMock.On("GetNodeLabels", mock.Anything, mock.Anything).Return(map[string]string{"topology.kubernetes.io/zone2": "zone2"}, nil)
+				nodeLabelsRetrieverMock.On("InClusterConfig", mock.Anything).Return(nil, nil)
+				nodeLabelsRetrieverMock.On("NewForConfig", mock.Anything).Return(nil, nil)
 				getArrayfn = func(_ *Service) map[string]*array.PowerStoreArray {
 					log.Infof("InsideGetArray")
 
@@ -6860,12 +6835,12 @@ func TestService_createHost(t *testing.T) {
 				initiators: []string{"initiator1", "initiator2"},
 			},
 			setup: func() {
-				log.Infof("Inside Setup - Failure")
-				getNodeLabelsfn = func(_ *Service, _ string) (map[string]string, error) {
-					log.Infof("InsidegetNode")
-					return map[string]string{"topology.kubernetes.io/zone1": "zone1"}, nil
-				}
 
+				nodeLabelsRetrieverMock = new(mocks.NodeLabelsRetrieverInterface)
+				k8sutils.NodeLabelsRetriever = nodeLabelsRetrieverMock
+				nodeLabelsRetrieverMock.On("GetNodeLabels", mock.Anything, mock.Anything).Return(map[string]string{"topology.kubernetes.io/zone1": "zone1"}, nil)
+				nodeLabelsRetrieverMock.On("InClusterConfig", mock.Anything).Return(nil, nil)
+				nodeLabelsRetrieverMock.On("NewForConfig", mock.Anything).Return(nil, nil)
 				getArrayfn = func(_ *Service) map[string]*array.PowerStoreArray {
 					log.Infof("InsideGetArray")
 
@@ -6916,12 +6891,6 @@ func TestService_createHost(t *testing.T) {
 				initiators: []string{"initiator1", "initiator2"},
 			},
 			setup: func() {
-				log.Infof("Inside Setup - Failure")
-				getNodeLabelsfn = func(_ *Service, _ string) (map[string]string, error) {
-					log.Infof("InsidegetNode")
-					return map[string]string{"topology.kubernetes.io/zone1": "zone1"}, nil
-				}
-
 				getArrayfn = func(_ *Service) map[string]*array.PowerStoreArray {
 					log.Infof("InsideGetArray")
 
@@ -6999,12 +6968,6 @@ func TestService_createHost(t *testing.T) {
 				initiators: []string{"initiator1", "initiator2"},
 			},
 			setup: func() {
-				log.Infof("Inside Setup - Failure")
-				getNodeLabelsfn = func(_ *Service, _ string) (map[string]string, error) {
-					log.Infof("InsidegetNode")
-					return map[string]string{"topology.kubernetes.io/zone1": "zone1"}, nil
-				}
-
 				getArrayfn = func(_ *Service) map[string]*array.PowerStoreArray {
 					log.Infof("InsideGetArray")
 
@@ -7041,12 +7004,6 @@ func TestService_createHost(t *testing.T) {
 				initiators: []string{"initiator1", "initiator2"},
 			},
 			setup: func() {
-				log.Infof("Inside Setup - Failure")
-				getNodeLabelsfn = func(_ *Service, _ string) (map[string]string, error) {
-					log.Infof("InsidegetNode")
-					return map[string]string{"topology.kubernetes.io/zone1": "zone1"}, nil
-				}
-
 				getArrayfn = func(_ *Service) map[string]*array.PowerStoreArray {
 					log.Infof("InsideGetArray")
 
@@ -7131,10 +7088,6 @@ func TestService_createHost(t *testing.T) {
 				initiators: []string{"initiator1", "initiator2"},
 			},
 			setup: func() {
-				getNodeLabelsfn = func(_ *Service, _ string) (map[string]string, error) {
-					return map[string]string{"topology.kubernetes.io/zone1": "zone1"}, nil
-				}
-
 				getArrayfn = func(_ *Service) map[string]*array.PowerStoreArray {
 					log.Infof("InsideGetArray")
 
