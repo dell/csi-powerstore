@@ -25,8 +25,8 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-powerstore/v2/mocks"
-	"github.com/dell/csm-hbnfs/nfs"
-	nfsmock "github.com/dell/csm-hbnfs/nfs/mocks"
+	"github.com/dell/csm-sharednfs/nfs"
+	nfsmock "github.com/dell/csm-sharednfs/nfs/mocks"
 	commonext "github.com/dell/dell-csi-extensions/common"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"

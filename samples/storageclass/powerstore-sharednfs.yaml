@@ -1,7 +1,7 @@
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: "powerstore-hbn"
+  name: "powerstore-sharednfs"
 provisioner: "csi-powerstore.dellemc.com"
 parameters:
   # arrayID: id of array to be used for volumes

@@ -9,7 +9,7 @@ require (
 	github.com/apparentlymart/go-cidr v1.1.0
 	github.com/container-storage-interface/spec v1.6.0
 	github.com/dell/csi-metadata-retriever v1.10.0
-	github.com/dell/csm-hbnfs v0.0.0-20250501141233-570087c187f5
+	github.com/dell/csm-sharednfs v0.0.0-20250501154455-b2e65b805092
 	github.com/dell/dell-csi-extensions/common v1.7.1-0.20250417144221-6fcddedebf59
 	github.com/dell/dell-csi-extensions/podmon v1.7.1-0.20250417144221-6fcddedebf59
 	github.com/dell/dell-csi-extensions/replication v1.10.2-0.20250417144221-6fcddedebf59
