@@ -5221,16 +5221,16 @@ func TestHandleNoLabelMatchRegistration(t *testing.T) {
 	originalGetIsHostAlreadyRegistered := getIsHostAlreadyRegistered
 	originalGetAllRemoteSystemsFunc := getAllRemoteSystemsFunc
 	originalGetIsRemoteToOtherArray := getIsRemoteToOtherArray
-	originalCreateHostfunc := CreateHostfunc
 	orginalSetCustomHTTPHeadersFunc := SetCustomHTTPHeadersFunc
 	originalRegisterHostFunc := registerHostFunc
+	clientMock = new(gopowerstoremock.Client)
+	clientMock.On("CreateHost", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validHostID}, nil)
 
 	defer func() {
 		getArrayfn = originalGetArrayfn
 		getIsHostAlreadyRegistered = originalGetIsHostAlreadyRegistered
 		getAllRemoteSystemsFunc = originalGetAllRemoteSystemsFunc
 		getIsRemoteToOtherArray = originalGetIsRemoteToOtherArray
-		CreateHostfunc = originalCreateHostfunc
 		SetCustomHTTPHeadersFunc = orginalSetCustomHTTPHeadersFunc
 		registerHostFunc = originalRegisterHostFunc
 	}()
@@ -5300,12 +5300,6 @@ func TestHandleNoLabelMatchRegistration(t *testing.T) {
 					return true
 				}
 
-				CreateHostfunc = func(_ gopowerstore.Client, _ context.Context, _ *gopowerstore.HostCreate) (gopowerstore.CreateResponse, error) {
-					defaultResponse := gopowerstore.CreateResponse{
-						ID: "id-1",
-					}
-					return defaultResponse, nil
-				}
 			},
 			wantErr: false,
 			want:    true,
@@ -5390,13 +5384,6 @@ func TestHandleNoLabelMatchRegistration(t *testing.T) {
 
 				getIsRemoteToOtherArray = func(_ *Service, _ context.Context, _, _ *array.PowerStoreArray) bool {
 					return true
-				}
-
-				CreateHostfunc = func(_ gopowerstore.Client, _ context.Context, _ *gopowerstore.HostCreate) (gopowerstore.CreateResponse, error) {
-					defaultResponse := gopowerstore.CreateResponse{
-						ID: "id-1",
-					}
-					return defaultResponse, nil
 				}
 
 				registerHostFunc = func(_ *Service, _ context.Context, _ gopowerstore.Client, _ string, _ []string, _ gopowerstore.HostConnectivityEnum) error {
@@ -5489,13 +5476,6 @@ func TestHandleNoLabelMatchRegistration(t *testing.T) {
 					return true
 				}
 
-				CreateHostfunc = func(_ gopowerstore.Client, _ context.Context, _ *gopowerstore.HostCreate) (gopowerstore.CreateResponse, error) {
-					defaultResponse := gopowerstore.CreateResponse{
-						ID: "id-1",
-					}
-					return defaultResponse, nil
-				}
-
 				registerHostFunc = func(_ *Service, _ context.Context, _ gopowerstore.Client, _ string, _ []string, _ gopowerstore.HostConnectivityEnum) error {
 					log.Infof("Inside RegisterHost")
 					return nil
@@ -5584,13 +5564,6 @@ func TestHandleNoLabelMatchRegistration(t *testing.T) {
 
 				getIsRemoteToOtherArray = func(_ *Service, _ context.Context, _, _ *array.PowerStoreArray) bool {
 					return true
-				}
-
-				CreateHostfunc = func(_ gopowerstore.Client, _ context.Context, _ *gopowerstore.HostCreate) (gopowerstore.CreateResponse, error) {
-					defaultResponse := gopowerstore.CreateResponse{
-						ID: "id-1",
-					}
-					return defaultResponse, nil
 				}
 
 				registerHostFunc = func(_ *Service, _ context.Context, _ gopowerstore.Client, _ string, _ []string, _ gopowerstore.HostConnectivityEnum) error {
@@ -5683,13 +5656,6 @@ func TestHandleNoLabelMatchRegistration(t *testing.T) {
 					return true
 				}
 
-				CreateHostfunc = func(_ gopowerstore.Client, _ context.Context, _ *gopowerstore.HostCreate) (gopowerstore.CreateResponse, error) {
-					defaultResponse := gopowerstore.CreateResponse{
-						ID: "id-1",
-					}
-					return defaultResponse, nil
-				}
-
 				registerHostFunc = func(_ *Service, _ context.Context, _ gopowerstore.Client, _ string, _ []string, _ gopowerstore.HostConnectivityEnum) error {
 					log.Infof("Inside RegisterHost")
 					return fmt.Errorf("failed to registerHost")
@@ -5755,13 +5721,6 @@ func TestHandleNoLabelMatchRegistration(t *testing.T) {
 
 				getIsRemoteToOtherArray = func(_ *Service, _ context.Context, _, _ *array.PowerStoreArray) bool {
 					return true
-				}
-
-				CreateHostfunc = func(_ gopowerstore.Client, _ context.Context, _ *gopowerstore.HostCreate) (gopowerstore.CreateResponse, error) {
-					defaultResponse := gopowerstore.CreateResponse{
-						ID: "id-1",
-					}
-					return defaultResponse, nil
 				}
 
 				registerHostFunc = func(_ *Service, _ context.Context, _ gopowerstore.Client, _ string, _ []string, _ gopowerstore.HostConnectivityEnum) error {
@@ -6830,7 +6789,7 @@ func TestService_createHost(t *testing.T) {
 				nodeLabelsRetrieverMock.On("GetNodeLabels", mock.Anything, mock.Anything).Return(map[string]string{"topology.kubernetes.io/zone1": "zone1"}, nil)
 				nodeLabelsRetrieverMock.On("InClusterConfig", mock.Anything).Return(nil, nil)
 				nodeLabelsRetrieverMock.On("NewForConfig", mock.Anything).Return(nil, nil)
-				
+
 				getArrayfn = func(_ *Service) map[string]*array.PowerStoreArray {
 					return map[string]*array.PowerStoreArray{
 						"Array1": {
