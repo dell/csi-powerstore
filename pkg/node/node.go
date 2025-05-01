@@ -1650,7 +1650,6 @@ func (s *Service) getNodeLabels(nodeName string) (map[string]string, error) {
 }
 
 var (
-
 	getArrayfn = func(s *Service) map[string]*array.PowerStoreArray {
 		return s.Arrays()
 	}

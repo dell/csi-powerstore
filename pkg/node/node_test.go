@@ -6506,7 +6506,6 @@ func TestService_createHost(t *testing.T) {
 				initiators: []string{"initiator1", "initiator2"},
 			},
 			setup: func() {
-
 				nodeLabelsRetrieverMock = new(mocks.NodeLabelsRetrieverInterface)
 				k8sutils.NodeLabelsRetriever = nodeLabelsRetrieverMock
 				nodeLabelsRetrieverMock.On("GetNodeLabels", mock.Anything, mock.Anything).Return(map[string]string{"topology.kubernetes.io/zone1": "zone1"}, nil)
@@ -6685,7 +6684,6 @@ func TestService_createHost(t *testing.T) {
 				initiators: []string{"initiator1", "initiator2"},
 			},
 			setup: func() {
-
 				nodeLabelsRetrieverMock = new(mocks.NodeLabelsRetrieverInterface)
 				k8sutils.NodeLabelsRetriever = nodeLabelsRetrieverMock
 				nodeLabelsRetrieverMock.On("GetNodeLabels", mock.Anything, mock.Anything).Return(map[string]string{"topology.kubernetes.io/zone1": "zone1", "topology.kubernetes.io/zone2": "zone2"}, nil)
@@ -6760,7 +6758,6 @@ func TestService_createHost(t *testing.T) {
 				initiators: []string{"initiator1", "initiator2"},
 			},
 			setup: func() {
-
 				nodeLabelsRetrieverMock = new(mocks.NodeLabelsRetrieverInterface)
 				k8sutils.NodeLabelsRetriever = nodeLabelsRetrieverMock
 				nodeLabelsRetrieverMock.On("GetNodeLabels", mock.Anything, mock.Anything).Return(map[string]string{"topology.kubernetes.io/zone2": "zone2"}, nil)
@@ -6835,7 +6832,6 @@ func TestService_createHost(t *testing.T) {
 				initiators: []string{"initiator1", "initiator2"},
 			},
 			setup: func() {
-
 				nodeLabelsRetrieverMock = new(mocks.NodeLabelsRetrieverInterface)
 				k8sutils.NodeLabelsRetriever = nodeLabelsRetrieverMock
 				nodeLabelsRetrieverMock.On("GetNodeLabels", mock.Anything, mock.Anything).Return(map[string]string{"topology.kubernetes.io/zone1": "zone1"}, nil)
