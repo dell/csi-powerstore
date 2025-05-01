@@ -6335,8 +6335,6 @@ func TestService_createHost(t *testing.T) {
 			},
 			setup: func() {
 				getArrayfn = func(_ *Service) map[string]*array.PowerStoreArray {
-					log.Infof("InsideGetArray")
-
 					return map[string]*array.PowerStoreArray{
 						"Array1": {
 							Endpoint:      "https://10.198.0.1/api/rest",
@@ -6553,8 +6551,6 @@ func TestService_createHost(t *testing.T) {
 			},
 			setup: func() {
 				getArrayfn = func(_ *Service) map[string]*array.PowerStoreArray {
-					log.Infof("InsideGetArray")
-
 					return map[string]*array.PowerStoreArray{
 						"Array1": {
 							Endpoint:      "https://10.198.0.1/api/rest",
@@ -6594,7 +6590,6 @@ func TestService_createHost(t *testing.T) {
 				initiators: []string{"initiator1", "initiator2"},
 			},
 			setup: func() {
-
 				getArrayfn = func(_ *Service) map[string]*array.PowerStoreArray {
 					return map[string]*array.PowerStoreArray{
 						"Array1": {
@@ -6731,7 +6726,6 @@ func TestService_createHost(t *testing.T) {
 							},
 						}, nil
 					}
-
 					return []gopowerstore.RemoteSystem{
 						{
 							ID:                  "arrayid2",
@@ -6763,9 +6757,8 @@ func TestService_createHost(t *testing.T) {
 				nodeLabelsRetrieverMock.On("GetNodeLabels", mock.Anything, mock.Anything).Return(map[string]string{"topology.kubernetes.io/zone2": "zone2"}, nil)
 				nodeLabelsRetrieverMock.On("InClusterConfig", mock.Anything).Return(nil, nil)
 				nodeLabelsRetrieverMock.On("NewForConfig", mock.Anything).Return(nil, nil)
-				getArrayfn = func(_ *Service) map[string]*array.PowerStoreArray {
-					log.Infof("InsideGetArray")
 
+				getArrayfn = func(_ *Service) map[string]*array.PowerStoreArray {
 					return map[string]*array.PowerStoreArray{
 						"Array1": {
 							Endpoint:      "https://10.198.0.1/api/rest",
@@ -6837,9 +6830,8 @@ func TestService_createHost(t *testing.T) {
 				nodeLabelsRetrieverMock.On("GetNodeLabels", mock.Anything, mock.Anything).Return(map[string]string{"topology.kubernetes.io/zone1": "zone1"}, nil)
 				nodeLabelsRetrieverMock.On("InClusterConfig", mock.Anything).Return(nil, nil)
 				nodeLabelsRetrieverMock.On("NewForConfig", mock.Anything).Return(nil, nil)
+				
 				getArrayfn = func(_ *Service) map[string]*array.PowerStoreArray {
-					log.Infof("InsideGetArray")
-
 					return map[string]*array.PowerStoreArray{
 						"Array1": {
 							Endpoint:      "https://10.198.0.1/api/rest",
@@ -6888,8 +6880,6 @@ func TestService_createHost(t *testing.T) {
 			},
 			setup: func() {
 				getArrayfn = func(_ *Service) map[string]*array.PowerStoreArray {
-					log.Infof("InsideGetArray")
-
 					return map[string]*array.PowerStoreArray{
 						"Array1": {
 							Endpoint:      "https://10.198.0.1/api/rest",
@@ -6965,8 +6955,6 @@ func TestService_createHost(t *testing.T) {
 			},
 			setup: func() {
 				getArrayfn = func(_ *Service) map[string]*array.PowerStoreArray {
-					log.Infof("InsideGetArray")
-
 					return map[string]*array.PowerStoreArray{
 						"Array1": {
 							Endpoint:      "https://10.198.0.1/api/rest",
@@ -7085,8 +7073,6 @@ func TestService_createHost(t *testing.T) {
 			},
 			setup: func() {
 				getArrayfn = func(_ *Service) map[string]*array.PowerStoreArray {
-					log.Infof("InsideGetArray")
-
 					return map[string]*array.PowerStoreArray{
 						"Array1": {
 							Endpoint:      "https://10.198.0.1/api/rest",
