@@ -113,8 +113,8 @@ github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.8.2-0.20250417144221-
 github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.8.2-0.20250417144221-6fcddedebf59/go.mod h1:XL9900kPbM5eHwl7d/ooE+wL0lNuSIt5R+zJNfGlLhQ=
 github.com/dell/gobrick v1.13.2-0.20250421073258-7cd497fd44fe h1:VpHRqeQgbeOuwnvHf5nHWPLShsHmT7USHvi3yZfcWKs=
 github.com/dell/gobrick v1.13.2-0.20250421073258-7cd497fd44fe/go.mod h1:NnVMtnjjZUNESkHCx3KSNdGYdIa7WN3YRbW+fOr0LCA=
-github.com/dell/gocsi v1.13.1-0.20250423132914-5966abd5770a h1:VRdrnE16CO3UVwbqOVQh4rgJIC9m76rQnEklgoLE39o=
-github.com/dell/gocsi v1.13.1-0.20250423132914-5966abd5770a/go.mod h1:gtJSIvoozueUbySOtuQjpHL+zHp9GuYwum2mkE/BhPI=
+github.com/dell/gocsi v1.13.1-0.20250429191623-c3d2d8e59834 h1:sU1CqG/XHv7/ZYqgk0FPyf/MaAdBSKVpnRdcsvoByuw=
+github.com/dell/gocsi v1.13.1-0.20250429191623-c3d2d8e59834/go.mod h1:YhF+LnH5S8t96qotoLk6wUjMzCwSy8rmnqvx7h4Nc3s=
 github.com/dell/gofsutil v1.18.1-0.20250424071242-3e01ce487273 h1:uijE7GwiGu5EQLQgRMjbedsc1qf7RjiMWBbUI0Y/R4w=
 github.com/dell/gofsutil v1.18.1-0.20250424071242-3e01ce487273/go.mod h1:tAt/uPiEK3aZ8kKvGJs4HnOoZv8qLXtuDoIwQsw5qfA=
 github.com/dell/goiscsi v1.11.1-0.20250414073142-a69a338c4871 h1:oicdQXy5MpcrSW/zUzQnzC+u8Wu8PB+pZWobcePOdAc=
