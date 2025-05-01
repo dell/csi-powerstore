@@ -24,14 +24,19 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"path/filepath"
+	"strings"
 	"syscall"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csm-hbnfs/nfs"
+	"github.com/dell/gofsutil"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 var (
-	osRemove   = os.Remove
+	osRemove   = os.RemoveAll
 	sysUnmount = syscall.Unmount
 )
 
@@ -66,6 +71,7 @@ func (s *service) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublis
 		log.Infof("csi-nfs: RWX calling nfssvc.NodeUnpublishVolume")
 		return nfssvc.NodeUnpublishVolume(ctx, req)
 	}
+
 	return nodeSvc.NodeUnpublishVolume(ctx, req)
 }
 
@@ -161,11 +167,33 @@ func (s *service) UnmountVolume(ctx context.Context, volumeID, exportPath string
 	target := path.Join(exportPath, publishContext[nfs.ServiceName])
 	var err error
 
-	log.Infof("UnmountVolume calling Unmount %s", target)
-	err = sysUnmount(target, 0)
-	if err != nil && !os.IsNotExist(err) {
-		log.Errorf("Could not Umount the target path: %s %s %s", volumeID, target, err.Error())
+	log.Infof("[UnmountVolume] Cleaning the following paths - target: %s, staging: %s", target, staging)
+	target = filepath.Clean(target)
+	staging = filepath.Clean(staging)
+
+	mounts, err := s.retrieveMounts()
+	if err != nil {
 		return err
+	}
+
+	found := false
+	for _, mount := range mounts {
+		if mount.Path == target {
+			log.Infof("[UnmountVolume] Found mount %s, will try to unmount", mount.Path)
+			found = true
+			break
+		}
+	}
+
+	if found {
+		log.Infof("[UnmountVolume] Unmounting %s", target)
+		err = sysUnmount(target, syscall.MNT_FORCE)
+		if err != nil {
+			log.Errorf("Could not Umount the target path: %s %s %s", volumeID, target, err.Error())
+			if !strings.Contains(err.Error(), "no such file") {
+				return err
+			}
+		}
 	}
 
 	err = osRemove(target)
@@ -193,4 +221,14 @@ func (s *service) UnmountVolume(ctx context.Context, volumeID, exportPath string
 	}
 	log.Infof("UnmountVolume %s ALL GOOD", volumeID)
 	return nil
+}
+
+func (s *service) retrieveMounts() ([]gofsutil.Info, error) {
+	mounts, err := s.fs.GetUtil().GetMounts(context.Background())
+	if err != nil {
+		log.Errorf("could not reliably determine existing mount status: %s", err.Error())
+		return nil, status.Errorf(codes.Internal, "could not reliably determine existing mount status: %s", err.Error())
+	}
+
+	return mounts, nil
 }
