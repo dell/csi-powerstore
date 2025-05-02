@@ -1644,10 +1644,6 @@ func (s *Service) updateHost(ctx context.Context, initiators []string, client go
 	return s.modifyHostInitiators(ctx, host.ID, client, initiatorsToAdd, initiatorsToDelete, nil, arrayID, connectivity)
 }
 
-// getNodeLabels retrieves the kubernetes node object and returns its labels
-func (s *Service) getNodeLabels(nodeName string) (map[string]string, error) {
-	return k8sutils.GetNodeLabels(context.Background(), s.opts.KubeConfigPath, nodeName)
-}
 
 var (
 	getArrayfn = func(s *Service) map[string]*array.PowerStoreArray {
@@ -1666,9 +1662,6 @@ var (
 		return s.isRemoteToOtherArray(ctx, arr, remoteArr)
 	}
 
-	CreateHostfunc = func(client gopowerstore.Client, ctx context.Context, createParams *gopowerstore.HostCreate) (gopowerstore.CreateResponse, error) {
-		return client.CreateHost(ctx, createParams)
-	}
 
 	SetCustomHTTPHeadersFunc = func(client gopowerstore.Client, headers http.Header) {
 		client.SetCustomHTTPHeaders(headers)
@@ -1684,7 +1677,7 @@ func (s *Service) createHost(
 	ctx context.Context,
 	initiators []string,
 ) (string, error) {
-	nodeLabels, err := s.getNodeLabels(s.opts.KubeNodeName)
+	nodeLabels, err := k8sutils.GetNodeLabels(context.Background(), s.opts.KubeConfigPath, s.opts.KubeNodeName)
 	if err != nil {
 		return "", fmt.Errorf("failed to get node labels for node %s: %v", s.opts.KubeNodeName, err)
 	}
@@ -2083,7 +2076,7 @@ func (s *Service) registerHost(
 	}
 
 	log.Infof("[registerHost] Creating host on array %s with connectivity: %s", arrayID, connType)
-	resp, err := CreateHostfunc(client, ctx, &createParams)
+	resp, err := client.CreateHost(ctx, &createParams)
 	SetCustomHTTPHeadersFunc(client, nil)
 
 	if err != nil {

@@ -5756,7 +5756,6 @@ func TestHandleLabelMatchRegistration(t *testing.T) {
 	originalGetIsHostAlreadyRegistered := getIsHostAlreadyRegistered
 	originalGetAllRemoteSystemsFunc := getAllRemoteSystemsFunc
 	originalGetIsRemoteToOtherArray := getIsRemoteToOtherArray
-	originalCreateHostfunc := CreateHostfunc
 	orginalSetCustomHTTPHeadersFunc := SetCustomHTTPHeadersFunc
 	originalRegisterHostFunc := registerHostFunc
 
@@ -5765,7 +5764,6 @@ func TestHandleLabelMatchRegistration(t *testing.T) {
 		getIsHostAlreadyRegistered = originalGetIsHostAlreadyRegistered
 		getAllRemoteSystemsFunc = originalGetAllRemoteSystemsFunc
 		getIsRemoteToOtherArray = originalGetIsRemoteToOtherArray
-		CreateHostfunc = originalCreateHostfunc
 		SetCustomHTTPHeadersFunc = orginalSetCustomHTTPHeadersFunc
 		registerHostFunc = originalRegisterHostFunc
 	}()
@@ -6138,7 +6136,6 @@ func TestService_createHost(t *testing.T) {
 	originalGetIsHostAlreadyRegistered := getIsHostAlreadyRegistered
 	originalGetAllRemoteSystemsFunc := getAllRemoteSystemsFunc
 	originalGetIsRemoteToOtherArray := getIsRemoteToOtherArray
-	originalCreateHostfunc := CreateHostfunc
 	orginalSetCustomHTTPHeadersFunc := SetCustomHTTPHeadersFunc
 	originalRegisterHostFunc := registerHostFunc
 	nodeLabelsRetrieverMock = new(mocks.NodeLabelsRetrieverInterface)
@@ -6146,13 +6143,16 @@ func TestService_createHost(t *testing.T) {
 	nodeLabelsRetrieverMock.On("GetNodeLabels", mock.Anything, mock.Anything).Return(map[string]string{"topology.kubernetes.io/zone1": "zone1"}, nil)
 	nodeLabelsRetrieverMock.On("InClusterConfig", mock.Anything).Return(nil, nil)
 	nodeLabelsRetrieverMock.On("NewForConfig", mock.Anything).Return(nil, nil)
+	clientMock = new(gopowerstoremock.Client)
+	clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
+	clientMock.On("CreateHost", mock.Anything, mock.Anything).
+		Return(gopowerstore.CreateResponse{ID: validHostID}, nil)
 
 	defer func() {
 		getArrayfn = originalGetArrayfn
 		getIsHostAlreadyRegistered = originalGetIsHostAlreadyRegistered
 		getAllRemoteSystemsFunc = originalGetAllRemoteSystemsFunc
 		getIsRemoteToOtherArray = originalGetIsRemoteToOtherArray
-		CreateHostfunc = originalCreateHostfunc
 		SetCustomHTTPHeadersFunc = orginalSetCustomHTTPHeadersFunc
 		registerHostFunc = originalRegisterHostFunc
 	}()
@@ -6189,16 +6189,6 @@ func TestService_createHost(t *testing.T) {
 		}, nil
 	}
 
-	CreateHostfunc = func(_ gopowerstore.Client, _ context.Context, _ *gopowerstore.HostCreate) (gopowerstore.CreateResponse, error) {
-		defaultResponse := gopowerstore.CreateResponse{
-			ID: "id-1",
-		}
-		return defaultResponse, nil
-	}
-
-	SetCustomHTTPHeadersFunc = func(_ gopowerstore.Client, _ http.Header) {
-		// do nothing
-	}
 
 	type args struct {
 		ctx        context.Context
@@ -6235,6 +6225,7 @@ func TestService_createHost(t *testing.T) {
 							MetroTopology: "Uniform",
 							Labels:        map[string]string{"topology.kubernetes.io/zone1": "zone2"},
 							IP:            "10.198.0.1",
+							Client:        clientMock,
 						},
 						"Array2": {
 							Endpoint:      "https://10.198.0.2/api/rest",
@@ -6246,6 +6237,7 @@ func TestService_createHost(t *testing.T) {
 							MetroTopology: "Uniform",
 							Labels:        map[string]string{"topology.kubernetes.io/zone1": "zone1"},
 							IP:            "10.198.0.2",
+							Client:        clientMock,
 						},
 					}
 				}
@@ -6275,6 +6267,7 @@ func TestService_createHost(t *testing.T) {
 							MetroTopology: "Uniform",
 							Labels:        map[string]string{"topology.kubernetes.io/zone1": "zone1"},
 							IP:            "10.198.0.1",
+							Client:        clientMock,
 						},
 						"Array2": {
 							Endpoint:      "https://10.198.0.2/api/rest",
@@ -6286,6 +6279,7 @@ func TestService_createHost(t *testing.T) {
 							MetroTopology: "Uniform",
 							Labels:        map[string]string{"topology.kubernetes.io/zone1": "zone2"},
 							IP:            "10.198.0.2",
+							Client:        clientMock,
 						},
 					}
 				}
@@ -6317,6 +6311,7 @@ func TestService_createHost(t *testing.T) {
 							MetroTopology: "Uniform",
 							Labels:        map[string]string{"topology.kubernetes.io/zone1": "zone1"},
 							IP:            "10.198.0.1",
+							Client:        clientMock,
 						},
 						"Array2": {
 							Endpoint:      "https://10.198.0.2/api/rest",
@@ -6328,6 +6323,7 @@ func TestService_createHost(t *testing.T) {
 							MetroTopology: "Uniform",
 							Labels:        map[string]string{"topology.kubernetes.io/zone1": "zone1"},
 							IP:            "10.198.0.2",
+							Client:        clientMock,
 						},
 					}
 				}
@@ -6359,6 +6355,7 @@ func TestService_createHost(t *testing.T) {
 							MetroTopology: "Uniform",
 							Labels:        map[string]string{"topology.kubernetes.io/zone1": "zone2"},
 							IP:            "10.198.0.1",
+							Client:        clientMock,
 						},
 						"Array2": {
 							Endpoint:      "https://10.198.0.2/api/rest",
@@ -6370,6 +6367,7 @@ func TestService_createHost(t *testing.T) {
 							MetroTopology: "Uniform",
 							Labels:        map[string]string{"topology.kubernetes.io/zone1": "zone2"},
 							IP:            "10.198.0.2",
+							Client:        clientMock,
 						},
 					}
 				}
@@ -6405,6 +6403,7 @@ func TestService_createHost(t *testing.T) {
 							MetroTopology: "Uniform",
 							Labels:        map[string]string{"topology.kubernetes.io/zone1": "zone2"},
 							IP:            "10.198.0.1",
+							Client:        clientMock,
 						},
 						"Array2": {
 							Endpoint:      "https://10.198.0.2/api/rest",
@@ -6416,6 +6415,7 @@ func TestService_createHost(t *testing.T) {
 							MetroTopology: "Uniform",
 							Labels:        map[string]string{"topology.kubernetes.io/zone1": "zone1"},
 							IP:            "10.198.0.2",
+							Client:        clientMock,
 						},
 					}
 				}
@@ -6451,6 +6451,7 @@ func TestService_createHost(t *testing.T) {
 							MetroTopology: "Uniform",
 							Labels:        map[string]string{"topology.kubernetes.io/zone1": "zone1", "topology.kubernetes.io/zone2": "zone2"},
 							IP:            "10.198.0.1",
+							Client:        clientMock,
 						},
 						"Array2": {
 							Endpoint:      "https://10.198.0.2/api/rest",
@@ -6462,6 +6463,7 @@ func TestService_createHost(t *testing.T) {
 							MetroTopology: "Uniform",
 							Labels:        map[string]string{"topology.kubernetes.io/zone1": "zone1", "topology.kubernetes.io/zone2": "zone2"},
 							IP:            "10.198.0.2",
+							Client:        clientMock,
 						},
 					}
 				}
@@ -6491,6 +6493,7 @@ func TestService_createHost(t *testing.T) {
 							MetroTopology: "Uniform",
 							Labels:        map[string]string{"topology.kubernetes.io/zone1": "zone1"},
 							IP:            "10.198.0.1",
+							Client:        clientMock,
 						},
 						"Array2": {
 							Endpoint:      "https://10.198.0.2/api/rest",
@@ -6502,6 +6505,7 @@ func TestService_createHost(t *testing.T) {
 							MetroTopology: "Uniform",
 							Labels:        map[string]string{"topology.kubernetes.io/zone1": "zone1", "topology.kubernetes.io/zone2": "zone2"},
 							IP:            "10.198.0.2",
+							Client:        clientMock,
 						},
 					}
 				}
@@ -6531,6 +6535,7 @@ func TestService_createHost(t *testing.T) {
 							MetroTopology: "Uniform",
 							Labels:        map[string]string{"topology.kubernetes.io/zone1": "zone1"},
 							IP:            "10.198.0.1",
+							Client:        clientMock,
 						},
 						"Array2": {
 							Endpoint:      "https://10.198.0.2/api/rest",
@@ -6542,6 +6547,7 @@ func TestService_createHost(t *testing.T) {
 							MetroTopology: "Uniform",
 							Labels:        map[string]string{"topology.kubernetes.io/zone1": "zone1"},
 							IP:            "10.198.0.2",
+							Client:        clientMock,
 						},
 					}
 				}
@@ -6576,6 +6582,7 @@ func TestService_createHost(t *testing.T) {
 							MetroTopology: "Uniform",
 							Labels:        map[string]string{"topology.kubernetes.io/zone1": "zone2"},
 							IP:            "10.198.0.1",
+							Client:        clientMock,
 						},
 						"Array2": {
 							Endpoint:      "https://10.198.0.2/api/rest",
@@ -6587,6 +6594,7 @@ func TestService_createHost(t *testing.T) {
 							MetroTopology: "Uniform",
 							Labels:        map[string]string{"topology.kubernetes.io/zone1": "zone1"},
 							IP:            "10.198.0.2",
+							Client:        clientMock,
 						},
 					}
 				}
@@ -6626,6 +6634,7 @@ func TestService_createHost(t *testing.T) {
 							MetroTopology: "Uniform",
 							Labels:        map[string]string{"topology.kubernetes.io/zone1": "zone1"},
 							IP:            "10.198.0.1",
+							Client:        clientMock,
 						},
 						"Array2": {
 							Endpoint:      "https://10.198.0.2/api/rest",
@@ -6637,6 +6646,7 @@ func TestService_createHost(t *testing.T) {
 							MetroTopology: "Uniform",
 							Labels:        map[string]string{"topology.kubernetes.io/zone2": "zone2"},
 							IP:            "10.198.0.2",
+							Client:        clientMock,
 						},
 					}
 				}
@@ -6699,6 +6709,7 @@ func TestService_createHost(t *testing.T) {
 							MetroTopology: "Uniform",
 							Labels:        map[string]string{"topology.kubernetes.io/zone1": "zone2"},
 							IP:            "10.198.0.1",
+							Client:        clientMock,
 						},
 						"Array2": {
 							Endpoint:      "https://10.198.0.2/api/rest",
@@ -6710,6 +6721,7 @@ func TestService_createHost(t *testing.T) {
 							MetroTopology: "Uniform",
 							Labels:        map[string]string{"topology.kubernetes.io/zone2": "zone2"},
 							IP:            "10.198.0.2",
+							Client:        clientMock,
 						},
 					}
 				}
@@ -6772,6 +6784,7 @@ func TestService_createHost(t *testing.T) {
 							MetroTopology: "Uniform",
 							Labels:        map[string]string{"topology.kubernetes.io/zone1": "zone2"},
 							IP:            "10.198.0.1",
+							Client:        clientMock,
 						},
 						"Array2": {
 							Endpoint:      "https://10.198.0.2/api/rest",
@@ -6783,6 +6796,7 @@ func TestService_createHost(t *testing.T) {
 							MetroTopology: "Uniform",
 							Labels:        map[string]string{"topology.kubernetes.io/zone1": "zone1"},
 							IP:            "10.198.0.2",
+							Client:        clientMock,
 						},
 					}
 				}
@@ -6820,6 +6834,7 @@ func TestService_createHost(t *testing.T) {
 							MetroTopology: "Uniform",
 							Labels:        map[string]string{"topology.kubernetes.io/zone1": "zone2"},
 							IP:            "10.198.0.1",
+							Client:        clientMock,
 						},
 						"Array2": {
 							Endpoint:      "https://10.198.0.2/api/rest",
@@ -6831,6 +6846,7 @@ func TestService_createHost(t *testing.T) {
 							MetroTopology: "Uniform",
 							Labels:        map[string]string{"topology.kubernetes.io/zone1": "zone1"},
 							IP:            "10.198.0.2",
+							Client:        clientMock,
 						},
 					}
 				}
@@ -6866,9 +6882,11 @@ func TestService_createHost(t *testing.T) {
 					return false
 				}
 
-				CreateHostfunc = func(_ gopowerstore.Client, _ context.Context, _ *gopowerstore.HostCreate) (gopowerstore.CreateResponse, error) {
-					return gopowerstore.CreateResponse{}, fmt.Errorf("failed to create host")
-				}
+				clientMock = new(gopowerstoremock.Client)
+				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
+				clientMock.On("CreateHost", mock.Anything, mock.Anything).
+					Return(gopowerstore.CreateResponse{}, fmt.Errorf("failed to create host"))
+
 			},
 			want:    []string{},
 			wantErr: true,
@@ -6892,6 +6910,7 @@ func TestService_createHost(t *testing.T) {
 							Password:      "Password123!",
 							Insecure:      true,
 							BlockProtocol: "auto",
+							Client:        clientMock,
 						},
 					}
 				}
@@ -6900,9 +6919,10 @@ func TestService_createHost(t *testing.T) {
 					return false
 				}
 
-				CreateHostfunc = func(_ gopowerstore.Client, _ context.Context, _ *gopowerstore.HostCreate) (gopowerstore.CreateResponse, error) {
-					return gopowerstore.CreateResponse{}, fmt.Errorf("failed to create host")
-				}
+				clientMock = new(gopowerstoremock.Client)
+				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
+				clientMock.On("CreateHost", mock.Anything, mock.Anything).
+					Return(gopowerstore.CreateResponse{}, fmt.Errorf("failed to create host"))
 			},
 			want:    []string{},
 			wantErr: true,
@@ -6931,6 +6951,7 @@ func TestService_createHost(t *testing.T) {
 							MetroTopology: "Uniform",
 							Labels:        map[string]string{"topology.kubernetes.io/zone1": "zone2"},
 							IP:            "10.198.0.1",
+							Client:        clientMock,
 						},
 						"Array2": {
 							Endpoint:      "https://10.198.0.2/api/rest",
@@ -6942,6 +6963,7 @@ func TestService_createHost(t *testing.T) {
 							MetroTopology: "Uniform",
 							Labels:        map[string]string{"topology.kubernetes.io/zone1": "zone1"},
 							IP:            "10.198.0.2",
+							Client:        clientMock,
 						},
 					}
 				}
@@ -6978,12 +7000,11 @@ func TestService_createHost(t *testing.T) {
 					return false
 				}
 
-				CreateHostfunc = func(_ gopowerstore.Client, _ context.Context, _ *gopowerstore.HostCreate) (gopowerstore.CreateResponse, error) {
-					defaultResponse := gopowerstore.CreateResponse{
-						ID: "id-1",
-					}
-					return defaultResponse, nil
-				}
+				clientMock = new(gopowerstoremock.Client)
+				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
+				clientMock.On("CreateHost", mock.Anything, mock.Anything).
+					Return(gopowerstore.CreateResponse{ID: validHostID}, nil)
+
 				getIsRemoteToOtherArray = func(_ *Service, _ context.Context, _, _ *array.PowerStoreArray) bool {
 					return false
 				}
@@ -7013,6 +7034,7 @@ func TestService_createHost(t *testing.T) {
 							MetroTopology: "Uniform",
 							Labels:        map[string]string{"topology.kubernetes.io/zone1": "zone2"},
 							IP:            "10.198.0.1",
+							Client:        clientMock,
 						},
 						"Array2": {
 							Endpoint:      "https://10.198.0.2/api/rest",
@@ -7024,6 +7046,7 @@ func TestService_createHost(t *testing.T) {
 							MetroTopology: "Uniform",
 							Labels:        map[string]string{"topology.kubernetes.io/zone1": "zone1"},
 							IP:            "10.198.0.2",
+							Client:        clientMock,
 						},
 					}
 				}
@@ -7059,9 +7082,10 @@ func TestService_createHost(t *testing.T) {
 					return false
 				}
 
-				CreateHostfunc = func(_ gopowerstore.Client, _ context.Context, _ *gopowerstore.HostCreate) (gopowerstore.CreateResponse, error) {
-					return gopowerstore.CreateResponse{}, fmt.Errorf("failed to create host")
-				}
+				clientMock = new(gopowerstoremock.Client)
+				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
+				clientMock.On("CreateHost", mock.Anything, mock.Anything).
+					Return(gopowerstore.CreateResponse{}, fmt.Errorf("failed to create host"))
 
 				registerHostFunc = func(_ *Service, _ context.Context, _ gopowerstore.Client, _ string, _ []string, _ gopowerstore.HostConnectivityEnum) error {
 					return fmt.Errorf("failed to registerHost")
