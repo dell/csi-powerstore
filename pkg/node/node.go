@@ -31,7 +31,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/dell/csm-hbnfs/nfs"
+	"github.com/dell/csm-sharednfs/nfs"
 	"github.com/dell/gonvme"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
