@@ -105,6 +105,8 @@ github.com/dell/csm-sharednfs v0.0.0-20250501154455-b2e65b805092 h1:MUo3LruPg9uZ
 github.com/dell/csm-sharednfs v0.0.0-20250501154455-b2e65b805092/go.mod h1:+flf+ETu0LkNUDVFEybV7fJtO6MEHedg816CILTrXhs=
 github.com/dell/csm-sharednfs v0.0.0-20250502125408-f39c226355c5 h1:f57cS9szYY3Id4PU68XjKfSv/BlURmiwd4umMxaYAeo=
 github.com/dell/csm-sharednfs v0.0.0-20250502125408-f39c226355c5/go.mod h1:+flf+ETu0LkNUDVFEybV7fJtO6MEHedg816CILTrXhs=
+github.com/dell/csm-sharednfs v0.0.0-20250502175820-0215caa207ad h1:PAzZpAoyKq7rMxIc3DQWHO7fnjgNuUdXokFJ4jwKOsg=
+github.com/dell/csm-sharednfs v0.0.0-20250502175820-0215caa207ad/go.mod h1:+flf+ETu0LkNUDVFEybV7fJtO6MEHedg816CILTrXhs=
 github.com/dell/dell-csi-extensions/common v1.7.1-0.20250417144221-6fcddedebf59 h1:XFwQVs0xU5qnRdjeY3YrWx6s33FW5lJ0tbXf6xUplfw=
 github.com/dell/dell-csi-extensions/common v1.7.1-0.20250417144221-6fcddedebf59/go.mod h1:0cJvgNiPOosCJujd60aV9ZTujsHbRJNXX0ARRMDyjfw=
 github.com/dell/dell-csi-extensions/podmon v1.7.1-0.20250417144221-6fcddedebf59 h1:+AdjYW32ofGgCWXleGSSw/qvw1ECLXXZl2ZV458Gc0w=
