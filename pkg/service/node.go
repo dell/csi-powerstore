@@ -59,7 +59,7 @@ func (s *service) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVol
 // NodePublishVolume publishes volume to the node by mounting it to the target path
 func (s *service) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
 	if nfs.IsNFSVolumeID(req.GetVolumeId()) {
-		log.Infof("csi-nfs: RWX calling nfssvc.NodePublishVolume")
+		log.Infof("shared-nfs: RWX calling nfssvc.NodePublishVolume")
 		return nfssvc.NodePublishVolume(ctx, req)
 	}
 	return nodeSvc.NodePublishVolume(ctx, req)
@@ -68,7 +68,7 @@ func (s *service) NodePublishVolume(ctx context.Context, req *csi.NodePublishVol
 // NodeUnpublishVolume unpublishes volume from the node by unmounting it from the target path
 func (s *service) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) {
 	if nfs.IsNFSVolumeID(req.GetVolumeId()) {
-		log.Infof("csi-nfs: RWX calling nfssvc.NodeUnpublishVolume")
+		log.Infof("shared-nfs: RWX calling nfssvc.NodeUnpublishVolume")
 		return nfssvc.NodeUnpublishVolume(ctx, req)
 	}
 
