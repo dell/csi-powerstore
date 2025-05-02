@@ -101,8 +101,8 @@ github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc h1:U9qPSI2PIWSS1
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/dell/csi-metadata-retriever v1.10.0 h1:OMzbwSJ+CMOTpf4WgcrSbT3j9Ve1txuLmYkfSTkRSBc=
 github.com/dell/csi-metadata-retriever v1.10.0/go.mod h1:ppgtPHlxaRNmNizU+TnxZLz8tNotTAwByZ/Lg32n660=
-github.com/dell/csm-hbnfs v0.0.0-20250428180458-f8a6d9ecb8c2 h1:29PgwImmlKmzZZO+j0o+qI8vZ9i1PdslgpD9xszI/MM=
-github.com/dell/csm-hbnfs v0.0.0-20250428180458-f8a6d9ecb8c2/go.mod h1:s0wmTFb45ajEnWcdWA/n/rWbPSKiBE6P7gRIJG5bTv4=
+github.com/dell/csm-sharednfs v0.0.0-20250501154455-b2e65b805092 h1:MUo3LruPg9uZ0xetjI0Kg8GG52zceeEpa61WHcy2yhY=
+github.com/dell/csm-sharednfs v0.0.0-20250501154455-b2e65b805092/go.mod h1:+flf+ETu0LkNUDVFEybV7fJtO6MEHedg816CILTrXhs=
 github.com/dell/dell-csi-extensions/common v1.7.1-0.20250417144221-6fcddedebf59 h1:XFwQVs0xU5qnRdjeY3YrWx6s33FW5lJ0tbXf6xUplfw=
 github.com/dell/dell-csi-extensions/common v1.7.1-0.20250417144221-6fcddedebf59/go.mod h1:0cJvgNiPOosCJujd60aV9ZTujsHbRJNXX0ARRMDyjfw=
 github.com/dell/dell-csi-extensions/podmon v1.7.1-0.20250417144221-6fcddedebf59 h1:+AdjYW32ofGgCWXleGSSw/qvw1ECLXXZl2ZV458Gc0w=
