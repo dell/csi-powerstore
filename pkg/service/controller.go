@@ -23,7 +23,7 @@ import (
 	"context"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/dell/csm-hbnfs/nfs"
+	"github.com/dell/csm-sharednfs/nfs"
 	commonext "github.com/dell/dell-csi-extensions/common"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
@@ -62,7 +62,7 @@ func createHostBasedNFSVolume(ctx context.Context, req *csi.CreateVolumeRequest)
 		}
 	}
 
-	log.Infof("csi-nfs: RWX calling nfssvc.CreateVolume")
+	log.Infof("shared-nfs: RWX calling nfssvc.CreateVolume")
 	return nfssvc.CreateVolume(ctx, req)
 }
 
@@ -123,7 +123,7 @@ func (s *service) ControllerPublishVolume(ctx context.Context, req *csi.Controll
 	}
 
 	if nfs.IsNFSVolumeID(csiVolID) {
-		log.Infof("csi-nfs: RWX calling nfssvc.ControllerPublishVolume")
+		log.Infof("shared-nfs: RWX calling nfssvc.ControllerPublishVolume")
 		return nfssvc.ControllerPublishVolume(ctx, req)
 	}
 	return controllerSvc.ControllerPublishVolume(ctx, req)
@@ -133,7 +133,7 @@ func (s *service) ControllerPublishVolume(ctx context.Context, req *csi.Controll
 func (s *service) ControllerUnpublishVolume(ctx context.Context, req *csi.ControllerUnpublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) {
 	log := getLogger(ctx)
 	if nfs.IsNFSVolumeID(req.GetVolumeId()) {
-		log.Info("csi-nfs: calling nfssrv.Controller.UnpublishVolume")
+		log.Info("shared-nfs: calling nfssrv.Controller.UnpublishVolume")
 		return nfssvc.ControllerUnpublishVolume(ctx, req)
 	}
 	return controllerSvc.ControllerUnpublishVolume(ctx, req)

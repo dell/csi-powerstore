@@ -1,7 +1,7 @@
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: "powerstore-hbn"
+  name: "powerstore-sharednfs"
 provisioner: "csi-powerstore.dellemc.com"
 parameters:
   # arrayID: id of array to be used for volumes
@@ -9,7 +9,7 @@ parameters:
   # Optional: false
   # Default value: None
   arrayID: globalID
-  csi-nfs: RWX
+  shared-nfs: RWX
   csi.storage.k8s.io/fstype: "ext4"
 
 # reclaimPolicy: PVs that are dynamically created by a StorageClass will have the reclaim policy specified here

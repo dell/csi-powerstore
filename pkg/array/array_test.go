@@ -31,7 +31,7 @@ import (
 	"github.com/dell/csi-powerstore/v2/pkg/array"
 	"github.com/dell/csi-powerstore/v2/pkg/common"
 	"github.com/dell/csi-powerstore/v2/pkg/common/fs"
-	hbnfs "github.com/dell/csm-hbnfs/nfs"
+	sharednfs "github.com/dell/csm-sharednfs/nfs"
 	"github.com/dell/gofsutil"
 	"github.com/dell/gopowerstore"
 	"github.com/dell/gopowerstore/api"
@@ -395,7 +395,7 @@ func TestParseVolumeID(t *testing.T) {
 
 	localVolUUID := "aaaaaaaa-0000-bbbb-1111-cccccccccccc"
 	powerstoreLocalSystemID := "PS000000000001"
-	HBNFSVolumeID := hbnfs.CsiNfsPrefixDash + localVolUUID + "/" + powerstoreLocalSystemID + "/" + scsi
+	SharedNFSVolumeID := sharednfs.CsiNfsPrefixDash + localVolUUID + "/" + powerstoreLocalSystemID + "/" + scsi
 	type args struct {
 		ctx          context.Context
 		volumeHandle string
@@ -412,12 +412,12 @@ func TestParseVolumeID(t *testing.T) {
 			name: "parse volume handle for a host-based nfs volume",
 			args: args{
 				ctx:          context.Background(),
-				volumeHandle: HBNFSVolumeID,
+				volumeHandle: SharedNFSVolumeID,
 				defaultArray: nil,
 				vc:           nil,
 			},
 			want: array.VolumeHandle{
-				LocalUUID:           hbnfs.CsiNfsPrefixDash + localVolUUID,
+				LocalUUID:           sharednfs.CsiNfsPrefixDash + localVolUUID,
 				LocalArrayGlobalID:  powerstoreLocalSystemID,
 				RemoteUUID:          "",
 				RemoteArrayGlobalID: "",
@@ -489,9 +489,9 @@ func Test_getVolumeIDPrefix(t *testing.T) {
 		{
 			name: "volume UUID with host-based nfs prefix",
 			args: args{
-				ID: hbnfs.CsiNfsPrefixDash + validBlockVolumeUUID,
+				ID: sharednfs.CsiNfsPrefixDash + validBlockVolumeUUID,
 			},
-			wantPrefix: hbnfs.CsiNfsPrefixDash,
+			wantPrefix: sharednfs.CsiNfsPrefixDash,
 		},
 	}
 	for _, tt := range tests {
