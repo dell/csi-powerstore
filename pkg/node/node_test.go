@@ -6561,7 +6561,6 @@ func TestService_createHost(t *testing.T) {
 				initiators: []string{"initiator1", "initiator2"},
 			},
 			setup: func() {
-
 				getArrayfn = func(_ *Service) map[string]*array.PowerStoreArray {
 					return map[string]*array.PowerStoreArray{
 						"Array1": {
