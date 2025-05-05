@@ -1714,13 +1714,13 @@ func (s *Service) createHost(
 		}
 
 		if len(arr.Labels) > 1 {
-			log.Infof("[createHost] Skipping Metro array %s: more than one label", arr.GlobalID)
+			log.Warnf("[createHost] Skipping Metro array %s: more than one label", arr.GlobalID)
 			continue
 		}
 
 		// 4) Skip Metro arrays if this node doesn’t match any Metro array label
 		if !anyLabelMatch {
-			log.Infof("[createHost] Node does not match any Metro array labels — skipping Metro registration for %s", arr.GlobalID)
+			log.Warnf("[createHost] Node does not match any Metro array labels — skipping Metro registration for %s", arr.GlobalID)
 			continue
 		}
 
