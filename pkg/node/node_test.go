@@ -425,62 +425,6 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 		})
 
 		ginkgo.When("there IS a suitable host", func() {
-			// ginkgo.When("nodeID == hostName", func() {
-			// 	ginkgo.It("should reuse host [no initiator updates]", func() {
-			// 		iscsiConnectorMock.On("GetInitiatorName", mock.Anything).
-			// 			Return(validISCSIInitiators, nil)
-			// 		nvmeConnectorMock.On("GetInitiatorName", mock.Anything).
-			// 			Return(validNVMEInitiators, nil)
-			// 		fcConnectorMock.On("GetInitiatorPorts", mock.Anything).
-			// 			Return(validFCTargetsWWPN, nil)
-
-			// 		clientMock.On("GetHostByName", mock.Anything, mock.AnythingOfType("string")).
-			// 			Return(gopowerstore.Host{
-			// 				ID: "host-id",
-			// 				Initiators: []gopowerstore.InitiatorInstance{
-			// 					{
-			// 						PortName: validISCSIInitiators[0],
-			// 						PortType: gopowerstore.InitiatorProtocolTypeEnumISCSI,
-			// 					},
-			// 					{
-			// 						PortName: validISCSIInitiators[1],
-			// 						PortType: gopowerstore.InitiatorProtocolTypeEnumISCSI,
-			// 					},
-			// 				},
-			// 				Name: "host-name",
-			// 			}, nil)
-			// 		setDefaultNodeLabelsMock()
-			// 		err := nodeSvc.Init()
-			// 		gomega.Expect(err).To(gomega.BeNil())
-			// 	})
-
-			// 	ginkgo.It("should modify host [update initiators]", func() {
-			// 		iscsiConnectorMock.On("GetInitiatorName", mock.Anything).
-			// 			Return(validISCSIInitiators, nil)
-			// 		nvmeConnectorMock.On("GetInitiatorName", mock.Anything).
-			// 			Return(validNVMEInitiators, nil)
-			// 		fcConnectorMock.On("GetInitiatorPorts", mock.Anything).
-			// 			Return(validFCTargetsWWPN, nil)
-
-			// 		clientMock.On("GetHostByName", mock.Anything, mock.AnythingOfType("string")).
-			// 			Return(gopowerstore.Host{
-			// 				ID: "host-id",
-			// 				Initiators: []gopowerstore.InitiatorInstance{{
-			// 					PortName: "not-matching-port-name",
-			// 					PortType: gopowerstore.InitiatorProtocolTypeEnumISCSI,
-			// 				}},
-			// 				Name: "host-name",
-			// 			}, nil)
-
-			// 		clientMock.On("ModifyHost", mock.Anything, mock.Anything, "host-id").
-			// 			Return(gopowerstore.CreateResponse{}, nil)
-			// 		setDefaultNodeLabelsMock()
-
-			// 		err := nodeSvc.Init()
-			// 		gomega.Expect(err).To(gomega.BeNil())
-			// 	})
-			// })
-
 			ginkgo.When("nodeID != hostName", func() {
 				ginkgo.It("should reuse host", func() {
 					nodeSvc.nodeID = ""
