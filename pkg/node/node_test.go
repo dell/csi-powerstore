@@ -7022,7 +7022,7 @@ func TestService_createHost(t *testing.T) {
 					Return(gopowerstore.CreateResponse{}, fmt.Errorf("failed to create host"))
 
 				registerHostFunc = func(_ *Service, _ context.Context, _ gopowerstore.Client, _ string, _ []string, _ gopowerstore.HostConnectivityEnum) error {
-					return fmt.Errorf("failed to registerHost")
+					return fmt.Errorf("failed to register Host")
 				}
 			},
 			want:    []string{},
