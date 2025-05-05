@@ -6877,7 +6877,6 @@ func TestService_createHost(t *testing.T) {
 				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 				clientMock.On("CreateHost", mock.Anything, mock.Anything).
 					Return(gopowerstore.CreateResponse{}, fmt.Errorf("failed to create host"))
-
 			},
 			want:    []string{},
 			wantErr: true,
