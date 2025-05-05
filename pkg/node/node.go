@@ -1640,10 +1640,8 @@ func (s *Service) buildInitiatorsArray(initiators []string, arrayID string) []go
 // create or update host on PowerStore array
 func (s *Service) updateHost(ctx context.Context, initiators []string, client gopowerstore.Client, host gopowerstore.Host, arrayID string, connectivity *gopowerstore.HostConnectivityEnum) error {
 	initiatorsToAdd, initiatorsToDelete := checkIQNS(initiators, host)
-
 	return s.modifyHostInitiators(ctx, host.ID, client, initiatorsToAdd, initiatorsToDelete, nil, arrayID, connectivity)
 }
-
 
 var (
 	getArrayfn = func(s *Service) map[string]*array.PowerStoreArray {
@@ -1660,11 +1658,6 @@ var (
 
 	getIsRemoteToOtherArray = func(s *Service, ctx context.Context, arr, remoteArr *array.PowerStoreArray) bool {
 		return s.isRemoteToOtherArray(ctx, arr, remoteArr)
-	}
-
-
-	SetCustomHTTPHeadersFunc = func(client gopowerstore.Client, headers http.Header) {
-		client.SetCustomHTTPHeaders(headers)
 	}
 
 	registerHostFunc = func(s *Service, ctx context.Context, client gopowerstore.Client, arrayID string, initiators []string, connType gopowerstore.HostConnectivityEnum) error {
@@ -2077,7 +2070,7 @@ func (s *Service) registerHost(
 
 	log.Infof("[registerHost] Creating host on array %s with connectivity: %s", arrayID, connType)
 	resp, err := client.CreateHost(ctx, &createParams)
-	SetCustomHTTPHeadersFunc(client, nil)
+	client.SetCustomHTTPHeaders(nil)
 
 	if err != nil {
 		if connType == gopowerstore.HostConnectivityEnumMetroOptimizeRemote &&

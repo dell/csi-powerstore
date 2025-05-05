@@ -5221,7 +5221,6 @@ func TestHandleNoLabelMatchRegistration(t *testing.T) {
 	originalGetIsHostAlreadyRegistered := getIsHostAlreadyRegistered
 	originalGetAllRemoteSystemsFunc := getAllRemoteSystemsFunc
 	originalGetIsRemoteToOtherArray := getIsRemoteToOtherArray
-	orginalSetCustomHTTPHeadersFunc := SetCustomHTTPHeadersFunc
 	originalRegisterHostFunc := registerHostFunc
 
 	defer func() {
@@ -5229,7 +5228,6 @@ func TestHandleNoLabelMatchRegistration(t *testing.T) {
 		getIsHostAlreadyRegistered = originalGetIsHostAlreadyRegistered
 		getAllRemoteSystemsFunc = originalGetAllRemoteSystemsFunc
 		getIsRemoteToOtherArray = originalGetIsRemoteToOtherArray
-		SetCustomHTTPHeadersFunc = orginalSetCustomHTTPHeadersFunc
 		registerHostFunc = originalRegisterHostFunc
 	}()
 
@@ -5756,7 +5754,6 @@ func TestHandleLabelMatchRegistration(t *testing.T) {
 	originalGetIsHostAlreadyRegistered := getIsHostAlreadyRegistered
 	originalGetAllRemoteSystemsFunc := getAllRemoteSystemsFunc
 	originalGetIsRemoteToOtherArray := getIsRemoteToOtherArray
-	orginalSetCustomHTTPHeadersFunc := SetCustomHTTPHeadersFunc
 	originalRegisterHostFunc := registerHostFunc
 
 	defer func() {
@@ -5764,7 +5761,6 @@ func TestHandleLabelMatchRegistration(t *testing.T) {
 		getIsHostAlreadyRegistered = originalGetIsHostAlreadyRegistered
 		getAllRemoteSystemsFunc = originalGetAllRemoteSystemsFunc
 		getIsRemoteToOtherArray = originalGetIsRemoteToOtherArray
-		SetCustomHTTPHeadersFunc = orginalSetCustomHTTPHeadersFunc
 		registerHostFunc = originalRegisterHostFunc
 	}()
 
@@ -5832,7 +5828,6 @@ func TestHandleLabelMatchRegistration(t *testing.T) {
 				getIsRemoteToOtherArray = func(_ *Service, _ context.Context, _, _ *array.PowerStoreArray) bool {
 					return true
 				}
-
 			},
 			wantErr: false,
 			want:    false,
@@ -6136,7 +6131,6 @@ func TestService_createHost(t *testing.T) {
 	originalGetIsHostAlreadyRegistered := getIsHostAlreadyRegistered
 	originalGetAllRemoteSystemsFunc := getAllRemoteSystemsFunc
 	originalGetIsRemoteToOtherArray := getIsRemoteToOtherArray
-	orginalSetCustomHTTPHeadersFunc := SetCustomHTTPHeadersFunc
 	originalRegisterHostFunc := registerHostFunc
 	nodeLabelsRetrieverMock = new(mocks.NodeLabelsRetrieverInterface)
 	k8sutils.NodeLabelsRetriever = nodeLabelsRetrieverMock
@@ -6153,7 +6147,6 @@ func TestService_createHost(t *testing.T) {
 		getIsHostAlreadyRegistered = originalGetIsHostAlreadyRegistered
 		getAllRemoteSystemsFunc = originalGetAllRemoteSystemsFunc
 		getIsRemoteToOtherArray = originalGetIsRemoteToOtherArray
-		SetCustomHTTPHeadersFunc = orginalSetCustomHTTPHeadersFunc
 		registerHostFunc = originalRegisterHostFunc
 	}()
 
@@ -6188,7 +6181,6 @@ func TestService_createHost(t *testing.T) {
 			},
 		}, nil
 	}
-
 
 	type args struct {
 		ctx        context.Context
