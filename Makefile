@@ -27,18 +27,19 @@ endif
 clean:
 	rm -f core/core_generated.go
 	rm -f semver.mk
-	go clean
+	go clean -cache
 
-build:
+generate:
 	go generate ./cmd/csi-powerstore
+
+build: generate
 	GOOS=linux CGO_ENABLED=0 go build ./cmd/csi-powerstore
 
 dev-docker: build
 	docker build -t csi-powerstore-hbn -f dev-docker-file --network host .
 	docker images | head -10
 
-install:
-	go generate ./cmd/csi-powerstore
+install: generate
 	GOOS=linux CGO_ENABLED=0 go install ./cmd/csi-powerstore
 
 # Tags the release with the Tag parameters set above
@@ -72,7 +73,7 @@ mocks:
 	mockery
 
 test:
-	go clean -cache; cd ./pkg; go test -race -cover -coverprofile=coverage.out ./...
+	cd ./pkg; go test -race -cover -coverprofile=coverage.out ./...
 
 coverage:
 	cd ./pkg; go tool cover -html=coverage.out -o coverage.html

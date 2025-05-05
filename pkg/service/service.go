@@ -23,11 +23,13 @@ import (
 	"time"
 
 	"github.com/dell/csi-powerstore/v2/pkg/common"
+	"github.com/dell/csi-powerstore/v2/pkg/common/fs"
 	"github.com/dell/csi-powerstore/v2/pkg/controller"
 	"github.com/dell/csi-powerstore/v2/pkg/node"
-	"github.com/dell/csm-hbnfs/nfs"
+	"github.com/dell/csm-sharednfs/nfs"
 	"github.com/dell/gocsi"
 	csictx "github.com/dell/gocsi/context"
+	"github.com/dell/gofsutil"
 	"github.com/fsnotify/fsnotify"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -55,10 +57,13 @@ var (
 
 type service struct {
 	mode string
+	fs   fs.Interface
 }
 
 func New() nfs.Service {
-	return &service{}
+	return &service{
+		fs: &fs.Fs{Util: &gofsutil.FS{}},
+	}
 }
 
 func (s *service) BeforeServe(ctx context.Context, sp *gocsi.StoragePlugin, lis net.Listener) error {
@@ -71,26 +76,33 @@ func (s *service) BeforeServe(ctx context.Context, sp *gocsi.StoragePlugin, lis 
 	if nodeName == "" {
 		nodeName = os.Getenv("KUBE_NODE_NAME")
 	}
+
 	if nodeName == "" {
 		nodeName = os.Getenv("X_CSI_NODE_NAME")
 	}
-	if nodeName == "" {
-		panic("X_CSI_NODE_NAME or X_CSI_POWERSTORE_KUBE_NODE_NAME or KUBE_NODE_NAME environment variable not set")
-	}
+
 	if s.mode == "node" {
 		nodeRoot := os.Getenv(common.EnvNodeChrootPath)
 		if nodeRoot == "" {
-			panic("X_CSI_POWERSTORE_NODE_CHROOT_PATH environment variable not set")
+			return fmt.Errorf("X_CSI_POWERSTORE_NODE_CHROOT_PATH environment variable not set")
 		}
 		nfs.NodeRoot = nodeRoot
 	}
+
 	err := os.Setenv("X_CSI_NODE_NAME", nodeName)
 	if err != nil {
 		log.Errorf("failed to set env X_CSI_NODE_NAME. err: %s", err.Error())
 		return err
 	}
+
 	log.Infof("Setting node name env to %s for NFS", nodeName)
-	return nfssvc.BeforeServe(ctx, sp, lis)
+
+	err = nfssvc.BeforeServe(ctx, sp, lis)
+	if err != nil {
+		log.Errorf("unable to start up nfsserver: %s", err.Error())
+	}
+
+	return nil
 }
 
 func (s *service) RegisterAdditionalServers(server *grpc.Server) {

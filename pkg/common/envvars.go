@@ -109,4 +109,7 @@ const (
 
 	// EnvNFSExportDirectory is the path to the folder where the nfs volumes are mounted
 	EnvNFSExportDirectory = "X_CSI_NFS_EXPORT_DIRECTORY"
+
+	// EnvDriverNamespace is the namespace where the powerstore driver is deployed
+	EnvDriverNamespace = "X_CSI_DRIVER_NAMESPACE"
 )

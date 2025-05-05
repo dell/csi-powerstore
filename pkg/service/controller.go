@@ -23,7 +23,7 @@ import (
 	"context"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/dell/csm-hbnfs/nfs"
+	"github.com/dell/csm-sharednfs/nfs"
 	commonext "github.com/dell/dell-csi-extensions/common"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
@@ -43,10 +43,52 @@ func (s *service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 		params[CsiNfsParameter] = "RWX"
 	}
 	if nfs.IsNFSStorageClass(params) {
-		log.Infof("csi-nfs: RWX calling nfssvc.CreateVolume")
-		return nfssvc.CreateVolume(ctx, req)
+		return createHostBasedNFSVolume(ctx, req)
 	}
+
 	return controllerSvc.CreateVolume(ctx, req)
+}
+
+func createHostBasedNFSVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
+	if contentSource := req.GetVolumeContentSource(); contentSource != nil {
+		// remove the nfs- prefix when cloning a host-based nfs volume,
+		// otherwise parsing the ID in the driver may fail to remove the prefix,
+		// and subsequent calls to the storage system API will fail because of a
+		// malformed volume UUID.
+		log.Info("creating host-based NFS volume from an existing source")
+		err := removeNFSPrefixFromSourceID(contentSource)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	log.Infof("shared-nfs: RWX calling nfssvc.CreateVolume")
+	return nfssvc.CreateVolume(ctx, req)
+}
+
+// removeNFSPrefixFromSourceID removes the nfs- prefix from a volume ID when a
+// volume is specified as the volume content source of a CreateVolume request.
+func removeNFSPrefixFromSourceID(source *csi.VolumeContentSource) error {
+	// if a volume is specified as volume content source, remove the nfs- prefix
+	if volume := source.GetVolume(); volume != nil {
+		if volume.VolumeId == "" {
+			return status.Error(codes.InvalidArgument,
+				"the volume ID of the volume to be cloned cannot be empty")
+		}
+		if !nfs.IsNFSVolumeID(volume.VolumeId) {
+			return status.Error(codes.InvalidArgument,
+				"the volume ID of the volume to be cloned must be of the host-based NFS type")
+		}
+		log.Infof("volume, %s, specified as volume content source", volume.VolumeId)
+		log.Debug("removing \"nfs-\" prefix from volume ID")
+		volume.VolumeId = nfs.ToArrayVolumeID(volume.VolumeId)
+	}
+	// snapshots should have been created without the "nfs-" prefix
+	if snapshot := source.GetSnapshot(); snapshot != nil {
+		log.Infof("snapshot, %s, specified as volume content source", snapshot.SnapshotId)
+	}
+
+	return nil
 }
 
 // DeleteVolume deletes either FileSystem or Volume from storage array.
@@ -81,7 +123,7 @@ func (s *service) ControllerPublishVolume(ctx context.Context, req *csi.Controll
 	}
 
 	if nfs.IsNFSVolumeID(csiVolID) {
-		log.Infof("csi-nfs: RWX calling nfssvc.ControllerPublishVolume")
+		log.Infof("shared-nfs: RWX calling nfssvc.ControllerPublishVolume")
 		return nfssvc.ControllerPublishVolume(ctx, req)
 	}
 	return controllerSvc.ControllerPublishVolume(ctx, req)
@@ -91,7 +133,7 @@ func (s *service) ControllerPublishVolume(ctx context.Context, req *csi.Controll
 func (s *service) ControllerUnpublishVolume(ctx context.Context, req *csi.ControllerUnpublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) {
 	log := getLogger(ctx)
 	if nfs.IsNFSVolumeID(req.GetVolumeId()) {
-		log.Info("csi-nfs: calling nfssrv.Controller.UnpublishVolume")
+		log.Info("shared-nfs: calling nfssrv.Controller.UnpublishVolume")
 		return nfssvc.ControllerUnpublishVolume(ctx, req)
 	}
 	return controllerSvc.ControllerUnpublishVolume(ctx, req)

@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"github.com/dell/csi-powerstore/v2/pkg/array"
+	"github.com/dell/csm-sharednfs/nfs"
 	csiext "github.com/dell/dell-csi-extensions/replication"
 	"github.com/dell/gopowerstore"
 	log "github.com/sirupsen/logrus"
@@ -37,11 +38,26 @@ func (s *Service) CreateRemoteVolume(ctx context.Context,
 	if volID == "" {
 		return nil, status.Error(codes.InvalidArgument, "volume ID is required")
 	}
+	params := req.GetParameters()
 
-	id, arrayID, protocol, _, _, err := array.ParseVolumeID(ctx, volID, s.DefaultArray(), nil)
+	volumeHandle, err := array.ParseVolumeID(ctx, volID, s.DefaultArray(), nil)
 	if err != nil {
 		log.Error(err)
 		return nil, err
+	}
+	id := volumeHandle.LocalUUID
+	arrayID := volumeHandle.LocalArrayGlobalID
+	protocol := volumeHandle.Protocol
+
+	volPrefix := ""
+	if accessMode, ok := params[nfs.CsiNfsParameter]; ok && accessMode != "" {
+		// host-based nfs volumes should have the "shared-nfs" parameter
+		// and an "nfs-" prefix in the volume ID that we need to remove
+		// for gopowerstore queries to succeed.
+		// Remove the prefix here and restore it when building the volume ID
+		// for the function response.
+		volPrefix = array.GetVolumeUUIDPrefix(id)
+		id = strings.TrimPrefix(id, volPrefix)
 	}
 
 	arr, ok := s.Arrays()[arrayID]
@@ -93,7 +109,10 @@ func (s *Service) CreateRemoteVolume(ctx context.Context,
 		s.replicationContextPrefix + "arrayID":           remoteSystem.SerialNumber,
 		s.replicationContextPrefix + "managementAddress": remoteSystem.ManagementAddress,
 	}
-	remoteVolume := getRemoteCSIVolume(remoteVolumeID+"/"+remoteParams[s.replicationContextPrefix+"arrayID"]+"/"+protocol, vol.Size)
+	remoteVolume := getRemoteCSIVolume(
+		volPrefix+remoteVolumeID+"/"+remoteParams[s.replicationContextPrefix+"arrayID"]+"/"+protocol,
+		vol.Size,
+	)
 	remoteVolume.VolumeContext = remoteParams
 	return &csiext.CreateRemoteVolumeResponse{
 		RemoteVolume: remoteVolume,
@@ -108,11 +127,24 @@ func (s *Service) CreateStorageProtectionGroup(ctx context.Context,
 	if volID == "" {
 		return nil, status.Error(codes.InvalidArgument, "volume ID is required")
 	}
+	params := req.GetParameters()
 
-	id, arrayID, protocol, _, _, err := array.ParseVolumeID(ctx, volID, s.DefaultArray(), nil)
+	volumeHandle, err := array.ParseVolumeID(ctx, volID, s.DefaultArray(), nil)
 	if err != nil {
 		log.Error(err)
 		return nil, err
+	}
+
+	id := volumeHandle.LocalUUID
+	arrayID := volumeHandle.LocalArrayGlobalID
+	protocol := volumeHandle.Protocol
+
+	if accessMode, ok := params[nfs.CsiNfsParameter]; ok && accessMode != "" {
+		// host-based nfs volumes should have the "shared-nfs" parameter
+		// and a "nfs-" prefix in the volume ID that we need to remove
+		// for gopowerstore queries to succeed
+		volPrefix := array.GetVolumeUUIDPrefix(id)
+		id = strings.TrimPrefix(id, volPrefix)
 	}
 
 	arr, ok := s.Arrays()[arrayID]

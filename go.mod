@@ -1,6 +1,8 @@
 module github.com/dell/csi-powerstore/v2
 
-go 1.24
+go 1.24.0
+
+toolchain go1.24.2
 
 replace github.com/dell/csm-hbnfs => ./csm-hbnfs
 
@@ -9,20 +11,21 @@ require (
 	github.com/apparentlymart/go-cidr v1.1.0
 	github.com/container-storage-interface/spec v1.8.0
 	github.com/dell/csi-metadata-retriever v1.10.0
-	github.com/dell/csm-hbnfs v0.0.0-20250401143151-95f13808d5cc
-	github.com/dell/dell-csi-extensions/common v1.7.1-0.20250404130030-01c3966b4bf6
-	github.com/dell/dell-csi-extensions/podmon v1.7.1-0.20250404130030-01c3966b4bf6
-	github.com/dell/dell-csi-extensions/replication v1.10.2-0.20250404130030-01c3966b4bf6
-	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.8.2-0.20250404130030-01c3966b4bf6
-	github.com/dell/gobrick v1.13.2-0.20250402132208-a383585969b3
-	github.com/dell/gocsi v1.13.1-0.20250327070427-854e59aaa95d
-	github.com/dell/gofsutil v1.18.1-0.20250402125640-883e291241f3
-	github.com/dell/goiscsi v1.11.1-0.20250327070438-0d5eaba96f39
-	github.com/dell/gonvme v1.10.2-0.20250327070413-9877f9a59ca9
-	github.com/dell/gopowerstore v1.18.1-0.20250327070356-d9ef961a7dbe
+	github.com/dell/csm-sharednfs v0.0.0-20250502175820-0215caa207ad
+	github.com/dell/dell-csi-extensions/common v1.7.1-0.20250429070859-de50563d621e
+	github.com/dell/dell-csi-extensions/podmon v1.7.1-0.20250429070859-de50563d621e
+	github.com/dell/dell-csi-extensions/replication v1.10.2-0.20250429070859-de50563d621e
+	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.8.2-0.20250417144221-6fcddedebf59
+	github.com/dell/gobrick v1.13.2-0.20250421073258-7cd497fd44fe
+	github.com/dell/gocsi v1.13.1-0.20250429191623-c3d2d8e59834
+	github.com/dell/gofsutil v1.18.1-0.20250424071242-3e01ce487273
+	github.com/dell/goiscsi v1.11.1-0.20250414073142-a69a338c4871
+	github.com/dell/gonvme v1.10.2-0.20250502050802-983cf3a533b7
+	github.com/dell/gopowerstore v1.18.1-0.20250411160922-a4e8cc4e5545
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/go-openapi/strfmt v0.23.0
 	github.com/golang/mock v1.6.0
+	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
 	github.com/kubernetes-csi/csi-lib-utils v0.11.0
@@ -35,13 +38,13 @@ require (
 	github.com/uber/jaeger-client-go v2.30.0+incompatible
 	github.com/uber/jaeger-lib v2.4.1+incompatible
 	go.uber.org/mock v0.5.0
-	golang.org/x/net v0.38.0
-	google.golang.org/grpc v1.71.0
+	golang.org/x/net v0.39.0
+	google.golang.org/grpc v1.72.0
 	google.golang.org/protobuf v1.36.5
 	gopkg.in/yaml.v3 v3.0.1
-	k8s.io/api v0.32.3
-	k8s.io/apimachinery v0.32.3
-	k8s.io/client-go v0.32.3
+	k8s.io/api v0.33.0
+	k8s.io/apimachinery v0.33.0
+	k8s.io/client-go v0.33.0
 )
 
 require (
@@ -65,8 +68,6 @@ require (
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/gnostic-models v0.6.9 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
-	github.com/google/gofuzz v1.2.0 // indirect
-	github.com/google/uuid v1.6.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/compress v1.17.11 // indirect
@@ -84,7 +85,6 @@ require (
 	github.com/prometheus/client_model v0.6.1 // indirect
 	github.com/prometheus/common v0.62.0 // indirect
 	github.com/prometheus/procfs v0.15.1 // indirect
-	github.com/rogpeppe/go-internal v1.13.1 // indirect
 	github.com/sagikazarmark/locafero v0.7.0 // indirect
 	github.com/sourcegraph/conc v0.3.0 // indirect
 	github.com/spf13/afero v1.12.0 // indirect
@@ -102,22 +102,23 @@ require (
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.0 // indirect
-	golang.org/x/oauth2 v0.25.0 // indirect
-	golang.org/x/sync v0.12.0 // indirect
-	golang.org/x/sys v0.31.0 // indirect
-	golang.org/x/term v0.30.0 // indirect
-	golang.org/x/text v0.23.0 // indirect
+	golang.org/x/oauth2 v0.27.0 // indirect
+	golang.org/x/sync v0.13.0 // indirect
+	golang.org/x/sys v0.32.0 // indirect
+	golang.org/x/term v0.31.0 // indirect
+	golang.org/x/text v0.24.0 // indirect
 	golang.org/x/time v0.9.0 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20250106144421-5f5ef82da422 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20250115164207-1a7da9e5054f // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20250218202821-56aae31c358a // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20250218202821-56aae31c358a // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 	k8s.io/component-base v0.32.1 // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
-	k8s.io/kube-openapi v0.0.0-20241105132330-32ad38e42d3f // indirect
+	k8s.io/kube-openapi v0.0.0-20250318190949-c8a335a9a2ff // indirect
 	k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738 // indirect
 	sigs.k8s.io/json v0.0.0-20241014173422-cfa47c3a1cc8 // indirect
-	sigs.k8s.io/structured-merge-diff/v4 v4.5.0 // indirect
+	sigs.k8s.io/randfill v1.0.0 // indirect
+	sigs.k8s.io/structured-merge-diff/v4 v4.6.0 // indirect
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )

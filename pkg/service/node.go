@@ -24,15 +24,19 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 	"syscall"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/dell/csm-hbnfs/nfs"
+	"github.com/dell/csm-sharednfs/nfs"
+	"github.com/dell/gofsutil"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 var (
-	osRemove   = os.Remove
+	osRemove   = os.RemoveAll
 	sysUnmount = syscall.Unmount
 )
 
@@ -57,7 +61,7 @@ func (s *service) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVol
 // NodePublishVolume publishes volume to the node by mounting it to the target path
 func (s *service) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
 	if nfs.IsNFSVolumeID(req.GetVolumeId()) {
-		log.Infof("csi-nfs: RWX calling nfssvc.NodePublishVolume")
+		log.Infof("shared-nfs: RWX calling nfssvc.NodePublishVolume")
 		return nfssvc.NodePublishVolume(ctx, req)
 	}
 	return nodeSvc.NodePublishVolume(ctx, req)
@@ -66,9 +70,10 @@ func (s *service) NodePublishVolume(ctx context.Context, req *csi.NodePublishVol
 // NodeUnpublishVolume unpublishes volume from the node by unmounting it from the target path
 func (s *service) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) {
 	if nfs.IsNFSVolumeID(req.GetVolumeId()) {
-		log.Infof("csi-nfs: RWX calling nfssvc.NodeUnpublishVolume")
+		log.Infof("shared-nfs: RWX calling nfssvc.NodeUnpublishVolume")
 		return nfssvc.NodeUnpublishVolume(ctx, req)
 	}
+
 	return nodeSvc.NodeUnpublishVolume(ctx, req)
 }
 
@@ -164,15 +169,37 @@ func (s *service) UnmountVolume(ctx context.Context, volumeID, exportPath string
 	target := path.Join(exportPath, publishContext[nfs.ServiceName])
 	var err error
 
-	log.Infof("UnmountVolume calling Unmount %s", target)
-	err = sysUnmount(target, 0)
-	if err != nil && !strings.Contains(err.Error(), "No such file") {
-		log.Errorf("could not unmount the target path: %s %s %s", volumeID, target, err.Error())
+	log.Infof("[UnmountVolume] Cleaning the following paths - target: %s, staging: %s", target, staging)
+	target = filepath.Clean(target)
+	staging = filepath.Clean(staging)
+
+	mounts, err := s.retrieveMounts()
+	if err != nil {
 		return err
 	}
 
+	found := false
+	for _, mount := range mounts {
+		if mount.Path == target {
+			log.Infof("[UnmountVolume] Found mount %s, will try to unmount", mount.Path)
+			found = true
+			break
+		}
+	}
+
+	if found {
+		log.Infof("[UnmountVolume] Unmounting %s", target)
+		err = sysUnmount(target, syscall.MNT_FORCE)
+		if err != nil {
+			log.Errorf("Could not Umount the target path: %s %s %s", volumeID, target, err.Error())
+			if !strings.Contains(err.Error(), "no such file") {
+				return err
+			}
+		}
+	}
+
 	err = osRemove(target)
-	if err != nil && !strings.Contains(err.Error(), "No such file") {
+	if err != nil && !os.IsNotExist(err) {
 		log.Errorf("UnmountVolume %s could not remove directory %s: %s", volumeID, target, err.Error())
 		return err
 	}
@@ -191,9 +218,19 @@ func (s *service) UnmountVolume(ctx context.Context, volumeID, exportPath string
 
 	// Remove the staging path.
 	err = osRemove(staging)
-	if err != nil && !strings.Contains(err.Error(), "No such file") {
+	if err != nil && !os.IsNotExist(err) {
 		log.Infof("UnmountVolume Remove %s staging path %s failed: %s", volumeID, "/noderoot/"+staging, err)
 	}
 	log.Infof("UnmountVolume %s ALL GOOD", volumeID)
 	return nil
+}
+
+func (s *service) retrieveMounts() ([]gofsutil.Info, error) {
+	mounts, err := s.fs.GetUtil().GetMounts(context.Background())
+	if err != nil {
+		log.Errorf("could not reliably determine existing mount status: %s", err.Error())
+		return nil, status.Errorf(codes.Internal, "could not reliably determine existing mount status: %s", err.Error())
+	}
+
+	return mounts, nil
 }
