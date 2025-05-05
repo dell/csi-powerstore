@@ -162,7 +162,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 	ginkgo.Describe("calling CreateVolume()", func() {
 		ginkgo.When("creating block volume", func() {
 			ginkgo.It("should successfully create block volume", func() {
-				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+				clientMock.On("GetCustomHTTPHeaders").Return(api.NewSafeHeader().GetHeader())
 				clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
 				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 				clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
@@ -195,7 +195,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 		})
 
 		ginkgo.It("should successfully create block volume and vol attributes should be set", func() {
-			clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+			clientMock.On("GetCustomHTTPHeaders").Return(api.NewSafeHeader().GetHeader())
 			clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
 			clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 			clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
@@ -252,7 +252,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 		})
 
 		ginkgo.It("should create volume and volumeGroup if policy exists - ASYNC", func() {
-			clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+			clientMock.On("GetCustomHTTPHeaders").Return(api.NewSafeHeader().GetHeader())
 			clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
 			clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 			// all entities not exists
@@ -294,7 +294,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 		})
 
 		ginkgo.It("should create volume and volumeGroup if policy exists - SYNC", func() {
-			clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+			clientMock.On("GetCustomHTTPHeaders").Return(api.NewSafeHeader().GetHeader())
 			clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
 			clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 			// Setting Replciation mode and corresponding attributes for SYNC
@@ -364,7 +364,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			createGroupRequest := &gopowerstore.VolumeGroupCreate{Name: validNamespacedGroupName, ProtectionPolicyID: validPolicyID}
 			clientMock.On("CreateVolumeGroup", mock.Anything, createGroupRequest).Return(gopowerstore.CreateResponse{ID: validGroupID}, nil)
 			clientMock.On("GetVolumeGroup", mock.Anything, validGroupID).Return(gopowerstore.VolumeGroup{ID: validGroupID, ProtectionPolicyID: validPolicyID}, nil)
-			clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+			clientMock.On("GetCustomHTTPHeaders").Return(api.NewSafeHeader().GetHeader())
 			clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
 			clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 			clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
@@ -422,7 +422,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			createGroupRequest := &gopowerstore.VolumeGroupCreate{Name: validNamespacedGroupNameSync, ProtectionPolicyID: validPolicyID}
 			clientMock.On("CreateVolumeGroup", mock.Anything, createGroupRequest).Return(gopowerstore.CreateResponse{ID: validGroupID}, nil)
 			clientMock.On("GetVolumeGroup", mock.Anything, validGroupID).Return(gopowerstore.VolumeGroup{ID: validGroupID, ProtectionPolicyID: validPolicyID}, nil)
-			clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+			clientMock.On("GetCustomHTTPHeaders").Return(api.NewSafeHeader().GetHeader())
 			clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
 			clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 			clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
@@ -460,7 +460,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 
 			req.Parameters[KeyCSIPVCName] = req.Name
 			req.Parameters[KeyCSIPVCNamespace] = validNamespaceName
-			clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+			clientMock.On("GetCustomHTTPHeaders").Return(api.NewSafeHeader().GetHeader())
 			clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
 			clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 			clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
@@ -500,7 +500,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 
 			req.Parameters[KeyCSIPVCName] = req.Name
 			req.Parameters[KeyCSIPVCNamespace] = validNamespaceName
-			clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+			clientMock.On("GetCustomHTTPHeaders").Return(api.NewSafeHeader().GetHeader())
 			clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
 			clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 			clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
@@ -541,7 +541,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 
 			req.Parameters[KeyCSIPVCName] = req.Name
 			req.Parameters[KeyCSIPVCNamespace] = validNamespaceName
-			clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+			clientMock.On("GetCustomHTTPHeaders").Return(api.NewSafeHeader().GetHeader())
 			clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
 			clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 			clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
@@ -562,7 +562,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 
 			req.Parameters[KeyCSIPVCName] = req.Name
 			req.Parameters[KeyCSIPVCNamespace] = validNamespaceName
-			clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+			clientMock.On("GetCustomHTTPHeaders").Return(api.NewSafeHeader().GetHeader())
 			clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
 			clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 			clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
@@ -604,7 +604,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			// Setting Replciation mode and corresponding attributes for SYNC
 			req.Parameters[ctrlSvc.WithRP(KeyReplicationMode)] = replicationModeSync
 			req.Parameters[ctrlSvc.WithRP(KeyReplicationRPO)] = zeroRPO
-			clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+			clientMock.On("GetCustomHTTPHeaders").Return(api.NewSafeHeader().GetHeader())
 			clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
 			clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 			clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
@@ -647,7 +647,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			// Setting Replciation mode and corresponding attributes for SYNC
 			req.Parameters[ctrlSvc.WithRP(KeyReplicationMode)] = replicationModeSync
 			req.Parameters[ctrlSvc.WithRP(KeyReplicationRPO)] = zeroRPO
-			clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+			clientMock.On("GetCustomHTTPHeaders").Return(api.NewSafeHeader().GetHeader())
 			clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
 			clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 			clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
@@ -717,7 +717,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 
 			EnsureProtectionPolicyExistsMockSync()
 
-			clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+			clientMock.On("GetCustomHTTPHeaders").Return(api.NewSafeHeader().GetHeader())
 			clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
 			clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 			clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
@@ -822,7 +822,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				configureMetroRequest = &gopowerstore.MetroConfig{RemoteSystemID: validRemoteSystemID}
 				req.Parameters[ctrlSvc.WithRP(KeyReplicationMode)] = "METRO"
 
-				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+				clientMock.On("GetCustomHTTPHeaders").Return(api.NewSafeHeader().GetHeader())
 				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 				clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
 				clientMock.On("GetRemoteSystemByName", mock.Anything, validRemoteSystemName).Return(gopowerstore.RemoteSystem{
@@ -1296,7 +1296,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 		ginkgo.When("volume name already in use", func() {
 			ginkgo.It("should return existing volume [Block]", func() {
 				volName := "my-vol"
-				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+				clientMock.On("GetCustomHTTPHeaders").Return(api.NewSafeHeader().GetHeader())
 				clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
 				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 				clientMock.On("CreateVolume", mock.Anything, mock.Anything).
@@ -1387,7 +1387,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			ginkgo.When("existing volume size is smaller", func() {
 				ginkgo.It("should fail [Block]", func() {
 					volName := "my-vol"
-					clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+					clientMock.On("GetCustomHTTPHeaders").Return(api.NewSafeHeader().GetHeader())
 					clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
 					clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 					clientMock.On("CreateVolume", mock.Anything, mock.Anything).
@@ -1653,7 +1653,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 
 		ginkgo.When("there is no array IP in storage class", func() {
 			ginkgo.It("should use default array", func() {
-				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+				clientMock.On("GetCustomHTTPHeaders").Return(api.NewSafeHeader().GetHeader())
 				clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
 				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 				clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
@@ -4437,7 +4437,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 		ginkgo.When("everything is ok and arrayip is provided", func() {
 			ginkgo.It("should succeed", func() {
 				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
-				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+				clientMock.On("GetCustomHTTPHeaders").Return(api.NewSafeHeader().GetHeader())
 				clientMock.On("GetCapacity", mock.Anything).Return(int64(123123123), nil)
 				clientMock.On("GetMaxVolumeSize", mock.Anything).Return(int64(-1), nil)
 				req := &csi.GetCapacityRequest{
@@ -4454,7 +4454,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 		ginkgo.When("everything is ok and array ip is not provided", func() {
 			ginkgo.It("should succeed", func() {
 				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
-				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+				clientMock.On("GetCustomHTTPHeaders").Return(api.NewSafeHeader().GetHeader())
 				clientMock.On("GetCapacity", mock.Anything).Return(int64(123123123), nil)
 				clientMock.On("GetMaxVolumeSize", mock.Anything).Return(int64(-1), nil)
 				req := &csi.GetCapacityRequest{
@@ -4469,7 +4469,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 		ginkgo.When("wrong arrayIP in params", func() {
 			ginkgo.It("should fail with predefined errmsg", func() {
 				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
-				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+				clientMock.On("GetCustomHTTPHeaders").Return(api.NewSafeHeader().GetHeader())
 				clientMock.On("GetCapacity", mock.Anything).Return(int64(123123123), nil)
 				clientMock.On("GetMaxVolumeSize", mock.Anything).Return(int64(-1), nil)
 				req := &csi.GetCapacityRequest{
@@ -4487,7 +4487,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 		ginkgo.When("everything is correct, but API failed", func() {
 			ginkgo.It("should fail with predefined errmsg", func() {
 				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
-				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+				clientMock.On("GetCustomHTTPHeaders").Return(api.NewSafeHeader().GetHeader())
 				clientMock.On("GetCapacity", mock.Anything).Return(int64(123123123), errors.New("APIErrorUnexpected"))
 				clientMock.On("GetMaxVolumeSize", mock.Anything).Return(int64(-1), nil)
 				req := &csi.GetCapacityRequest{
@@ -4505,7 +4505,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 		ginkgo.When("everything is correct, but GetMaxVolumeSize API failed", func() {
 			ginkgo.It("MaximumVolumeSize should not be set in the response", func() {
 				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
-				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+				clientMock.On("GetCustomHTTPHeaders").Return(api.NewSafeHeader().GetHeader())
 				clientMock.On("GetCapacity", mock.Anything).Return(int64(123123123), nil)
 				req := &csi.GetCapacityRequest{
 					Parameters: map[string]string{},
@@ -4521,7 +4521,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 		ginkgo.When("negative MaximumVolumeSize", func() {
 			ginkgo.It("MaximumVolumeSize should not be set in the response", func() {
 				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
-				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+				clientMock.On("GetCustomHTTPHeaders").Return(api.NewSafeHeader().GetHeader())
 				clientMock.On("GetCapacity", mock.Anything).Return(int64(123123123), nil)
 				req := &csi.GetCapacityRequest{
 					Parameters: map[string]string{},
@@ -4537,7 +4537,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 		ginkgo.When("non negative MaximumVolumeSize", func() {
 			ginkgo.It("MaximumVolumeSize should be set in the response", func() {
 				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
-				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+				clientMock.On("GetCustomHTTPHeaders").Return(api.NewSafeHeader().GetHeader())
 				clientMock.On("GetCapacity", mock.Anything).Return(int64(123123123), nil)
 				req := &csi.GetCapacityRequest{
 					Parameters: map[string]string{},

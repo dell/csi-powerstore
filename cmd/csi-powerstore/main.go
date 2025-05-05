@@ -19,9 +19,12 @@ package main
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
 	"time"
+
+	_ "net/http/pprof"
 
 	"github.com/dell/csi-powerstore/v2/core"
 	"github.com/dell/csi-powerstore/v2/pkg/common"
@@ -91,7 +94,18 @@ func initilizeDriverConfigParams() {
 	updateDriverConfigParams(paramsViper)
 }
 
+func pprofInit() {
+	go func() {
+		log.Println("Starting pprof server on :6060")
+		if err := http.ListenAndServe("0.0.0.0:6060", nil); err != nil {
+			log.Fatalf("pprof server failed: %v", err)
+		}
+	}()
+}
+
 func main() {
+	pprofInit()
+
 	f := &fs.Fs{Util: &gofsutil.FS{}}
 
 	common.RmSockFile(f)

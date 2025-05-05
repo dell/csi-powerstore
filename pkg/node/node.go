@@ -23,7 +23,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/http"
 	"os"
 	"path"
 	"path/filepath"
@@ -33,6 +32,7 @@ import (
 
 	"github.com/dell/csm-hbnfs/nfs"
 	"github.com/dell/gonvme"
+	"github.com/dell/gopowerstore/api"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-powerstore/v2/pkg/array"
@@ -1679,7 +1679,7 @@ func (s *Service) createHost(ctx context.Context, initiators []string, client go
 	var createParams gopowerstore.HostCreate
 	defaultHeaders := client.GetCustomHTTPHeaders()
 	if defaultHeaders == nil {
-		defaultHeaders = make(http.Header)
+		defaultHeaders = api.NewSafeHeader().GetHeader()
 	}
 	customHeaders := defaultHeaders
 	k8sMetadataSupported := common.IsK8sMetadataSupported(client)

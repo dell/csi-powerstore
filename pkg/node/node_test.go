@@ -318,7 +318,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 						}},
 						Name: "host-name",
 					}}, nil)
-				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+				clientMock.On("GetCustomHTTPHeaders").Return(api.NewSafeHeader().GetHeader())
 				clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
 				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 				clientMock.On("CreateHost", mock.Anything, mock.Anything).
@@ -598,7 +598,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 						}},
 						Name: "host-name",
 					}}, nil)
-				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+				clientMock.On("GetCustomHTTPHeaders").Return(api.NewSafeHeader().GetHeader())
 				clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
 				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 				clientMock.On("CreateHost", mock.Anything, mock.Anything).
@@ -644,7 +644,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 						Name: "host-name",
 					}}, nil)
 
-				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+				clientMock.On("GetCustomHTTPHeaders").Return(api.NewSafeHeader().GetHeader())
 				clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
 				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 				clientMock.On("CreateHost", mock.Anything, mock.Anything).
@@ -698,7 +698,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 						Name: "host-name",
 					}}, nil)
 
-				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+				clientMock.On("GetCustomHTTPHeaders").Return(api.NewSafeHeader().GetHeader())
 				clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
 				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 				clientMock.On("CreateHost", mock.Anything, mock.Anything).
@@ -740,7 +740,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 						}},
 						Name: "host-name",
 					}}, nil)
-				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+				clientMock.On("GetCustomHTTPHeaders").Return(api.NewSafeHeader().GetHeader())
 				clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
 				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 				clientMock.On("CreateHost", mock.Anything, mock.Anything).
@@ -784,7 +784,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 						}},
 						Name: "host-name",
 					}}, nil)
-				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+				clientMock.On("GetCustomHTTPHeaders").Return(api.NewSafeHeader().GetHeader())
 				clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
 				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 				clientMock.On("CreateHost", mock.Anything, mock.Anything).
@@ -830,7 +830,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 						Name: "host-name",
 					}}, nil)
 
-				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+				clientMock.On("GetCustomHTTPHeaders").Return(api.NewSafeHeader().GetHeader())
 				clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
 				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 				clientMock.On("CreateHost", mock.Anything, mock.Anything).
@@ -4416,7 +4416,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					}},
 					Name: "host-name",
 				}}, nil)
-			clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+			clientMock.On("GetCustomHTTPHeaders").Return(api.NewSafeHeader().GetHeader())
 			clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
 			clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 			clientMock.On("CreateHost", mock.Anything, mock.Anything).

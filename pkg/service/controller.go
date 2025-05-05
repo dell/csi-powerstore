@@ -21,7 +21,6 @@ package service
 
 import (
 	"context"
-	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csm-hbnfs/nfs"
@@ -39,8 +38,6 @@ const (
 
 // CreateVolume creates either FileSystem or Volume on storage array.
 func (s *service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
-	deadlineTimeout, _ := ctx.Deadline()
-	log.Infof("[Bharath] CreateVolume - deadline = %v", time.Until(deadlineTimeout))
 	params := req.GetParameters()
 	if params[CsiNfsParameter] != "" {
 		params[CsiNfsParameter] = "RWX"

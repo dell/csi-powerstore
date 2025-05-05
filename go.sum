@@ -151,6 +151,12 @@ github.com/dell/gopowerstore v1.18.1-0.20250430174200-d253a74108b2 h1:lQhrMNFRIj
 github.com/dell/gopowerstore v1.18.1-0.20250430174200-d253a74108b2/go.mod h1:ZEF/MMMvPk/JdPeKIUGZFXd+AgQxVqCw/NePpV3QcHc=
 github.com/dell/gopowerstore v1.18.1-0.20250430180651-56753aa6eae4 h1:JCabQVrjzHSS/ie0N2uSSXxgrz5IyqQVdtZ82BD3xtw=
 github.com/dell/gopowerstore v1.18.1-0.20250430180651-56753aa6eae4/go.mod h1:ZEF/MMMvPk/JdPeKIUGZFXd+AgQxVqCw/NePpV3QcHc=
+github.com/dell/gopowerstore v1.18.1-0.20250501163149-53b8121eec7b h1:Cl6j8/KBu0OT+lbuNRgiUr17WmXh8qft6z/0qO3PkUQ=
+github.com/dell/gopowerstore v1.18.1-0.20250501163149-53b8121eec7b/go.mod h1:ZEF/MMMvPk/JdPeKIUGZFXd+AgQxVqCw/NePpV3QcHc=
+github.com/dell/gopowerstore v1.18.1-0.20250501165705-01252dca98b6 h1:19jHo2rSZQtjf46LmPgf5ZLuiCmtL2epb0xmLuVWKBk=
+github.com/dell/gopowerstore v1.18.1-0.20250501165705-01252dca98b6/go.mod h1:ZEF/MMMvPk/JdPeKIUGZFXd+AgQxVqCw/NePpV3QcHc=
+github.com/dell/gopowerstore v1.18.1-0.20250501174714-6b872affa85b h1:0XpbpUGJSi26PKCp49ovBYUk7Fz7+IPTOjxXWH1oTkI=
+github.com/dell/gopowerstore v1.18.1-0.20250501174714-6b872affa85b/go.mod h1:ZEF/MMMvPk/JdPeKIUGZFXd+AgQxVqCw/NePpV3QcHc=
 github.com/dgrijalva/jwt-go v3.2.0+incompatible/go.mod h1:E3ru+11k8xSBh+hMPgOLZmtrrCbhqsmaPHjLKYnJCaQ=
 github.com/dgryski/go-sip13 v0.0.0-20181026042036-e10d5fee7954/go.mod h1:vAd38F8PWV+bWy6jNmig1y/TA+kYO4g3RSRF0IAv0no=
 github.com/docopt/docopt-go v0.0.0-20180111231733-ee0de3bc6815/go.mod h1:WwZ+bS3ebgob9U8Nd0kOddGdZWjyMGR8Wziv+TBNwSE=
