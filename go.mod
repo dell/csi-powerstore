@@ -4,7 +4,7 @@ go 1.24.0
 
 toolchain go1.24.2
 
-replace github.com/dell/csm-hbnfs => ./csm-hbnfs
+replace github.com/dell/csm-sharednfs => ./csm-hbnfs
 
 require (
 	github.com/akutz/gosync v0.1.0
