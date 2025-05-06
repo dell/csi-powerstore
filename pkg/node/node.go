@@ -1541,86 +1541,59 @@ func (s *Service) setupHost(initiators []string, client gopowerstore.Client, arr
 	}
 
 	if s.useNVME[arrayID] {
-		// Check for duplicate hostnqn uuids
 		s.checkForDuplicateUUIDs()
 	}
 
 	reqInitiators := s.buildInitiatorsArray(initiators, arrayID)
-
-	var host *gopowerstore.Host
-	updateCHAP := false
-
-	h, err := client.GetHostByName(context.Background(), s.nodeID)
-	if err == nil {
-		err := s.updateHost(context.Background(), initiators, client, h, arrayID)
-		if err != nil {
-			return err
-		}
-		if s.opts.EnableCHAP && len(h.Initiators) > 0 && (h.Initiators[0].ChapSingleUsername == "" || h.Initiators[0].ChapSingleUsername == "admin") {
-			log.Debug("CHAP was enabled earlier, modifying credentials")
-			err := s.modifyHostInitiators(context.Background(), h.ID, client, nil, nil, initiators, arrayID)
-			if err != nil {
-				return fmt.Errorf("can't modify initiators CHAP credentials %s", err.Error())
-			}
-		}
-
-		s.initialized = true
-		return nil
-	}
+	var existingHost *gopowerstore.Host
 
 	hosts, err := client.GetHosts(context.Background())
 	if err != nil {
-		log.Error(err.Error())
-		return err
+		return fmt.Errorf("failed getting hosts on %s", arrayIP)
 	}
 
-	for i, h := range hosts {
-		found := false
-		for _, hI := range h.Initiators {
+	for i := range hosts {
+		for _, hI := range hosts[i].Initiators {
 			for _, rI := range reqInitiators {
 				if hI.PortName == *rI.PortName && hI.PortType == *rI.PortType {
-					log.Info("Found existing host ", h.Name, hI.PortName, hI.PortType)
-					updateCHAP = s.opts.EnableCHAP && (hI.ChapSingleUsername == "" || hI.ChapSingleUsername == "admin")
-					found = true
+					existingHost = &hosts[i]
 					break
 				}
 			}
-			if found {
+			if existingHost != nil {
 				break
 			}
 		}
-		if found {
-			host = &hosts[i]
+		if existingHost != nil {
 			break
 		}
 	}
 
-	if host == nil {
-		// register node on PowerStore
-		_, err := s.createHost(context.Background(), initiators, client, arrayID)
+	if existingHost == nil {
+		log.Infof("Creating host %s on array %s", s.nodeID, arrayID)
+		_, err := s.createHost(context.Background(), initiators)
 		if err != nil {
-			log.Error(err.Error())
 			return err
 		}
 	} else {
-		// node already registered
-		if updateCHAP { // add CHAP credentials if they aren't available
-			err := s.modifyHostInitiators(context.Background(), host.ID, client, nil, nil, initiators, arrayID)
+		log.Infof("Host with initiator already exists. Updating metadata or CHAP if needed.")
+		if s.opts.EnableCHAP {
+			err := s.modifyHostInitiators(context.Background(), existingHost.ID, client, nil, nil, initiators, arrayID, &existingHost.HostConnectivity)
 			if err != nil {
-				return fmt.Errorf("can't modify initiators CHAP credentials %s", err.Error())
+				return fmt.Errorf("failed to update CHAP: %v", err)
 			}
 		}
 
-		// Modify the host entry with the new node ID having different prefix
-		err := s.modifyHostName(context.Background(), client, s.nodeID, host.ID)
-		if err != nil {
-			return fmt.Errorf("cannot update the host name %s", err.Error())
+		if s.nodeID != existingHost.ID {
+			err := s.modifyHostName(context.Background(), client, s.nodeID, existingHost.ID)
+			if err != nil {
+				return fmt.Errorf("failed to update host name: %v", err)
+			}
 		}
 		s.reusedHost = true
 	}
 
 	s.initialized = true
-
 	return nil
 }
 
@@ -1665,89 +1638,509 @@ func (s *Service) buildInitiatorsArray(initiators []string, arrayID string) []go
 }
 
 // create or update host on PowerStore array
-func (s *Service) updateHost(ctx context.Context, initiators []string, client gopowerstore.Client, host gopowerstore.Host, arrayID string) (err error) {
+func (s *Service) updateHost(ctx context.Context, initiators []string, client gopowerstore.Client, host gopowerstore.Host, arrayID string, connectivity *gopowerstore.HostConnectivityEnum) error {
 	initiatorsToAdd, initiatorsToDelete := checkIQNS(initiators, host)
-	return s.modifyHostInitiators(ctx, host.ID, client, initiatorsToAdd, initiatorsToDelete, nil, arrayID)
+	return s.modifyHostInitiators(ctx, host.ID, client, initiatorsToAdd, initiatorsToDelete, nil, arrayID, connectivity)
 }
 
-// register host
-func (s *Service) createHost(ctx context.Context, initiators []string, client gopowerstore.Client, arrayID string) (id string, err error) {
-	osType := gopowerstore.OSTypeEnumLinux
-	reqInitiators := s.buildInitiatorsArray(initiators, arrayID)
-	description := fmt.Sprintf("k8s node: %s", s.opts.KubeNodeName)
-
-	var createParams gopowerstore.HostCreate
-	defaultHeaders := client.GetCustomHTTPHeaders()
-	if defaultHeaders == nil {
-		defaultHeaders = make(http.Header)
+var (
+	getArrayfn = func(s *Service) map[string]*array.PowerStoreArray {
+		return s.Arrays()
 	}
-	customHeaders := defaultHeaders
-	k8sMetadataSupported := common.IsK8sMetadataSupported(client)
-	if k8sMetadataSupported {
-		customHeaders.Add("DELL-VISIBILITY", "internal")
-		client.SetCustomHTTPHeaders(customHeaders)
 
-		if s.opts.KubeNodeName == "" {
-			log.Warnf("KubeNodeName value is not set")
-			createParams = gopowerstore.HostCreate{
-				Name: &s.nodeID, OsType: &osType, Initiators: &reqInitiators,
-				Description: &description,
+	getIsHostAlreadyRegistered = func(s *Service, ctx context.Context, client gopowerstore.Client, initiators []string) bool {
+		return s.isHostAlreadyRegistered(ctx, client, initiators)
+	}
+
+	getAllRemoteSystemsFunc = func(arr *array.PowerStoreArray, ctx context.Context) ([]gopowerstore.RemoteSystem, error) {
+		return arr.GetClient().GetAllRemoteSystems(ctx)
+	}
+
+	getIsRemoteToOtherArray = func(s *Service, ctx context.Context, arr, remoteArr *array.PowerStoreArray) bool {
+		return s.isRemoteToOtherArray(ctx, arr, remoteArr)
+	}
+
+	registerHostFunc = func(s *Service, ctx context.Context, client gopowerstore.Client, arrayID string, initiators []string, connType gopowerstore.HostConnectivityEnum) error {
+		return s.registerHost(ctx, client, arrayID, initiators, connType)
+	}
+)
+
+// register host
+func (s *Service) createHost(
+	ctx context.Context,
+	initiators []string,
+) (string, error) {
+	nodeLabels, err := k8sutils.GetNodeLabels(context.Background(), s.opts.KubeConfigPath, s.opts.KubeNodeName)
+	if err != nil {
+		return "", fmt.Errorf("failed to get node labels for node %s: %v", s.opts.KubeNodeName, err)
+	}
+	var primaryArrayID string
+
+	// Step 1: Check if this node matches at least one labeled Metro array
+	anyLabelMatch := false
+	for _, arr := range getArrayfn(s) {
+		if strings.ToLower(arr.MetroTopology) == "uniform" && len(arr.Labels) == 1 {
+			if labelsMatch(arr.Labels, nodeLabels) {
+				anyLabelMatch = true
+				break
+			}
+		}
+	}
+
+	for _, arr := range getArrayfn(s) {
+		log.Infof("[createHost] Processing array %s (%s)", arr.GlobalID, arr.IP)
+		// 1) Skip if already registered
+		if getIsHostAlreadyRegistered(s, ctx, arr.GetClient(), initiators) {
+			log.Infof("[createHost] Already registered on %s, skipping", arr.GlobalID)
+			if primaryArrayID == "" {
+				primaryArrayID = arr.GlobalID
+			}
+			continue
+		}
+
+		// 2) Metro vs Non‑Metro
+		if strings.ToLower(arr.MetroTopology) != "uniform" {
+			log.Infof("[createHost] Non‑Metro array %s → registering LocalOnly", arr.GlobalID)
+			if err := s.registerHost(
+				ctx, arr.GetClient(), arr.GlobalID, initiators,
+				gopowerstore.HostConnectivityEnumLocalOnly,
+			); err != nil {
+				return "", fmt.Errorf("failed LocalOnly on %s: %v", arr.GlobalID, err)
+			}
+			if primaryArrayID == "" {
+				primaryArrayID = arr.GlobalID
+			}
+			continue
+		}
+
+		if len(arr.Labels) > 1 {
+			log.Warnf("[createHost] Skipping Metro array %s: more than one label", arr.GlobalID)
+			continue
+		}
+
+		// 4) Skip Metro arrays if this node doesn’t match any Metro array label
+		if !anyLabelMatch {
+			log.Warnf("[createHost] Node does not match any Metro array labels — skipping Metro registration for %s", arr.GlobalID)
+			continue
+		}
+
+		// 5) Metro: now dispatch to label-match vs no-label-match
+		arrayAddedList := make(map[string]bool)
+
+		if labelsMatch(arr.Labels, nodeLabels) {
+			// 4a) Labels match
+			log.Infof("[createHost] Metro & label match on %s", arr.GlobalID)
+			coLocated, err := s.handleLabelMatchRegistration(ctx, arr, initiators, nodeLabels, arrayAddedList)
+			if err != nil {
+				return "", err
+			}
+			conn := gopowerstore.HostConnectivityEnumMetroOptimizeLocal
+			if coLocated {
+				conn = gopowerstore.HostConnectivityEnumMetroOptimizeBoth
+			}
+			log.Infof("[createHost] Registering %s as %s", arr.GlobalID, conn)
+			if err := registerHostFunc(s, ctx, arr.GetClient(), arr.GlobalID, initiators, conn); err != nil {
+				return "", fmt.Errorf("failed on %s: %v", arr.GlobalID, err)
+			}
+			if primaryArrayID == "" {
+				primaryArrayID = arr.GlobalID
 			}
 		} else {
-			metadata := map[string]string{
-				"k8s_node_name": s.opts.KubeNodeName,
+			// 4b) Labels don’t match
+			log.Infof("[createHost] Metro & no label match on %s", arr.GlobalID)
+			coLocated, err := s.handleNoLabelMatchRegistration(
+				ctx, arr, initiators, nodeLabels, arrayAddedList,
+			)
+			if err != nil {
+				return "", err
 			}
-			createParams = gopowerstore.HostCreate{
-				Name: &s.nodeID, OsType: &osType, Initiators: &reqInitiators,
-				Description: &description, Metadata: &metadata,
+			conn := gopowerstore.HostConnectivityEnumMetroOptimizeRemote
+			if coLocated {
+				conn = gopowerstore.HostConnectivityEnumMetroOptimizeBoth
 			}
-		}
-	} else {
-		createParams = gopowerstore.HostCreate{
-			Name: &s.nodeID, OsType: &osType, Initiators: &reqInitiators,
-			Description: &description,
+
+			log.Infof("[createHost] Registering %s as %s", arr.GlobalID, conn)
+			if err := s.registerHost(
+				ctx, arr.GetClient(), arr.GlobalID, initiators, conn,
+			); err != nil {
+				return "", fmt.Errorf("failed on %s: %v", arr.GlobalID, err)
+			}
+			if primaryArrayID == "" {
+				primaryArrayID = arr.GlobalID
+			}
 		}
 	}
-	resp, err := client.CreateHost(ctx, &createParams)
-	// reset custom header
-	customHeaders.Del("DELL-VISIBILITY")
-	client.SetCustomHTTPHeaders(customHeaders)
+
+	if primaryArrayID != "" {
+		log.Infof("[createHost] Success. Primary array: %s", primaryArrayID)
+		return primaryArrayID, nil
+	}
+	return "", fmt.Errorf("[createHost] Failed to register host on any array")
+}
+
+func (s *Service) handleLabelMatchRegistration(
+	ctx context.Context,
+	arr *array.PowerStoreArray,
+	initiators []string,
+	nodeLabels map[string]string,
+	arrayAddedList map[string]bool,
+) (bool, error) {
+	// Early exit if no array labels match the node labels
+	anyLabelMatch := false
+	for _, configuredArr := range getArrayfn(s) {
+		if labelsMatch(configuredArr.Labels, nodeLabels) {
+			anyLabelMatch = true
+			break
+		}
+	}
+	if !anyLabelMatch {
+		log.Infof("[handleLabelMatch] No arrays match node labels — skipping registration")
+		return false, nil
+	}
+
+	remoteSystems, err := getAllRemoteSystemsFunc(arr, ctx)
 	if err != nil {
-		return id, err
+		log.Warnf("[handleLabelMatch] failed to get remotes for %s: %v", arr.GlobalID, err)
+		return false, err
 	}
-	return resp.ID, err
+
+	coLocated := false
+
+	// 1) Determine this array's connectivity based on its label vs. the node's labels
+	var arrayConn gopowerstore.HostConnectivityEnum
+	if labelsMatch(arr.Labels, nodeLabels) {
+		arrayConn = gopowerstore.HostConnectivityEnumMetroOptimizeLocal
+	} else {
+		arrayConn = gopowerstore.HostConnectivityEnumMetroOptimizeRemote
+	}
+
+	for _, remote := range remoteSystems {
+		if remote.Name == "" || arrayAddedList[remote.SerialNumber] {
+			continue
+		}
+
+		for _, remoteArr := range getArrayfn(s) {
+			if remoteArr.GlobalID != remote.SerialNumber {
+				continue
+			}
+			if len(remoteArr.Labels) > 1 {
+				return false, fmt.Errorf("skipping remote array %s – more than one label", remoteArr.GlobalID)
+			}
+
+			// 2) Mutual-remote check
+			if !getIsRemoteToOtherArray(s, ctx, arr, remoteArr) {
+				log.Infof("[handleLabelMatch] skipping %s↔%s: not mutually remote",
+					arr.GlobalID, remoteArr.GlobalID)
+				continue
+			}
+
+			clientB := remoteArr.GetClient()
+			if getIsHostAlreadyRegistered(s, ctx, clientB, initiators) {
+				arrayAddedList[remoteArr.GlobalID] = true
+				continue
+			}
+
+			if !labelsMatch(remoteArr.Labels, arr.Labels) && labelsMatch(remoteArr.Labels, nodeLabels) && labelsMatch(arr.Labels, nodeLabels) {
+				log.Info("skipping registration as the node is having all the array labels")
+				return false, fmt.Errorf("skipping registration as the node matching all the array labels node label: %s, arr label: %s, remote label: %s", nodeLabels, arr.Labels, remoteArr.Labels)
+			}
+
+			// 3) Determine remote's connectivity
+			var remoteConn gopowerstore.HostConnectivityEnum
+			if labelsMatch(remoteArr.Labels, arr.Labels) {
+				remoteConn = gopowerstore.HostConnectivityEnumMetroOptimizeBoth
+			} else if labelsMatch(remoteArr.Labels, nodeLabels) {
+				remoteConn = gopowerstore.HostConnectivityEnumMetroOptimizeLocal
+			} else {
+				remoteConn = gopowerstore.HostConnectivityEnumMetroOptimizeRemote
+			}
+
+			// 4) Guard: skip if both would end up with the same non‑Both connectivity
+			if arrayConn == remoteConn && remoteConn != gopowerstore.HostConnectivityEnumMetroOptimizeBoth {
+				log.Infof("[handleLabelMatch] skipping %s: both arrays would be %s",
+					arr.GlobalID, arrayConn)
+				continue
+			}
+
+			// 5) Register
+			if remoteConn == gopowerstore.HostConnectivityEnumMetroOptimizeBoth {
+				log.Infof("[handleLabelMatch] Full match → MetroOptimizeBoth on %s", remoteArr.GlobalID)
+			} else {
+				log.Infof("[handleLabelMatch] Partial match → MetroOptimizeRemote on %s", remoteArr.GlobalID)
+			}
+			if err := registerHostFunc(s, ctx, clientB, remoteArr.GlobalID, initiators, remoteConn); err != nil {
+				return false, err
+			}
+			arrayAddedList[remoteArr.GlobalID] = true
+
+			if remoteConn == gopowerstore.HostConnectivityEnumMetroOptimizeBoth {
+				coLocated = true
+			}
+		}
+	}
+	return coLocated, nil
+}
+
+func (s *Service) handleNoLabelMatchRegistration(
+	ctx context.Context,
+	arr *array.PowerStoreArray,
+	initiators []string,
+	nodeLabels map[string]string,
+	arrayAddedList map[string]bool,
+) (bool, error) {
+	// Early exit if no array labels match the node labels
+	anyLabelMatch := false
+	for _, configuredArr := range getArrayfn(s) {
+		if labelsMatch(configuredArr.Labels, nodeLabels) {
+			anyLabelMatch = true
+			break
+		}
+	}
+	if !anyLabelMatch {
+		log.Infof("[handleNoLabelMatch] No arrays match node labels — skipping registration for %s", arr.GlobalID)
+		return false, nil
+	}
+
+	remoteSystems, err := getAllRemoteSystemsFunc(arr, ctx)
+	if err != nil {
+		log.Warnf("[handleNoLabelMatch] failed to get remotes for %s: %v", arr.GlobalID, err)
+		return false, err
+	}
+
+	coLocated := false
+	// 1) Determine this array's connectivity based on its label vs. the node's labels
+	var arrayConn gopowerstore.HostConnectivityEnum
+	if labelsMatch(arr.Labels, nodeLabels) {
+		arrayConn = gopowerstore.HostConnectivityEnumMetroOptimizeLocal
+	} else {
+		arrayConn = gopowerstore.HostConnectivityEnumMetroOptimizeRemote
+	}
+
+	for _, remote := range remoteSystems {
+		if remote.Name == "" || arrayAddedList[remote.SerialNumber] {
+			continue
+		}
+
+		for _, remoteArr := range getArrayfn(s) {
+			if remoteArr.GlobalID != remote.SerialNumber {
+				continue
+			}
+			// Mutual remote check
+			if !getIsRemoteToOtherArray(s, ctx, arr, remoteArr) {
+				log.Infof("[handleNoLabelMatch] skipping %s↔%s: not mutually remote",
+					arr.GlobalID, remoteArr.GlobalID)
+				continue
+			}
+
+			clientB := remoteArr.GetClient()
+			if getIsHostAlreadyRegistered(s, ctx, clientB, initiators) {
+				arrayAddedList[remoteArr.GlobalID] = true
+				continue
+			}
+
+			if !labelsMatch(remoteArr.Labels, arr.Labels) && labelsMatch(remoteArr.Labels, nodeLabels) && labelsMatch(arr.Labels, nodeLabels) {
+				log.Info("skipping registration as the node is having all the array labels")
+				return false, fmt.Errorf("skipping registration as the node matching all the array labels node label: %s, arr label: %s, remote label: %s", nodeLabels, arr.Labels, remoteArr.Labels)
+			}
+
+			// Determine remote's connectivity
+			var remoteConn gopowerstore.HostConnectivityEnum
+			if labelsMatch(remoteArr.Labels, arr.Labels) {
+				remoteConn = gopowerstore.HostConnectivityEnumMetroOptimizeBoth
+			} else if labelsMatch(remoteArr.Labels, nodeLabels) {
+				remoteConn = gopowerstore.HostConnectivityEnumMetroOptimizeLocal
+			} else {
+				remoteConn = gopowerstore.HostConnectivityEnumMetroOptimizeRemote
+			}
+
+			// Guard: skip if both would end up with the same non-Both connectivity
+			if arrayConn == remoteConn && remoteConn != gopowerstore.HostConnectivityEnumMetroOptimizeBoth {
+				log.Infof("[handleNoLabelMatch] skipping %s: both arrays would be %s",
+					arr.GlobalID, arrayConn)
+				continue
+			}
+
+			// Register
+			if remoteConn == gopowerstore.HostConnectivityEnumMetroOptimizeBoth {
+				log.Infof("[handleNoLabelMatch] Full match → MetroOptimizeBoth on %s", remoteArr.GlobalID)
+			} else {
+				log.Infof("[handleNoLabelMatch] Partial match → MetroOptimizeRemote on %s", remoteArr.GlobalID)
+			}
+			if err := registerHostFunc(s, ctx, clientB, remoteArr.GlobalID, initiators, remoteConn); err != nil {
+				return false, err
+			}
+			arrayAddedList[remoteArr.GlobalID] = true
+
+			if remoteConn == gopowerstore.HostConnectivityEnumMetroOptimizeBoth {
+				coLocated = true
+			}
+		}
+	}
+	return coLocated, nil
+}
+
+// isRemoteToOtherArray returns true if arrA and arrB are mutually remote to each other.
+func (s *Service) isRemoteToOtherArray(
+	ctx context.Context,
+	arrA, arrB *array.PowerStoreArray,
+) bool {
+	// fetch arrA’s remotes
+	remotesA, err := getAllRemoteSystemsFunc(arrA, ctx)
+	if err != nil {
+		log.Warnf("[isRemoteToOtherArray] failed to get remotes for %s: %v", arrA.GlobalID, err)
+		return false
+	}
+	// fetch arrB’s remotes
+	remotesB, err := getAllRemoteSystemsFunc(arrB, ctx)
+	if err != nil {
+		log.Warnf("[isRemoteToOtherArray] failed to get remotes for %s: %v", arrB.GlobalID, err)
+		return false
+	}
+
+	foundAtoB := false
+	for _, r := range remotesA {
+		if r.SerialNumber == arrB.GlobalID {
+			foundAtoB = true
+			break
+		}
+	}
+	if !foundAtoB {
+		return false
+	}
+
+	for _, r := range remotesB {
+		if r.SerialNumber == arrA.GlobalID {
+			return true
+		}
+	}
+	return false
+}
+
+// Checks if host with given initiators already exists
+func (s *Service) isHostAlreadyRegistered(ctx context.Context, client gopowerstore.Client, initiators []string) bool {
+	existingHosts, err := client.GetHosts(ctx)
+	if err != nil {
+		log.Warnf("[isHostAlreadyRegistered] Failed to get hosts: %v", err)
+		return false
+	}
+
+	for _, host := range existingHosts {
+		for _, hInit := range host.Initiators {
+			for _, i := range initiators {
+				if hInit.PortName == i {
+					log.Infof("[isHostAlreadyRegistered] Found existing host with initiator %s", i)
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+func (s *Service) registerHost(
+	ctx context.Context,
+	client gopowerstore.Client,
+	arrayID string,
+	initiators []string,
+	connType gopowerstore.HostConnectivityEnum,
+) error {
+	description := fmt.Sprintf("k8s node: %s", s.opts.KubeNodeName)
+	reqInitiators := s.buildInitiatorsArray(initiators, arrayID)
+	osType := gopowerstore.OSTypeEnumLinux
+
+	createParams := gopowerstore.HostCreate{
+		Name:             &s.nodeID,
+		OsType:           &osType,
+		Initiators:       &reqInitiators,
+		Description:      &description,
+		HostConnectivity: connType,
+	}
+
+	if s.opts.KubeNodeName != "" && common.IsK8sMetadataSupported(client) {
+		metadata := map[string]string{"k8s_node_name": s.opts.KubeNodeName}
+		createParams.Metadata = &metadata
+
+		headers := client.GetCustomHTTPHeaders()
+		if headers == nil {
+			headers = make(http.Header)
+		}
+		headers.Add("DELL-VISIBILITY", "internal")
+		client.SetCustomHTTPHeaders(headers)
+	}
+
+	log.Infof("[registerHost] Creating host on array %s with connectivity: %s", arrayID, connType)
+	resp, err := client.CreateHost(ctx, &createParams)
+	client.SetCustomHTTPHeaders(nil)
+
+	if err != nil {
+		if connType == gopowerstore.HostConnectivityEnumMetroOptimizeRemote &&
+			strings.Contains(err.Error(), "already registered with another host") {
+			log.Warnf("[registerHost] Skipping array %s due to duplicate initiator error (remote host): %v", arrayID, err)
+			return nil
+		}
+		log.Errorf("[registerHost] Failed to create host on array %s: %v", arrayID, err)
+		return err
+	}
+	log.Infof("[registerHost] Host successfully registered on array %s with ID: %s", arrayID, resp.ID)
+	return nil
+}
+
+func labelsMatch(arrayLabels, nodeLabels map[string]string) bool {
+	for key, val := range arrayLabels {
+		if nodeVal, exists := nodeLabels[key]; !exists || nodeVal != val {
+			return false
+		}
+	}
+	return true
 }
 
 // add or remove initiators from host
 func (s *Service) modifyHostInitiators(ctx context.Context, hostID string, client gopowerstore.Client,
-	initiatorsToAdd []string, initiatorsToDelete []string, initiatorsToModify []string, arrayID string,
+	initiatorsToAdd []string, initiatorsToDelete []string, initiatorsToModify []string, arrayID string, connectivity *gopowerstore.HostConnectivityEnum,
 ) error {
 	if len(initiatorsToDelete) > 0 {
-		modifyParams := gopowerstore.HostModify{}
-		modifyParams.RemoveInitiators = &initiatorsToDelete
+		modifyParams := gopowerstore.HostModify{RemoveInitiators: &initiatorsToDelete}
 		_, err := client.ModifyHost(ctx, &modifyParams, hostID)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to remove initiators: %w", err)
 		}
 	}
+
 	if len(initiatorsToAdd) > 0 {
 		modifyParams := gopowerstore.HostModify{}
 		initiators := s.buildInitiatorsArray(initiatorsToAdd, arrayID)
 		modifyParams.AddInitiators = &initiators
+
 		_, err := client.ModifyHost(ctx, &modifyParams, hostID)
 		if err != nil {
-			return err
+			if strings.Contains(err.Error(), "already registered with another host") {
+				log.Warnf("Skipping duplicate initiator registration: %v", err)
+			} else {
+				return fmt.Errorf("failed to add initiators: %w", err)
+			}
 		}
 	}
+
 	if len(initiatorsToModify) > 0 {
 		modifyParams := gopowerstore.HostModify{}
 		initiators := s.buildInitiatorsArrayModify(initiatorsToModify, arrayID)
 		modifyParams.ModifyInitiators = &initiators
+
 		_, err := client.ModifyHost(ctx, &modifyParams, hostID)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to modify initiators: %w", err)
 		}
 	}
+
+	// Ensure HostConnectivity is updated only if needed
+	if connectivity != nil {
+		modifyParams := gopowerstore.HostModify{HostConnectivity: *connectivity}
+		_, err := client.ModifyHost(ctx, &modifyParams, hostID)
+		if err != nil {
+			return fmt.Errorf("failed to update host connectivity for %s: %w", hostID, err)
+		}
+	}
+
 	return nil
 }
 
