@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-powerstore/v2/mocks"
@@ -75,6 +76,8 @@ func TestGetPowerStoreArrays(t *testing.T) {
 		data string
 	}
 	_ = os.Setenv(common.EnvThrottlingRateLimit, "1000")
+	_ = os.Setenv(common.EnvMultiNASFailureThreshold, "10")
+	_ = os.Setenv(common.EnvMultiNASCooldownPeriod, "2m")
 
 	tests := []struct {
 		name    string
@@ -143,6 +146,9 @@ func TestGetPowerStoreArrays(t *testing.T) {
 				assert.Equal(t, v1.Insecure, got[k].Insecure)
 				assert.Equal(t, v1.IsDefault, got[k].IsDefault)
 				assert.Equal(t, v1.BlockProtocol, got[k].BlockProtocol)
+				got[k].NASCooldownTracker.(*array.NASCooldown).GetCooldownPeriod()
+				assert.Equal(t, 10, got[k].NASCooldownTracker.(*array.NASCooldown).GetThreshold())
+				assert.Equal(t, 2*time.Minute, got[k].NASCooldownTracker.(*array.NASCooldown).GetCooldownPeriod())
 			}
 		})
 	}
@@ -193,6 +199,27 @@ func TestGetPowerStoreArrays(t *testing.T) {
 		f := &fs.Fs{Util: &gofsutil.FS{SysBlockDir: "/sys/block"}}
 		_, _, _, err := array.GetPowerStoreArrays(f, "./testdata/one-arr.yaml")
 		assert.NoError(t, err)
+	})
+
+	t.Run("incorrect EnvMultiNASFailureThreshold & EnvMultiNASCooldownPeriod value", func(t *testing.T) {
+		_ = os.Setenv(common.EnvMultiNASFailureThreshold, "0")
+		_ = os.Setenv(common.EnvMultiNASCooldownPeriod, "0m")
+		f := &fs.Fs{Util: &gofsutil.FS{SysBlockDir: "/sys/block"}}
+		got, _, _, err := array.GetPowerStoreArrays(f, "./testdata/one-arr.yaml")
+		assert.NoError(t, err)
+		assert.Equal(t, 5, got["gid1"].NASCooldownTracker.(*array.NASCooldown).GetThreshold())
+		assert.Equal(t, 1*time.Minute, got["gid1"].NASCooldownTracker.(*array.NASCooldown).GetCooldownPeriod())
+	})
+
+	t.Run("invalid format EnvMultiNASFailureThreshold & EnvMultiNASCooldownPeriod", func(t *testing.T) {
+		_ = os.Setenv(common.EnvMultiNASFailureThreshold, "abc")
+		_ = os.Setenv(common.EnvMultiNASCooldownPeriod, "abc")
+
+		f := &fs.Fs{Util: &gofsutil.FS{SysBlockDir: "/sys/block"}}
+		got, _, _, err := array.GetPowerStoreArrays(f, "./testdata/one-arr.yaml")
+		assert.NoError(t, err)
+		assert.Equal(t, 5, got["gid1"].NASCooldownTracker.(*array.NASCooldown).GetThreshold())
+		assert.Equal(t, 1*time.Minute, got["gid1"].NASCooldownTracker.(*array.NASCooldown).GetCooldownPeriod())
 	})
 }
 
@@ -470,42 +497,64 @@ func TestGetLeastUsedActiveNAS(t *testing.T) {
 	}
 
 	tests := []struct {
-		name               string
-		nasList            []gopowerstore.NAS
-		expectedNAS        *gopowerstore.NAS
-		listOfAvailableNAS []string
+		name           string
+		nasList        []gopowerstore.NAS
+		expectedNAS    *gopowerstore.NAS
+		markForFailure []string
+		nasServersInSc []string
 
 		expectedErrMsg string
 	}{
 		{
-			name:               "Valid NAS selection (least FS count wins)",
-			nasList:            []gopowerstore.NAS{validNAS1, validNAS2, validNAS3, validNAS4, invalidNAS1, invalidNAS2},
-			expectedNAS:        &validNAS4, // nasD has the least FS count (1)
-			listOfAvailableNAS: []string{"nasA", "nasD"},
+			name:           "Valid NAS selection (least FS count wins)",
+			nasList:        []gopowerstore.NAS{validNAS1, validNAS2, validNAS3, validNAS4, invalidNAS1, invalidNAS2},
+			expectedNAS:    &validNAS4, // nasD has the least FS count (1)
+			nasServersInSc: []string{"nasA", "nasD"},
 		},
 		{
-			name:               "NAS not in nasServers map",
-			nasList:            []gopowerstore.NAS{invalidNAS3},
-			expectedErrMsg:     "no suitable NAS server found",
-			listOfAvailableNAS: []string{"nasA", "nasD"},
+			name:           "NAS not in nasServers map",
+			nasList:        []gopowerstore.NAS{invalidNAS3},
+			expectedErrMsg: "no suitable NAS server found",
+			nasServersInSc: []string{"nasA", "nasD"},
 		},
 		{
-			name:               "NAS not active",
-			nasList:            []gopowerstore.NAS{invalidNAS1},
-			expectedErrMsg:     "no suitable NAS server found",
-			listOfAvailableNAS: []string{"nasA", "nasD", "nasX"},
+			name:           "NAS not active",
+			nasList:        []gopowerstore.NAS{invalidNAS1},
+			expectedErrMsg: "no suitable NAS server found",
+			nasServersInSc: []string{"nasA", "nasD", "nasX"},
 		},
 		{
-			name:               "NAS with invalid health state",
-			nasList:            []gopowerstore.NAS{invalidNAS2},
-			expectedErrMsg:     "no suitable NAS server found",
-			listOfAvailableNAS: []string{"nasA", "nasD", "nasY"},
+			name:           "NAS with invalid health state",
+			nasList:        []gopowerstore.NAS{invalidNAS2},
+			expectedErrMsg: "no suitable NAS server found",
+			nasServersInSc: []string{"nasA", "nasD", "nasY"},
 		},
 		{
-			name:               "All NAS servers inactive or unhealthy",
-			nasList:            []gopowerstore.NAS{invalidNAS1, invalidNAS2},
-			expectedErrMsg:     "no suitable NAS server found",
-			listOfAvailableNAS: []string{"nasA", "nasB", "nasC", "nasD", "nasX", "nasY", "nasZ"},
+			name:           "All NAS servers inactive or unhealthy",
+			nasList:        []gopowerstore.NAS{invalidNAS1, invalidNAS2},
+			expectedErrMsg: "no suitable NAS server found",
+			nasServersInSc: []string{"nasA", "nasB", "nasC", "nasD", "nasX", "nasY", "nasZ"},
+		},
+		{
+			name:           "All NAS servers are in cooldown 1",
+			nasList:        []gopowerstore.NAS{validNAS1, validNAS2, validNAS3, validNAS4, invalidNAS1, invalidNAS2},
+			expectedNAS:    &validNAS4, // nasD has the least Failure count (1)
+			markForFailure: []string{"nasA", "nasD"},
+			nasServersInSc: []string{"nasD", "nasA"},
+		},
+		{
+			name:           "All NAS servers are in cooldown 2",
+			nasList:        []gopowerstore.NAS{validNAS1, validNAS2, validNAS3, validNAS4, invalidNAS1, invalidNAS2},
+			expectedNAS:    &validNAS1, // nasA has the least Failure count (1)
+			markForFailure: []string{"nasA", "nasD", "nasD"},
+			nasServersInSc: []string{"nasD", "nasA"},
+		},
+		{
+			name:           "Few NAS servers inactive or unhealthy and rest are in cooldown",
+			nasList:        []gopowerstore.NAS{invalidNAS1, invalidNAS2, validNAS3, validNAS4},
+			expectedNAS:    &validNAS3, // nasC has the least Failure count (1)
+			markForFailure: []string{"nasC", "nasD", "nasD"},
+			nasServersInSc: []string{"nasA", "nasB", "nasC", "nasD", "nasX", "nasY", "nasZ"},
 		},
 		{
 			name:           "Empty NAS list",
@@ -528,15 +577,19 @@ func TestGetLeastUsedActiveNAS(t *testing.T) {
 				clientMock.On("GetNASServers", ctx).Return(tc.nasList, nil).Once()
 			}
 
-			arr := &array.PowerStoreArray{Client: clientMock, NASCooldownTracker: &array.NASCooldown{}}
+			arr := &array.PowerStoreArray{Client: clientMock, NASCooldownTracker: array.NewNASCooldown(30*time.Minute, 1)}
+			for _, nas := range tc.markForFailure {
+				arr.NASCooldownTracker.MarkFailure(nas)
+			}
+
 			// Call the function
-			result, err := array.GetLeastUsedActiveNAS(ctx, arr, tc.listOfAvailableNAS)
+			result, err := array.GetLeastUsedActiveNAS(ctx, arr, tc.nasServersInSc)
 
 			// Assertions
 			if tc.expectedErrMsg != "" {
 				assert.Empty(t, result)
 				assert.Error(t, err)
-				assert.Contains(t, err.Error(), tc.expectedErrMsg)
+				assert.ErrorContains(t, err, tc.expectedErrMsg)
 			} else {
 				assert.NoError(t, err)
 				assert.NotNil(t, result)
@@ -544,6 +597,82 @@ func TestGetLeastUsedActiveNAS(t *testing.T) {
 			}
 
 			clientMock.AssertExpectations(t)
+		})
+	}
+}
+
+func TestResetFailure(t *testing.T) {
+	tests := []struct {
+		name             string
+		nasList          []string
+		markForFailure   []string
+		expectedFailures int
+		expectedCooldown time.Duration
+		expectedMapLen   int
+	}{
+		{
+			name:             "1 failure",
+			markForFailure:   []string{"nas1"},
+			expectedFailures: 1,
+			expectedCooldown: 1 * time.Minute,
+		},
+		{
+			name:             "2 failures",
+			markForFailure:   []string{"nas1", "nas1"},
+			expectedFailures: 2,
+			expectedCooldown: 1 * time.Minute,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			nas := array.NewNASCooldown(tc.expectedCooldown, 1)
+			for _, nasName := range tc.markForFailure {
+				nas.MarkFailure(nasName)
+			}
+			assert.Equal(t, tc.expectedFailures, nas.GetStatusMap()["nas1"].Failures)
+			assert.WithinDuration(t, time.Now(), nas.GetStatusMap()["nas1"].CooldownUntil, tc.expectedCooldown)
+
+			nas.ResetFailure("nas1")
+			assert.Empty(t, nas.GetStatusMap()["nas1"])
+		})
+	}
+}
+
+func TestFallbackRetry(t *testing.T) {
+	nas := array.NewNASCooldown(1*time.Minute, 1)
+	nas.MarkFailure("nas1")
+	nas.MarkFailure("nas1")
+	nas.MarkFailure("nas3")
+
+	tests := []struct {
+		name    string
+		nasList []string
+		want    string
+	}{
+		{
+			name:    "Test FallbackRetry with nas1, nas2, nas3",
+			nasList: []string{"nas1", "nas2", "nas3"},
+			want:    "nas2",
+		},
+		{
+			name:    "Test FallbackRetry with nas1, nas2",
+			nasList: []string{"nas1", "nas2"},
+			want:    "nas2",
+		},
+		{
+			name:    "Test FallbackRetry with nas1",
+			nasList: []string{"nas1"},
+			want:    "nas1",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := nas.FallbackRetry(tt.nasList)
+			if got != tt.want {
+				t.Errorf("got %v, want %v", got, tt.want)
+			}
 		})
 	}
 }

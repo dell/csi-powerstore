@@ -145,6 +145,31 @@ type NASCooldown struct {
 	mu             sync.Mutex
 }
 
+// NewNASCooldown returns a new instance of NASCooldown.
+func NewNASCooldown(cooldownPeriod time.Duration, threshold int) *NASCooldown {
+	return &NASCooldown{
+		statusMap:      make(map[string]*NASStatus),
+		cooldownPeriod: cooldownPeriod,
+		threshold:      threshold,
+		mu:             sync.Mutex{},
+	}
+}
+
+// GetStatusMap is a getter for statusMap
+func (n *NASCooldown) GetStatusMap() map[string]*NASStatus {
+	return n.statusMap
+}
+
+// GetCooldownPeriod is a getter for cooldownPeriod
+func (n *NASCooldown) GetCooldownPeriod() time.Duration {
+	return n.cooldownPeriod
+}
+
+// GetThreshold is a getter for threshold
+func (n *NASCooldown) GetThreshold() int {
+	return n.threshold
+}
+
 // Mark NAS as failed; only enter cooldown if threshold exceeded
 func (n *NASCooldown) MarkFailure(nas string) {
 	n.mu.Lock()
@@ -168,11 +193,7 @@ func (n *NASCooldown) IsInCooldown(nas string) bool {
 	defer n.mu.Unlock()
 
 	if status, exists := n.statusMap[nas]; exists {
-		if time.Now().Before(status.CooldownUntil) {
-			return true
-		}
-		// Cooldown expired - remove nas status
-		delete(n.statusMap, nas)
+		return time.Now().Before(status.CooldownUntil)
 	}
 	return false
 }
@@ -191,7 +212,13 @@ func (n *NASCooldown) FallbackRetry(nasList []string) string {
 	defer n.mu.Unlock()
 
 	sort.Slice(nasList, func(i, j int) bool {
-		return n.statusMap[nasList[i]].Failures < n.statusMap[nasList[j]].Failures
+		if n.statusMap[nasList[i]] == nil {
+			return true
+		} else if n.statusMap[nasList[j]] == nil {
+			return false
+		} else {
+			return n.statusMap[nasList[i]].Failures < n.statusMap[nasList[j]].Failures
+		}
 	})
 
 	return nasList[0] // Pick NAS with least failures
@@ -355,11 +382,7 @@ func GetPowerStoreArrays(fs fs.Interface, filePath string) (map[string]*PowerSto
 				cooldownPeriod = duration
 			}
 		}
-		array.NASCooldownTracker = &NASCooldown{
-			statusMap:      make(map[string]*NASStatus),
-			cooldownPeriod: cooldownPeriod,
-			threshold:      failureThreshold,
-		}
+		array.NASCooldownTracker = NewNASCooldown(cooldownPeriod, failureThreshold)
 	}
 
 	return arrayMap, mapper, defaultArray, nil
@@ -506,25 +529,25 @@ func GetLeastUsedActiveNAS(ctx context.Context, arr *PowerStoreArray, nasServers
 	}
 
 	if leastUsedNAS == nil {
-		if areAllNASInCooldown(arr, nasServers) {
-			return arr.NASCooldownTracker.FallbackRetry(nasServers), nil
+		nasInCooldown := GetNASInCooldown(arr, nasServers)
+		if len(nasInCooldown) != 0 {
+			log.Debugf("some NAS servers are in cooldown, moving to fallback retry")
+			return arr.NASCooldownTracker.FallbackRetry(nasInCooldown), nil
 		}
-		return "", fmt.Errorf("no suitable NAS server found")
+		log.Warnf("all NAS servers are inactive/unhealthy")
+		return "", fmt.Errorf("no suitable NAS server found, please ensure the NAS is running and healthy")
 	}
 
 	return leastUsedNAS.Name, nil
 }
 
-// Check if all the NAS are in cooldown
-func areAllNASInCooldown(arr *PowerStoreArray, nasServers []string) bool {
-	if len(nasServers) == 0 {
-		return false
-	}
-	allNASInCooldown := true
+// GetNASInCooldown returns a list of NAS servers that are in cooldown
+func GetNASInCooldown(arr *PowerStoreArray, nasServers []string) []string {
+	nasInCooldown := make([]string, 0)
 	for _, nas := range nasServers {
-		if !arr.NASCooldownTracker.IsInCooldown(nas) {
-			allNASInCooldown = false
+		if arr.NASCooldownTracker.IsInCooldown(nas) {
+			nasInCooldown = append(nasInCooldown, nas)
 		}
 	}
-	return allNASInCooldown
+	return nasInCooldown
 }
