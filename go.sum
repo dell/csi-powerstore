@@ -119,8 +119,8 @@ github.com/dell/goiscsi v1.11.1-0.20250414073142-a69a338c4871 h1:oicdQXy5MpcrSW/
 github.com/dell/goiscsi v1.11.1-0.20250414073142-a69a338c4871/go.mod h1:nMLnEG6QBpouHxFRMxpmJA6X+Nrr3KeN9mr5n2gV+5M=
 github.com/dell/gonvme v1.10.2-0.20250502050802-983cf3a533b7 h1:0bbn3pB2ygW+MsR4VMxyOXqAar5a5oSN+7YfxvMi8Nc=
 github.com/dell/gonvme v1.10.2-0.20250502050802-983cf3a533b7/go.mod h1:3bgVCRevHuVWR4UOV2uv5UksaJP5SiCzrgQZHqihaYA=
-github.com/dell/gopowerstore v1.18.1-0.20250411160922-a4e8cc4e5545 h1:XDMxMvYH+kVbPu0tehj/Jb2/OXMoBV1mSSvAFsjCGBs=
-github.com/dell/gopowerstore v1.18.1-0.20250411160922-a4e8cc4e5545/go.mod h1:ZEF/MMMvPk/JdPeKIUGZFXd+AgQxVqCw/NePpV3QcHc=
+github.com/dell/gopowerstore v1.18.1-0.20250507171424-bf810a70c9d9 h1:Rn4zFqaHSJX7GpXAha39C3iCQW1qnjoZpRBcG4SpP+I=
+github.com/dell/gopowerstore v1.18.1-0.20250507171424-bf810a70c9d9/go.mod h1:ZEF/MMMvPk/JdPeKIUGZFXd+AgQxVqCw/NePpV3QcHc=
 github.com/dgrijalva/jwt-go v3.2.0+incompatible/go.mod h1:E3ru+11k8xSBh+hMPgOLZmtrrCbhqsmaPHjLKYnJCaQ=
 github.com/dgryski/go-sip13 v0.0.0-20181026042036-e10d5fee7954/go.mod h1:vAd38F8PWV+bWy6jNmig1y/TA+kYO4g3RSRF0IAv0no=
 github.com/docopt/docopt-go v0.0.0-20180111231733-ee0de3bc6815/go.mod h1:WwZ+bS3ebgob9U8Nd0kOddGdZWjyMGR8Wziv+TBNwSE=
