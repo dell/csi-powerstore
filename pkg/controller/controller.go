@@ -161,19 +161,39 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 
 	var creator VolumeCreator
 	var protocol string
+	var selectedNasName string
 
 	nfsAcls := s.nfsAcls
 	if useNFS {
 		protocol = "nfs"
 		nasParamsName, ok := params[KeyNasName]
 		if ok {
-			creator = &NfsCreator{
-				nasName: nasParamsName,
+			if strings.Contains(nasParamsName, ",") {
+				// Comma-separated NAS names
+				rawNasList := strings.Split(nasParamsName, ",")
+				nasList := make([]string, 0, len(rawNasList))
+				for _, nas := range rawNasList {
+					trimmed := strings.TrimSpace(nas)
+					if trimmed != "" {
+						nasList = append(nasList, trimmed)
+					}
+				}
+				leastUsedNas, err := array.GetLeastUsedActiveNAS(ctx, arr, nasList)
+				if err != nil {
+					return nil, fmt.Errorf("failed to get least used NAS: %w", err)
+				}
+				selectedNasName = leastUsedNas
+			} else {
+				// Single NAS name
+				selectedNasName = nasParamsName
 			}
 		} else {
-			creator = &NfsCreator{
-				nasName: arr.GetNasName(),
-			}
+			// No NAS name provided in params
+			selectedNasName = arr.GetNasName()
+		}
+
+		creator = &NfsCreator{
+			nasName: selectedNasName,
 		}
 
 		if params[common.KeyNfsACL] != "" {
@@ -398,15 +418,28 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 	var volumeResponse *csi.Volume
 	resp, err := creator.Create(ctx, req, sizeInBytes, arr.GetClient())
 	if err != nil {
-		if apiError, ok := err.(gopowerstore.APIError); ok && (apiError.VolumeNameIsAlreadyUse() || apiError.FSNameIsAlreadyUse()) {
-			volumeResponse, err = creator.CheckIfAlreadyExists(ctx, req.GetName(), sizeInBytes, arr.GetClient())
-			if err != nil {
-				return nil, err
+		if apiError, ok := err.(gopowerstore.APIError); ok {
+			if apiError.VolumeNameIsAlreadyUse() || apiError.FSNameIsAlreadyUse() {
+				volumeResponse, err = creator.CheckIfAlreadyExists(ctx, req.GetName(), sizeInBytes, arr.GetClient())
+				if err != nil {
+					return nil, err
+				}
+			} else if apiError.FSCreationLimitReached() {
+				if nfsCreator, ok := creator.(*NfsCreator); ok {
+					arr.NASCooldownTracker.MarkFailure(nfsCreator.nasName)
+				}
+				return nil, status.Error(codes.ResourceExhausted, "FS creation limit reached for NAS")
+			} else {
+				return nil, status.Error(codes.Internal, err.Error())
 			}
 		} else {
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 	} else {
+		// Success path
+		if nfsCreator, ok := creator.(*NfsCreator); ok {
+			arr.NASCooldownTracker.ResetFailure(nfsCreator.nasName)
+		}
 		volumeResponse = getCSIVolume(resp.ID, sizeInBytes)
 	}
 
@@ -454,7 +487,7 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 
 	if useNFS {
 		volumeResponse.VolumeContext[common.KeyNfsACL] = nfsAcls
-		volumeResponse.VolumeContext[common.KeyNasName] = arr.GetNasName()
+		volumeResponse.VolumeContext[common.KeyNasName] = selectedNasName
 		topology = common.GetNfsTopology(arr.GetIP())
 		log.Infof("Modified topology to nfs for %s", req.GetName())
 	}

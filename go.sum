@@ -119,8 +119,8 @@ github.com/dell/goiscsi v1.11.1-0.20250313165902-65cabee40e17 h1:YNvQPKIPdjRaSC4
 github.com/dell/goiscsi v1.11.1-0.20250313165902-65cabee40e17/go.mod h1:nMLnEG6QBpouHxFRMxpmJA6X+Nrr3KeN9mr5n2gV+5M=
 github.com/dell/gonvme v1.10.2-0.20250226203131-a3942eb04728 h1:Ay0d4XzBmZciVU1fg6UyaLU8j00sOGNLyuk8x5YKQe0=
 github.com/dell/gonvme v1.10.2-0.20250226203131-a3942eb04728/go.mod h1:QKHlqjKObR7L5tugb+MCG4r3H/6AKje1sfg4XP6mA4U=
-github.com/dell/gopowerstore v1.17.1-0.20250318032634-ae51b1f12c00 h1:ATY6Bc0Ah4gS6U1G3iXhTW08M2/M4qHrxqL19DrTWJU=
-github.com/dell/gopowerstore v1.17.1-0.20250318032634-ae51b1f12c00/go.mod h1:9qiSVpAKigzpBnAe6buq//krFGtc9XGbNsct/WGOoVU=
+github.com/dell/gopowerstore v1.18.1-0.20250508053353-0638255da9a4 h1:4U65dWwYADm1+eZS6erVTqU75z50Qz6yjG43mmmoMNM=
+github.com/dell/gopowerstore v1.18.1-0.20250508053353-0638255da9a4/go.mod h1:ZEF/MMMvPk/JdPeKIUGZFXd+AgQxVqCw/NePpV3QcHc=
 github.com/dgrijalva/jwt-go v3.2.0+incompatible/go.mod h1:E3ru+11k8xSBh+hMPgOLZmtrrCbhqsmaPHjLKYnJCaQ=
 github.com/dgryski/go-sip13 v0.0.0-20181026042036-e10d5fee7954/go.mod h1:vAd38F8PWV+bWy6jNmig1y/TA+kYO4g3RSRF0IAv0no=
 github.com/docopt/docopt-go v0.0.0-20180111231733-ee0de3bc6815/go.mod h1:WwZ+bS3ebgob9U8Nd0kOddGdZWjyMGR8Wziv+TBNwSE=
@@ -303,8 +303,8 @@ github.com/hpcloud/tail v1.0.0/go.mod h1:ab1qPbhIpdTxEkNHXyeSf5vhxWSCs/tWer42PpO
 github.com/ianlancetaylor/demangle v0.0.0-20181102032728-5e5cf60278f6/go.mod h1:aSSvb/t6k1mPoxDqO4vJh6VOCGPwU4O0C2/Eqndh1Sc=
 github.com/imdario/mergo v0.3.5/go.mod h1:2EnlNZ0deacrJVfApfmtdGgDfMuh/nq6Ok1EcJh5FfA=
 github.com/inconshreveable/mousetrap v1.0.0/go.mod h1:PxqpIevigyE2G7u3NXJIT2ANytuPF1OarO4DADm73n8=
-github.com/jarcoal/httpmock v1.3.1 h1:iUx3whfZWVf3jT01hQTO/Eo5sAYtB2/rqaUuOtpInww=
-github.com/jarcoal/httpmock v1.3.1/go.mod h1:3yb8rc4BI7TCBhFY8ng0gjuLKJNquuDNiPaZjnENuYg=
+github.com/jarcoal/httpmock v1.4.0 h1:BvhqnH0JAYbNudL2GMJKgOHe2CtKlzJ/5rWKyp+hc2k=
+github.com/jarcoal/httpmock v1.4.0/go.mod h1:ftW1xULwo+j0R0JJkJIIi7UKigZUXCLLanykgjwBXL0=
 github.com/jonboulle/clockwork v0.1.0/go.mod h1:Ii8DK3G1RaLaWxj9trq07+26W01tbo22gdxWY5EU2bo=
 github.com/jonboulle/clockwork v0.2.2 h1:UOGuzwb1PwsrDAObMuhUnj0p5ULPj8V/xJ7Kx9qUBdQ=
 github.com/jonboulle/clockwork v0.2.2/go.mod h1:Pkfl5aHPm1nk2H9h0bjmnJD/BcgbGXUBGnn1kMkgxc8=
