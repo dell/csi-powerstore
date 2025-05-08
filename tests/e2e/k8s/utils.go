@@ -117,8 +117,8 @@ func ScaleDownDeployment(client clientset.Interface, deploymentObject *apps.Depl
 func CreateStatefulSet(ns string, ss *apps.StatefulSet, c clientset.Interface) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	framework.Logf("Creating statefulset %s/%s with %d replicas and selector %+v",
-		ss.Namespace, ss.Name, *(ss.Spec.Replicas), ss.Spec.Selector)
+	framework.Logf(fmt.Sprintf("Creating statefulset %v/%v with %d replicas and selector %+v",
+		ss.Namespace, ss.Name, *(ss.Spec.Replicas), ss.Spec.Selector))
 
 	_, err := c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
@@ -129,8 +129,8 @@ func CreateStatefulSet(ns string, ss *apps.StatefulSet, c clientset.Interface) {
 func CreateDeployment() (ns string, ss *apps.Deployment, c clientset.Interface) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	framework.Logf("Creating Deployment %v/%v with %d replicas and selector %+v",
-		ss.Namespace, ss.Name, *(ss.Spec.Replicas), ss.Spec.Selector)
+	framework.Logf(fmt.Sprintf("Creating Deployment %v/%v with %d replicas and selector %+v",
+		ss.Namespace, ss.Name, *(ss.Spec.Replicas), ss.Spec.Selector))
 
 	_, err := c.AppsV1().Deployments(ns).Create(ctx, ss, metav1.CreateOptions{})
 	framework.ExpectNoError(err)

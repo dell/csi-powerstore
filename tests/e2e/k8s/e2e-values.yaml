@@ -21,9 +21,6 @@ driverNamespace: "powerstore"
 e2eCSIDriverName: "csi-powerstore.dellemc.com"
 arrayID: "unique"
 
-# replace this with the list of available NASServers
-mutiNASServers: ["nas1", "nas2", "nas3"]
-
 diskSize: "3Gi"
 execCommand: "while true ; do sleep 2 ; done"
 
