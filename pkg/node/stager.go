@@ -20,7 +20,6 @@ package node
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -35,6 +34,7 @@ import (
 	"github.com/dell/csi-powerstore/v2/pkg/common/fs"
 	"github.com/dell/gobrick"
 	"github.com/dell/gopowerstore"
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -87,9 +87,9 @@ func (s *SCSIStager) Stage(ctx context.Context, req *csi.NodeStageVolumeRequest,
 	logFields["WWN"] = publishContext.deviceWWN
 	logFields["Lun"] = publishContext.volumeLUNAddress
 	logFields["StagingPath"] = stagingPath
-	ctx = common.SetLogFields(ctx, logFields)
+	ctxNew := common.SetLogFields(ctx, logFields)
 
-	found, ready, err := isReadyToPublish(ctx, stagingPath, fs)
+	found, ready, err := isReadyToPublish(ctxNew, stagingPath, fs)
 	if err != nil {
 		return nil, err
 	}
@@ -99,13 +99,13 @@ func (s *SCSIStager) Stage(ctx context.Context, req *csi.NodeStageVolumeRequest,
 	} else if found {
 		log.WithFields(logFields).Warning("volume found in staging path but it is not ready for publish," +
 			"try to unmount it and retry staging again")
-		_, err := unstageVolume(ctx, stagingPath, id, logFields, err, fs)
+		_, err := unstageVolume(ctxNew, stagingPath, id, logFields, err, fs)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to unmount volume: %s", err.Error())
 		}
 	}
 
-	devicePath, err := s.connectDevice(ctx, publishContext)
+	devicePath, err := s.connectDevice(ctxNew, publishContext)
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +120,7 @@ func (s *SCSIStager) Stage(ctx context.Context, req *csi.NodeStageVolumeRequest,
 	log.WithFields(logFields).Info("target path successfully created")
 
 	mntFlags := common.GetMountFlags(req.GetVolumeCapability())
-	if err := fs.GetUtil().BindMount(ctx, devicePath, stagingPath, mntFlags...); err != nil {
+	if err := fs.GetUtil().BindMount(ctxNew, devicePath, stagingPath, mntFlags...); err != nil {
 		return nil, status.Errorf(codes.Internal,
 			"error bind disk %s to target path: %s", devicePath, err.Error())
 	}
@@ -401,6 +401,9 @@ func readFCTargetsFromPublishContext(pc map[string]string, isRemote bool) []gobr
 
 func (s *SCSIStager) connectDevice(ctx context.Context, data scsiPublishContextData) (string, error) {
 	logFields := common.GetLogFields(ctx)
+	uuid := uuid.New()
+	log.Infof("starting device connection process for req: %s", uuid)
+	defer log.Infof("finishing device connection process for req: %s", uuid)
 	var err error
 	lun, err := strconv.Atoi(data.volumeLUNAddress)
 	if err != nil {
@@ -465,28 +468,11 @@ func (s *SCSIStager) connectNVMEDevice(ctx context.Context,
 	connectorCtx, cFunc := context.WithTimeout(context.Background(), time.Second*120)
 	defer cFunc()
 
-	type connectVolResp struct {
-		device gobrick.Device
-		err    error
-	}
-	connectResp := make(chan connectVolResp)
-	go func() {
-		connectorCtx = common.SetLogFields(connectorCtx, logFields)
-		resp, err := s.nvmeConnector.ConnectVolume(connectorCtx, gobrick.NVMeVolumeInfo{
-			Targets: targets,
-			WWN:     wwn,
-		}, useFC)
-		connectResp <- connectVolResp{resp, err}
-	}()
-
-	select {
-	case <-ctx.Done():
-		return gobrick.Device{}, errors.New("connectNVMEDevice parent context canceled")
-	case <-connectorCtx.Done():
-		return gobrick.Device{}, errors.New("connectNVMEDevice context canceled")
-	case resp := <-connectResp:
-		return resp.device, resp.err
-	}
+	connectorCtx = common.SetLogFields(connectorCtx, logFields)
+	return s.nvmeConnector.ConnectVolume(connectorCtx, gobrick.NVMeVolumeInfo{
+		Targets: targets,
+		WWN:     wwn,
+	}, useFC)
 }
 
 func (s *SCSIStager) connectFCDevice(ctx context.Context,
