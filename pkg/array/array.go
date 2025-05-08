@@ -46,8 +46,10 @@ import (
 
 var (
 	// IPToArray - Store Array IPs
-	IPToArray    map[string]string
-	ipToArrayMux sync.Mutex
+	IPToArray                map[string]string
+	ipToArrayMux             sync.Mutex
+	defaultMultiNasThreshold = 5
+	defaultMultiNasCooldown  = 5 * time.Minute
 )
 
 // Consumer provides methods for safe management of arrays
@@ -360,7 +362,7 @@ func GetPowerStoreArrays(fs fs.Interface, filePath string) (map[string]*PowerSto
 			defaultArray = array
 			foundDefault = true
 		}
-		failureThreshold := 5
+		failureThreshold := defaultMultiNasThreshold
 		if threshold, ok := csictx.LookupEnv(context.Background(), common.EnvMultiNASFailureThreshold); ok {
 			if thresholdInt, err := strconv.Atoi(threshold); err != nil {
 				log.Warnf("can't parse multi NAS failure threshold, using default %d", failureThreshold)
@@ -371,7 +373,7 @@ func GetPowerStoreArrays(fs fs.Interface, filePath string) (map[string]*PowerSto
 				failureThreshold = thresholdInt
 			}
 		}
-		cooldownPeriod := 1 * time.Minute
+		cooldownPeriod := defaultMultiNasCooldown
 		if cp, ok := csictx.LookupEnv(context.Background(), common.EnvMultiNASCooldownPeriod); ok {
 			if duration, err := time.ParseDuration(cp); err != nil {
 				log.Warnf("can't parse multi NAS cooldown period, using default %v", cooldownPeriod)
