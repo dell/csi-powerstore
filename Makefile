@@ -35,10 +35,6 @@ generate:
 build: generate
 	GOOS=linux CGO_ENABLED=0 go build ./cmd/csi-powerstore
 
-dev-docker: build
-	docker build -t csi-powerstore-hbn -f dev-docker-file --network host .
-	docker images | head -10
-
 install: generate
 	GOOS=linux CGO_ENABLED=0 go install ./cmd/csi-powerstore
 
