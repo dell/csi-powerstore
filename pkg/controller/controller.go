@@ -424,21 +424,16 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 				if err != nil {
 					return nil, err
 				}
-			} else if apiError.FSCreationLimitReached() {
-				if nfsCreator, ok := creator.(*NfsCreator); ok {
-					arr.NASCooldownTracker.MarkFailure(nfsCreator.nasName)
-				}
-				return nil, status.Error(codes.ResourceExhausted, "FS creation limit reached for NAS")
-			} else {
-				return nil, status.Error(codes.Internal, err.Error())
+			} else if apiError.FSCreationLimitReached() && useNFS {
+				arr.NASCooldownTracker.MarkFailure(selectedNasName)
+				return nil, status.Error(codes.ResourceExhausted, err.Error())
 			}
 		} else {
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 	} else {
-		// Success path
-		if nfsCreator, ok := creator.(*NfsCreator); ok {
-			arr.NASCooldownTracker.ResetFailure(nfsCreator.nasName)
+		if useNFS {
+			arr.NASCooldownTracker.ResetFailure(selectedNasName)
 		}
 		volumeResponse = getCSIVolume(resp.ID, sizeInBytes)
 	}
