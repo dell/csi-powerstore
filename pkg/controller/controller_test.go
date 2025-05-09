@@ -1907,7 +1907,6 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			gomega.Expect(res).To(gomega.BeNil())
 			tracker := ctrlSvc.Arrays()[secondValidID].NASCooldownTracker.(*array.NASCooldown)
 			gomega.Expect(tracker.GetStatusMap()["nasA"].Failures).To(gomega.Equal(1))
-
 		})
 
 		ginkgo.It("should fail if CreateFS fails with some other API error & failure count should be incremented", func() {
