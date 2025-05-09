@@ -1133,7 +1133,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			gomega.Expect(res).To(gomega.BeNil())
 		})
 
-		ginkgo.It("should fail when fs creation limit is exceeded", func() {
+		ginkgo.It("should increase the failure count if FS creation fails", func() {
 			clientMock.On("GetNASServers", mock.Anything).Return([]gopowerstore.NAS{validNAS1, validNAS2, validNAS3, invalidNAS4}, nil)
 			clientMock.On("GetNASByName", mock.Anything, "nasA").Return(gopowerstore.NAS{ID: validNasID}, nil)
 			clientMock.On("CreateFS", mock.Anything, mock.Anything).
@@ -1143,6 +1143,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 						Message:    "New file system can not be created. The limit of 125 file systems for the NAS server 24aefac2-a796-47dc-886a-c73ff8c1a671 has been reached.",
 					},
 				})
+			clientMock.On("GetFSByName", mock.Anything, "my-vol").Return(gopowerstore.FileSystem{}, errors.New("not nil"))
 
 			req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
 			req.Parameters[common.KeyArrayID] = secondValidID
