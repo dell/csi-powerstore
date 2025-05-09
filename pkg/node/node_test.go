@@ -2861,6 +2861,15 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				gomega.Ω(res).To(gomega.Equal(&csi.NodeExpandVolumeResponse{}))
 			})
 		})
+		ginkgo.When("using NFS mode", func() {
+			// workaround for https://github.com/kubernetes/kubernetes/issues/131419
+			ginkgo.It("should succeed [nfs]", func() {
+				// nothing to mock as it is a NO-OP
+				res, err := nodeSvc.NodeExpandVolume(context.Background(), getNodeVolumeExpandValidRequest(validNfsVolumeID, false))
+				gomega.Ω(err).To(gomega.BeNil())
+				gomega.Ω(res).To(gomega.Equal(&csi.NodeExpandVolumeResponse{}))
+			})
+		})
 		ginkgo.When("the request is missing the Volume ID", func() {
 			ginkgo.It("should fail", func() {
 				_, err := nodeSvc.NodeExpandVolume(context.Background(), getNodeVolumeExpandValidRequest("", true))

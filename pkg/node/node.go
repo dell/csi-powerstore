@@ -888,6 +888,11 @@ func (s *Service) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolum
 		return nil, err
 	}
 
+	if volumeHandle.Protocol == "nfs" {
+		// workaround for https://github.com/kubernetes/kubernetes/issues/131419
+		return &csi.NodeExpandVolumeResponse{}, nil
+	}
+
 	id := volumeHandle.LocalUUID
 	arrayID := volumeHandle.LocalArrayGlobalID
 
