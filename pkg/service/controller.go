@@ -42,7 +42,11 @@ func (s *service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 	if params[CsiNfsParameter] != "" {
 		params[CsiNfsParameter] = "RWX"
 	}
+
 	if nfs.IsNFSStorageClass(params) {
+		if req.VolumeCapabilities[0].GetBlock() != nil {
+			return nil, status.Errorf(codes.InvalidArgument, "Block requested from Shared-NFS Volume")
+		}
 		return createHostBasedNFSVolume(ctx, req)
 	}
 

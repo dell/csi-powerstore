@@ -62,6 +62,11 @@ func TestCreateVolume(t *testing.T) {
 				ctx: context.Background(),
 				req: &csi.CreateVolumeRequest{
 					Parameters: map[string]string{CsiNfsParameter: "RWX"},
+					VolumeCapabilities: []*csi.VolumeCapability{
+						{
+							AccessType: &csi.VolumeCapability_Mount{Mount: &csi.VolumeCapability_MountVolume{}},
+						},
+					},
 				},
 			},
 			mockSetup: func(mockController *mocks.ControllerInterface, _ *mocks.MockInterface, mockNfs *nfsmock.MockService) {
@@ -74,7 +79,13 @@ func TestCreateVolume(t *testing.T) {
 			name: "normal volume",
 			args: args{
 				ctx: context.Background(),
-				req: &csi.CreateVolumeRequest{},
+				req: &csi.CreateVolumeRequest{
+					VolumeCapabilities: []*csi.VolumeCapability{
+						{
+							AccessType: &csi.VolumeCapability_Mount{Mount: &csi.VolumeCapability_MountVolume{}},
+						},
+					},
+				},
 			},
 			mockSetup: func(mockController *mocks.ControllerInterface, _ *mocks.MockInterface, mockNfs *nfsmock.MockService) {
 				mockController.On("CreateVolume", mock.Anything, mock.Anything).Return(&csi.CreateVolumeResponse{}, nil)
@@ -89,6 +100,11 @@ func TestCreateVolume(t *testing.T) {
 				req: &csi.CreateVolumeRequest{
 					Parameters: map[string]string{CsiNfsParameter: "RWX"},
 					// provide a host-based nfs volume as content source, signifying a clone request
+					VolumeCapabilities: []*csi.VolumeCapability{
+						{
+							AccessType: &csi.VolumeCapability_Mount{Mount: &csi.VolumeCapability_MountVolume{}},
+						},
+					},
 					VolumeContentSource: &csi.VolumeContentSource{
 						Type: &csi.VolumeContentSource_Volume{
 							Volume: &csi.VolumeContentSource_VolumeSource{
@@ -111,6 +127,11 @@ func TestCreateVolume(t *testing.T) {
 				req: &csi.CreateVolumeRequest{
 					// CsiNfsParameter denotes a host-based NFS storage class
 					Parameters: map[string]string{CsiNfsParameter: "RWX"},
+					VolumeCapabilities: []*csi.VolumeCapability{
+						{
+							AccessType: &csi.VolumeCapability_Mount{Mount: &csi.VolumeCapability_MountVolume{}},
+						},
+					},
 					// provide a regular volume ID as content source
 					VolumeContentSource: &csi.VolumeContentSource{
 						Type: &csi.VolumeContentSource_Volume{

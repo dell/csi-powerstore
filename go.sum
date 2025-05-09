@@ -103,6 +103,8 @@ github.com/dell/csi-metadata-retriever v1.10.0 h1:OMzbwSJ+CMOTpf4WgcrSbT3j9Ve1tx
 github.com/dell/csi-metadata-retriever v1.10.0/go.mod h1:ppgtPHlxaRNmNizU+TnxZLz8tNotTAwByZ/Lg32n660=
 github.com/dell/csm-sharednfs v0.0.0-20250502175820-0215caa207ad h1:PAzZpAoyKq7rMxIc3DQWHO7fnjgNuUdXokFJ4jwKOsg=
 github.com/dell/csm-sharednfs v0.0.0-20250502175820-0215caa207ad/go.mod h1:+flf+ETu0LkNUDVFEybV7fJtO6MEHedg816CILTrXhs=
+github.com/dell/csm-sharednfs v0.0.0-20250508054056-fed2cd325687 h1:5xHGkUDoUDrP9qFVixvD7hwGvWvFV0GbEjT1MceRjCI=
+github.com/dell/csm-sharednfs v0.0.0-20250508054056-fed2cd325687/go.mod h1:+flf+ETu0LkNUDVFEybV7fJtO6MEHedg816CILTrXhs=
 github.com/dell/dell-csi-extensions/common v1.7.1-0.20250429070859-de50563d621e h1:+H9j5Utjxv/rNLVu69y0bwnQaKOwcFCAHhubtRou7mw=
 github.com/dell/dell-csi-extensions/common v1.7.1-0.20250429070859-de50563d621e/go.mod h1:0cJvgNiPOosCJujd60aV9ZTujsHbRJNXX0ARRMDyjfw=
 github.com/dell/dell-csi-extensions/podmon v1.7.1-0.20250429070859-de50563d621e h1:Y2gEO0vrYNtA26uWKQNoFW85H0+JnjJK1ro7au3nIBI=
@@ -121,8 +123,8 @@ github.com/dell/goiscsi v1.11.1-0.20250414073142-a69a338c4871 h1:oicdQXy5MpcrSW/
 github.com/dell/goiscsi v1.11.1-0.20250414073142-a69a338c4871/go.mod h1:nMLnEG6QBpouHxFRMxpmJA6X+Nrr3KeN9mr5n2gV+5M=
 github.com/dell/gonvme v1.10.2-0.20250502050802-983cf3a533b7 h1:0bbn3pB2ygW+MsR4VMxyOXqAar5a5oSN+7YfxvMi8Nc=
 github.com/dell/gonvme v1.10.2-0.20250502050802-983cf3a533b7/go.mod h1:3bgVCRevHuVWR4UOV2uv5UksaJP5SiCzrgQZHqihaYA=
-github.com/dell/gopowerstore v1.18.1-0.20250411160922-a4e8cc4e5545 h1:XDMxMvYH+kVbPu0tehj/Jb2/OXMoBV1mSSvAFsjCGBs=
-github.com/dell/gopowerstore v1.18.1-0.20250411160922-a4e8cc4e5545/go.mod h1:ZEF/MMMvPk/JdPeKIUGZFXd+AgQxVqCw/NePpV3QcHc=
+github.com/dell/gopowerstore v1.18.1-0.20250507171424-bf810a70c9d9 h1:Rn4zFqaHSJX7GpXAha39C3iCQW1qnjoZpRBcG4SpP+I=
+github.com/dell/gopowerstore v1.18.1-0.20250507171424-bf810a70c9d9/go.mod h1:ZEF/MMMvPk/JdPeKIUGZFXd+AgQxVqCw/NePpV3QcHc=
 github.com/dgrijalva/jwt-go v3.2.0+incompatible/go.mod h1:E3ru+11k8xSBh+hMPgOLZmtrrCbhqsmaPHjLKYnJCaQ=
 github.com/dgryski/go-sip13 v0.0.0-20181026042036-e10d5fee7954/go.mod h1:vAd38F8PWV+bWy6jNmig1y/TA+kYO4g3RSRF0IAv0no=
 github.com/docopt/docopt-go v0.0.0-20180111231733-ee0de3bc6815/go.mod h1:WwZ+bS3ebgob9U8Nd0kOddGdZWjyMGR8Wziv+TBNwSE=

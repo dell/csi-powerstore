@@ -23,7 +23,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/http"
 	"os"
 	"path"
 	"path/filepath"
@@ -33,6 +32,7 @@ import (
 
 	"github.com/dell/csm-sharednfs/nfs"
 	"github.com/dell/gonvme"
+	"github.com/dell/gopowerstore/api"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-powerstore/v2/pkg/array"
@@ -2067,7 +2067,7 @@ func (s *Service) registerHost(
 
 		headers := client.GetCustomHTTPHeaders()
 		if headers == nil {
-			headers = make(http.Header)
+			headers = api.NewSafeHeader().GetHeader()
 		}
 		headers.Add("DELL-VISIBILITY", "internal")
 		client.SetCustomHTTPHeaders(headers)
