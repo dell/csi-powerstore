@@ -419,16 +419,23 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 	resp, err := creator.Create(ctx, req, sizeInBytes, arr.GetClient())
 	if err != nil {
 		if apiError, ok := err.(gopowerstore.APIError); ok {
-			if apiError.FSCreationLimitReached() && useNFS {
+			switch {
+			case apiError.FSCreationLimitReached() && useNFS:
 				arr.NASCooldownTracker.MarkFailure(selectedNasName)
 				return nil, status.Error(codes.ResourceExhausted, err.Error())
-			} else if apiError.VolumeNameIsAlreadyUse() || apiError.FSNameIsAlreadyUse() {
+
+			case apiError.VolumeNameIsAlreadyUse(), apiError.FSNameIsAlreadyUse():
 				volumeResponse, err = creator.CheckIfAlreadyExists(ctx, req.GetName(), sizeInBytes, arr.GetClient())
 				if err != nil {
 					return nil, err
 				}
+
+			default:
+				// Catch all other API errors
+				return nil, status.Error(codes.Internal, err.Error())
 			}
 		} else {
+			// Non-API error
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 	} else {

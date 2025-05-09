@@ -25,6 +25,7 @@ import (
 	"net/http"
 	"path/filepath"
 	"testing"
+	"time"
 
 	csiext "github.com/dell/dell-csi-extensions/replication"
 
@@ -108,26 +109,28 @@ func setVariables() {
 
 	arrays := make(map[string]*array.PowerStoreArray)
 	first := &array.PowerStoreArray{
-		Endpoint:      "https://192.168.0.1/api/rest",
-		Username:      "admin",
-		GlobalID:      firstValidID,
-		Password:      "pass",
-		BlockProtocol: common.ISCSITransport,
-		Insecure:      true,
-		IsDefault:     true,
-		Client:        clientMock,
-		IP:            "192.168.0.1",
+		Endpoint:           "https://192.168.0.1/api/rest",
+		Username:           "admin",
+		GlobalID:           firstValidID,
+		Password:           "pass",
+		BlockProtocol:      common.ISCSITransport,
+		Insecure:           true,
+		IsDefault:          true,
+		Client:             clientMock,
+		IP:                 "192.168.0.1",
+		NASCooldownTracker: array.NewNASCooldown(time.Minute, 5),
 	}
 	second := &array.PowerStoreArray{
-		Endpoint:      "https://192.168.0.2/api/rest",
-		Username:      "admin",
-		GlobalID:      secondValidID,
-		Password:      "pass",
-		NasName:       validNasName,
-		BlockProtocol: common.NoneTransport,
-		Insecure:      true,
-		Client:        clientMock,
-		IP:            "192.168.0.2",
+		Endpoint:           "https://192.168.0.2/api/rest",
+		Username:           "admin",
+		GlobalID:           secondValidID,
+		Password:           "pass",
+		NasName:            validNasName,
+		BlockProtocol:      common.NoneTransport,
+		Insecure:           true,
+		Client:             clientMock,
+		IP:                 "192.168.0.2",
+		NASCooldownTracker: array.NewNASCooldown(time.Minute, 5),
 	}
 
 	arrays[firstValidID] = first
@@ -1012,6 +1015,185 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 					AccessibleTopology: []*csi.Topology{{Segments: map[string]string{common.Name + "/" + ctrlSvc.Arrays()[secondValidID].GetIP() + "-nfs": "true"}}},
 				},
 			}))
+		})
+
+		validNAS1 := gopowerstore.NAS{
+			Name:              "nasA",
+			OperationalStatus: gopowerstore.Started,
+			HealthDetails:     gopowerstore.HealthDetails{State: gopowerstore.None},
+			FileSystems:       make([]gopowerstore.FileSystem, 1), // 1 FS (should be chosen)
+		}
+
+		validNAS2 := gopowerstore.NAS{
+			Name:              "nasB",
+			OperationalStatus: gopowerstore.Started,
+			HealthDetails:     gopowerstore.HealthDetails{State: gopowerstore.Info},
+			FileSystems:       make([]gopowerstore.FileSystem, 2), // 2 FS, but lexicographically larger
+		}
+
+		validNAS3 := gopowerstore.NAS{
+			Name:              "nasC",
+			OperationalStatus: gopowerstore.Started,
+			HealthDetails:     gopowerstore.HealthDetails{State: gopowerstore.Info},
+			FileSystems:       make([]gopowerstore.FileSystem, 3),
+		}
+
+		invalidNAS4 := gopowerstore.NAS{
+			Name:              "nasX",
+			OperationalStatus: gopowerstore.Stopped, // Inactive NAS
+			HealthDetails:     gopowerstore.HealthDetails{State: gopowerstore.Info},
+			FileSystems:       make([]gopowerstore.FileSystem, 1),
+		}
+
+		ginkgo.It("should successfully create nfs volume with least used NAS if multiple NAS exist in storage class", func() {
+			clientMock.On("GetNASServers", mock.Anything).Return([]gopowerstore.NAS{validNAS1, validNAS2, validNAS3, invalidNAS4}, nil)
+			clientMock.On("GetNASByName", mock.Anything, "nasA").Return(gopowerstore.NAS{ID: validNasID}, nil)
+			clientMock.On("CreateFS", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
+			clientMock.On("GetFS", context.Background(), mock.Anything).Return(gopowerstore.FileSystem{NasServerID: validNasID}, nil)
+			clientMock.On("GetNAS", context.Background(), mock.Anything).Return(gopowerstore.NAS{CurrentNodeID: validNodeID}, nil)
+			clientMock.On("GetApplianceByName", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
+
+			req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
+			req.Parameters[common.KeyArrayID] = secondValidID
+
+			req.Parameters[controller.KeyCSIPVCName] = req.Name
+			req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
+			req.Parameters[common.KeyNasName] = "nasA, nasB, nasC, nasX"
+
+			res, err := ctrlSvc.CreateVolume(context.Background(), req)
+			gomega.Expect(err).To(gomega.BeNil())
+			gomega.Expect(res).To(gomega.Equal(&csi.CreateVolumeResponse{
+				Volume: &csi.Volume{
+					CapacityBytes: validVolSize,
+					VolumeId:      filepath.Join(validBaseVolID, secondValidID, "nfs"),
+					VolumeContext: map[string]string{
+						common.KeyArrayVolumeName:     "my-vol",
+						common.KeyProtocol:            "nfs",
+						common.KeyArrayID:             secondValidID,
+						common.KeyNfsACL:              "A::OWNER@:RWX",
+						common.KeyNasName:             "nasA",
+						common.KeyVolumeDescription:   req.Name + "-" + validNamespaceName,
+						common.KeyServiceTag:          validServiceTag,
+						controller.KeyCSIPVCName:      req.Name,
+						controller.KeyCSIPVCNamespace: validNamespaceName,
+					},
+					AccessibleTopology: []*csi.Topology{{Segments: map[string]string{common.Name + "/" + ctrlSvc.Arrays()[secondValidID].GetIP() + "-nfs": "true"}}},
+				},
+			}))
+		})
+
+		ginkgo.It("should successfully create nfs volume if only one NAS exist in storage class", func() {
+			clientMock.On("GetNASByName", mock.Anything, "nasA").Return(gopowerstore.NAS{ID: validNasID}, nil)
+			clientMock.On("CreateFS", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
+			clientMock.On("GetFS", context.Background(), mock.Anything).Return(gopowerstore.FileSystem{NasServerID: validNasID}, nil)
+			clientMock.On("GetNAS", context.Background(), mock.Anything).Return(gopowerstore.NAS{CurrentNodeID: validNodeID}, nil)
+			clientMock.On("GetApplianceByName", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
+
+			req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
+			req.Parameters[common.KeyArrayID] = secondValidID
+
+			req.Parameters[controller.KeyCSIPVCName] = req.Name
+			req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
+			req.Parameters[common.KeyNasName] = "nasA"
+
+			res, err := ctrlSvc.CreateVolume(context.Background(), req)
+			gomega.Expect(err).To(gomega.BeNil())
+			gomega.Expect(res).To(gomega.Equal(&csi.CreateVolumeResponse{
+				Volume: &csi.Volume{
+					CapacityBytes: validVolSize,
+					VolumeId:      filepath.Join(validBaseVolID, secondValidID, "nfs"),
+					VolumeContext: map[string]string{
+						common.KeyArrayVolumeName:     "my-vol",
+						common.KeyProtocol:            "nfs",
+						common.KeyArrayID:             secondValidID,
+						common.KeyNfsACL:              "A::OWNER@:RWX",
+						common.KeyNasName:             "nasA",
+						common.KeyVolumeDescription:   req.Name + "-" + validNamespaceName,
+						common.KeyServiceTag:          validServiceTag,
+						controller.KeyCSIPVCName:      req.Name,
+						controller.KeyCSIPVCNamespace: validNamespaceName,
+					},
+					AccessibleTopology: []*csi.Topology{{Segments: map[string]string{common.Name + "/" + ctrlSvc.Arrays()[secondValidID].GetIP() + "-nfs": "true"}}},
+				},
+			}))
+		})
+
+		ginkgo.It("should fail when there is no least used NAS[Invalid NAS]", func() {
+			clientMock.On("GetNASServers", mock.Anything).Return([]gopowerstore.NAS{invalidNAS4}, nil)
+
+			req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
+			req.Parameters[common.KeyArrayID] = secondValidID
+
+			req.Parameters[controller.KeyCSIPVCName] = req.Name
+			req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
+			req.Parameters[common.KeyNasName] = "nasA, nasB, nasC, nasX"
+
+			res, err := ctrlSvc.CreateVolume(context.Background(), req)
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("no suitable NAS server found, please ensure the NAS is running and healthy"))
+			gomega.Expect(res).To(gomega.BeNil())
+		})
+
+		ginkgo.It("should fail when fs creation limit is exceeded", func() {
+			clientMock.On("GetNASServers", mock.Anything).Return([]gopowerstore.NAS{validNAS1, validNAS2, validNAS3, invalidNAS4}, nil)
+			clientMock.On("GetNASByName", mock.Anything, "nasA").Return(gopowerstore.NAS{ID: validNasID}, nil)
+			clientMock.On("CreateFS", mock.Anything, mock.Anything).
+				Return(gopowerstore.CreateResponse{}, gopowerstore.APIError{
+					ErrorMsg: &api.ErrorMsg{
+						StatusCode: http.StatusUnprocessableEntity,
+						Message:    "New file system can not be created. The limit of 125 file systems for the NAS server 24aefac2-a796-47dc-886a-c73ff8c1a671 has been reached.",
+					},
+				})
+
+			req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
+			req.Parameters[common.KeyArrayID] = secondValidID
+
+			req.Parameters[controller.KeyCSIPVCName] = req.Name
+			req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
+			req.Parameters[common.KeyNasName] = "nasA, nasB, nasC, nasX"
+
+			res, err := ctrlSvc.CreateVolume(context.Background(), req)
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("The limit of 125 file systems for the NAS server"))
+			gomega.Expect(res).To(gomega.BeNil())
+		})
+
+		ginkgo.It("should fail if CreateFS fails with some other API error", func() {
+			clientMock.On("GetNASServers", mock.Anything).Return([]gopowerstore.NAS{validNAS1, validNAS2, validNAS3, invalidNAS4}, nil)
+			clientMock.On("GetNASByName", mock.Anything, "nasA").Return(gopowerstore.NAS{ID: validNasID}, nil)
+			clientMock.On("CreateFS", mock.Anything, mock.Anything).
+				Return(gopowerstore.CreateResponse{}, gopowerstore.APIError{
+					ErrorMsg: &api.ErrorMsg{
+						StatusCode: http.StatusForbidden,
+						Message:    "some error message",
+					},
+				})
+
+			req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
+			req.Parameters[common.KeyArrayID] = secondValidID
+
+			req.Parameters[controller.KeyCSIPVCName] = req.Name
+			req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
+			req.Parameters[common.KeyNasName] = "nasA, nasB, nasC, nasX"
+
+			res, err := ctrlSvc.CreateVolume(context.Background(), req)
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("some error message"))
+			gomega.Expect(res).To(gomega.BeNil())
+		})
+
+		ginkgo.It("should fail if CreateFS fails with some other Non API error", func() {
+			clientMock.On("GetNASServers", mock.Anything).Return([]gopowerstore.NAS{validNAS1, validNAS2, validNAS3, invalidNAS4}, nil)
+			clientMock.On("GetNASByName", mock.Anything, "nasA").Return(gopowerstore.NAS{ID: validNasID}, nil)
+			clientMock.On("CreateFS", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{}, errors.New("some error message"))
+
+			req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
+			req.Parameters[common.KeyArrayID] = secondValidID
+
+			req.Parameters[controller.KeyCSIPVCName] = req.Name
+			req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
+			req.Parameters[common.KeyNasName] = "nasA, nasB, nasC, nasX"
+
+			res, err := ctrlSvc.CreateVolume(context.Background(), req)
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("some error message"))
+			gomega.Expect(res).To(gomega.BeNil())
 		})
 
 		ginkgo.It("should successfully create nfs volume & all vol attribute should get set", func() {
