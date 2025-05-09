@@ -179,7 +179,7 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 				}
 				leastUsedNas, err := array.GetLeastUsedActiveNAS(ctx, arr, nasList)
 				if err != nil {
-					return nil, fmt.Errorf("failed to get least used NAS: %w", err)
+					return nil, status.Errorf(codes.Internal, "failed to get least used NAS: %w", err)
 				}
 				selectedNasName = leastUsedNas
 			} else {
@@ -417,21 +417,13 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 	var volumeResponse *csi.Volume
 	resp, err := creator.Create(ctx, req, sizeInBytes, arr.GetClient())
 	if err != nil {
-		if apiError, ok := err.(gopowerstore.APIError); ok {
-			switch {
-			case apiError.FSCreationLimitReached() && useNFS:
-				arr.NASCooldownTracker.MarkFailure(selectedNasName)
-				return nil, status.Error(codes.ResourceExhausted, err.Error())
-
-			case apiError.VolumeNameIsAlreadyUse(), apiError.FSNameIsAlreadyUse():
-				volumeResponse, err = creator.CheckIfAlreadyExists(ctx, req.GetName(), sizeInBytes, arr.GetClient())
-				if err != nil {
-					return nil, err
-				}
-
-			default:
-				// Catch all other API errors
-				return nil, status.Error(codes.Internal, err.Error())
+		if useNFS {
+			arr.NASCooldownTracker.MarkFailure(selectedNasName)
+			return nil, status.Error(codes.ResourceExhausted, err.Error())
+		} else if apiError, ok := err.(gopowerstore.APIError); ok && (apiError.VolumeNameIsAlreadyUse() || apiError.FSNameIsAlreadyUse()) {
+			volumeResponse, err = creator.CheckIfAlreadyExists(ctx, req.GetName(), sizeInBytes, arr.GetClient())
+			if err != nil {
+				return nil, err
 			}
 		} else {
 			// Non-API error
