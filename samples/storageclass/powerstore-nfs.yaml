@@ -38,10 +38,11 @@ parameters:
   # will be used as default value
   csi.storage.k8s.io/fstype: "nfs"
   # nasName: NAS server's name. If not specified, value from secret.yaml will be used
+  # User can specify one or multiple NAS servers, separated by commas.
   # Allowed values: string
   # Optional: true
   # Default value: None
-  nasName: "nas-server"
+  nasName: "nas-server1,nas-server2,nas-server3"
 
   # allowRoot: enables or disables root squashing (valid only for NFS)
   # Allowed values:
