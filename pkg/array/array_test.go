@@ -208,7 +208,7 @@ func TestGetPowerStoreArrays(t *testing.T) {
 		got, _, _, err := array.GetPowerStoreArrays(f, "./testdata/one-arr.yaml")
 		assert.NoError(t, err)
 		assert.Equal(t, 5, got["gid1"].NASCooldownTracker.(*array.NASCooldown).GetThreshold())
-		assert.Equal(t, 1*time.Minute, got["gid1"].NASCooldownTracker.(*array.NASCooldown).GetCooldownPeriod())
+		assert.Equal(t, 5*time.Minute, got["gid1"].NASCooldownTracker.(*array.NASCooldown).GetCooldownPeriod())
 	})
 
 	t.Run("invalid format EnvMultiNASFailureThreshold & EnvMultiNASCooldownPeriod", func(t *testing.T) {
@@ -219,7 +219,7 @@ func TestGetPowerStoreArrays(t *testing.T) {
 		got, _, _, err := array.GetPowerStoreArrays(f, "./testdata/one-arr.yaml")
 		assert.NoError(t, err)
 		assert.Equal(t, 5, got["gid1"].NASCooldownTracker.(*array.NASCooldown).GetThreshold())
-		assert.Equal(t, 1*time.Minute, got["gid1"].NASCooldownTracker.(*array.NASCooldown).GetCooldownPeriod())
+		assert.Equal(t, 5*time.Minute, got["gid1"].NASCooldownTracker.(*array.NASCooldown).GetCooldownPeriod())
 	})
 }
 

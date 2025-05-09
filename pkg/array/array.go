@@ -218,9 +218,8 @@ func (n *NASCooldown) FallbackRetry(nasList []string) string {
 			return true
 		} else if n.statusMap[nasList[j]] == nil {
 			return false
-		} else {
-			return n.statusMap[nasList[i]].Failures < n.statusMap[nasList[j]].Failures
 		}
+		return n.statusMap[nasList[i]].Failures < n.statusMap[nasList[j]].Failures
 	})
 
 	return nasList[0] // Pick NAS with least failures
