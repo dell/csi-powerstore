@@ -1,0 +1,49 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: "powerstore-sharednfs"
+provisioner: "csi-powerstore.dellemc.com"
+parameters:
+  # arrayID: id of array to be used for volumes
+  # Allowed values: arrayID corresponding to array's globalID specified in secret.yaml
+  # Optional: false
+  # Default value: None
+  arrayID: globalID
+  shared-nfs: RWX
+  csi.storage.k8s.io/fstype: "ext4"
+
+# reclaimPolicy: PVs that are dynamically created by a StorageClass will have the reclaim policy specified here
+# Allowed values:
+#   Reclaim: retain the PV after PVC deletion
+#   Delete: delete the PV after PVC deletion
+# Optional: true
+# Default value: Delete
+reclaimPolicy: Delete
+
+# allowVolumeExpansion: allows the users to resize the volume by editing the corresponding PVC object
+# Allowed values:
+#   true: allow users to resize the PVC
+#   false: does not allow users to resize the PVC
+# Optional: true
+# Default value: false
+allowVolumeExpansion: true
+
+# volumeBindingMode controls when volume binding and dynamic provisioning should occur.
+# Allowed values:
+#   Immediate: indicates that volume binding and dynamic provisioning occurs once the
+#   PersistentVolumeClaim is created
+#   WaitForFirstConsumer: will delay the binding and provisioning of a PersistentVolume (must use this with topology)
+#   until a Pod using the PersistentVolumeClaim is created
+# Optional: true
+# Default value: Immediate
+volumeBindingMode: WaitForFirstConsumer
+
+# allowedTopologies: helps scheduling pods on worker nodes which match all of below expressions.
+# replace "-iscsi" with "-fc", "-nvmetcp", "-nvmefc" or "-nfs" at the end to use FC, NVMeTCP, NVMeFC, or NFS enabled hosts
+# replace "12.34.56.78" with PowerStore endpoint IP
+# Optional: true
+allowedTopologies:
+  - matchLabelExpressions:
+      - key: "csi-powerstore.dellemc.com/10.0.0.1-iscsi"
+        values:
+          - "true"

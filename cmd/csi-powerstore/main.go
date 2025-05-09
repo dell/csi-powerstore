@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2021-2024 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2021-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,6 +30,7 @@ import (
 	"github.com/dell/csi-powerstore/v2/pkg/identity"
 	"github.com/dell/csi-powerstore/v2/pkg/interceptors"
 	"github.com/dell/csi-powerstore/v2/pkg/node"
+	"github.com/dell/csi-powerstore/v2/pkg/provider"
 	"github.com/dell/csi-powerstore/v2/pkg/tracer"
 	"github.com/dell/gocsi"
 	csictx "github.com/dell/gocsi/context"
@@ -91,7 +92,7 @@ func initilizeDriverConfigParams() {
 }
 
 func main() {
-	f := &fs.Fs{Util: &gofsutil.FS{SysBlockDir: "/sys/block"}}
+	f := &fs.Fs{Util: &gofsutil.FS{}}
 
 	common.RmSockFile(f)
 
@@ -178,20 +179,8 @@ func main() {
 		opentracing.SetGlobalTracer(t)
 		InterceptorsList = append(InterceptorsList, grpc_opentracing.UnaryServerInterceptor(grpc_opentracing.WithTracer(t)))
 	}
-	storageProvider := &gocsi.StoragePlugin{
-		Controller:                controllerService,
-		Identity:                  identityService,
-		Node:                      nodeService,
-		Interceptors:              InterceptorsList,
-		RegisterAdditionalServers: controllerService.RegisterAdditionalServers,
 
-		EnvVars: []string{
-			// Enable request validation.
-			gocsi.EnvVarSpecReqValidation + "=true",
-			// Enable serial volume access.
-			gocsi.EnvVarSerialVolAccess + "=true",
-		},
-	}
+	storageProvider := provider.New(controllerService, identityService, nodeService, InterceptorsList)
 	runCSIPlugin(storageProvider)
 }
 
@@ -241,52 +230,52 @@ const usage = `
 	  X_CSI_POWERSTORE_INSECURE
 		  Specifies that the PowerStore's hostname and certificate chain
 		  should not be verified.
-  
+
 		  The default value is false.
-  
+
 	  X_CSI_POWERSTORE_NODE_ID_PATH
 		  Specifies the name of the text file contents of which will
 		  be appended to the node ID
-  
+
 	  X_CSI_POWERSTORE_KUBE_NODE_NAME
 		  Specifies the name of the kubernetes node
-  
+
 	  X_CSI_POWERSTORE_NODE_NAME_PREFIX
 		  Specifies prefix which will be used when registering node
 		  on PowerStore array
-  
+
 	  X_CSI_POWERSTORE_NODE_CHROOT_PATH
 		  Specifies path to chroot where to execute iSCSI commands
-  
+
 	  X_CSI_POWERSTORE_TMP_DIR
 		  Specifies path to the folder which will be used for csi-powerstore temporary files
-	  
+
 	  X_CSI_FC_PORTS_FILTER_FILE_PATH
 		  Specifies path to the file which provide list of WWPN which
 		  should be used by the driver for FC connection on this node
 		  example content of the file:
 		  21:00:00:29:ff:48:9f:6e,21:00:00:29:ff:48:9f:6e
-		  If file does not exist, empty or in invalid format, 
+		  If file does not exist, empty or in invalid format,
 		  then the driver will use all available FC ports
-  
+
 	  X_CSI_POWERSTORE_THROTTLING_RATE_LIMIT
-		  Specifies a number of concurrent requests to one storage API 
-  
+		  Specifies a number of concurrent requests to one storage API
+
 	  X_CSI_POWERSTORE_ENABLE_CHAP
 		  Specifies whether driver should set CHAP credentials in the ISCSI
-		  node database at the time of node plugin boot 
-	  
+		  node database at the time of node plugin boot
+
 	  X_CSI_POWERSTORE_EXTERNAL_ACCESS
 		  Specifies an IP of the additional router you wish to add for nfs export
 		  Used to provide NFS volumes behind NAT
-	  
+
 	  X_CSI_POWERSTORE_CONFIG_PATH
 		  Specifies the filepath to PowerStore arrays config file which will be used
 		  for connection to PowerStore arrays
-  
+
 	  X_CSI_REPLICATION_CONTEXT_PREFIX
 		  Enables sidecars to read required information from volume context
-  
+
 	  X_CSI_REPLICATION_PREFIX
 		  Used as a prefix to find out if replication is enabled
   `

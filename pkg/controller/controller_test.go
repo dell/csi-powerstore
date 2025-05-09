@@ -16,7 +16,7 @@
  *
  */
 
-package controller_test
+package controller
 
 import (
 	"context"
@@ -27,10 +27,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dell/csm-sharednfs/nfs"
 	csiext "github.com/dell/dell-csi-extensions/replication"
 
 	"github.com/dell/csi-powerstore/v2/mocks"
-	"github.com/dell/csi-powerstore/v2/pkg/controller"
 	csictx "github.com/dell/gocsi/context"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
@@ -81,7 +81,7 @@ const (
 	validPolicyNameSync          = "pp-" + validGroupNameSync
 	validRuleID                  = "c721f30b-0b37-4aaf-a3a2-ef99caba2100"
 	validRuleName                = "rr-" + validGroupName
-	validReplicationPrefix       = "/" + controller.KeyReplicationEnabled
+	validReplicationPrefix       = "/" + KeyReplicationEnabled
 	validVolumeGroupName         = "VGName"
 	validRemoteSystemGlobalID    = "PS111111111111"
 	validNfsAcls                 = "A::OWNER@:RWX"
@@ -94,7 +94,7 @@ const (
 var (
 	clientMock *gopowerstoremock.Client
 	fsMock     *mocks.FsInterface
-	ctrlSvc    *controller.Service
+	ctrlSvc    *Service
 )
 
 func TestCSIControllerService(t *testing.T) {
@@ -139,7 +139,7 @@ func setVariables() {
 	csictx.Setenv(context.Background(), common.EnvReplicationPrefix, "replication.storage.dell.com")
 	csictx.Setenv(context.Background(), common.EnvNfsAcls, "A::OWNER@:RWX")
 
-	ctrlSvc = &controller.Service{Fs: fsMock}
+	ctrlSvc = &Service{Fs: fsMock}
 	ctrlSvc.SetArrays(arrays)
 	ctrlSvc.SetDefaultArray(first)
 	ctrlSvc.Init()
@@ -149,9 +149,9 @@ func addMetaData(createParams interface{}) {
 	if t, ok := createParams.(interface {
 		MetaData() http.Header
 	}); ok {
-		t.MetaData().Set(controller.HeaderPersistentVolumeName, "")
-		t.MetaData().Set(controller.HeaderPersistentVolumeClaimName, "")
-		t.MetaData().Set(controller.HeaderPersistentVolumeClaimNamespace, "")
+		t.MetaData().Set(HeaderPersistentVolumeName, "")
+		t.MetaData().Set(HeaderPersistentVolumeClaimName, "")
+		t.MetaData().Set(HeaderPersistentVolumeClaimNamespace, "")
 	} else {
 		fmt.Printf("warning: %T: no MetaData method exists, consider updating gopowerstore library.", createParams)
 	}
@@ -165,7 +165,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 	ginkgo.Describe("calling CreateVolume()", func() {
 		ginkgo.When("creating block volume", func() {
 			ginkgo.It("should successfully create block volume", func() {
-				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+				clientMock.On("GetCustomHTTPHeaders").Return(api.NewSafeHeader().GetHeader())
 				clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
 				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 				clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
@@ -174,8 +174,8 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 
 				req := getTypicalCreateVolumeRequest("my-vol", validVolSize)
 				req.Parameters[common.KeyArrayID] = firstValidID
-				req.Parameters[controller.KeyCSIPVCName] = req.Name
-				req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
+				req.Parameters[KeyCSIPVCName] = req.Name
+				req.Parameters[KeyCSIPVCNamespace] = validNamespaceName
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
 
 				gomega.Expect(err).To(gomega.BeNil())
@@ -184,13 +184,13 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 						CapacityBytes: validVolSize,
 						VolumeId:      filepath.Join(validBaseVolID, firstValidID, "scsi"),
 						VolumeContext: map[string]string{
-							common.KeyArrayID:             firstValidID,
-							common.KeyArrayVolumeName:     "my-vol",
-							common.KeyProtocol:            "scsi",
-							common.KeyVolumeDescription:   req.Name + "-" + validNamespaceName,
-							controller.KeyCSIPVCName:      req.Name,
-							controller.KeyCSIPVCNamespace: validNamespaceName,
-							common.KeyServiceTag:          validServiceTag,
+							common.KeyArrayID:           firstValidID,
+							common.KeyArrayVolumeName:   "my-vol",
+							common.KeyProtocol:          "scsi",
+							common.KeyVolumeDescription: req.Name + "-" + validNamespaceName,
+							KeyCSIPVCName:               req.Name,
+							KeyCSIPVCNamespace:          validNamespaceName,
+							common.KeyServiceTag:        validServiceTag,
 						},
 					},
 				}))
@@ -198,7 +198,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 		})
 
 		ginkgo.It("should successfully create block volume and vol attributes should be set", func() {
-			clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+			clientMock.On("GetCustomHTTPHeaders").Return(api.NewSafeHeader().GetHeader())
 			clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
 			clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 			clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
@@ -207,8 +207,8 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 
 			req := getTypicalCreateVolumeRequest("my-vol", validVolSize)
 			req.Parameters[common.KeyArrayID] = firstValidID
-			req.Parameters[controller.KeyCSIPVCName] = req.Name
-			req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
+			req.Parameters[KeyCSIPVCName] = req.Name
+			req.Parameters[KeyCSIPVCNamespace] = validNamespaceName
 			req.Parameters[common.KeyVolumeDescription] = "Vol-description"
 			req.Parameters[common.KeyAppType] = "Other"
 			req.Parameters[common.KeyAppTypeOther] = "Android"
@@ -232,8 +232,8 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 						common.KeyApplianceID:         "12345",
 						common.KeyProtectionPolicyID:  "xyz",
 						common.KeyPerformancePolicyID: "abc",
-						controller.KeyCSIPVCName:      req.Name,
-						controller.KeyCSIPVCNamespace: validNamespaceName,
+						KeyCSIPVCName:                 req.Name,
+						KeyCSIPVCNamespace:            validNamespaceName,
 						common.KeyServiceTag:          validServiceTag,
 					},
 				},
@@ -245,17 +245,17 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 		ginkgo.BeforeEach(func() {
 			req = getTypicalCreateVolumeRequest("my-vol", validVolSize)
 			req.Parameters[common.KeyArrayID] = firstValidID
-			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationEnabled)] = "true"
-			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationRPO)] = validRPO
-			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationRemoteSystem)] = validRemoteSystemName
-			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationIgnoreNamespaces)] = "true"
-			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationVGPrefix)] = "csi"
-			req.Parameters[controller.KeyCSIPVCName] = req.Name
-			req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
+			req.Parameters[ctrlSvc.WithRP(KeyReplicationEnabled)] = "true"
+			req.Parameters[ctrlSvc.WithRP(KeyReplicationRPO)] = validRPO
+			req.Parameters[ctrlSvc.WithRP(KeyReplicationRemoteSystem)] = validRemoteSystemName
+			req.Parameters[ctrlSvc.WithRP(KeyReplicationIgnoreNamespaces)] = "true"
+			req.Parameters[ctrlSvc.WithRP(KeyReplicationVGPrefix)] = "csi"
+			req.Parameters[KeyCSIPVCName] = req.Name
+			req.Parameters[KeyCSIPVCNamespace] = validNamespaceName
 		})
 
 		ginkgo.It("should create volume and volumeGroup if policy exists - ASYNC", func() {
-			clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+			clientMock.On("GetCustomHTTPHeaders").Return(api.NewSafeHeader().GetHeader())
 			clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
 			clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 			// all entities not exists
@@ -279,30 +279,30 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 					CapacityBytes: validVolSize,
 					VolumeId:      filepath.Join(validBaseVolID, firstValidID, "scsi"),
 					VolumeContext: map[string]string{
-						common.KeyArrayVolumeName:                                 "my-vol",
-						common.KeyProtocol:                                        "scsi",
-						common.KeyArrayID:                                         firstValidID,
-						common.KeyVolumeDescription:                               req.Name + "-" + validNamespaceName,
-						common.KeyServiceTag:                                      validServiceTag,
-						controller.KeyCSIPVCName:                                  req.Name,
-						controller.KeyCSIPVCNamespace:                             validNamespaceName,
-						ctrlSvc.WithRP(controller.KeyReplicationEnabled):          "true",
-						ctrlSvc.WithRP(controller.KeyReplicationRPO):              validRPO,
-						ctrlSvc.WithRP(controller.KeyReplicationRemoteSystem):     validRemoteSystemName,
-						ctrlSvc.WithRP(controller.KeyReplicationIgnoreNamespaces): "true",
-						ctrlSvc.WithRP(controller.KeyReplicationVGPrefix):         "csi",
+						common.KeyArrayVolumeName:                      "my-vol",
+						common.KeyProtocol:                             "scsi",
+						common.KeyArrayID:                              firstValidID,
+						common.KeyVolumeDescription:                    req.Name + "-" + validNamespaceName,
+						common.KeyServiceTag:                           validServiceTag,
+						KeyCSIPVCName:                                  req.Name,
+						KeyCSIPVCNamespace:                             validNamespaceName,
+						ctrlSvc.WithRP(KeyReplicationEnabled):          "true",
+						ctrlSvc.WithRP(KeyReplicationRPO):              validRPO,
+						ctrlSvc.WithRP(KeyReplicationRemoteSystem):     validRemoteSystemName,
+						ctrlSvc.WithRP(KeyReplicationIgnoreNamespaces): "true",
+						ctrlSvc.WithRP(KeyReplicationVGPrefix):         "csi",
 					},
 				},
 			}))
 		})
 
 		ginkgo.It("should create volume and volumeGroup if policy exists - SYNC", func() {
-			clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+			clientMock.On("GetCustomHTTPHeaders").Return(api.NewSafeHeader().GetHeader())
 			clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
 			clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 			// Setting Replciation mode and corresponding attributes for SYNC
-			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationMode)] = replicationModeSync
-			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationRPO)] = zeroRPO
+			req.Parameters[ctrlSvc.WithRP(KeyReplicationMode)] = replicationModeSync
+			req.Parameters[ctrlSvc.WithRP(KeyReplicationRPO)] = zeroRPO
 
 			// all entities not exists
 			clientMock.On("GetVolumeGroupByName", mock.Anything, validGroupNameSync).
@@ -325,32 +325,32 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 					CapacityBytes: validVolSize,
 					VolumeId:      filepath.Join(validBaseVolID, firstValidID, "scsi"),
 					VolumeContext: map[string]string{
-						common.KeyArrayVolumeName:                                 "my-vol",
-						common.KeyProtocol:                                        "scsi",
-						common.KeyArrayID:                                         firstValidID,
-						common.KeyVolumeDescription:                               req.Name + "-" + validNamespaceName,
-						common.KeyServiceTag:                                      validServiceTag,
-						controller.KeyCSIPVCName:                                  req.Name,
-						controller.KeyCSIPVCNamespace:                             validNamespaceName,
-						ctrlSvc.WithRP(controller.KeyReplicationMode):             replicationModeSync,
-						ctrlSvc.WithRP(controller.KeyReplicationEnabled):          "true",
-						ctrlSvc.WithRP(controller.KeyReplicationRPO):              zeroRPO,
-						ctrlSvc.WithRP(controller.KeyReplicationRemoteSystem):     validRemoteSystemName,
-						ctrlSvc.WithRP(controller.KeyReplicationIgnoreNamespaces): "true",
-						ctrlSvc.WithRP(controller.KeyReplicationVGPrefix):         "csi",
+						common.KeyArrayVolumeName:                      "my-vol",
+						common.KeyProtocol:                             "scsi",
+						common.KeyArrayID:                              firstValidID,
+						common.KeyVolumeDescription:                    req.Name + "-" + validNamespaceName,
+						common.KeyServiceTag:                           validServiceTag,
+						KeyCSIPVCName:                                  req.Name,
+						KeyCSIPVCNamespace:                             validNamespaceName,
+						ctrlSvc.WithRP(KeyReplicationMode):             replicationModeSync,
+						ctrlSvc.WithRP(KeyReplicationEnabled):          "true",
+						ctrlSvc.WithRP(KeyReplicationRPO):              zeroRPO,
+						ctrlSvc.WithRP(KeyReplicationRemoteSystem):     validRemoteSystemName,
+						ctrlSvc.WithRP(KeyReplicationIgnoreNamespaces): "true",
+						ctrlSvc.WithRP(KeyReplicationVGPrefix):         "csi",
 					},
 				},
 			}))
 		})
 
 		ginkgo.It("should create vg with namespace if namespaces not ignored - ASYNC", func() {
-			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationIgnoreNamespaces)] = "false"
-			req.Parameters[controller.KeyCSIPVCName] = req.Name
-			req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
+			req.Parameters[ctrlSvc.WithRP(KeyReplicationIgnoreNamespaces)] = "false"
+			req.Parameters[KeyCSIPVCName] = req.Name
+			req.Parameters[KeyCSIPVCNamespace] = validNamespaceName
 
 			defer func() {
-				req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationIgnoreNamespaces)] = "true"
-				req.Parameters[controller.KeyCSIPVCNamespace] = ""
+				req.Parameters[ctrlSvc.WithRP(KeyReplicationIgnoreNamespaces)] = "true"
+				req.Parameters[KeyCSIPVCNamespace] = ""
 			}()
 
 			clientMock.On("GetVolumeGroupByName", mock.Anything, validNamespacedGroupName).
@@ -367,7 +367,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			createGroupRequest := &gopowerstore.VolumeGroupCreate{Name: validNamespacedGroupName, ProtectionPolicyID: validPolicyID}
 			clientMock.On("CreateVolumeGroup", mock.Anything, createGroupRequest).Return(gopowerstore.CreateResponse{ID: validGroupID}, nil)
 			clientMock.On("GetVolumeGroup", mock.Anything, validGroupID).Return(gopowerstore.VolumeGroup{ID: validGroupID, ProtectionPolicyID: validPolicyID}, nil)
-			clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+			clientMock.On("GetCustomHTTPHeaders").Return(api.NewSafeHeader().GetHeader())
 			clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
 			clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 			clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
@@ -381,34 +381,34 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 					CapacityBytes: validVolSize,
 					VolumeId:      filepath.Join(validBaseVolID, firstValidID, "scsi"),
 					VolumeContext: map[string]string{
-						common.KeyArrayVolumeName:                                 "my-vol",
-						common.KeyProtocol:                                        "scsi",
-						common.KeyArrayID:                                         firstValidID,
-						common.KeyVolumeDescription:                               req.Name + "-" + validNamespaceName,
-						common.KeyServiceTag:                                      validServiceTag,
-						controller.KeyCSIPVCName:                                  req.Name,
-						controller.KeyCSIPVCNamespace:                             validNamespaceName,
-						ctrlSvc.WithRP(controller.KeyReplicationEnabled):          "true",
-						ctrlSvc.WithRP(controller.KeyReplicationRPO):              validRPO,
-						ctrlSvc.WithRP(controller.KeyReplicationRemoteSystem):     validRemoteSystemName,
-						ctrlSvc.WithRP(controller.KeyReplicationIgnoreNamespaces): "false",
-						ctrlSvc.WithRP(controller.KeyReplicationVGPrefix):         "csi",
+						common.KeyArrayVolumeName:                      "my-vol",
+						common.KeyProtocol:                             "scsi",
+						common.KeyArrayID:                              firstValidID,
+						common.KeyVolumeDescription:                    req.Name + "-" + validNamespaceName,
+						common.KeyServiceTag:                           validServiceTag,
+						KeyCSIPVCName:                                  req.Name,
+						KeyCSIPVCNamespace:                             validNamespaceName,
+						ctrlSvc.WithRP(KeyReplicationEnabled):          "true",
+						ctrlSvc.WithRP(KeyReplicationRPO):              validRPO,
+						ctrlSvc.WithRP(KeyReplicationRemoteSystem):     validRemoteSystemName,
+						ctrlSvc.WithRP(KeyReplicationIgnoreNamespaces): "false",
+						ctrlSvc.WithRP(KeyReplicationVGPrefix):         "csi",
 					},
 				},
 			}))
 		})
 
 		ginkgo.It("should create vg with namespace if namespaces not ignored - SYNC", func() {
-			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationIgnoreNamespaces)] = "false"
-			req.Parameters[controller.KeyCSIPVCName] = req.Name
-			req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
+			req.Parameters[ctrlSvc.WithRP(KeyReplicationIgnoreNamespaces)] = "false"
+			req.Parameters[KeyCSIPVCName] = req.Name
+			req.Parameters[KeyCSIPVCNamespace] = validNamespaceName
 			// Setting Replciation mode and corresponding attributes for SYNC
-			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationMode)] = replicationModeSync
-			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationRPO)] = zeroRPO
+			req.Parameters[ctrlSvc.WithRP(KeyReplicationMode)] = replicationModeSync
+			req.Parameters[ctrlSvc.WithRP(KeyReplicationRPO)] = zeroRPO
 
 			defer func() {
-				req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationIgnoreNamespaces)] = "true"
-				req.Parameters[controller.KeyCSIPVCNamespace] = ""
+				req.Parameters[ctrlSvc.WithRP(KeyReplicationIgnoreNamespaces)] = "true"
+				req.Parameters[KeyCSIPVCNamespace] = ""
 			}()
 
 			clientMock.On("GetVolumeGroupByName", mock.Anything, validNamespacedGroupNameSync).
@@ -425,7 +425,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			createGroupRequest := &gopowerstore.VolumeGroupCreate{Name: validNamespacedGroupNameSync, ProtectionPolicyID: validPolicyID}
 			clientMock.On("CreateVolumeGroup", mock.Anything, createGroupRequest).Return(gopowerstore.CreateResponse{ID: validGroupID}, nil)
 			clientMock.On("GetVolumeGroup", mock.Anything, validGroupID).Return(gopowerstore.VolumeGroup{ID: validGroupID, ProtectionPolicyID: validPolicyID}, nil)
-			clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+			clientMock.On("GetCustomHTTPHeaders").Return(api.NewSafeHeader().GetHeader())
 			clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
 			clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 			clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
@@ -439,19 +439,19 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 					CapacityBytes: validVolSize,
 					VolumeId:      filepath.Join(validBaseVolID, firstValidID, "scsi"),
 					VolumeContext: map[string]string{
-						common.KeyArrayVolumeName:                                 "my-vol",
-						common.KeyProtocol:                                        "scsi",
-						common.KeyArrayID:                                         firstValidID,
-						common.KeyVolumeDescription:                               req.Name + "-" + validNamespaceName,
-						common.KeyServiceTag:                                      validServiceTag,
-						controller.KeyCSIPVCName:                                  req.Name,
-						controller.KeyCSIPVCNamespace:                             validNamespaceName,
-						ctrlSvc.WithRP(controller.KeyReplicationMode):             replicationModeSync,
-						ctrlSvc.WithRP(controller.KeyReplicationEnabled):          "true",
-						ctrlSvc.WithRP(controller.KeyReplicationRPO):              zeroRPO,
-						ctrlSvc.WithRP(controller.KeyReplicationRemoteSystem):     validRemoteSystemName,
-						ctrlSvc.WithRP(controller.KeyReplicationIgnoreNamespaces): "false",
-						ctrlSvc.WithRP(controller.KeyReplicationVGPrefix):         "csi",
+						common.KeyArrayVolumeName:                      "my-vol",
+						common.KeyProtocol:                             "scsi",
+						common.KeyArrayID:                              firstValidID,
+						common.KeyVolumeDescription:                    req.Name + "-" + validNamespaceName,
+						common.KeyServiceTag:                           validServiceTag,
+						KeyCSIPVCName:                                  req.Name,
+						KeyCSIPVCNamespace:                             validNamespaceName,
+						ctrlSvc.WithRP(KeyReplicationMode):             replicationModeSync,
+						ctrlSvc.WithRP(KeyReplicationEnabled):          "true",
+						ctrlSvc.WithRP(KeyReplicationRPO):              zeroRPO,
+						ctrlSvc.WithRP(KeyReplicationRemoteSystem):     validRemoteSystemName,
+						ctrlSvc.WithRP(KeyReplicationIgnoreNamespaces): "false",
+						ctrlSvc.WithRP(KeyReplicationVGPrefix):         "csi",
 					},
 				},
 			}))
@@ -461,9 +461,9 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			clientMock.On("GetVolumeGroupByName", mock.Anything, validGroupName).
 				Return(gopowerstore.VolumeGroup{ID: validGroupID, ProtectionPolicyID: validPolicyID}, nil)
 
-			req.Parameters[controller.KeyCSIPVCName] = req.Name
-			req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
-			clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+			req.Parameters[KeyCSIPVCName] = req.Name
+			req.Parameters[KeyCSIPVCNamespace] = validNamespaceName
+			clientMock.On("GetCustomHTTPHeaders").Return(api.NewSafeHeader().GetHeader())
 			clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
 			clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 			clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
@@ -477,18 +477,18 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 					CapacityBytes: validVolSize,
 					VolumeId:      filepath.Join(validBaseVolID, firstValidID, "scsi"),
 					VolumeContext: map[string]string{
-						common.KeyArrayVolumeName:                                 "my-vol",
-						common.KeyProtocol:                                        "scsi",
-						common.KeyArrayID:                                         firstValidID,
-						common.KeyVolumeDescription:                               req.Name + "-" + validNamespaceName,
-						common.KeyServiceTag:                                      validServiceTag,
-						controller.KeyCSIPVCName:                                  req.Name,
-						controller.KeyCSIPVCNamespace:                             validNamespaceName,
-						ctrlSvc.WithRP(controller.KeyReplicationEnabled):          "true",
-						ctrlSvc.WithRP(controller.KeyReplicationRPO):              validRPO,
-						ctrlSvc.WithRP(controller.KeyReplicationRemoteSystem):     validRemoteSystemName,
-						ctrlSvc.WithRP(controller.KeyReplicationIgnoreNamespaces): "true",
-						ctrlSvc.WithRP(controller.KeyReplicationVGPrefix):         "csi",
+						common.KeyArrayVolumeName:                      "my-vol",
+						common.KeyProtocol:                             "scsi",
+						common.KeyArrayID:                              firstValidID,
+						common.KeyVolumeDescription:                    req.Name + "-" + validNamespaceName,
+						common.KeyServiceTag:                           validServiceTag,
+						KeyCSIPVCName:                                  req.Name,
+						KeyCSIPVCNamespace:                             validNamespaceName,
+						ctrlSvc.WithRP(KeyReplicationEnabled):          "true",
+						ctrlSvc.WithRP(KeyReplicationRPO):              validRPO,
+						ctrlSvc.WithRP(KeyReplicationRemoteSystem):     validRemoteSystemName,
+						ctrlSvc.WithRP(KeyReplicationIgnoreNamespaces): "true",
+						ctrlSvc.WithRP(KeyReplicationVGPrefix):         "csi",
 					},
 				},
 			}))
@@ -498,12 +498,12 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			clientMock.On("GetVolumeGroupByName", mock.Anything, validGroupNameSync).
 				Return(gopowerstore.VolumeGroup{ID: validGroupID, ProtectionPolicyID: validPolicyID, IsWriteOrderConsistent: true}, nil)
 			// Setting Replciation mode and corresponding attributes for SYNC
-			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationMode)] = replicationModeSync
-			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationRPO)] = zeroRPO
+			req.Parameters[ctrlSvc.WithRP(KeyReplicationMode)] = replicationModeSync
+			req.Parameters[ctrlSvc.WithRP(KeyReplicationRPO)] = zeroRPO
 
-			req.Parameters[controller.KeyCSIPVCName] = req.Name
-			req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
-			clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+			req.Parameters[KeyCSIPVCName] = req.Name
+			req.Parameters[KeyCSIPVCNamespace] = validNamespaceName
+			clientMock.On("GetCustomHTTPHeaders").Return(api.NewSafeHeader().GetHeader())
 			clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
 			clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 			clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
@@ -517,19 +517,19 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 					CapacityBytes: validVolSize,
 					VolumeId:      filepath.Join(validBaseVolID, firstValidID, "scsi"),
 					VolumeContext: map[string]string{
-						common.KeyArrayVolumeName:                                 "my-vol",
-						common.KeyProtocol:                                        "scsi",
-						common.KeyArrayID:                                         firstValidID,
-						common.KeyVolumeDescription:                               req.Name + "-" + validNamespaceName,
-						common.KeyServiceTag:                                      validServiceTag,
-						controller.KeyCSIPVCName:                                  req.Name,
-						controller.KeyCSIPVCNamespace:                             validNamespaceName,
-						ctrlSvc.WithRP(controller.KeyReplicationEnabled):          "true",
-						ctrlSvc.WithRP(controller.KeyReplicationMode):             replicationModeSync,
-						ctrlSvc.WithRP(controller.KeyReplicationRPO):              zeroRPO,
-						ctrlSvc.WithRP(controller.KeyReplicationRemoteSystem):     validRemoteSystemName,
-						ctrlSvc.WithRP(controller.KeyReplicationIgnoreNamespaces): "true",
-						ctrlSvc.WithRP(controller.KeyReplicationVGPrefix):         "csi",
+						common.KeyArrayVolumeName:                      "my-vol",
+						common.KeyProtocol:                             "scsi",
+						common.KeyArrayID:                              firstValidID,
+						common.KeyVolumeDescription:                    req.Name + "-" + validNamespaceName,
+						common.KeyServiceTag:                           validServiceTag,
+						KeyCSIPVCName:                                  req.Name,
+						KeyCSIPVCNamespace:                             validNamespaceName,
+						ctrlSvc.WithRP(KeyReplicationEnabled):          "true",
+						ctrlSvc.WithRP(KeyReplicationMode):             replicationModeSync,
+						ctrlSvc.WithRP(KeyReplicationRPO):              zeroRPO,
+						ctrlSvc.WithRP(KeyReplicationRemoteSystem):     validRemoteSystemName,
+						ctrlSvc.WithRP(KeyReplicationIgnoreNamespaces): "true",
+						ctrlSvc.WithRP(KeyReplicationVGPrefix):         "csi",
 					},
 				},
 			}))
@@ -539,12 +539,12 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			clientMock.On("GetVolumeGroupByName", mock.Anything, validGroupNameSync).
 				Return(gopowerstore.VolumeGroup{ID: validGroupID, ProtectionPolicyID: validPolicyID, IsWriteOrderConsistent: false}, nil)
 			// Setting Replciation mode and corresponding attributes for SYNC
-			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationMode)] = replicationModeSync
-			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationRPO)] = zeroRPO
+			req.Parameters[ctrlSvc.WithRP(KeyReplicationMode)] = replicationModeSync
+			req.Parameters[ctrlSvc.WithRP(KeyReplicationRPO)] = zeroRPO
 
-			req.Parameters[controller.KeyCSIPVCName] = req.Name
-			req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
-			clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+			req.Parameters[KeyCSIPVCName] = req.Name
+			req.Parameters[KeyCSIPVCNamespace] = validNamespaceName
+			clientMock.On("GetCustomHTTPHeaders").Return(api.NewSafeHeader().GetHeader())
 			clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
 			clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 			clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
@@ -563,9 +563,9 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 
 			EnsureProtectionPolicyExistsMock()
 
-			req.Parameters[controller.KeyCSIPVCName] = req.Name
-			req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
-			clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+			req.Parameters[KeyCSIPVCName] = req.Name
+			req.Parameters[KeyCSIPVCNamespace] = validNamespaceName
+			clientMock.On("GetCustomHTTPHeaders").Return(api.NewSafeHeader().GetHeader())
 			clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
 			clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 			clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
@@ -579,18 +579,18 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 					CapacityBytes: validVolSize,
 					VolumeId:      filepath.Join(validBaseVolID, firstValidID, "scsi"),
 					VolumeContext: map[string]string{
-						common.KeyArrayVolumeName:                                 "my-vol",
-						common.KeyProtocol:                                        "scsi",
-						common.KeyArrayID:                                         firstValidID,
-						common.KeyVolumeDescription:                               req.Name + "-" + validNamespaceName,
-						common.KeyServiceTag:                                      validServiceTag,
-						controller.KeyCSIPVCName:                                  req.Name,
-						controller.KeyCSIPVCNamespace:                             validNamespaceName,
-						ctrlSvc.WithRP(controller.KeyReplicationEnabled):          "true",
-						ctrlSvc.WithRP(controller.KeyReplicationRPO):              validRPO,
-						ctrlSvc.WithRP(controller.KeyReplicationRemoteSystem):     validRemoteSystemName,
-						ctrlSvc.WithRP(controller.KeyReplicationIgnoreNamespaces): "true",
-						ctrlSvc.WithRP(controller.KeyReplicationVGPrefix):         "csi",
+						common.KeyArrayVolumeName:                      "my-vol",
+						common.KeyProtocol:                             "scsi",
+						common.KeyArrayID:                              firstValidID,
+						common.KeyVolumeDescription:                    req.Name + "-" + validNamespaceName,
+						common.KeyServiceTag:                           validServiceTag,
+						KeyCSIPVCName:                                  req.Name,
+						KeyCSIPVCNamespace:                             validNamespaceName,
+						ctrlSvc.WithRP(KeyReplicationEnabled):          "true",
+						ctrlSvc.WithRP(KeyReplicationRPO):              validRPO,
+						ctrlSvc.WithRP(KeyReplicationRemoteSystem):     validRemoteSystemName,
+						ctrlSvc.WithRP(KeyReplicationIgnoreNamespaces): "true",
+						ctrlSvc.WithRP(KeyReplicationVGPrefix):         "csi",
 					},
 				},
 			}))
@@ -602,12 +602,12 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 
 			EnsureProtectionPolicyExistsMockSync()
 
-			req.Parameters[controller.KeyCSIPVCName] = req.Name
-			req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
+			req.Parameters[KeyCSIPVCName] = req.Name
+			req.Parameters[KeyCSIPVCNamespace] = validNamespaceName
 			// Setting Replciation mode and corresponding attributes for SYNC
-			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationMode)] = replicationModeSync
-			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationRPO)] = zeroRPO
-			clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+			req.Parameters[ctrlSvc.WithRP(KeyReplicationMode)] = replicationModeSync
+			req.Parameters[ctrlSvc.WithRP(KeyReplicationRPO)] = zeroRPO
+			clientMock.On("GetCustomHTTPHeaders").Return(api.NewSafeHeader().GetHeader())
 			clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
 			clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 			clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
@@ -621,19 +621,19 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 					CapacityBytes: validVolSize,
 					VolumeId:      filepath.Join(validBaseVolID, firstValidID, "scsi"),
 					VolumeContext: map[string]string{
-						common.KeyArrayVolumeName:                                 "my-vol",
-						common.KeyProtocol:                                        "scsi",
-						common.KeyArrayID:                                         firstValidID,
-						common.KeyVolumeDescription:                               req.Name + "-" + validNamespaceName,
-						common.KeyServiceTag:                                      validServiceTag,
-						controller.KeyCSIPVCName:                                  req.Name,
-						controller.KeyCSIPVCNamespace:                             validNamespaceName,
-						ctrlSvc.WithRP(controller.KeyReplicationEnabled):          "true",
-						ctrlSvc.WithRP(controller.KeyReplicationMode):             replicationModeSync,
-						ctrlSvc.WithRP(controller.KeyReplicationRPO):              zeroRPO,
-						ctrlSvc.WithRP(controller.KeyReplicationRemoteSystem):     validRemoteSystemName,
-						ctrlSvc.WithRP(controller.KeyReplicationIgnoreNamespaces): "true",
-						ctrlSvc.WithRP(controller.KeyReplicationVGPrefix):         "csi",
+						common.KeyArrayVolumeName:                      "my-vol",
+						common.KeyProtocol:                             "scsi",
+						common.KeyArrayID:                              firstValidID,
+						common.KeyVolumeDescription:                    req.Name + "-" + validNamespaceName,
+						common.KeyServiceTag:                           validServiceTag,
+						KeyCSIPVCName:                                  req.Name,
+						KeyCSIPVCNamespace:                             validNamespaceName,
+						ctrlSvc.WithRP(KeyReplicationEnabled):          "true",
+						ctrlSvc.WithRP(KeyReplicationMode):             replicationModeSync,
+						ctrlSvc.WithRP(KeyReplicationRPO):              zeroRPO,
+						ctrlSvc.WithRP(KeyReplicationRemoteSystem):     validRemoteSystemName,
+						ctrlSvc.WithRP(KeyReplicationIgnoreNamespaces): "true",
+						ctrlSvc.WithRP(KeyReplicationVGPrefix):         "csi",
 					},
 				},
 			}))
@@ -645,12 +645,12 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 
 			EnsureProtectionPolicyExistsMockSync()
 
-			req.Parameters[controller.KeyCSIPVCName] = req.Name
-			req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
+			req.Parameters[KeyCSIPVCName] = req.Name
+			req.Parameters[KeyCSIPVCNamespace] = validNamespaceName
 			// Setting Replciation mode and corresponding attributes for SYNC
-			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationMode)] = replicationModeSync
-			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationRPO)] = zeroRPO
-			clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+			req.Parameters[ctrlSvc.WithRP(KeyReplicationMode)] = replicationModeSync
+			req.Parameters[ctrlSvc.WithRP(KeyReplicationRPO)] = zeroRPO
+			clientMock.On("GetCustomHTTPHeaders").Return(api.NewSafeHeader().GetHeader())
 			clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
 			clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 			clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
@@ -684,8 +684,8 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				Return(gopowerstore.RemoteSystem{}, gopowerstore.NewHostIsNotExistError())
 
 			// Setting Replciation mode and corresponding attributes for SYNC
-			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationMode)] = replicationModeSync
-			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationRPO)] = zeroRPO
+			req.Parameters[ctrlSvc.WithRP(KeyReplicationMode)] = replicationModeSync
+			req.Parameters[ctrlSvc.WithRP(KeyReplicationRPO)] = zeroRPO
 
 			res, err := ctrlSvc.CreateVolume(context.Background(), req)
 			gomega.Expect(res).To(gomega.BeNil())
@@ -696,7 +696,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 		ginkgo.It("should fail when rpo incorrect", func() {
 			clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
 
-			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationRPO)] = "invalidRpo"
+			req.Parameters[ctrlSvc.WithRP(KeyReplicationRPO)] = "invalidRpo"
 
 			res, err := ctrlSvc.CreateVolume(context.Background(), req)
 			gomega.Expect(res).To(gomega.BeNil())
@@ -705,7 +705,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 		})
 
 		ginkgo.It("should fail when rpo not declared in parameters -ASYNC", func() {
-			delete(req.Parameters, ctrlSvc.WithRP(controller.KeyReplicationRPO))
+			delete(req.Parameters, ctrlSvc.WithRP(KeyReplicationRPO))
 
 			res, err := ctrlSvc.CreateVolume(context.Background(), req)
 			gomega.Expect(res).To(gomega.BeNil())
@@ -714,20 +714,20 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 		})
 
 		ginkgo.It("should default RPO to Zero when mode is SYNC and RPO is not specified", func() {
-			delete(req.Parameters, ctrlSvc.WithRP(controller.KeyReplicationRPO))
+			delete(req.Parameters, ctrlSvc.WithRP(KeyReplicationRPO))
 			clientMock.On("GetVolumeGroupByName", mock.Anything, validGroupNameSync).
 				Return(gopowerstore.VolumeGroup{ID: validGroupID, ProtectionPolicyID: validPolicyID, IsWriteOrderConsistent: true}, nil)
 
 			EnsureProtectionPolicyExistsMockSync()
 
-			clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+			clientMock.On("GetCustomHTTPHeaders").Return(api.NewSafeHeader().GetHeader())
 			clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
 			clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 			clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
 			clientMock.On("GetVolume", context.Background(), mock.Anything).Return(gopowerstore.Volume{ApplianceID: validApplianceID}, nil)
 			clientMock.On("GetAppliance", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
 
-			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationMode)] = "SYNC"
+			req.Parameters[ctrlSvc.WithRP(KeyReplicationMode)] = "SYNC"
 			res, err := ctrlSvc.CreateVolume(context.Background(), req)
 			gomega.Expect(err).To(gomega.BeNil())
 			gomega.Expect(res).To(gomega.Equal(&csi.CreateVolumeResponse{
@@ -735,25 +735,25 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 					CapacityBytes: validVolSize,
 					VolumeId:      filepath.Join(validBaseVolID, firstValidID, "scsi"),
 					VolumeContext: map[string]string{
-						common.KeyArrayVolumeName:                                 "my-vol",
-						common.KeyProtocol:                                        "scsi",
-						common.KeyArrayID:                                         firstValidID,
-						common.KeyVolumeDescription:                               req.Name + "-" + validNamespaceName,
-						common.KeyServiceTag:                                      validServiceTag,
-						controller.KeyCSIPVCName:                                  req.Name,
-						controller.KeyCSIPVCNamespace:                             validNamespaceName,
-						ctrlSvc.WithRP(controller.KeyReplicationEnabled):          "true",
-						ctrlSvc.WithRP(controller.KeyReplicationMode):             replicationModeSync,
-						ctrlSvc.WithRP(controller.KeyReplicationRemoteSystem):     validRemoteSystemName,
-						ctrlSvc.WithRP(controller.KeyReplicationIgnoreNamespaces): "true",
-						ctrlSvc.WithRP(controller.KeyReplicationVGPrefix):         "csi",
+						common.KeyArrayVolumeName:                      "my-vol",
+						common.KeyProtocol:                             "scsi",
+						common.KeyArrayID:                              firstValidID,
+						common.KeyVolumeDescription:                    req.Name + "-" + validNamespaceName,
+						common.KeyServiceTag:                           validServiceTag,
+						KeyCSIPVCName:                                  req.Name,
+						KeyCSIPVCNamespace:                             validNamespaceName,
+						ctrlSvc.WithRP(KeyReplicationEnabled):          "true",
+						ctrlSvc.WithRP(KeyReplicationMode):             replicationModeSync,
+						ctrlSvc.WithRP(KeyReplicationRemoteSystem):     validRemoteSystemName,
+						ctrlSvc.WithRP(KeyReplicationIgnoreNamespaces): "true",
+						ctrlSvc.WithRP(KeyReplicationVGPrefix):         "csi",
 					},
 				},
 			}))
 		})
 
 		ginkgo.It("should fail when remote system not declared in parameters", func() {
-			delete(req.Parameters, ctrlSvc.WithRP(controller.KeyReplicationRemoteSystem))
+			delete(req.Parameters, ctrlSvc.WithRP(KeyReplicationRemoteSystem))
 
 			res, err := ctrlSvc.CreateVolume(context.Background(), req)
 			gomega.Expect(res).To(gomega.BeNil())
@@ -764,7 +764,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 		ginkgo.It("should fail when mode is incorrect", func() {
 			clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
 
-			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationMode)] = "SYNCMETRO"
+			req.Parameters[ctrlSvc.WithRP(KeyReplicationMode)] = "SYNCMETRO"
 
 			res, err := ctrlSvc.CreateVolume(context.Background(), req)
 			gomega.Expect(res).To(gomega.BeNil())
@@ -775,8 +775,8 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 		ginkgo.It("should fail when mode is ASYNC and RPO is Zero", func() {
 			clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
 
-			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationMode)] = replicationModeAsync
-			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationRPO)] = zeroRPO
+			req.Parameters[ctrlSvc.WithRP(KeyReplicationMode)] = replicationModeAsync
+			req.Parameters[ctrlSvc.WithRP(KeyReplicationRPO)] = zeroRPO
 			res, err := ctrlSvc.CreateVolume(context.Background(), req)
 			gomega.Expect(res).To(gomega.BeNil())
 			gomega.Expect(err).NotTo(gomega.BeNil())
@@ -786,8 +786,8 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 		ginkgo.It("should fail when mode is SYNC and RPO is not Zero", func() {
 			clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
 
-			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationMode)] = "SYNC"
-			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationRPO)] = validRPO
+			req.Parameters[ctrlSvc.WithRP(KeyReplicationMode)] = "SYNC"
+			req.Parameters[ctrlSvc.WithRP(KeyReplicationRPO)] = validRPO
 			res, err := ctrlSvc.CreateVolume(context.Background(), req)
 			gomega.Expect(res).To(gomega.BeNil())
 			gomega.Expect(err).NotTo(gomega.BeNil())
@@ -795,7 +795,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 		})
 
 		ginkgo.It("should fail when volume group prefix not declared in parameters", func() {
-			delete(req.Parameters, ctrlSvc.WithRP(controller.KeyReplicationVGPrefix))
+			delete(req.Parameters, ctrlSvc.WithRP(KeyReplicationVGPrefix))
 
 			res, err := ctrlSvc.CreateVolume(context.Background(), req)
 			gomega.Expect(res).To(gomega.BeNil())
@@ -804,8 +804,8 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 		})
 
 		ginkgo.It("should fail when invalid remote system is specified in parameters for metro volume", func() {
-			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationMode)] = "METRO"
-			req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationRemoteSystem)] = "invalid"
+			req.Parameters[ctrlSvc.WithRP(KeyReplicationMode)] = "METRO"
+			req.Parameters[ctrlSvc.WithRP(KeyReplicationRemoteSystem)] = "invalid"
 
 			clientMock.On("GetRemoteSystemByName", mock.Anything, "invalid").Return(gopowerstore.RemoteSystem{}, gopowerstore.NewNotFoundError())
 
@@ -823,9 +823,9 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				// Default mock function functionality for metro replication.
 				// This base functionality can be overridden in the individual test implementation.
 				configureMetroRequest = &gopowerstore.MetroConfig{RemoteSystemID: validRemoteSystemID}
-				req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationMode)] = "METRO"
+				req.Parameters[ctrlSvc.WithRP(KeyReplicationMode)] = "METRO"
 
-				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+				clientMock.On("GetCustomHTTPHeaders").Return(api.NewSafeHeader().GetHeader())
 				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 				clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
 				clientMock.On("GetRemoteSystemByName", mock.Anything, validRemoteSystemName).Return(gopowerstore.RemoteSystem{
@@ -837,9 +837,9 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			})
 
 			ginkgo.It("should configure metro replication on volume", func() {
-				delete(req.Parameters, ctrlSvc.WithRP(controller.KeyReplicationRPO))
-				delete(req.Parameters, ctrlSvc.WithRP(controller.KeyReplicationIgnoreNamespaces))
-				delete(req.Parameters, ctrlSvc.WithRP(controller.KeyReplicationVGPrefix))
+				delete(req.Parameters, ctrlSvc.WithRP(KeyReplicationRPO))
+				delete(req.Parameters, ctrlSvc.WithRP(KeyReplicationIgnoreNamespaces))
+				delete(req.Parameters, ctrlSvc.WithRP(KeyReplicationVGPrefix))
 
 				clientMock.On("ConfigureMetroVolume", mock.Anything, validBaseVolID, configureMetroRequest).
 					Return(gopowerstore.MetroSessionResponse{ID: validSessionID}, nil)
@@ -860,25 +860,25 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 						CapacityBytes: validVolSize,
 						VolumeId:      fmt.Sprintf("%s/%s/%s:%s/%s", validBaseVolID, firstValidID, "scsi", validRemoteVolID, secondValidID),
 						VolumeContext: map[string]string{
-							common.KeyArrayVolumeName:                             "my-vol",
-							common.KeyProtocol:                                    "scsi",
-							common.KeyArrayID:                                     firstValidID,
-							common.KeyVolumeDescription:                           req.Name + "-" + validNamespaceName,
-							common.KeyServiceTag:                                  validServiceTag,
-							controller.KeyCSIPVCName:                              req.Name,
-							controller.KeyCSIPVCNamespace:                         validNamespaceName,
-							ctrlSvc.WithRP(controller.KeyReplicationEnabled):      "true",
-							ctrlSvc.WithRP(controller.KeyReplicationMode):         "METRO",
-							ctrlSvc.WithRP(controller.KeyReplicationRemoteSystem): validRemoteSystemName,
+							common.KeyArrayVolumeName:                  "my-vol",
+							common.KeyProtocol:                         "scsi",
+							common.KeyArrayID:                          firstValidID,
+							common.KeyVolumeDescription:                req.Name + "-" + validNamespaceName,
+							common.KeyServiceTag:                       validServiceTag,
+							KeyCSIPVCName:                              req.Name,
+							KeyCSIPVCNamespace:                         validNamespaceName,
+							ctrlSvc.WithRP(KeyReplicationEnabled):      "true",
+							ctrlSvc.WithRP(KeyReplicationMode):         "METRO",
+							ctrlSvc.WithRP(KeyReplicationRemoteSystem): validRemoteSystemName,
 						},
 					},
 				}))
 			})
 
 			ginkgo.It("should continue metro replication on volume to support idempotency when metro was previously configured", func() {
-				delete(req.Parameters, ctrlSvc.WithRP(controller.KeyReplicationRPO))
-				delete(req.Parameters, ctrlSvc.WithRP(controller.KeyReplicationIgnoreNamespaces))
-				delete(req.Parameters, ctrlSvc.WithRP(controller.KeyReplicationVGPrefix))
+				delete(req.Parameters, ctrlSvc.WithRP(KeyReplicationRPO))
+				delete(req.Parameters, ctrlSvc.WithRP(KeyReplicationIgnoreNamespaces))
+				delete(req.Parameters, ctrlSvc.WithRP(KeyReplicationVGPrefix))
 
 				clientMock.On("ConfigureMetroVolume", mock.Anything, validBaseVolID, configureMetroRequest).
 					Return(gopowerstore.MetroSessionResponse{}, gopowerstore.APIError{
@@ -903,16 +903,16 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 						CapacityBytes: validVolSize,
 						VolumeId:      fmt.Sprintf("%s/%s/%s:%s/%s", validBaseVolID, firstValidID, "scsi", validRemoteVolID, secondValidID),
 						VolumeContext: map[string]string{
-							common.KeyArrayVolumeName:                             "my-vol",
-							common.KeyProtocol:                                    "scsi",
-							common.KeyArrayID:                                     firstValidID,
-							common.KeyVolumeDescription:                           req.Name + "-" + validNamespaceName,
-							common.KeyServiceTag:                                  validServiceTag,
-							controller.KeyCSIPVCName:                              req.Name,
-							controller.KeyCSIPVCNamespace:                         validNamespaceName,
-							ctrlSvc.WithRP(controller.KeyReplicationEnabled):      "true",
-							ctrlSvc.WithRP(controller.KeyReplicationMode):         "METRO",
-							ctrlSvc.WithRP(controller.KeyReplicationRemoteSystem): validRemoteSystemName,
+							common.KeyArrayVolumeName:                  "my-vol",
+							common.KeyProtocol:                         "scsi",
+							common.KeyArrayID:                          firstValidID,
+							common.KeyVolumeDescription:                req.Name + "-" + validNamespaceName,
+							common.KeyServiceTag:                       validServiceTag,
+							KeyCSIPVCName:                              req.Name,
+							KeyCSIPVCNamespace:                         validNamespaceName,
+							ctrlSvc.WithRP(KeyReplicationEnabled):      "true",
+							ctrlSvc.WithRP(KeyReplicationMode):         "METRO",
+							ctrlSvc.WithRP(KeyReplicationRemoteSystem): validRemoteSystemName,
 						},
 					},
 				}))
@@ -932,7 +932,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			})
 
 			ginkgo.It("should fail when invalid remote system is specified in parameters for metro volume", func() {
-				req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationRemoteSystem)] = "invalid"
+				req.Parameters[ctrlSvc.WithRP(KeyReplicationRemoteSystem)] = "invalid"
 
 				// return 404 Not Found error when querying for the remote system
 				clientMock.On("GetRemoteSystemByName", mock.Anything, "invalid").Return(gopowerstore.RemoteSystem{}, gopowerstore.NewNotFoundError())
@@ -992,8 +992,8 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
 			req.Parameters[common.KeyArrayID] = secondValidID
 
-			req.Parameters[controller.KeyCSIPVCName] = req.Name
-			req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
+			req.Parameters[KeyCSIPVCName] = req.Name
+			req.Parameters[KeyCSIPVCNamespace] = validNamespaceName
 
 			res, err := ctrlSvc.CreateVolume(context.Background(), req)
 			gomega.Expect(err).To(gomega.BeNil())
@@ -1002,15 +1002,15 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 					CapacityBytes: validVolSize,
 					VolumeId:      filepath.Join(validBaseVolID, secondValidID, "nfs"),
 					VolumeContext: map[string]string{
-						common.KeyArrayVolumeName:     "my-vol",
-						common.KeyProtocol:            "nfs",
-						common.KeyArrayID:             secondValidID,
-						common.KeyNfsACL:              "A::OWNER@:RWX",
-						common.KeyNasName:             validNasName,
-						common.KeyVolumeDescription:   req.Name + "-" + validNamespaceName,
-						common.KeyServiceTag:          validServiceTag,
-						controller.KeyCSIPVCName:      req.Name,
-						controller.KeyCSIPVCNamespace: validNamespaceName,
+						common.KeyArrayVolumeName:   "my-vol",
+						common.KeyProtocol:          "nfs",
+						common.KeyArrayID:           secondValidID,
+						common.KeyNfsACL:            "A::OWNER@:RWX",
+						common.KeyNasName:           validNasName,
+						common.KeyVolumeDescription: req.Name + "-" + validNamespaceName,
+						common.KeyServiceTag:        validServiceTag,
+						KeyCSIPVCName:               req.Name,
+						KeyCSIPVCNamespace:          validNamespaceName,
 					},
 					AccessibleTopology: []*csi.Topology{{Segments: map[string]string{common.Name + "/" + ctrlSvc.Arrays()[secondValidID].GetIP() + "-nfs": "true"}}},
 				},
@@ -1056,8 +1056,8 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
 			req.Parameters[common.KeyArrayID] = secondValidID
 
-			req.Parameters[controller.KeyCSIPVCName] = req.Name
-			req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
+			req.Parameters[KeyCSIPVCName] = req.Name
+			req.Parameters[KeyCSIPVCNamespace] = validNamespaceName
 			req.Parameters[common.KeyNasName] = "nasA, nasB, nasC, nasX"
 
 			res, err := ctrlSvc.CreateVolume(context.Background(), req)
@@ -1067,15 +1067,15 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 					CapacityBytes: validVolSize,
 					VolumeId:      filepath.Join(validBaseVolID, secondValidID, "nfs"),
 					VolumeContext: map[string]string{
-						common.KeyArrayVolumeName:     "my-vol",
-						common.KeyProtocol:            "nfs",
-						common.KeyArrayID:             secondValidID,
-						common.KeyNfsACL:              "A::OWNER@:RWX",
-						common.KeyNasName:             "nasA",
-						common.KeyVolumeDescription:   req.Name + "-" + validNamespaceName,
-						common.KeyServiceTag:          validServiceTag,
-						controller.KeyCSIPVCName:      req.Name,
-						controller.KeyCSIPVCNamespace: validNamespaceName,
+						common.KeyArrayVolumeName:   "my-vol",
+						common.KeyProtocol:          "nfs",
+						common.KeyArrayID:           secondValidID,
+						common.KeyNfsACL:            "A::OWNER@:RWX",
+						common.KeyNasName:           "nasA",
+						common.KeyVolumeDescription: req.Name + "-" + validNamespaceName,
+						common.KeyServiceTag:        validServiceTag,
+						KeyCSIPVCName:               req.Name,
+						KeyCSIPVCNamespace:          validNamespaceName,
 					},
 					AccessibleTopology: []*csi.Topology{{Segments: map[string]string{common.Name + "/" + ctrlSvc.Arrays()[secondValidID].GetIP() + "-nfs": "true"}}},
 				},
@@ -1092,8 +1092,8 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
 			req.Parameters[common.KeyArrayID] = secondValidID
 
-			req.Parameters[controller.KeyCSIPVCName] = req.Name
-			req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
+			req.Parameters[KeyCSIPVCName] = req.Name
+			req.Parameters[KeyCSIPVCNamespace] = validNamespaceName
 			req.Parameters[common.KeyNasName] = "nasA"
 
 			res, err := ctrlSvc.CreateVolume(context.Background(), req)
@@ -1103,15 +1103,15 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 					CapacityBytes: validVolSize,
 					VolumeId:      filepath.Join(validBaseVolID, secondValidID, "nfs"),
 					VolumeContext: map[string]string{
-						common.KeyArrayVolumeName:     "my-vol",
-						common.KeyProtocol:            "nfs",
-						common.KeyArrayID:             secondValidID,
-						common.KeyNfsACL:              "A::OWNER@:RWX",
-						common.KeyNasName:             "nasA",
-						common.KeyVolumeDescription:   req.Name + "-" + validNamespaceName,
-						common.KeyServiceTag:          validServiceTag,
-						controller.KeyCSIPVCName:      req.Name,
-						controller.KeyCSIPVCNamespace: validNamespaceName,
+						common.KeyArrayVolumeName:   "my-vol",
+						common.KeyProtocol:          "nfs",
+						common.KeyArrayID:           secondValidID,
+						common.KeyNfsACL:            "A::OWNER@:RWX",
+						common.KeyNasName:           "nasA",
+						common.KeyVolumeDescription: req.Name + "-" + validNamespaceName,
+						common.KeyServiceTag:        validServiceTag,
+						KeyCSIPVCName:               req.Name,
+						KeyCSIPVCNamespace:          validNamespaceName,
 					},
 					AccessibleTopology: []*csi.Topology{{Segments: map[string]string{common.Name + "/" + ctrlSvc.Arrays()[secondValidID].GetIP() + "-nfs": "true"}}},
 				},
@@ -1124,8 +1124,8 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
 			req.Parameters[common.KeyArrayID] = secondValidID
 
-			req.Parameters[controller.KeyCSIPVCName] = req.Name
-			req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
+			req.Parameters[KeyCSIPVCName] = req.Name
+			req.Parameters[KeyCSIPVCNamespace] = validNamespaceName
 			req.Parameters[common.KeyNasName] = "nasA, nasB, nasC, nasX"
 
 			res, err := ctrlSvc.CreateVolume(context.Background(), req)
@@ -1147,8 +1147,8 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
 			req.Parameters[common.KeyArrayID] = secondValidID
 
-			req.Parameters[controller.KeyCSIPVCName] = req.Name
-			req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
+			req.Parameters[KeyCSIPVCName] = req.Name
+			req.Parameters[KeyCSIPVCNamespace] = validNamespaceName
 			req.Parameters[common.KeyNasName] = "nasA, nasB, nasC, nasX"
 
 			res, err := ctrlSvc.CreateVolume(context.Background(), req)
@@ -1170,8 +1170,8 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
 			req.Parameters[common.KeyArrayID] = secondValidID
 
-			req.Parameters[controller.KeyCSIPVCName] = req.Name
-			req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
+			req.Parameters[KeyCSIPVCName] = req.Name
+			req.Parameters[KeyCSIPVCNamespace] = validNamespaceName
 			req.Parameters[common.KeyNasName] = "nasA, nasB, nasC, nasX"
 
 			res, err := ctrlSvc.CreateVolume(context.Background(), req)
@@ -1187,8 +1187,8 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
 			req.Parameters[common.KeyArrayID] = secondValidID
 
-			req.Parameters[controller.KeyCSIPVCName] = req.Name
-			req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
+			req.Parameters[KeyCSIPVCName] = req.Name
+			req.Parameters[KeyCSIPVCNamespace] = validNamespaceName
 			req.Parameters[common.KeyNasName] = "nasA, nasB, nasC, nasX"
 
 			res, err := ctrlSvc.CreateVolume(context.Background(), req)
@@ -1206,8 +1206,8 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
 			req.Parameters[common.KeyArrayID] = secondValidID
 
-			req.Parameters[controller.KeyCSIPVCName] = req.Name
-			req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
+			req.Parameters[KeyCSIPVCName] = req.Name
+			req.Parameters[KeyCSIPVCNamespace] = validNamespaceName
 			req.Parameters[common.KeyVolumeDescription] = "Vol-description"
 			req.Parameters[common.KeyConfigType] = "ConfigType_A"
 			req.Parameters[common.KeyAccessPolicy] = "AccessPolicy_A"
@@ -1248,8 +1248,8 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 						common.KeyFlrMinRetention:          "KeyFlrMinRetention",
 						common.KeyFlrMaxRetention:          "KeyFlrMaxRetention",
 						common.KeyServiceTag:               validServiceTag,
-						controller.KeyCSIPVCName:           req.Name,
-						controller.KeyCSIPVCNamespace:      validNamespaceName,
+						KeyCSIPVCName:                      req.Name,
+						KeyCSIPVCNamespace:                 validNamespaceName,
 					},
 					AccessibleTopology: []*csi.Topology{{Segments: map[string]string{common.Name + "/" + ctrlSvc.Arrays()[secondValidID].GetIP() + "-nfs": "true"}}},
 				},
@@ -1270,8 +1270,8 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
 				req.Parameters[common.KeyNfsACL] = "0777"
 				req.Parameters[common.KeyArrayID] = secondValidID
-				req.Parameters[controller.KeyCSIPVCName] = req.Name
-				req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
+				req.Parameters[KeyCSIPVCName] = req.Name
+				req.Parameters[KeyCSIPVCNamespace] = validNamespaceName
 
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
 				gomega.Expect(err).To(gomega.BeNil())
@@ -1280,15 +1280,15 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 						CapacityBytes: validVolSize,
 						VolumeId:      filepath.Join(validBaseVolID, secondValidID, "nfs"),
 						VolumeContext: map[string]string{
-							common.KeyArrayVolumeName:     "my-vol",
-							common.KeyProtocol:            "nfs",
-							common.KeyArrayID:             secondValidID,
-							common.KeyNfsACL:              "0777",
-							common.KeyNasName:             validNasName,
-							common.KeyVolumeDescription:   req.Name + "-" + validNamespaceName,
-							common.KeyServiceTag:          validServiceTag,
-							controller.KeyCSIPVCName:      req.Name,
-							controller.KeyCSIPVCNamespace: validNamespaceName,
+							common.KeyArrayVolumeName:   "my-vol",
+							common.KeyProtocol:          "nfs",
+							common.KeyArrayID:           secondValidID,
+							common.KeyNfsACL:            "0777",
+							common.KeyNasName:           validNasName,
+							common.KeyVolumeDescription: req.Name + "-" + validNamespaceName,
+							common.KeyServiceTag:        validServiceTag,
+							KeyCSIPVCName:               req.Name,
+							KeyCSIPVCNamespace:          validNamespaceName,
 						},
 						AccessibleTopology: []*csi.Topology{{Segments: map[string]string{common.Name + "/" + ctrlSvc.Arrays()[secondValidID].GetIP() + "-nfs": "true"}}},
 					},
@@ -1309,8 +1309,8 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 
 				req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
 				req.Parameters[common.KeyArrayID] = secondValidID
-				req.Parameters[controller.KeyCSIPVCName] = req.Name
-				req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
+				req.Parameters[KeyCSIPVCName] = req.Name
+				req.Parameters[KeyCSIPVCNamespace] = validNamespaceName
 
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
 				gomega.Expect(err).To(gomega.BeNil())
@@ -1319,15 +1319,15 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 						CapacityBytes: validVolSize,
 						VolumeId:      filepath.Join(validBaseVolID, secondValidID, "nfs"),
 						VolumeContext: map[string]string{
-							common.KeyArrayVolumeName:     "my-vol",
-							common.KeyProtocol:            "nfs",
-							common.KeyArrayID:             secondValidID,
-							common.KeyNfsACL:              "A::GROUP@:RWX",
-							common.KeyNasName:             validNasName,
-							common.KeyVolumeDescription:   req.Name + "-" + validNamespaceName,
-							common.KeyServiceTag:          validServiceTag,
-							controller.KeyCSIPVCName:      req.Name,
-							controller.KeyCSIPVCNamespace: validNamespaceName,
+							common.KeyArrayVolumeName:   "my-vol",
+							common.KeyProtocol:          "nfs",
+							common.KeyArrayID:           secondValidID,
+							common.KeyNfsACL:            "A::GROUP@:RWX",
+							common.KeyNasName:           validNasName,
+							common.KeyVolumeDescription: req.Name + "-" + validNamespaceName,
+							common.KeyServiceTag:        validServiceTag,
+							KeyCSIPVCName:               req.Name,
+							KeyCSIPVCNamespace:          validNamespaceName,
 						},
 						AccessibleTopology: []*csi.Topology{{Segments: map[string]string{common.Name + "/" + ctrlSvc.Arrays()[secondValidID].GetIP() + "-nfs": "true"}}},
 					},
@@ -1346,8 +1346,8 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 
 				req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
 				req.Parameters[common.KeyArrayID] = secondValidID
-				req.Parameters[controller.KeyCSIPVCName] = req.Name
-				req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
+				req.Parameters[KeyCSIPVCName] = req.Name
+				req.Parameters[KeyCSIPVCNamespace] = validNamespaceName
 
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
 				gomega.Expect(err).To(gomega.BeNil())
@@ -1356,15 +1356,15 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 						CapacityBytes: validVolSize,
 						VolumeId:      filepath.Join(validBaseVolID, secondValidID, "nfs"),
 						VolumeContext: map[string]string{
-							common.KeyArrayVolumeName:     "my-vol",
-							common.KeyProtocol:            "nfs",
-							common.KeyArrayID:             secondValidID,
-							common.KeyNfsACL:              "A::OWNER@:RWX",
-							common.KeyNasName:             validNasName,
-							common.KeyVolumeDescription:   req.Name + "-" + validNamespaceName,
-							common.KeyServiceTag:          validServiceTag,
-							controller.KeyCSIPVCName:      req.Name,
-							controller.KeyCSIPVCNamespace: validNamespaceName,
+							common.KeyArrayVolumeName:   "my-vol",
+							common.KeyProtocol:          "nfs",
+							common.KeyArrayID:           secondValidID,
+							common.KeyNfsACL:            "A::OWNER@:RWX",
+							common.KeyNasName:           validNasName,
+							common.KeyVolumeDescription: req.Name + "-" + validNamespaceName,
+							common.KeyServiceTag:        validServiceTag,
+							KeyCSIPVCName:               req.Name,
+							KeyCSIPVCNamespace:          validNamespaceName,
 						},
 						AccessibleTopology: []*csi.Topology{{Segments: map[string]string{common.Name + "/" + ctrlSvc.Arrays()[secondValidID].GetIP() + "-nfs": "true"}}},
 					},
@@ -1383,8 +1383,8 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 
 				req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
 				req.Parameters[common.KeyArrayID] = secondValidID
-				req.Parameters[controller.KeyCSIPVCName] = req.Name
-				req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
+				req.Parameters[KeyCSIPVCName] = req.Name
+				req.Parameters[KeyCSIPVCNamespace] = validNamespaceName
 
 				ctrlSvc.Arrays()[secondValidID].NfsAcls = ""
 				csictx.Setenv(context.Background(), common.EnvNfsAcls, "")
@@ -1398,15 +1398,15 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 						CapacityBytes: validVolSize,
 						VolumeId:      filepath.Join(validBaseVolID, secondValidID, "nfs"),
 						VolumeContext: map[string]string{
-							common.KeyArrayVolumeName:     "my-vol",
-							common.KeyProtocol:            "nfs",
-							common.KeyArrayID:             secondValidID,
-							common.KeyNfsACL:              "",
-							common.KeyNasName:             validNasName,
-							common.KeyVolumeDescription:   req.Name + "-" + validNamespaceName,
-							common.KeyServiceTag:          validServiceTag,
-							controller.KeyCSIPVCName:      req.Name,
-							controller.KeyCSIPVCNamespace: validNamespaceName,
+							common.KeyArrayVolumeName:   "my-vol",
+							common.KeyProtocol:          "nfs",
+							common.KeyArrayID:           secondValidID,
+							common.KeyNfsACL:            "",
+							common.KeyNasName:           validNasName,
+							common.KeyVolumeDescription: req.Name + "-" + validNamespaceName,
+							common.KeyServiceTag:        validServiceTag,
+							KeyCSIPVCName:               req.Name,
+							KeyCSIPVCNamespace:          validNamespaceName,
 						},
 						AccessibleTopology: []*csi.Topology{{Segments: map[string]string{common.Name + "/" + ctrlSvc.Arrays()[secondValidID].GetIP() + "-nfs": "true"}}},
 					},
@@ -1419,8 +1419,8 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
 				req.Parameters[common.KeyArrayID] = secondValidID
 
-				req.Parameters[controller.KeyCSIPVCName] = req.Name
-				req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
+				req.Parameters[KeyCSIPVCName] = req.Name
+				req.Parameters[KeyCSIPVCNamespace] = validNamespaceName
 
 				iscsiTopology := &csi.Topology{Segments: map[string]string{common.Name + "/" + ctrlSvc.Arrays()[secondValidID].GetIP() + "-iscsi": "true"}}
 				preferred := []*csi.Topology{iscsiTopology}
@@ -1446,8 +1446,8 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
 				req.Parameters[common.KeyArrayID] = secondValidID
 
-				req.Parameters[controller.KeyCSIPVCName] = req.Name
-				req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
+				req.Parameters[KeyCSIPVCName] = req.Name
+				req.Parameters[KeyCSIPVCNamespace] = validNamespaceName
 
 				iscsiTopology := &csi.Topology{Segments: map[string]string{common.Name + "/" + ctrlSvc.Arrays()[secondValidID].GetIP() + "-iscis": "true"}}
 				req.AccessibilityRequirements.Preferred = append(req.AccessibilityRequirements.Preferred, iscsiTopology)
@@ -1459,15 +1459,15 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 						CapacityBytes: validVolSize,
 						VolumeId:      filepath.Join(validBaseVolID, secondValidID, "nfs"),
 						VolumeContext: map[string]string{
-							common.KeyArrayVolumeName:     "my-vol",
-							common.KeyProtocol:            "nfs",
-							common.KeyArrayID:             secondValidID,
-							common.KeyNfsACL:              "A::OWNER@:RWX",
-							common.KeyNasName:             validNasName,
-							common.KeyVolumeDescription:   req.Name + "-" + validNamespaceName,
-							common.KeyServiceTag:          validServiceTag,
-							controller.KeyCSIPVCName:      req.Name,
-							controller.KeyCSIPVCNamespace: validNamespaceName,
+							common.KeyArrayVolumeName:   "my-vol",
+							common.KeyProtocol:          "nfs",
+							common.KeyArrayID:           secondValidID,
+							common.KeyNfsACL:            "A::OWNER@:RWX",
+							common.KeyNasName:           validNasName,
+							common.KeyVolumeDescription: req.Name + "-" + validNamespaceName,
+							common.KeyServiceTag:        validServiceTag,
+							KeyCSIPVCName:               req.Name,
+							KeyCSIPVCNamespace:          validNamespaceName,
 						},
 						AccessibleTopology: []*csi.Topology{{Segments: map[string]string{common.Name + "/" + ctrlSvc.Arrays()[secondValidID].GetIP() + "-nfs": "true"}}},
 					},
@@ -1478,7 +1478,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 		ginkgo.When("volume name already in use", func() {
 			ginkgo.It("should return existing volume [Block]", func() {
 				volName := "my-vol"
-				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+				clientMock.On("GetCustomHTTPHeaders").Return(api.NewSafeHeader().GetHeader())
 				clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
 				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 				clientMock.On("CreateVolume", mock.Anything, mock.Anything).
@@ -1498,8 +1498,8 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 
 				req := getTypicalCreateVolumeRequest(volName, validVolSize)
 				req.Parameters[common.KeyArrayID] = firstValidID
-				req.Parameters[controller.KeyCSIPVCName] = req.Name
-				req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
+				req.Parameters[KeyCSIPVCName] = req.Name
+				req.Parameters[KeyCSIPVCNamespace] = validNamespaceName
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
 
 				gomega.Expect(err).To(gomega.BeNil())
@@ -1508,13 +1508,13 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 						CapacityBytes: validVolSize,
 						VolumeId:      filepath.Join(validBaseVolID, firstValidID, "scsi"),
 						VolumeContext: map[string]string{
-							common.KeyArrayVolumeName:     "my-vol",
-							common.KeyProtocol:            "scsi",
-							common.KeyArrayID:             firstValidID,
-							common.KeyVolumeDescription:   req.Name + "-" + validNamespaceName,
-							common.KeyServiceTag:          validServiceTag,
-							controller.KeyCSIPVCName:      req.Name,
-							controller.KeyCSIPVCNamespace: validNamespaceName,
+							common.KeyArrayVolumeName:   "my-vol",
+							common.KeyProtocol:          "scsi",
+							common.KeyArrayID:           firstValidID,
+							common.KeyVolumeDescription: req.Name + "-" + validNamespaceName,
+							common.KeyServiceTag:        validServiceTag,
+							KeyCSIPVCName:               req.Name,
+							KeyCSIPVCNamespace:          validNamespaceName,
 						},
 					},
 				}))
@@ -1541,8 +1541,8 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 
 				req := getTypicalCreateVolumeNFSRequest(volName, validVolSize)
 				req.Parameters[common.KeyArrayID] = secondValidID
-				req.Parameters[controller.KeyCSIPVCName] = req.Name
-				req.Parameters[controller.KeyCSIPVCNamespace] = validNamespaceName
+				req.Parameters[KeyCSIPVCName] = req.Name
+				req.Parameters[KeyCSIPVCNamespace] = validNamespaceName
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
 
 				gomega.Expect(err).To(gomega.BeNil())
@@ -1551,15 +1551,15 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 						CapacityBytes: validVolSize,
 						VolumeId:      filepath.Join(validBaseVolID, secondValidID, "nfs"),
 						VolumeContext: map[string]string{
-							common.KeyArrayVolumeName:     "my-vol",
-							common.KeyProtocol:            "nfs",
-							common.KeyArrayID:             secondValidID,
-							common.KeyNfsACL:              "A::OWNER@:RWX",
-							common.KeyNasName:             validNasName,
-							common.KeyVolumeDescription:   req.Name + "-" + validNamespaceName,
-							common.KeyServiceTag:          validServiceTag,
-							controller.KeyCSIPVCName:      req.Name,
-							controller.KeyCSIPVCNamespace: validNamespaceName,
+							common.KeyArrayVolumeName:   "my-vol",
+							common.KeyProtocol:          "nfs",
+							common.KeyArrayID:           secondValidID,
+							common.KeyNfsACL:            "A::OWNER@:RWX",
+							common.KeyNasName:           validNasName,
+							common.KeyVolumeDescription: req.Name + "-" + validNamespaceName,
+							common.KeyServiceTag:        validServiceTag,
+							KeyCSIPVCName:               req.Name,
+							KeyCSIPVCNamespace:          validNamespaceName,
 						},
 						AccessibleTopology: []*csi.Topology{{Segments: map[string]string{common.Name + "/" + ctrlSvc.Arrays()[secondValidID].GetIP() + "-nfs": "true"}}},
 					},
@@ -1569,7 +1569,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			ginkgo.When("existing volume size is smaller", func() {
 				ginkgo.It("should fail [Block]", func() {
 					volName := "my-vol"
-					clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+					clientMock.On("GetCustomHTTPHeaders").Return(api.NewSafeHeader().GetHeader())
 					clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
 					clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 					clientMock.On("CreateVolume", mock.Anything, mock.Anything).
@@ -1672,8 +1672,8 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				req := getTypicalCreateVolumeRequest("my-vol", validVolSize)
 				req.VolumeContentSource = contentSource
 				req.Parameters[common.KeyArrayID] = firstValidID
-				req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationEnabled)] = "true"
-				req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationMode)] = "METRO"
+				req.Parameters[ctrlSvc.WithRP(KeyReplicationEnabled)] = "true"
+				req.Parameters[ctrlSvc.WithRP(KeyReplicationMode)] = "METRO"
 
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
 
@@ -1694,7 +1694,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 
 				clientMock.On("GetFS", mock.Anything, validBaseVolID).Return(gopowerstore.FileSystem{
 					ID:        validBaseVolID,
-					SizeTotal: validVolSize + controller.ReservedSize,
+					SizeTotal: validVolSize + ReservedSize,
 				}, nil)
 
 				fsClone := &gopowerstore.FsClone{
@@ -1780,8 +1780,8 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				req := getTypicalCreateVolumeRequest(volName, validVolSize)
 				req.VolumeContentSource = contentSource
 				req.Parameters[common.KeyArrayID] = firstValidID
-				req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationEnabled)] = "true"
-				req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationMode)] = "METRO"
+				req.Parameters[ctrlSvc.WithRP(KeyReplicationEnabled)] = "true"
+				req.Parameters[ctrlSvc.WithRP(KeyReplicationMode)] = "METRO"
 
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
 
@@ -1802,7 +1802,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 
 				clientMock.On("GetFS", mock.Anything, validBaseVolID).Return(gopowerstore.FileSystem{
 					ID:        validBaseVolID,
-					SizeTotal: validVolSize + controller.ReservedSize,
+					SizeTotal: validVolSize + ReservedSize,
 				}, nil)
 
 				fsClone := &gopowerstore.FsClone{
@@ -1835,7 +1835,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 
 		ginkgo.When("there is no array IP in storage class", func() {
 			ginkgo.It("should use default array", func() {
-				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+				clientMock.On("GetCustomHTTPHeaders").Return(api.NewSafeHeader().GetHeader())
 				clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
 				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 				clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
@@ -1881,7 +1881,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 					Block: &csi.VolumeCapability_BlockVolume{},
 				}
 				req.Parameters[common.KeyArrayID] = secondValidID
-				req.Parameters[controller.KeyFsType] = "nfs"
+				req.Parameters[KeyFsType] = "nfs"
 
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
 				gomega.Expect(res).To(gomega.BeNil())
@@ -1895,7 +1895,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 					Block: &csi.VolumeCapability_BlockVolume{},
 				}
 				req.Parameters[common.KeyArrayID] = secondValidID
-				req.Parameters[controller.KeyFsTypeOld] = "nfs"
+				req.Parameters[KeyFsTypeOld] = "nfs"
 
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
 				gomega.Expect(res).To(gomega.BeNil())
@@ -1934,7 +1934,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			ginkgo.It("should fail", func() {
 				req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
 				req.Parameters[common.KeyArrayID] = secondValidID
-				req.Parameters[ctrlSvc.WithRP(controller.KeyReplicationEnabled)] = "true"
+				req.Parameters[ctrlSvc.WithRP(KeyReplicationEnabled)] = "true"
 
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
 
@@ -2385,7 +2385,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 
 				gomega.Expect(err).To(gomega.BeNil())
 				gomega.Expect(res.Snapshot.SnapshotId).To(gomega.Equal("new-snap-id/globalvolid2/nfs"))
-				gomega.Expect(res.Snapshot.SizeBytes).To(gomega.Equal(int64(validVolSize - controller.ReservedSize)))
+				gomega.Expect(res.Snapshot.SizeBytes).To(gomega.Equal(int64(validVolSize - ReservedSize)))
 				gomega.Expect(res.Snapshot.SourceVolumeId).To(gomega.Equal(validBaseVolID))
 			})
 		})
@@ -2891,7 +2891,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 
 		ginkgo.When("requested size exceeds limit", func() {
 			ginkgo.It("should fail", func() {
-				req := getTypicalControllerExpandRequest(validBlockVolumeID, controller.MaxVolumeSizeBytes+1)
+				req := getTypicalControllerExpandRequest(validBlockVolumeID, MaxVolumeSizeBytes+1)
 
 				_, err := ctrlSvc.ControllerExpandVolume(context.Background(), req)
 				gomega.Expect(err).ToNot(gomega.BeNil())
@@ -2950,7 +2950,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 					Return(gopowerstore.Cluster{Name: validClusterName, NVMeNQN: "nqn"}, nil)
 
 				req := getTypicalControllerPublishVolumeRequest("single-writer", validNodeID, validBlockVolumeID)
-				req.VolumeContext = map[string]string{controller.KeyFsType: "xfs"}
+				req.VolumeContext = map[string]string{KeyFsType: "xfs"}
 
 				res, err := ctrlSvc.ControllerPublishVolume(context.Background(), req)
 
@@ -3010,7 +3010,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 
 				req := getTypicalControllerPublishVolumeRequest("multiple-writer", validNodeID, validNfsVolumeID)
 				req.VolumeCapability = getVolumeCapabilityNFS()
-				req.VolumeContext = map[string]string{controller.KeyFsType: "nfs"}
+				req.VolumeContext = map[string]string{KeyFsType: "nfs"}
 
 				res, err := ctrlSvc.ControllerPublishVolume(context.Background(), req)
 
@@ -3074,7 +3074,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 
 				req := getTypicalControllerPublishVolumeRequest("multiple-writer", validNodeID, validNfsVolumeID)
 				req.VolumeCapability = getVolumeCapabilityNFS()
-				req.VolumeContext = map[string]string{controller.KeyFsType: "nfs"}
+				req.VolumeContext = map[string]string{KeyFsType: "nfs"}
 
 				res, err := ctrlSvc.ControllerPublishVolume(context.Background(), req)
 
@@ -3148,7 +3148,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 					Return(gopowerstore.Cluster{Name: validClusterName}, nil)
 
 				req := getTypicalControllerPublishVolumeRequest("single-writer", validNodeID, validBlockVolumeID)
-				req.VolumeContext = map[string]string{controller.KeyFsType: "xfs"}
+				req.VolumeContext = map[string]string{KeyFsType: "xfs"}
 
 				res, err := ctrlSvc.ControllerPublishVolume(context.Background(), req)
 
@@ -3211,7 +3211,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 
 				req := getTypicalControllerPublishVolumeRequest("multi-writer", validNodeID, validNfsVolumeID)
 				req.VolumeCapability = getVolumeCapabilityNFS()
-				req.VolumeContext = map[string]string{controller.KeyFsType: "nfs"}
+				req.VolumeContext = map[string]string{KeyFsType: "nfs"}
 
 				res, err := ctrlSvc.ControllerPublishVolume(context.Background(), req)
 
@@ -3266,7 +3266,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 						Return(gopowerstore.Cluster{Name: validClusterName}, nil)
 
 					req := getTypicalControllerPublishVolumeRequest("single-writer", validNodeID, validBlockVolumeID)
-					req.VolumeContext = map[string]string{controller.KeyFsType: "xfs"}
+					req.VolumeContext = map[string]string{KeyFsType: "xfs"}
 
 					res, err := ctrlSvc.ControllerPublishVolume(context.Background(), req)
 
@@ -3320,7 +3320,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 						Return(gopowerstore.Cluster{Name: validClusterName}, nil)
 
 					req := getTypicalControllerPublishVolumeRequest("single-writer", validNodeID, validBlockVolumeID)
-					req.VolumeContext = map[string]string{controller.KeyFsType: "xfs"}
+					req.VolumeContext = map[string]string{KeyFsType: "xfs"}
 
 					res, err := ctrlSvc.ControllerPublishVolume(context.Background(), req)
 
@@ -3373,7 +3373,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 						Return(gopowerstore.Cluster{Name: validClusterName}, nil)
 
 					req := getTypicalControllerPublishVolumeRequest("multiple-writer", validNodeID, validBlockVolumeID)
-					req.VolumeContext = map[string]string{controller.KeyFsType: "xfs"}
+					req.VolumeContext = map[string]string{KeyFsType: "xfs"}
 
 					res, err := ctrlSvc.ControllerPublishVolume(context.Background(), req)
 
@@ -3471,7 +3471,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 
 				volumeID := fmt.Sprintf("%s/%s/%s:%s/%s", validBaseVolID, firstValidID, "scsi", validRemoteVolID, secondValidID)
 				req := getTypicalControllerPublishVolumeRequest("single-writer", validNodeID, volumeID)
-				req.VolumeContext = map[string]string{controller.KeyFsType: "xfs"}
+				req.VolumeContext = map[string]string{KeyFsType: "xfs"}
 
 				res, err := ctrlSvc.ControllerPublishVolume(context.Background(), req)
 
@@ -3502,7 +3502,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				ip := "127.0.0.1" // we don't have array with this IP
 				volumeID := fmt.Sprintf("%s/%s/%s:%s/%s", validBaseVolID, firstValidID, "scsi", validRemoteVolID, ip)
 				req := getTypicalControllerPublishVolumeRequest("single-writer", validNodeID, volumeID)
-				req.VolumeContext = map[string]string{controller.KeyFsType: "xfs"}
+				req.VolumeContext = map[string]string{KeyFsType: "xfs"}
 				req.VolumeCapability = nil
 
 				_, err := ctrlSvc.ControllerPublishVolume(context.Background(), req)
@@ -3556,7 +3556,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 
 				_, err := ctrlSvc.ControllerPublishVolume(context.Background(), req)
 				gomega.Expect(err).ToNot(gomega.BeNil())
-				gomega.Expect(err.Error()).To(gomega.ContainSubstring(controller.ErrUnknownAccessMode))
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring(ErrUnknownAccessMode))
 			})
 		})
 
@@ -3582,7 +3582,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 					})
 
 				req := getTypicalControllerPublishVolumeRequest("single-writer", validNodeID, validBlockVolumeID)
-				req.VolumeContext = map[string]string{controller.KeyFsType: "xfs"}
+				req.VolumeContext = map[string]string{KeyFsType: "xfs"}
 
 				_, err := ctrlSvc.ControllerPublishVolume(context.Background(), req)
 				gomega.Expect(err).ToNot(gomega.BeNil())
@@ -3598,7 +3598,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 					})
 
 				req := getTypicalControllerPublishVolumeRequest("single-writer", validNodeID, validNfsVolumeID)
-				req.VolumeContext = map[string]string{controller.KeyFsType: "xfs"}
+				req.VolumeContext = map[string]string{KeyFsType: "xfs"}
 
 				_, err := ctrlSvc.ControllerPublishVolume(context.Background(), req)
 				gomega.Expect(err).ToNot(gomega.BeNil())
@@ -3612,7 +3612,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 					clientMock.On("GetFS", mock.Anything, validBaseVolID).Return(gopowerstore.FileSystem{}, e)
 
 					req := getTypicalControllerPublishVolumeRequest("single-writer", validNodeID, validBaseVolID)
-					req.VolumeContext = map[string]string{controller.KeyFsType: "xfs"}
+					req.VolumeContext = map[string]string{KeyFsType: "xfs"}
 					req.VolumeCapability = nil
 
 					_, err := ctrlSvc.ControllerPublishVolume(context.Background(), req)
@@ -3643,7 +3643,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 					}).Once()
 
 				req := getTypicalControllerPublishVolumeRequest("single-writer", validNodeID, validBlockVolumeID)
-				req.VolumeContext = map[string]string{controller.KeyFsType: "xfs"}
+				req.VolumeContext = map[string]string{KeyFsType: "xfs"}
 
 				_, err := ctrlSvc.ControllerPublishVolume(context.Background(), req)
 				gomega.Expect(err).ToNot(gomega.BeNil())
@@ -3656,7 +3656,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				ip := "127.0.0.1" // we don't have array with this ip
 				req := getTypicalControllerPublishVolumeRequest("single-writer", validNodeID,
 					validBaseVolID+"/"+ip+"/scsi")
-				req.VolumeContext = map[string]string{controller.KeyFsType: "xfs"}
+				req.VolumeContext = map[string]string{KeyFsType: "xfs"}
 				req.VolumeCapability = nil
 
 				_, err := ctrlSvc.ControllerPublishVolume(context.Background(), req)
@@ -4619,7 +4619,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 		ginkgo.When("everything is ok and arrayip is provided", func() {
 			ginkgo.It("should succeed", func() {
 				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
-				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+				clientMock.On("GetCustomHTTPHeaders").Return(api.NewSafeHeader().GetHeader())
 				clientMock.On("GetCapacity", mock.Anything).Return(int64(123123123), nil)
 				clientMock.On("GetMaxVolumeSize", mock.Anything).Return(int64(-1), nil)
 				req := &csi.GetCapacityRequest{
@@ -4636,7 +4636,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 		ginkgo.When("everything is ok and array ip is not provided", func() {
 			ginkgo.It("should succeed", func() {
 				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
-				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+				clientMock.On("GetCustomHTTPHeaders").Return(api.NewSafeHeader().GetHeader())
 				clientMock.On("GetCapacity", mock.Anything).Return(int64(123123123), nil)
 				clientMock.On("GetMaxVolumeSize", mock.Anything).Return(int64(-1), nil)
 				req := &csi.GetCapacityRequest{
@@ -4651,7 +4651,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 		ginkgo.When("wrong arrayIP in params", func() {
 			ginkgo.It("should fail with predefined errmsg", func() {
 				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
-				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+				clientMock.On("GetCustomHTTPHeaders").Return(api.NewSafeHeader().GetHeader())
 				clientMock.On("GetCapacity", mock.Anything).Return(int64(123123123), nil)
 				clientMock.On("GetMaxVolumeSize", mock.Anything).Return(int64(-1), nil)
 				req := &csi.GetCapacityRequest{
@@ -4669,7 +4669,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 		ginkgo.When("everything is correct, but API failed", func() {
 			ginkgo.It("should fail with predefined errmsg", func() {
 				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
-				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+				clientMock.On("GetCustomHTTPHeaders").Return(api.NewSafeHeader().GetHeader())
 				clientMock.On("GetCapacity", mock.Anything).Return(int64(123123123), errors.New("APIErrorUnexpected"))
 				clientMock.On("GetMaxVolumeSize", mock.Anything).Return(int64(-1), nil)
 				req := &csi.GetCapacityRequest{
@@ -4687,7 +4687,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 		ginkgo.When("everything is correct, but GetMaxVolumeSize API failed", func() {
 			ginkgo.It("MaximumVolumeSize should not be set in the response", func() {
 				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
-				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+				clientMock.On("GetCustomHTTPHeaders").Return(api.NewSafeHeader().GetHeader())
 				clientMock.On("GetCapacity", mock.Anything).Return(int64(123123123), nil)
 				req := &csi.GetCapacityRequest{
 					Parameters: map[string]string{},
@@ -4703,7 +4703,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 		ginkgo.When("negative MaximumVolumeSize", func() {
 			ginkgo.It("MaximumVolumeSize should not be set in the response", func() {
 				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
-				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+				clientMock.On("GetCustomHTTPHeaders").Return(api.NewSafeHeader().GetHeader())
 				clientMock.On("GetCapacity", mock.Anything).Return(int64(123123123), nil)
 				req := &csi.GetCapacityRequest{
 					Parameters: map[string]string{},
@@ -4719,7 +4719,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 		ginkgo.When("non negative MaximumVolumeSize", func() {
 			ginkgo.It("MaximumVolumeSize should be set in the response", func() {
 				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
-				clientMock.On("GetCustomHTTPHeaders").Return(make(http.Header))
+				clientMock.On("GetCustomHTTPHeaders").Return(api.NewSafeHeader().GetHeader())
 				clientMock.On("GetCapacity", mock.Anything).Return(int64(123123123), nil)
 				req := &csi.GetCapacityRequest{
 					Parameters: map[string]string{},
@@ -5157,6 +5157,52 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				}))
 			})
 
+			ginkgo.It("should successfully discover protection group of a host-based nfs volume", func() {
+				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).
+					Return(gopowerstore.VolumeGroups{VolumeGroup: []gopowerstore.VolumeGroup{{ID: validGroupID, Name: validVolumeGroupName}}}, nil)
+
+				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, validGroupID).
+					Return(gopowerstore.ReplicationSession{
+						RemoteSystemID:   validRemoteSystemID,
+						LocalResourceID:  validGroupID,
+						RemoteResourceID: validRemoteGroupID,
+						StorageElementPairs: []gopowerstore.StorageElementPair{{
+							LocalStorageElementID:  validBaseVolID,
+							RemoteStorageElementID: validRemoteVolID,
+						}},
+					}, nil)
+
+				clientMock.On("GetCluster", mock.Anything).
+					Return(gopowerstore.Cluster{Name: validClusterName, ManagementAddress: firstValidID}, nil)
+
+				clientMock.On("GetRemoteSystem", mock.Anything, validRemoteSystemID).
+					Return(gopowerstore.RemoteSystem{
+						Name:              validRemoteSystemName,
+						ManagementAddress: secondValidID,
+						SerialNumber:      validRemoteSystemGlobalID,
+					}, nil)
+
+				req := &csiext.CreateStorageProtectionGroupRequest{
+					VolumeHandle: nfs.CsiNfsPrefixDash + validBaseVolID + "/" + firstValidID + "/" + "iscsi",
+					Parameters: map[string]string{
+						nfs.CsiNfsParameter: "RWX",
+					},
+				}
+
+				res, err := ctrlSvc.CreateStorageProtectionGroup(context.Background(), req)
+
+				localParams, remoteParams := getLocalAndRemoteParams(validClusterName, firstValidID,
+					validRemoteSystemName, secondValidID, validRemoteSystemGlobalID, validVolumeGroupName)
+
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csiext.CreateStorageProtectionGroupResponse{
+					LocalProtectionGroupId:          validGroupID,
+					RemoteProtectionGroupId:         validRemoteGroupID,
+					LocalProtectionGroupAttributes:  localParams,
+					RemoteProtectionGroupAttributes: remoteParams,
+				}))
+			})
+
 			ginkgo.It("should fail if volume doesn't exists", func() {
 				req := &csiext.CreateStorageProtectionGroupRequest{
 					VolumeHandle: "",
@@ -5352,7 +5398,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				clientMock.On("GetRemoteSystemByName", mock.Anything, validRemoteSystemName).
 					Return(gopowerstore.RemoteSystem{}, gopowerstore.NewHostIsNotExistError())
 
-				_, err := controller.EnsureProtectionPolicyExists(context.Background(), ctrlSvc.DefaultArray(),
+				_, err := EnsureProtectionPolicyExists(context.Background(), ctrlSvc.DefaultArray(),
 					validGroupName, validRemoteSystemName, validRPO)
 				gomega.Expect(err).ToNot(gomega.BeNil())
 			})
@@ -5364,7 +5410,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				clientMock.On("GetProtectionPolicyByName", mock.Anything, validPolicyName).
 					Return(gopowerstore.ProtectionPolicy{ID: validPolicyID, Name: validPolicyName}, nil)
 
-				res, err := controller.EnsureProtectionPolicyExists(context.Background(), ctrlSvc.DefaultArray(),
+				res, err := EnsureProtectionPolicyExists(context.Background(), ctrlSvc.DefaultArray(),
 					validGroupName, validRemoteSystemName, validRPO)
 				gomega.Expect(err).To(gomega.BeNil())
 				gomega.Expect(res).To(gomega.Equal(validPolicyID))
@@ -5385,7 +5431,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 						Name:               validPolicyName,
 						ReplicationRuleIDs: []string{validRuleID},
 					}).Return(gopowerstore.CreateResponse{ID: validPolicyID}, nil)
-				res, err := controller.EnsureProtectionPolicyExists(context.Background(), ctrlSvc.DefaultArray(),
+				res, err := EnsureProtectionPolicyExists(context.Background(), ctrlSvc.DefaultArray(),
 					validGroupName, validRemoteSystemName, validRPO)
 				gomega.Expect(err).To(gomega.BeNil())
 				gomega.Expect(res).To(gomega.Equal(validPolicyID))
@@ -5407,7 +5453,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 					},
 				).Return(gopowerstore.CreateResponse{ID: validRuleID}, nil)
 
-				res, err := controller.EnsureReplicationRuleExists(context.Background(), ctrlSvc.DefaultArray(),
+				res, err := EnsureReplicationRuleExists(context.Background(), ctrlSvc.DefaultArray(),
 					validGroupName, validRemoteSystemID, gopowerstore.RpoFiveMinutes)
 
 				gomega.Expect(err).To(gomega.BeNil())
@@ -5418,7 +5464,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				clientMock.On("GetReplicationRuleByName", mock.Anything, validRuleName).
 					Return(gopowerstore.ReplicationRule{ID: validRuleID}, nil)
 
-				res, err := controller.EnsureReplicationRuleExists(context.Background(), ctrlSvc.DefaultArray(),
+				res, err := EnsureReplicationRuleExists(context.Background(), ctrlSvc.DefaultArray(),
 					validGroupName, validRemoteSystemID, validRPO)
 
 				gomega.Expect(err).To(gomega.BeNil())
@@ -5443,7 +5489,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 					},
 				).Return(gopowerstore.CreateResponse{}, gopowerstore.WrapErr(apiErr))
 
-				res, err := controller.EnsureReplicationRuleExists(context.Background(), ctrlSvc.DefaultArray(),
+				res, err := EnsureReplicationRuleExists(context.Background(), ctrlSvc.DefaultArray(),
 					validGroupName, validRemoteSystemID, validRPO)
 
 				gomega.Expect(res).To(gomega.BeEmpty())
@@ -5729,7 +5775,7 @@ func getTypicalControllerExpandRequest(volid string, size int64) *csi.Controller
 		VolumeId: volid,
 		CapacityRange: &csi.CapacityRange{
 			RequiredBytes: size,
-			LimitBytes:    controller.MaxVolumeSizeBytes,
+			LimitBytes:    MaxVolumeSizeBytes,
 		},
 	}
 }

@@ -23,6 +23,7 @@ import (
 	"errors"
 	"net/http"
 	"os"
+	"reflect"
 	"testing"
 	"time"
 
@@ -31,12 +32,11 @@ import (
 	"github.com/dell/csi-powerstore/v2/pkg/array"
 	"github.com/dell/csi-powerstore/v2/pkg/common"
 	"github.com/dell/csi-powerstore/v2/pkg/common/fs"
+	sharednfs "github.com/dell/csm-sharednfs/nfs"
+	"github.com/dell/gofsutil"
 	"github.com/dell/gopowerstore"
-
 	"github.com/dell/gopowerstore/api"
 	gopowerstoremock "github.com/dell/gopowerstore/mocks"
-
-	"github.com/dell/gofsutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
@@ -87,7 +87,7 @@ func TestGetPowerStoreArrays(t *testing.T) {
 	}{
 		{
 			name:    "two arrays",
-			args:    args{data: "./testdata/two-arr.yaml", fs: &fs.Fs{Util: &gofsutil.FS{SysBlockDir: "/sys/block"}}},
+			args:    args{data: "./testdata/two-arr.yaml", fs: &fs.Fs{Util: &gofsutil.FS{}}},
 			wantErr: false,
 			want: map[string]*array.PowerStoreArray{
 				"gid1": {
@@ -110,7 +110,7 @@ func TestGetPowerStoreArrays(t *testing.T) {
 		},
 		{
 			name:    "one array",
-			args:    args{data: "./testdata/one-arr.yaml", fs: &fs.Fs{Util: &gofsutil.FS{SysBlockDir: "/sys/block"}}},
+			args:    args{data: "./testdata/one-arr.yaml", fs: &fs.Fs{Util: &gofsutil.FS{}}},
 			wantErr: false,
 			want: map[string]*array.PowerStoreArray{
 				"gid1": {
@@ -125,7 +125,7 @@ func TestGetPowerStoreArrays(t *testing.T) {
 		},
 		{
 			name:    "empty arrays",
-			args:    args{data: "./testdata/no-arr.yaml", fs: &fs.Fs{Util: &gofsutil.FS{SysBlockDir: "/sys/block"}}},
+			args:    args{data: "./testdata/no-arr.yaml", fs: &fs.Fs{Util: &gofsutil.FS{}}},
 			wantErr: false,
 			want:    map[string]*array.PowerStoreArray{},
 		},
@@ -175,20 +175,20 @@ func TestGetPowerStoreArrays(t *testing.T) {
 	})
 
 	t.Run("incorrect endpoint", func(t *testing.T) {
-		f := &fs.Fs{Util: &gofsutil.FS{SysBlockDir: "/sys/block"}}
+		f := &fs.Fs{Util: &gofsutil.FS{}}
 		_, _, _, err := array.GetPowerStoreArrays(f, "./testdata/incorrect-endpoint.yaml")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "can't get ips from endpoint")
 	})
 
 	t.Run("invalid endpoint", func(t *testing.T) {
-		f := &fs.Fs{Util: &gofsutil.FS{SysBlockDir: "/sys/block"}}
+		f := &fs.Fs{Util: &gofsutil.FS{}}
 		_, _, _, err := array.GetPowerStoreArrays(f, "./testdata/invalid-endpoint.yaml")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "can't get ips from endpoint")
 	})
 	t.Run("no global ID", func(t *testing.T) {
-		f := &fs.Fs{Util: &gofsutil.FS{SysBlockDir: "/sys/block"}}
+		f := &fs.Fs{Util: &gofsutil.FS{}}
 		_, _, _, err := array.GetPowerStoreArrays(f, "./testdata/no-globalID.yaml")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "no GlobalID field found in config.yaml")
@@ -196,7 +196,7 @@ func TestGetPowerStoreArrays(t *testing.T) {
 
 	t.Run("incorrect throttling limit", func(t *testing.T) {
 		_ = os.Setenv(common.EnvThrottlingRateLimit, "abc")
-		f := &fs.Fs{Util: &gofsutil.FS{SysBlockDir: "/sys/block"}}
+		f := &fs.Fs{Util: &gofsutil.FS{}}
 		_, _, _, err := array.GetPowerStoreArrays(f, "./testdata/one-arr.yaml")
 		assert.NoError(t, err)
 	})
@@ -204,7 +204,7 @@ func TestGetPowerStoreArrays(t *testing.T) {
 	t.Run("incorrect EnvMultiNASFailureThreshold & EnvMultiNASCooldownPeriod value", func(t *testing.T) {
 		_ = os.Setenv(common.EnvMultiNASFailureThreshold, "0")
 		_ = os.Setenv(common.EnvMultiNASCooldownPeriod, "0m")
-		f := &fs.Fs{Util: &gofsutil.FS{SysBlockDir: "/sys/block"}}
+		f := &fs.Fs{Util: &gofsutil.FS{}}
 		got, _, _, err := array.GetPowerStoreArrays(f, "./testdata/one-arr.yaml")
 		assert.NoError(t, err)
 		assert.Equal(t, 5, got["gid1"].NASCooldownTracker.(*array.NASCooldown).GetThreshold())
@@ -215,7 +215,7 @@ func TestGetPowerStoreArrays(t *testing.T) {
 		_ = os.Setenv(common.EnvMultiNASFailureThreshold, "abc")
 		_ = os.Setenv(common.EnvMultiNASCooldownPeriod, "abc")
 
-		f := &fs.Fs{Util: &gofsutil.FS{SysBlockDir: "/sys/block"}}
+		f := &fs.Fs{Util: &gofsutil.FS{}}
 		got, _, _, err := array.GetPowerStoreArrays(f, "./testdata/one-arr.yaml")
 		assert.NoError(t, err)
 		assert.Equal(t, 5, got["gid1"].NASCooldownTracker.(*array.NASCooldown).GetThreshold())
@@ -282,11 +282,11 @@ func (s *LegacyParseVolumeTestSuite) TestVolumeCapabilityNFS() {
 	}
 
 	volCap := getVolCap()
-	gotID, gotIP, protocol, _, _, err := array.ParseVolumeID(context.Background(), id, &array.PowerStoreArray{IP: ip, GlobalID: "gid1"}, volCap)
+	gotID, err := array.ParseVolumeID(context.Background(), id, &array.PowerStoreArray{IP: ip, GlobalID: "gid1"}, volCap)
 	assert.NoError(s.T(), err)
-	assert.Equal(s.T(), id, gotID)
-	assert.Equal(s.T(), ip, gotIP)
-	assert.Equal(s.T(), protocol, "nfs")
+	assert.Equal(s.T(), id, gotID.LocalUUID)
+	assert.Equal(s.T(), ip, gotID.LocalArrayGlobalID)
+	assert.Equal(s.T(), "nfs", gotID.Protocol)
 }
 
 func (s *LegacyParseVolumeTestSuite) TestVolumeCapabilitySCSI() {
@@ -308,11 +308,11 @@ func (s *LegacyParseVolumeTestSuite) TestVolumeCapabilitySCSI() {
 	}
 
 	volCap := getVolCap()
-	gotID, gotGlobalID, protocol, _, _, err := array.ParseVolumeID(context.Background(), id, &array.PowerStoreArray{IP: ip, GlobalID: validGlobalID}, volCap)
+	gotID, err := array.ParseVolumeID(context.Background(), id, &array.PowerStoreArray{IP: ip, GlobalID: validGlobalID}, volCap)
 	assert.NoError(s.T(), err)
-	assert.Equal(s.T(), id, gotID)
-	assert.Equal(s.T(), validGlobalID, gotGlobalID)
-	assert.Equal(s.T(), scsi, protocol)
+	assert.Equal(s.T(), id, gotID.LocalUUID)
+	assert.Equal(s.T(), validGlobalID, gotID.LocalArrayGlobalID)
+	assert.Equal(s.T(), scsi, gotID.Protocol)
 }
 
 func (s *LegacyParseVolumeTestSuite) TestMissingSCSIProtocol() {
@@ -320,11 +320,11 @@ func (s *LegacyParseVolumeTestSuite) TestMissingSCSIProtocol() {
 	// if GetVolume returns without error, the protocol should be scsi.
 	s.mockAPI.GetVolume.Return(gopowerstore.Volume{ID: validBlockVolumeUUID}, nil)
 
-	id, globalID, protocol, _, _, err := array.ParseVolumeID(context.Background(), validBlockVolumeUUID, s.psArray, nil)
+	gotID, err := array.ParseVolumeID(context.Background(), validBlockVolumeUUID, s.psArray, nil)
 	assert.NoError(s.T(), err)
-	assert.Equal(s.T(), validBlockVolumeUUID, id)
-	assert.Equal(s.T(), s.psArray.GlobalID, globalID)
-	assert.Equal(s.T(), protocol, scsi)
+	assert.Equal(s.T(), validBlockVolumeUUID, gotID.LocalUUID)
+	assert.Equal(s.T(), s.psArray.GlobalID, gotID.LocalArrayGlobalID)
+	assert.Equal(s.T(), scsi, gotID.Protocol)
 }
 
 func (s *LegacyParseVolumeTestSuite) TestGetNFSProtocolFromAPIClient() {
@@ -334,11 +334,11 @@ func (s *LegacyParseVolumeTestSuite) TestGetNFSProtocolFromAPIClient() {
 	s.mockAPI.GetVolume.Return(gopowerstore.Volume{}, errors.New("error"))
 	s.mockAPI.GetFS.Return(gopowerstore.FileSystem{ID: validFileSystemUUID}, nil)
 
-	id, globalID, protocol, _, _, err := array.ParseVolumeID(context.Background(), validFileSystemUUID, s.psArray, nil)
+	id, err := array.ParseVolumeID(context.Background(), validFileSystemUUID, s.psArray, nil)
 	assert.NoError(s.T(), err)
-	assert.Equal(s.T(), validFileSystemUUID, id)
-	assert.Equal(s.T(), validGlobalID, globalID)
-	assert.Equal(s.T(), protocol, nfs)
+	assert.Equal(s.T(), validFileSystemUUID, id.LocalUUID)
+	assert.Equal(s.T(), validGlobalID, id.LocalArrayGlobalID)
+	assert.Equal(s.T(), nfs, id.Protocol)
 }
 
 func (s *LegacyParseVolumeTestSuite) TestVolumeNotFound() {
@@ -356,7 +356,7 @@ func (s *LegacyParseVolumeTestSuite) TestVolumeNotFound() {
 
 	s.mockAPI.GetFS.Return(gopowerstore.FileSystem{}, error(s.mockAPI.APIError))
 
-	_, _, _, _, _, err := array.ParseVolumeID(context.Background(), validFileSystemUUID, s.psArray, nil)
+	_, err := array.ParseVolumeID(context.Background(), validFileSystemUUID, s.psArray, nil)
 	assert.ErrorIs(s.T(), err, error(s.mockAPI.APIError))
 }
 
@@ -375,7 +375,7 @@ func (s *LegacyParseVolumeTestSuite) TestVolumeUnknownError() {
 
 	s.mockAPI.GetFS.Return(gopowerstore.FileSystem{}, error(s.mockAPI.APIError))
 
-	_, _, _, _, _, err := array.ParseVolumeID(context.Background(), validFileSystemUUID, s.psArray, nil)
+	_, err := array.ParseVolumeID(context.Background(), validFileSystemUUID, s.psArray, nil)
 	assert.ErrorContains(s.T(), err, s.mockAPI.APIError.ErrorMsg.Message)
 }
 
@@ -389,41 +389,87 @@ func (s *LegacyParseVolumeTestSuite) TestIPAsArrayID() {
 	// Build a volume ID using an IP in place of a PowerStore Global ID
 	volID := buildVolumeName(validBlockVolumeUUID, validPowerStoreIP, scsi)
 
-	id, globalID, protocol, _, _, err := array.ParseVolumeID(context.Background(), volID, nil, nil)
+	id, err := array.ParseVolumeID(context.Background(), volID, nil, nil)
 	assert.NoError(s.T(), err)
-	assert.Equal(s.T(), validBlockVolumeUUID, id)
-	assert.Equal(s.T(), globalID, validGlobalID)
-	assert.Equal(s.T(), protocol, scsi)
+	assert.Equal(s.T(), validBlockVolumeUUID, id.LocalUUID)
+	assert.Equal(s.T(), validGlobalID, id.LocalArrayGlobalID)
+	assert.Equal(s.T(), scsi, id.Protocol)
 }
 
 func TestParseVolumeID(t *testing.T) {
 	t.Run("parse volume name", func(t *testing.T) {
-		id, globalID, protocol, _, _, err := array.ParseVolumeID(context.Background(), validBlockVolumeNameSCSI, nil, nil)
+		id, err := array.ParseVolumeID(context.Background(), validBlockVolumeNameSCSI, nil, nil)
 		assert.NoError(t, err)
-		assert.Equal(t, validBlockVolumeUUID, id)
-		assert.Equal(t, validGlobalID, globalID)
-		assert.Equal(t, scsi, protocol)
+		assert.Equal(t, validBlockVolumeUUID, id.LocalUUID)
+		assert.Equal(t, validGlobalID, id.LocalArrayGlobalID)
+		assert.Equal(t, scsi, id.Protocol)
 	})
 
 	t.Run("incorrect volume id", func(t *testing.T) {
-		_, _, _, _, _, err := array.ParseVolumeID(context.Background(), "", nil, nil)
+		_, err := array.ParseVolumeID(context.Background(), "", nil, nil)
 		assert.Error(t, err)
 	})
 
 	t.Run("parse metro volume name", func(t *testing.T) {
-		id, globalID, protocol, remoteID, remoteGlobalID, err := array.ParseVolumeID(context.Background(), validMetroBlockVolumeNameSCSI, nil, nil)
+		id, err := array.ParseVolumeID(context.Background(), validMetroBlockVolumeNameSCSI, nil, nil)
 		assert.NoError(t, err)
-		assert.Equal(t, validBlockVolumeUUID, id)
-		assert.Equal(t, validRemoteBlockVolumeUUID, remoteID)
-		assert.Equal(t, validGlobalID, globalID)
-		assert.Equal(t, remoteGlobalID, validRemoteGlobalID)
-		assert.Equal(t, scsi, protocol)
+		assert.Equal(t, validBlockVolumeUUID, id.LocalUUID)
+		assert.Equal(t, validRemoteBlockVolumeUUID, id.RemoteUUID)
+		assert.Equal(t, validGlobalID, id.LocalArrayGlobalID)
+		assert.Equal(t, validRemoteGlobalID, id.RemoteArrayGlobalID)
+		assert.Equal(t, scsi, id.Protocol)
 	})
+
+	localVolUUID := "aaaaaaaa-0000-bbbb-1111-cccccccccccc"
+	powerstoreLocalSystemID := "PS000000000001"
+	SharedNFSVolumeID := sharednfs.CsiNfsPrefixDash + localVolUUID + "/" + powerstoreLocalSystemID + "/" + scsi
+	type args struct {
+		ctx          context.Context
+		volumeHandle string
+		defaultArray *array.PowerStoreArray
+		vc           *csi.VolumeCapability
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    array.VolumeHandle
+		wantErr bool
+	}{
+		{
+			name: "parse volume handle for a host-based nfs volume",
+			args: args{
+				ctx:          context.Background(),
+				volumeHandle: SharedNFSVolumeID,
+				defaultArray: nil,
+				vc:           nil,
+			},
+			want: array.VolumeHandle{
+				LocalUUID:           sharednfs.CsiNfsPrefixDash + localVolUUID,
+				LocalArrayGlobalID:  powerstoreLocalSystemID,
+				RemoteUUID:          "",
+				RemoteArrayGlobalID: "",
+				Protocol:            scsi,
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := array.ParseVolumeID(tt.args.ctx, tt.args.volumeHandle, tt.args.defaultArray, tt.args.vc)
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("ParseVolumeID() got = %v, want %v", got, tt.want)
+			}
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ParseVolumeID() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+		})
+	}
 }
 
 func TestLocker_UpdateArrays(t *testing.T) {
 	lck := array.Locker{}
-	err := lck.UpdateArrays("./testdata/one-arr.yaml", &fs.Fs{Util: &gofsutil.FS{SysBlockDir: "/sys/block"}})
+	err := lck.UpdateArrays("./testdata/one-arr.yaml", &fs.Fs{Util: &gofsutil.FS{}})
 	assert.NoError(t, err)
 	assert.Equal(t, lck.DefaultArray().Endpoint, "https://127.0.0.1/api/rest")
 }
@@ -672,6 +718,49 @@ func TestFallbackRetry(t *testing.T) {
 			got := nas.FallbackRetry(tt.nasList)
 			if got != tt.want {
 				t.Errorf("got %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_getVolumeIDPrefix(t *testing.T) {
+	legacyVolumeID := "1cd254s"
+
+	type args struct {
+		ID string
+	}
+	tests := []struct {
+		name       string
+		args       args
+		wantPrefix string
+	}{
+		{
+			name: "legacy volume ID",
+			args: args{
+				ID: legacyVolumeID,
+			},
+			wantPrefix: "",
+		},
+		{
+			name: "volume UUID with no prefix",
+			args: args{
+				ID: validBlockVolumeUUID,
+			},
+			wantPrefix: "",
+		},
+		{
+			name: "volume UUID with host-based nfs prefix",
+			args: args{
+				ID: sharednfs.CsiNfsPrefixDash + validBlockVolumeUUID,
+			},
+			wantPrefix: sharednfs.CsiNfsPrefixDash,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotPrefix := array.GetVolumeUUIDPrefix(tt.args.ID)
+			if gotPrefix != tt.wantPrefix {
+				t.Errorf("getVolumeIDPrefix() gotPrefix = %v, want %v", gotPrefix, tt.wantPrefix)
 			}
 		})
 	}
