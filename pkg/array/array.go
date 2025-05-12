@@ -159,16 +159,27 @@ func NewNASCooldown(cooldownPeriod time.Duration, threshold int) *NASCooldown {
 
 // GetStatusMap is a getter for statusMap
 func (n *NASCooldown) GetStatusMap() map[string]*NASStatus {
-	return n.statusMap
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	// Return a copy of statusMap so that the original statusMap cannot be updated by the caller
+	statusMapCopy := make(map[string]*NASStatus)
+	for key, value := range n.statusMap {
+		statusMapCopy[key] = value
+	}
+	return statusMapCopy
 }
 
 // GetCooldownPeriod is a getter for cooldownPeriod
 func (n *NASCooldown) GetCooldownPeriod() time.Duration {
+	n.mu.Lock()
+	defer n.mu.Unlock()
 	return n.cooldownPeriod
 }
 
 // GetThreshold is a getter for threshold
 func (n *NASCooldown) GetThreshold() int {
+	n.mu.Lock()
+	defer n.mu.Unlock()
 	return n.threshold
 }
 
