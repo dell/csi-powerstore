@@ -178,30 +178,19 @@ func (s *service) UnmountVolume(ctx context.Context, volumeID, exportPath string
 		return err
 	}
 
-	found := false
 	for _, mount := range mounts {
-		if mount.Path == target {
+		if strings.Contains(mount.Path, target) {
 			log.Infof("[UnmountVolume] Found mount %s, will try to unmount", mount.Path)
-			found = true
+
+			err = sysUnmount(mount.Path, syscall.MNT_FORCE)
+			if err != nil {
+				log.Errorf("Could not Umount the target path: %s %s %s", volumeID, target, err.Error())
+				if !strings.Contains(err.Error(), "no such file") {
+					return err
+				}
+			}
 			break
 		}
-	}
-
-	if found {
-		log.Infof("[UnmountVolume] Unmounting %s", target)
-		err = sysUnmount(target, syscall.MNT_FORCE)
-		if err != nil {
-			log.Errorf("Could not Umount the target path: %s %s %s", volumeID, target, err.Error())
-			if !strings.Contains(err.Error(), "no such file") {
-				return err
-			}
-		}
-	}
-
-	err = osRemove(target)
-	if err != nil && !os.IsNotExist(err) {
-		log.Errorf("UnmountVolume %s could not remove directory %s: %s", volumeID, target, err.Error())
-		return err
 	}
 
 	nodeUnstageReq := &csi.NodeUnstageVolumeRequest{
@@ -215,6 +204,12 @@ func (s *service) UnmountVolume(ctx context.Context, volumeID, exportPath string
 		return fmt.Errorf("UnmountVolume unstaging volume %s failed: %e", volumeID, err)
 	}
 	log.Infof("NodeUnstage %s %s returned successfully", volumeID, exportPath)
+
+	err = osRemove(target)
+	if err != nil && !os.IsNotExist(err) {
+		log.Errorf("UnmountVolume %s could not remove directory %s: %s", volumeID, target, err.Error())
+		return err
+	}
 
 	// Remove the staging path.
 	err = osRemove(staging)
