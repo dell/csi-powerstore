@@ -647,6 +647,57 @@ func TestGetLeastUsedActiveNAS(t *testing.T) {
 	}
 }
 
+func TestIsLessUsed(t *testing.T) {
+	makeFS := func(count int) []gopowerstore.FileSystem {
+		return make([]gopowerstore.FileSystem, count)
+	}
+
+	tests := []struct {
+		name     string
+		nas      *gopowerstore.NAS
+		current  *gopowerstore.NAS
+		expected bool
+	}{
+		{
+			name:     "NAS has fewer filesystems than current",
+			nas:      &gopowerstore.NAS{Name: "nasA", FileSystems: makeFS(2)},
+			current:  &gopowerstore.NAS{Name: "nasB", FileSystems: makeFS(3)},
+			expected: true,
+		},
+		{
+			name:     "NAS has more filesystems than current",
+			nas:      &gopowerstore.NAS{Name: "nasA", FileSystems: makeFS(4)},
+			current:  &gopowerstore.NAS{Name: "nasB", FileSystems: makeFS(3)},
+			expected: false,
+		},
+		{
+			name:     "NAS and current have same FS count, NAS name is lexicographically smaller",
+			nas:      &gopowerstore.NAS{Name: "nasA", FileSystems: makeFS(2)},
+			current:  &gopowerstore.NAS{Name: "nasB", FileSystems: makeFS(2)},
+			expected: true,
+		},
+		{
+			name:     "NAS and current have same FS count, NAS name is lexicographically larger",
+			nas:      &gopowerstore.NAS{Name: "nasC", FileSystems: makeFS(2)},
+			current:  &gopowerstore.NAS{Name: "nasB", FileSystems: makeFS(2)},
+			expected: false,
+		},
+		{
+			name:     "NAS and current are identical",
+			nas:      &gopowerstore.NAS{Name: "nasA", FileSystems: makeFS(2)},
+			current:  &gopowerstore.NAS{Name: "nasA", FileSystems: makeFS(2)},
+			expected: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := array.IsLessUsed(tc.nas, tc.current)
+			assert.Equal(t, tc.expected, result)
+		})
+	}
+}
+
 func TestResetFailure(t *testing.T) {
 	tests := []struct {
 		name             string

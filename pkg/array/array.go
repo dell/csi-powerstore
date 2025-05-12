@@ -556,42 +556,9 @@ func GetLeastUsedActiveNAS(ctx context.Context, arr *PowerStoreArray, nasServers
 		log.Errorf("Failed to fetch NAS servers: %v", err)
 		return "", err
 	}
-	nasMap := make(map[string]bool)
-	for _, nasServer := range nasServers {
-		nasMap[nasServer] = true
-	}
 
-	var leastUsedNAS *gopowerstore.NAS
-
-	for i := range nasList {
-		nas := &nasList[i]
-
-		// Check if NAS is present in nasserver map
-		if !nasMap[nas.Name] {
-			continue
-		}
-
-		// Ignore if NAS is in cooldown
-		if arr.NASCooldownTracker.IsInCooldown(nas.Name) {
-			continue
-		}
-
-		// Ignore non-active NAS servers
-		if nas.OperationalStatus != gopowerstore.Started {
-			continue
-		}
-
-		// Proceed only if at least one of the health states is valid
-		if !(nas.HealthDetails.State == gopowerstore.Info || nas.HealthDetails.State == gopowerstore.None) {
-			continue
-		}
-
-		// If it's the first valid NAS or has fewer FSs, update
-		if leastUsedNAS == nil || len(nas.FileSystems) < len(leastUsedNAS.FileSystems) ||
-			(len(nas.FileSystems) == len(leastUsedNAS.FileSystems) && nas.Name < leastUsedNAS.Name) {
-			leastUsedNAS = nas
-		}
-	}
+	nasMap := createNASMap(nasServers)
+	leastUsedNAS := findLeastUsedActiveNAS(arr, nasList, nasMap)
 
 	if leastUsedNAS == nil {
 		nasInCooldown := GetNASInCooldown(arr, nasServers)
@@ -604,6 +571,54 @@ func GetLeastUsedActiveNAS(ctx context.Context, arr *PowerStoreArray, nasServers
 	}
 
 	return leastUsedNAS.Name, nil
+}
+
+func createNASMap(nasServers []string) map[string]bool {
+	nasMap := make(map[string]bool)
+	for _, nasServer := range nasServers {
+		nasMap[nasServer] = true
+	}
+	return nasMap
+}
+
+func findLeastUsedActiveNAS(arr *PowerStoreArray, nasList []gopowerstore.NAS, nasMap map[string]bool) *gopowerstore.NAS {
+	var leastUsedNAS *gopowerstore.NAS
+	for i := range nasList {
+		nas := &nasList[i]
+		if !isEligibleNAS(arr, nas, nasMap) {
+			continue
+		}
+		if leastUsedNAS == nil || IsLessUsed(nas, leastUsedNAS) {
+			leastUsedNAS = nas
+		}
+	}
+	return leastUsedNAS
+}
+
+func isEligibleNAS(arr *PowerStoreArray, nas *gopowerstore.NAS, nasMap map[string]bool) bool {
+	if !nasMap[nas.Name] {
+		return false
+	}
+	if arr.NASCooldownTracker.IsInCooldown(nas.Name) {
+		return false
+	}
+	if nas.OperationalStatus != gopowerstore.Started {
+		return false
+	}
+	if !(nas.HealthDetails.State == gopowerstore.Info || nas.HealthDetails.State == gopowerstore.None) {
+		return false
+	}
+	return true
+}
+
+func IsLessUsed(nas, current *gopowerstore.NAS) bool {
+	if len(nas.FileSystems) < len(current.FileSystems) {
+		return true
+	}
+	if len(nas.FileSystems) == len(current.FileSystems) && nas.Name < current.Name {
+		return true
+	}
+	return false
 }
 
 // GetNASInCooldown returns a list of NAS servers that are in cooldown
