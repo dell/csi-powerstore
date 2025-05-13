@@ -107,6 +107,12 @@ const (
 	// EnvPodmonArrayConnectivityPollRate indicates the polling frequency to check array connectivity
 	EnvPodmonArrayConnectivityPollRate = "X_CSI_PODMON_ARRAY_CONNECTIVITY_POLL_RATE"
 
+	// EnvMultiNASThreshold specifies the failure threshold used to put NAS in cooldown.
+	EnvMultiNASFailureThreshold = "X_CSI_MULTI_NAS_FAILURE_THRESHOLD"
+
+	// EnvMultiNASCooldownPeriod specifies the cooldown period for multiple NAS devices.
+	EnvMultiNASCooldownPeriod = "X_CSI_MULTI_NAS_COOLDOWN_PERIOD"
+
 	// EnvNFSExportDirectory is the path to the folder where the nfs volumes are mounted
 	EnvNFSExportDirectory = "X_CSI_NFS_EXPORT_DIRECTORY"
 
