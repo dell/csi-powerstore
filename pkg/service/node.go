@@ -44,7 +44,7 @@ var (
 func (s *service) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
 	if nfs.IsNFSVolumeID(req.GetVolumeId()) {
 		return nfssvc.NodeStageVolume(ctx, req)
-		//return &csi.NodeStageVolumeResponse{}, nil
+		// return &csi.NodeStageVolumeResponse{}, nil
 	}
 	return nodeSvc.NodeStageVolume(ctx, req)
 }
@@ -182,7 +182,7 @@ func (s *service) UnmountVolume(ctx context.Context, volumeID, exportPath string
 		if strings.Contains(mount.Path, target) {
 			log.Infof("[UnmountVolume] Found mount %s, will try to unmount", mount.Path)
 
-			err = sysUnmount(mount.Path, syscall.MNT_FORCE)
+			err = sysUnmount(mount.Path, syscall.MNT_FORCE|syscall.MNT_DETACH)
 			if err != nil {
 				log.Errorf("Could not Umount the target path: %s %s %s", volumeID, target, err.Error())
 				if !strings.Contains(err.Error(), "no such file") {
