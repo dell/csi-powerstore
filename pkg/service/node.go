@@ -25,14 +25,10 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"strings"
 	"syscall"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csm-sharednfs/nfs"
-	"github.com/dell/gofsutil"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 var (
@@ -165,30 +161,20 @@ func (s *service) MountVolume(ctx context.Context, volumeID, fsType, nfsExportDi
 func (s *service) UnmountVolume(ctx context.Context, volumeID, exportPath string, publishContext map[string]string) error {
 	staging := path.Join(exportPath, publishContext[nfs.ServiceName]+"-dev")
 	target := path.Join(exportPath, publishContext[nfs.ServiceName])
-	var err error
 
-	log.Infof("[UnmountVolume] Cleaning the following paths - target: %s, staging: %s", target, staging)
 	target = filepath.Clean(target)
 	staging = filepath.Clean(staging)
 
-	mounts, err := s.retrieveMounts()
-	if err != nil {
-		return err
+	nodeUnpublishReq := &csi.NodeUnpublishVolumeRequest{
+		VolumeId:   volumeID,
+		TargetPath: target,
 	}
 
-	for _, mount := range mounts {
-		if strings.Contains(mount.Path, target) {
-			log.Infof("[UnmountVolume] Found mount %s, will try to unmount", mount.Path)
-
-			err = sysUnmount(mount.Path, syscall.MNT_FORCE|syscall.MNT_DETACH)
-			if err != nil {
-				log.Errorf("Could not Umount the target path: %s %s %s", volumeID, target, err.Error())
-				if !strings.Contains(err.Error(), "no such file") {
-					return err
-				}
-			}
-			break
-		}
+	log.Infof("[UnmountVolume] Target: %s", target)
+	// Unpublish the target directory for sharedNFS first. This will properly clean up and /dev/sdX entries associated to the mount.
+	_, err := nodeSvc.NodeUnpublishVolume(ctx, nodeUnpublishReq)
+	if err != nil {
+		return fmt.Errorf("[UnmountVolume] unpublish failed for %s: %e", target, err)
 	}
 
 	nodeUnstageReq := &csi.NodeUnstageVolumeRequest{
@@ -196,34 +182,26 @@ func (s *service) UnmountVolume(ctx context.Context, volumeID, exportPath string
 		StagingTargetPath: staging,
 	}
 
-	log.Infof("UnmountVolume calling NodeUnstageVolume %+v", nodeUnstageReq)
+	// Unmount the staging directory for sharedNFS (-dev) to clean up anything related to the mount.
+	log.Infof("[UnmountVolume] Staging: %s", staging)
 	_, err = nodeSvc.NodeUnstageVolume(ctx, nodeUnstageReq)
 	if err != nil {
-		return fmt.Errorf("UnmountVolume unstaging volume %s failed: %e", volumeID, err)
+		return fmt.Errorf("[UnmountVolume] unstage failed for %s: %e", staging, err)
 	}
-	log.Infof("NodeUnstage %s %s returned successfully", volumeID, exportPath)
 
+	// After successfully unmounting/unstaging both target and staging, remove both.
 	err = osRemove(target)
 	if err != nil && !os.IsNotExist(err) {
-		log.Errorf("UnmountVolume %s could not remove directory %s: %s", volumeID, target, err.Error())
+		log.Errorf("[UnmountVolume] could not remove target path %s: %s", target, err.Error())
 		return err
 	}
 
-	// Remove the staging path.
 	err = osRemove(staging)
 	if err != nil && !os.IsNotExist(err) {
-		log.Infof("UnmountVolume Remove %s staging path %s failed: %s", volumeID, "/noderoot/"+staging, err)
+		log.Errorf("[UnmountVolume] could not remove staging path %s: %s", staging, err.Error())
+		return err
 	}
-	log.Infof("UnmountVolume %s ALL GOOD", volumeID)
+
+	log.Infof("[UnmountVolume] Successfully unmounted volume %s", volumeID)
 	return nil
-}
-
-func (s *service) retrieveMounts() ([]gofsutil.Info, error) {
-	mounts, err := s.fs.GetUtil().GetMounts(context.Background())
-	if err != nil {
-		log.Errorf("could not reliably determine existing mount status: %s", err.Error())
-		return nil, status.Errorf(codes.Internal, "could not reliably determine existing mount status: %s", err.Error())
-	}
-
-	return mounts, nil
 }
