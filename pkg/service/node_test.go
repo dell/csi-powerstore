@@ -154,8 +154,12 @@ func TestNodeUnstageVolume(t *testing.T) {
 	PutNodeService(mockNode)
 	t.Run("nfs volume", func(t *testing.T) {
 		req := &csi.NodeUnstageVolumeRequest{
-			VolumeId: "nfs-123",
+			VolumeId: "nfs-aaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
 		}
+		mockNFSSvc := nfsmock.NewMockService(ctrl)
+		mockNFSSvc.EXPECT().NodeUnstageVolume(gomock.Any(), req).AnyTimes().Return(&csi.NodeUnstageVolumeResponse{}, nil)
+		PutNfsService(mockNFSSvc)
+
 		resp, err := svc.NodeUnstageVolume(context.Background(), req)
 		assert.Nil(t, err)
 		assert.Empty(t, resp)
@@ -180,8 +184,12 @@ func TestNodeStageVolume(t *testing.T) {
 	PutNodeService(mockNode)
 	t.Run("nfs volume", func(t *testing.T) {
 		req := &csi.NodeStageVolumeRequest{
-			VolumeId: "nfs-123",
+			VolumeId: "nfs-aaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
 		}
+		mockNFSSvc := nfsmock.NewMockService(ctrl)
+		mockNFSSvc.EXPECT().NodeStageVolume(gomock.Any(), req).AnyTimes().Return(&csi.NodeStageVolumeResponse{}, nil)
+		PutNfsService(mockNFSSvc)
+
 		resp, err := svc.NodeStageVolume(context.Background(), req)
 		assert.Nil(t, err)
 		assert.Empty(t, resp)
