@@ -4,14 +4,12 @@ go 1.24.0
 
 toolchain go1.24.2
 
-replace github.com/dell/csm-sharednfs => ./csm-hbnfs
-
 require (
 	github.com/akutz/gosync v0.1.0
 	github.com/apparentlymart/go-cidr v1.1.0
 	github.com/container-storage-interface/spec v1.8.0
 	github.com/dell/csi-metadata-retriever v1.10.0
-	github.com/dell/csm-sharednfs v0.0.0-20250508054056-fed2cd325687
+	github.com/dell/csm-sharednfs v0.0.0-20250515144900-ae7df1fd37d1
 	github.com/dell/dell-csi-extensions/common v1.7.1-0.20250429070859-de50563d621e
 	github.com/dell/dell-csi-extensions/podmon v1.7.1-0.20250429070859-de50563d621e
 	github.com/dell/dell-csi-extensions/replication v1.10.2-0.20250429070859-de50563d621e
