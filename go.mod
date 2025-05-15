@@ -7,7 +7,7 @@ toolchain go1.24.2
 require (
 	github.com/akutz/gosync v0.1.0
 	github.com/apparentlymart/go-cidr v1.1.0
-	github.com/container-storage-interface/spec v1.8.0
+	github.com/container-storage-interface/spec v1.6.0
 	github.com/dell/csi-metadata-retriever v1.10.0
 	github.com/dell/csm-sharednfs v0.0.0-20250515144900-ae7df1fd37d1
 	github.com/dell/dell-csi-extensions/common v1.8.0
