@@ -23,8 +23,6 @@ This project may be compiled as a stand-alone binary using Golang that, when run
 * [Security](https://github.com/dell/csm/blob/main/docs/SECURITY.md)
 * [Building](#building)
 * [Runtime Dependecies](#runtime-dependencies)
-* [Driver Installation](#driver-installation)
-* [Using Driver](#using-driver)
 * [Documentation](#documentation)
 
 ## Support
@@ -53,12 +51,6 @@ If you want to use NFS be sure to enable it in `myvalues.yaml` or in your storag
 If you want to use NVMe/TCP be sure that the `nvme-cli` package is installed on your node.
 
 If you want to use NVMe/FC be sure that the NVMeFC zoning of the Host Bus Adapters to the Fibre Channel port is done.
-
-## Driver Installation
-Please consult the [Installation Guide](https://dell.github.io/csm-docs/docs/deployment/)
-
-## Using Driver
-Please refer to the section `Testing Drivers` in the [Documentation](https://dell.github.io/csm-docs/docs/csidriver/test/) for more info.
 
 ## Documentation
 For more detailed information on the driver, please refer to [Container Storage Modules documentation](https://dell.github.io/csm-docs/).
