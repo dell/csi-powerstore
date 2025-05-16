@@ -30,9 +30,7 @@ import (
 	"github.com/dell/csm-sharednfs/nfs"
 )
 
-var (
-	osRemove = os.RemoveAll
-)
+var osRemove = os.RemoveAll
 
 // NodeStageVolume prepares volume to be consumed by node publish by connecting volume to the node
 func (s *service) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
