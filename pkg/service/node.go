@@ -25,15 +25,13 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"syscall"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csm-sharednfs/nfs"
 )
 
 var (
-	osRemove   = os.RemoveAll
-	sysUnmount = syscall.Unmount
+	osRemove = os.RemoveAll
 )
 
 // NodeStageVolume prepares volume to be consumed by node publish by connecting volume to the node

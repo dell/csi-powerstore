@@ -23,13 +23,11 @@ import (
 	"time"
 
 	"github.com/dell/csi-powerstore/v2/pkg/common"
-	"github.com/dell/csi-powerstore/v2/pkg/common/fs"
 	"github.com/dell/csi-powerstore/v2/pkg/controller"
 	"github.com/dell/csi-powerstore/v2/pkg/node"
 	"github.com/dell/csm-sharednfs/nfs"
 	"github.com/dell/gocsi"
 	csictx "github.com/dell/gocsi/context"
-	"github.com/dell/gofsutil"
 	"github.com/fsnotify/fsnotify"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -41,7 +39,6 @@ import (
 var log = logrus.New()
 
 var (
-	syncNodeInfoChan chan bool
 	// DriverConfig driver config
 	DriverConfig string
 	// DriverSecret driver secret
@@ -52,18 +49,14 @@ var (
 	nfssvc        nfs.Service
 
 	mx = sync.Mutex{}
-	px = sync.Mutex{}
 )
 
 type service struct {
 	mode string
-	fs   fs.Interface
 }
 
 func New() nfs.Service {
-	return &service{
-		fs: &fs.Fs{Util: &gofsutil.FS{}},
-	}
+	return &service{}
 }
 
 func (s *service) BeforeServe(ctx context.Context, sp *gocsi.StoragePlugin, lis net.Listener) error {
