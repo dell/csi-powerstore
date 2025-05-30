@@ -23,6 +23,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	log "github.com/sirupsen/logrus"
+
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-powerstore/v2/pkg/common"
 	"github.com/dell/gopowerstore"
@@ -109,6 +111,7 @@ func volumeSizeValidation(minSize, maxSize int64) error {
 }
 
 func getCSIVolume(volumeID string, size int64) *csi.Volume {
+	log.Infof("[BONUS LOG] Fields passed to getCSIVolume: volumeID %s with size %d", volumeID, size)
 	volume := &csi.Volume{
 		VolumeId:      volumeID,
 		CapacityBytes: size,
