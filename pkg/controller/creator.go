@@ -418,7 +418,9 @@ func (*NfsCreator) CheckIfAlreadyExists(ctx context.Context, name string, sizeIn
 			"filesystem '%s' already exists but is incompatible volume size: %d < %d",
 			name, alreadyExistVolume.SizeTotal, sizeInBytes)
 	}
-	volumeResponse := getCSIVolume(alreadyExistVolume.ID, alreadyExistVolume.SizeTotal)
+	log.Infof("[BONUS LOG] Total size is: %d", alreadyExistVolume.SizeTotal)
+	log.Infof("[BONUS LOG] [Idempotent request]: Fields passed to getCSIVolume: volumeID %s with size %d", alreadyExistVolume.ID, sizeInBytes)
+	volumeResponse := getCSIVolume(alreadyExistVolume.ID, sizeInBytes)
 	return volumeResponse, nil
 }
 
