@@ -424,6 +424,10 @@ func (*NfsCreator) CheckIfAlreadyExists(ctx context.Context, name string, sizeIn
 
 // Create creates new FileSystem on storage array
 func (c *NfsCreator) Create(ctx context.Context, req *csi.CreateVolumeRequest, sizeInBytes int64, client gopowerstore.Client) (gopowerstore.CreateResponse, error) {
+	log.Println("[BONUS LOG] Create called")
+	log.Infof("[BONUS LOG] sizeInBytes: %+d", sizeInBytes)
+	log.Infof("[BONUS LOG] ReservedSize: %+d", ReservedSize)
+	log.Infof("[BONUS LOG] Create volume request: %+v", req)
 	nas, err := client.GetNASByName(ctx, c.nasName)
 	if err != nil {
 		return gopowerstore.CreateResponse{}, err

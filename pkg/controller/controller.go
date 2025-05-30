@@ -196,6 +196,7 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 	}
 
 	sizeInBytes, err := creator.CheckSize(ctx, req.GetCapacityRange(), s.isAutoRoundOffFsSizeEnabled)
+	log.Infof("[BONUS LOG] sizeInBytes: %d", sizeInBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -220,6 +221,7 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 				req.GetName(), sizeInBytes, req.Parameters, arr.GetClient())
 		}
 		if err != nil {
+			log.Infof("[BONUS LOG] Error returned from CreateVolumeFromSnapshot: %v", err)
 			resp, err := creator.CheckIfAlreadyExists(ctx, req.GetName(), sizeInBytes, arr.GetClient())
 			if err != nil {
 				return nil, err
@@ -389,17 +391,23 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 	params[common.KeyVolumeDescription] = getDescription(req.GetParameters())
 
 	var volumeResponse *csi.Volume
+	log.Infof("[BONUS LOG] sizeInBytes right before creator.Create is: %d", sizeInBytes)
 	resp, err := creator.Create(ctx, req, sizeInBytes, arr.GetClient())
 	if err != nil {
+		log.Infof("[BONUS LOG] Error returned from creator.Create: %v", err)
 		if apiError, ok := err.(gopowerstore.APIError); ok && (apiError.VolumeNameIsAlreadyUse() || apiError.FSNameIsAlreadyUse()) {
+			log.Infof("[BONUS LOG] apiError is: %v", req.GetName())
 			volumeResponse, err = creator.CheckIfAlreadyExists(ctx, req.GetName(), sizeInBytes, arr.GetClient())
+			log.Infof("[BONUS LOG] volumeResponse is: %v", volumeResponse)
 			if err != nil {
+				log.Infof("[BONUS LOG] Error returned from creator.CheckIfAlreadyExists: %v", err)
 				return nil, err
 			}
 		} else {
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 	} else {
+		log.Infof("[BONUS LOG] sizeInBytes right before getCSIVolume is: %d", sizeInBytes)
 		volumeResponse = getCSIVolume(resp.ID, sizeInBytes)
 	}
 
