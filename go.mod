@@ -2,7 +2,7 @@ module github.com/dell/csi-powerstore/v2
 
 go 1.24.0
 
-toolchain go1.24.2
+toolchain go1.24.3
 
 require (
 	github.com/akutz/gosync v0.1.0
