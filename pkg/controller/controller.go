@@ -255,6 +255,7 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 				req.GetName(), sizeInBytes, req.Parameters, arr.GetClient())
 		}
 		if err != nil {
+			log.Warnf("Failed to create volume: %s from snapshot: %s", req.GetName(), err.Error())
 			resp, err := creator.CheckIfAlreadyExists(ctx, req.GetName(), sizeInBytes, arr.GetClient())
 			if err != nil {
 				return nil, err
@@ -417,6 +418,7 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 	var volumeResponse *csi.Volume
 	resp, createError := creator.Create(ctx, req, sizeInBytes, arr.GetClient())
 	if createError != nil {
+		log.Warnf("create volume for %s failed: '%s'", req.GetName(), createError.Error())
 		if apiError, ok := createError.(gopowerstore.APIError); ok && (apiError.VolumeNameIsAlreadyUse() || apiError.FSNameIsAlreadyUse()) {
 			volumeResponse, err = creator.CheckIfAlreadyExists(ctx, req.GetName(), sizeInBytes, arr.GetClient())
 			if err != nil {
