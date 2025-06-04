@@ -137,8 +137,8 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 	fsType := req.VolumeCapabilities[0].GetMount().GetFsType()
 	useNFS = fsType == "nfs"
 
-	//If capability does not have NFS, check if params request NFS
-	//This can happen when running csi-sanity tests
+	// If capability does not have NFS, check if params request NFS
+	// This can happen when running csi-sanity tests
 	if !useNFS && params[KeyFsType] == "nfs" {
 		log.Infof("Request's volume capability does not specify NFS, but params do, using NFS")
 		useNFS = true
@@ -161,7 +161,7 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 	// Prevent user from creating an NFS volume with incorrect topology(e.g. iscsi, nvme). At least one entry for nfs should be present in the topology, otherwise return an error
 	if useNFS && req.AccessibilityRequirements != nil {
 		if ok := common.HasRequiredTopology(req.AccessibilityRequirements.Preferred, arr.GetIP(), "nfs"); !ok {
-			//if not in preferred, try requisite next
+			// if not in preferred, try requisite next
 			if ok := common.HasRequiredTopology(req.AccessibilityRequirements.Requisite, arr.GetIP(), "nfs"); !ok {
 				return nil, status.Errorf(codes.InvalidArgument, "invalid topology requested for NFS Volume. Please validate your storage class has nfs topology.")
 			}
