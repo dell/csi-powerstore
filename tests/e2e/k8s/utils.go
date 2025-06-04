@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2022-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2022-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -134,7 +134,8 @@ func CreateDeployment() (ns string, ss *apps.Deployment, c clientset.Interface) 
 
 	_, err := c.AppsV1().Deployments(ns).Create(ctx, ss, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
-	deployment.WaitForDeploymentComplete(c, ss)
+	err = deployment.WaitForDeploymentComplete(c, ss)
+	framework.ExpectNoError(err)
 	return
 }
 
