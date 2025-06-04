@@ -890,7 +890,7 @@ func (s *Service) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolum
 	if err != nil {
 		if apiError, ok := err.(gopowerstore.APIError); ok && apiError.NotFound() {
 			// Return error code csi-sanity test expects
-			return nil, status.Error(codes.InvalidArgument, err.Error())
+			return nil, status.Error(codes.NotFound, err.Error())
 		}
 		return nil, err
 	}

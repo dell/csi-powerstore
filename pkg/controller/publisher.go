@@ -250,7 +250,7 @@ func (n *NfsPublisher) Publish(ctx context.Context, publishContext map[string]st
 
 	ipList := common.GetIPListFromString(kubeNodeID)
 	if ipList == nil || len(ipList) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "can't find IP in node ID")
+		return nil, status.Error(codes.NotFound, "can't find IP in node ID")
 	}
 	ip := ipList[0]
 

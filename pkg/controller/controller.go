@@ -257,7 +257,7 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 				if apiError, ok := err.(gopowerstore.APIError); ok && apiError.NotFound() {
 					// Return error code csi-sanity test expects
 					log.Errorf("Volume source: %s not found", volumeSource.VolumeId)
-					return nil, status.Error(codes.InvalidArgument, err.Error())
+					return nil, status.Error(codes.NotFound, err.Error())
 				}
 			}
 			volumeSource.VolumeId = volumeHandle.LocalUUID
@@ -271,7 +271,7 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 				if apiError, ok := err.(gopowerstore.APIError); ok && apiError.NotFound() {
 					// Return error code csi-sanity test expects
 					log.Errorf("Snapshot source: %s not found", snapshotSource.SnapshotId)
-					return nil, status.Error(codes.InvalidArgument, err.Error())
+					return nil, status.Error(codes.NotFound, err.Error())
 				}
 			}
 			snapshotSource.SnapshotId = volumeHandle.LocalUUID
