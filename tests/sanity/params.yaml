@@ -1,5 +1,5 @@
-arrayID: "unique"
+# put your storage class parameters here, csi-sanity test will pass them to any createVolume request
+arrayID: "REPLACE_ARRAY_ID"
 csi.storage.k8s.io/fstype: "nfs"
-nasName: "nas-server"
+nasName: "REPLACE_NAS"
 allowRoot: "false"
-# nfsAcls: "0777"
