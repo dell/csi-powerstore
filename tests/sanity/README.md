@@ -2,23 +2,52 @@
 
 Testing done by standard test suite from [Sanity Test Command Line Program](https://github.com/kubernetes-csi/csi-test/tree/master/cmd/csi-sanity) 
 
-### Building Image 
+### Prerequisites 
 
-To run these tests you need to build an image by yourself and upload it to any available repository.
+To run these tests you need to:
+1. Build and install the csi-sanity binary:
+```
+git clone https://github.com/kubernetes-csi/csi-test.git
+cd csi-test
+make build-sanity
+cp cmd/csi-sanity/csi-sanity /usr/local/bin/
+```
+2. Build the driver binary:
+```
+cd csi-powerstore/
+make build
+go generate ./cmd/csi-powerstore
+GOOS=linux CGO_ENABLED=0 go build ./cmd/csi-powerstore
+```
+3. Fill in the following files in tests/sanity/; anything with a "REPLACE" prefix needs to be replaced with a real value:  
+  - config.yaml, this file will be used by the binary built in step 2 (from now on, referred to as "the binary" for short) to connect to array
+  - setup-driver-controller-sanity.sh, this file is used to start the driver's controller service from the binary
+  - setup-driver-node-sanity.sh, this file is used to start the driver's node service from the binary
+  - params.yaml, this file is used by the sanity test to pass in parameters that would be defined in the storageclass
+  - [Optional] driver-config-params.yaml, this file controls how the binary's logger is configured
 
 ### Running
 
-#### Prerequisites
-Copy the `values.yaml` from `sanity-csi-powerstore` folder to folder with `install-sanity.sh` script and rename it to myvalues.
-In `myvalues.yaml` ,`/helm/secret.yaml`, `params.yaml` point to your PowerStore array.
-Install to kubernetes cluster by running install-sanity.sh. 
-> It will install bare version of driver without any sidecar containers
-
-To run the tests run the `install-sanity.sh` script with full path to your csi-sanity image as first argument
-
-Example: 
+1. Run the shell script to setup the driver's node service
 ```
-./install-sanity.sh csi-sanity:latest
+./setup-driver-node-sanity.sh
+...
+{"level":"info","msg":"node service registered","time":"2025-06-04T21:11:42.493415761+01:00"}
+{"endpoint":"unix:///root/csi-powerstore/tests/sanity/node.sock","level":"info","msg":"serving","time":"2025-06-04T21:11:42.493449589+01:00"}
 ```
-
-Wait until testing is finished
+2. In a new terminal window, run the shell script to setup the driver's controller service
+```
+./setup-driver-controller-sanity.sh
+...
+{"level":"info","msg":"node service registered","time":"2025-06-04T21:11:42.493415761+01:00"}
+{"endpoint":"unix:///root/csi-powerstore/tests/sanity/node.sock","level":"info","msg":"serving","time":"2025-06-04T21:11:42.493449589+01:00"}
+```
+3. In (another) new terminal window, run the shell script to run the sanity test 
+```
+ ./run-csi-sanity.sh 
+```
+Tests should pass in 10-12 minutes
+```
+Ran 68 of 92 Specs in 706.781 seconds
+SUCCESS! -- 68 Passed | 0 Failed | 1 Pending | 23 Skipped
+```
