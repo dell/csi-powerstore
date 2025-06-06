@@ -252,12 +252,12 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 		volumeSource := contentSource.GetVolume()
 		if volumeSource != nil {
 			log.Printf("volume %s specified as volume content source", volumeSource.VolumeId)
-			volumeHandle, err := array.ParseVolumeID(ctx, volumeSource.VolumeId, s.DefaultArray(), nil)
-			if err != nil {
-				if apiError, ok := err.(gopowerstore.APIError); ok && apiError.NotFound() {
+			volumeHandle, parseVolErr := array.ParseVolumeID(ctx, volumeSource.VolumeId, s.DefaultArray(), nil)
+			if parseVolErr != nil {
+				if apiError, ok := parseVolErr.(gopowerstore.APIError); ok && apiError.NotFound() {
 					// Return error code csi-sanity test expects
 					log.Errorf("Volume source: %s not found", volumeSource.VolumeId)
-					return nil, status.Error(codes.NotFound, err.Error())
+					return nil, status.Error(codes.NotFound, parseVolErr.Error())
 				}
 			}
 			volumeSource.VolumeId = volumeHandle.LocalUUID
@@ -266,12 +266,12 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 		snapshotSource := contentSource.GetSnapshot()
 		if snapshotSource != nil {
 			log.Printf("snapshot %s specified as volume content source", snapshotSource.SnapshotId)
-			volumeHandle, err := array.ParseVolumeID(ctx, snapshotSource.SnapshotId, s.DefaultArray(), nil)
-			if err != nil {
-				if apiError, ok := err.(gopowerstore.APIError); ok && apiError.NotFound() {
+			volumeHandle, parseVolErr := array.ParseVolumeID(ctx, snapshotSource.SnapshotId, s.DefaultArray(), nil)
+			if parseVolErr != nil {
+				if apiError, ok := parseVolErr.(gopowerstore.APIError); ok && apiError.NotFound() {
 					// Return error code csi-sanity test expects
 					log.Errorf("Snapshot source: %s not found", snapshotSource.SnapshotId)
-					return nil, status.Error(codes.NotFound, err.Error())
+					return nil, status.Error(codes.NotFound, parseVolErr.Error())
 				}
 			}
 			snapshotSource.SnapshotId = volumeHandle.LocalUUID
