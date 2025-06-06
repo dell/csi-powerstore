@@ -631,6 +631,12 @@ func (s *Service) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublis
 			targetPath, err.Error())
 	}
 
+	// remove target path
+	err = s.Fs.Remove(targetPath)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "Failed to remove target path: %s as part of NodeUnpublish: %s", targetPath, err.Error())
+	}
+
 	log.WithFields(logFields).Info("unpublish complete")
 	log.Debug("Checking for ephemeral after node unpublish")
 
@@ -883,9 +889,15 @@ func (s *Service) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolum
 	volumeHandle, err := array.ParseVolumeID(ctx, req.VolumeId, s.DefaultArray(), nil)
 	if err != nil {
 		if apiError, ok := err.(gopowerstore.APIError); ok && apiError.NotFound() {
-			return nil, err
+			// Return error code csi-sanity test expects
+			return nil, status.Error(codes.NotFound, err.Error())
 		}
 		return nil, err
+	}
+
+	targetPath := req.GetVolumePath()
+	if targetPath == "" {
+		return nil, status.Error(codes.InvalidArgument, "targetPath is required")
 	}
 
 	if volumeHandle.Protocol == "nfs" {
@@ -901,10 +913,6 @@ func (s *Service) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolum
 		return nil, status.Error(codes.InvalidArgument, "failed to find array with given ID")
 	}
 
-	targetPath := req.GetVolumePath()
-	if targetPath == "" {
-		return nil, status.Error(codes.InvalidArgument, "targetPath is required")
-	}
 	isBlock := strings.Contains(targetPath, blockVolumePathMarker)
 
 	// Parse the CSI VolumeId and validate against the volume

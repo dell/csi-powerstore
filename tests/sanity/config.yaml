@@ -1,0 +1,9 @@
+arrays:
+  - endpoint: "https://REPLACE_ENDPOINT/api/rest"
+    username: "REPLACE_USER"
+    globalID: "REPLACE_ARRAY_ID"
+    password: "REPLACE_PASS"
+    skipCertificateValidation: true
+    isDefault: true
+    blockProtocol: "none"
+    nasName: "REPLACE_NAS"

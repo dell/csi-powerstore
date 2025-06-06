@@ -2580,6 +2580,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 				fsMock.On("Stat", mock.Anything).Return(&mocks.FileInfo{}, os.ErrNotExist)
 				utilMock.On("Unmount", mock.Anything, validTargetPath).Return(nil)
+				fsMock.On("Remove", mock.Anything).Return(nil)
 
 				res, err := nodeSvc.NodeUnpublishVolume(context.Background(), &csi.NodeUnpublishVolumeRequest{
 					VolumeId:   validBlockVolumeID,
@@ -2604,6 +2605,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 				fsMock.On("Stat", mock.Anything).Return(&mocks.FileInfo{}, os.ErrNotExist)
 				utilMock.On("Unmount", mock.Anything, validTargetPath).Return(nil)
+				fsMock.On("Remove", mock.Anything).Return(nil)
 
 				res, err := nodeSvc.NodeUnpublishVolume(context.Background(), &csi.NodeUnpublishVolumeRequest{
 					VolumeId:   validNfsVolumeID,
@@ -3206,6 +3208,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 				fsMock.On("Stat", mock.Anything).Return(&mocks.FileInfo{}, os.ErrNotExist)
 				utilMock.On("Unmount", mock.Anything, mock.Anything).Return(nil)
+				fsMock.On("Remove", mock.Anything).Return(nil)
 
 				_, err := nodeSvc.NodePublishVolume(context.Background(), &csi.NodePublishVolumeRequest{
 					VolumeId:          validBlockVolumeID,

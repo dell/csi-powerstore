@@ -106,6 +106,31 @@ func TestVolumeCreator_CheckIfAlreadyExists(t *testing.T) {
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "can't find filesystem")
 	})
+
+	t.Run("volume already exists [nfs]", func(t *testing.T) {
+		nc := &NfsCreator{}
+		name := "test"
+		sizeInBytes := int64(1610612736)
+		clientMock := new(mocks.Client)
+		clientMock.On("GetFSByName", context.Background(), name).
+			Return(gopowerstore.FileSystem{SizeTotal: 3221225472}, nil)
+
+		vol, err := nc.CheckIfAlreadyExists(context.Background(), name, sizeInBytes, clientMock)
+		assert.NoError(t, err)
+		assert.Equal(t, sizeInBytes, vol.CapacityBytes)
+	})
+	t.Run("volume with same name exists, but is wrong size [nfs]", func(t *testing.T) {
+		nc := &NfsCreator{}
+		name := "test"
+		sizeInBytes := int64(3221225472)
+		clientMock := new(mocks.Client)
+		clientMock.On("GetFSByName", context.Background(), name).
+			Return(gopowerstore.FileSystem{SizeTotal: 1610612736}, nil)
+
+		_, err := nc.CheckIfAlreadyExists(context.Background(), name, sizeInBytes, clientMock)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "already exists but is incompatible volume size")
+	})
 }
 
 func TestVolumeCreator_Clone(t *testing.T) {
