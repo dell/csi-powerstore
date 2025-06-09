@@ -1,0 +1,84 @@
+apiVersion: skaffold/v4beta13
+kind: Config
+metadata:
+  name: csi-powerstore
+build:
+  artifacts:
+    - image: quay.io/dell/container-storage-modules/csi-powerstore
+      runtimeType: go
+      custom:
+        buildCommand: make docker
+
+      # Example docker build config
+      # docker:
+      #   dockerfile: Dockerfile
+      #   buildArgs: 
+      #     GOIMAGE: golang:1.24  # or {{ .DEFAULT_GOIMAGE }} if the environment var is already set or provided by skaffold.env
+      #     BASEIMAGE: quay.io/dell/container-storage-modules/csm-base-image:nightly
+      #   pullParent: false
+      #   squash: false
+
+deploy:
+  helm:
+    releases:
+      - name: powerstore
+        namespace: powerstore
+        createNamespace: true
+
+        version: 2.14.0
+        remoteChart: csi-powerstore
+        repo: https://dell.github.io/helm-charts
+        # Path to a local chart
+        # chartPath: ../helm-charts/charts/csi-powerstore
+        #
+        # Path to a local values file with values to be applied to the helm chart
+        # valuesFiles:
+        #   - ../helm-charts/charts/csi-powerstore/values.yaml
+        setValueTemplates:
+          # templated image name and tag based on the name of the image being built above in the 'build' section.
+          # Replaces the named yaml field in the helm chart values file with the resolved value.
+          images.driver.image: "{{.IMAGE_FULLY_QUALIFIED_quay_io_dell_container_storage_modules_csi_powerstore}}"
+
+profiles:
+  - name: dev
+    requiresAllActivations: false
+    activation:
+      - command: dev
+      - command: run
+      - command: debug
+    build:
+      local:
+        push: true
+      artifacts:
+          # Replace the default image and supply your artifactory repo
+        - image: artifactory.com/some-user/csi-powerstore
+          runtimeType: go
+          # Update the build command to build the debuggable version of the image.
+          # This makefile target will use the Dockerfile.debug Dockerfile and environment variables provided
+          # by skaffold to tag and push the image. The Dockerfile.debug file also uses skaffold environment variables
+          # to disable compiler optimizations for debugging.
+          custom:
+            buildCommand: make semver && make -f docker.mk skaffold-debug
+    deploy:
+      helm:
+        releases:
+          - name: powerstore
+            namespace: powerstore
+            createNamespace: true
+
+            version: 2.14.0
+            # Uncomment below to use a remote chart
+            # remoteChart: csi-powerstore
+            # repo: https://dell.github.io/helm-charts
+
+            # Use a local chart if you need to make changes to the chart or are using an unreleased version
+            chartPath: /home/user/helm-charts/charts/csi-powerstore
+            valuesFiles:
+              # update this path as needed to point to your values
+              - /home/user/helm-charts/charts/csi-powerstore/my-powerstore-settings-2_14_0.yaml
+            setValueTemplates:
+              # Ensure the helm deployment references the image being built for this skaffold profile. Should match
+              # the name of the image provided under build.artifacts[].image in this profile.
+              # For further info on how to construct the template for the image tag, see:
+              #   https://skaffold.dev/docs/renderers/helm/#sanitizing-the-artifact-name-from-invalid-go-template-characters
+              images.driver.image: "{{.IMAGE_FULLY_QUALIFIED_artifactory_com_some_user_csi_powerstore}}"

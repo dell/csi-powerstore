@@ -38,19 +38,19 @@ build: generate
 install: generate
 	GOOS=linux CGO_ENABLED=0 go install ./cmd/csi-powerstore
 
+semver:
+	go run core/semver/semver.go -f mk -o semver.mk
+
 # Tags the release with the Tag parameters set above
-tag:
-	go run core/semver/semver.go -f mk >semver.mk
+tag: semver
 	make -f docker.mk tag TAGMSG='$(TAGMSG)'
 
 # Generates the docker container (but does not push)
-docker:
-	go run core/semver/semver.go -f mk >semver.mk
+docker: semver
 	make -f docker.mk docker
 
 # Same as `docker` but without cached layers and will pull latest version of base image
-docker-no-cache:
-	go run core/semver/semver.go -f mk >semver.mk
+docker-no-cache: semver
 	make -f docker.mk docker-no-cache
 
 # Pushes container to the repository
