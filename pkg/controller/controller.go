@@ -137,6 +137,13 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 	fsType := req.VolumeCapabilities[0].GetMount().GetFsType()
 	useNFS = fsType == "nfs"
 
+	// If capability does not have NFS, check if params request NFS
+	// This can happen when running csi-sanity tests
+	if !useNFS && params[KeyFsType] == "nfs" {
+		log.Infof("Request's volume capability does not specify NFS, but params do, using NFS")
+		useNFS = true
+	}
+
 	if req.VolumeCapabilities[0].GetBlock() != nil {
 		// We need to check if user requests raw block access from nfs and prevent that
 		fsType, ok := params[KeyFsType]
@@ -154,7 +161,10 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 	// Prevent user from creating an NFS volume with incorrect topology(e.g. iscsi, nvme). At least one entry for nfs should be present in the topology, otherwise return an error
 	if useNFS && req.AccessibilityRequirements != nil {
 		if ok := common.HasRequiredTopology(req.AccessibilityRequirements.Preferred, arr.GetIP(), "nfs"); !ok {
-			return nil, status.Errorf(codes.InvalidArgument, "invalid topology requested for NFS Volume. Please validate your storage class has nfs topology.")
+			// if not in preferred, try requisite next
+			if ok := common.HasRequiredTopology(req.AccessibilityRequirements.Requisite, arr.GetIP(), "nfs"); !ok {
+				return nil, status.Errorf(codes.InvalidArgument, "invalid topology requested for NFS Volume. Please validate your storage class has nfs topology.")
+			}
 		}
 	}
 
@@ -242,19 +252,34 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 		volumeSource := contentSource.GetVolume()
 		if volumeSource != nil {
 			log.Printf("volume %s specified as volume content source", volumeSource.VolumeId)
-			volumeHandle, _ := array.ParseVolumeID(ctx, volumeSource.VolumeId, s.DefaultArray(), nil)
+			volumeHandle, parseVolErr := array.ParseVolumeID(ctx, volumeSource.VolumeId, s.DefaultArray(), nil)
+			if parseVolErr != nil {
+				if apiError, ok := parseVolErr.(gopowerstore.APIError); ok && apiError.NotFound() {
+					// Return error code csi-sanity test expects
+					log.Errorf("Volume source: %s not found", volumeSource.VolumeId)
+					return nil, status.Error(codes.NotFound, parseVolErr.Error())
+				}
+			}
 			volumeSource.VolumeId = volumeHandle.LocalUUID
 			volResp, err = creator.Clone(ctx, volumeSource, req.GetName(), sizeInBytes, req.Parameters, arr.GetClient())
 		}
 		snapshotSource := contentSource.GetSnapshot()
 		if snapshotSource != nil {
 			log.Printf("snapshot %s specified as volume content source", snapshotSource.SnapshotId)
-			volumeHandle, _ := array.ParseVolumeID(ctx, snapshotSource.SnapshotId, s.DefaultArray(), nil)
+			volumeHandle, parseVolErr := array.ParseVolumeID(ctx, snapshotSource.SnapshotId, s.DefaultArray(), nil)
+			if parseVolErr != nil {
+				if apiError, ok := parseVolErr.(gopowerstore.APIError); ok && apiError.NotFound() {
+					// Return error code csi-sanity test expects
+					log.Errorf("Snapshot source: %s not found", snapshotSource.SnapshotId)
+					return nil, status.Error(codes.NotFound, parseVolErr.Error())
+				}
+			}
 			snapshotSource.SnapshotId = volumeHandle.LocalUUID
 			volResp, err = creator.CreateVolumeFromSnapshot(ctx, snapshotSource,
 				req.GetName(), sizeInBytes, req.Parameters, arr.GetClient())
 		}
 		if err != nil {
+			log.Warnf("Failed to create volume: %s from snapshot: %s", req.GetName(), err.Error())
 			resp, err := creator.CheckIfAlreadyExists(ctx, req.GetName(), sizeInBytes, arr.GetClient())
 			if err != nil {
 				return nil, err
@@ -417,6 +442,7 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 	var volumeResponse *csi.Volume
 	resp, createError := creator.Create(ctx, req, sizeInBytes, arr.GetClient())
 	if createError != nil {
+		log.Warnf("create volume for %s failed: '%s'", req.GetName(), createError.Error())
 		if apiError, ok := createError.(gopowerstore.APIError); ok && (apiError.VolumeNameIsAlreadyUse() || apiError.FSNameIsAlreadyUse()) {
 			volumeResponse, err = creator.CheckIfAlreadyExists(ctx, req.GetName(), sizeInBytes, arr.GetClient())
 			if err != nil {
