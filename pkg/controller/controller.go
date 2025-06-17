@@ -805,6 +805,8 @@ func (s *Service) ControllerUnpublishVolume(ctx context.Context, req *csi.Contro
 	remoteVolumeID := volumeHandle.RemoteUUID
 	remoteArrayID := volumeHandle.RemoteArrayGlobalID
 
+	log.Infof("volumeHandle Local Array Global ID: %s, Remote Array Global ID: %s", arrayID, remoteArrayID)
+
 	arr, ok := s.Arrays()[arrayID]
 	if !ok {
 		return nil, status.Errorf(codes.InvalidArgument, "cannot find array %s", arrayID)

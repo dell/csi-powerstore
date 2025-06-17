@@ -73,6 +73,10 @@ type Locker struct {
 func (s *Locker) Arrays() map[string]*PowerStoreArray {
 	s.arraysLock.Lock()
 	defer s.arraysLock.Unlock()
+
+	for key, array := range s.arrays {
+		log.Infof("[Bharath] ----> Key : %s, GlobalID: %s, EndPoint: %s", key, array.GlobalID, array.Endpoint)
+	}
 	return s.arrays
 }
 
