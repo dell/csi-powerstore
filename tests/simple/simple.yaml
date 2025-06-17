@@ -41,40 +41,12 @@ metadata:
   namespace: testpowerstore
 spec:
   accessModes:
-    - ReadWriteOnce
-  volumeMode: Filesystem
-  resources:
-    requests:
-      storage: 8Gi
-  storageClassName: powerstore-ext4
----
-kind: PersistentVolumeClaim
-apiVersion: v1
-metadata:
-  name: pvol1
-  namespace: testpowerstore
-spec:
-  accessModes:
-    - ReadWriteOnce
-  volumeMode: Filesystem
-  resources:
-    requests:
-      storage: 12Gi
-  storageClassName: powerstore-xfs
----
-kind: PersistentVolumeClaim
-apiVersion: v1
-metadata:
-  name: pvol2
-  namespace: testpowerstore
-spec:
-  accessModes:
     - ReadWriteMany
   volumeMode: Filesystem
   resources:
     requests:
-      storage: 10Gi
-  storageClassName: powerstore-nfs
+      storage: 8Gi
+  storageClassName: powerstore-metro
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -89,6 +61,7 @@ metadata:
   namespace: testpowerstore
 spec:
   serviceName: powerstoretest
+  replicas: 2
   selector:
     matchLabels:
       app: powerstoretest
@@ -106,17 +79,7 @@ spec:
           volumeMounts:
             - mountPath: "/data0"
               name: pvol0
-            - mountPath: "/data1"
-              name: pvol1
-            - mountPath: "/data2"
-              name: pvol2
       volumes:
         - name: pvol0
           persistentVolumeClaim:
             claimName: pvol0
-        - name: pvol1
-          persistentVolumeClaim:
-            claimName: pvol1
-        - name: pvol2
-          persistentVolumeClaim:
-            claimName: pvol2
