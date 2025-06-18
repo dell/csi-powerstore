@@ -1176,7 +1176,8 @@ func (s *Service) NodeGetInfo(ctx context.Context, _ *csi.NodeGetInfoRequest) (*
 	for _, arr := range s.Arrays() {
 		if isNFSEnabled, err := common.IsNFSServiceEnabled(ctx, arr.GetClient()); err != nil {
 			log.Errorf("failed to validate NFS service for the array: %s", err.Error())
-		} else if isNFSEnabled {
+		}
+		if isNFSEnabled {
 			log.Info("NFS service is enabled on the array ", arr.GetGlobalID())
 			_, err := getOutboundIP(arr.GetIP(), s.Fs)
 			if err == nil {
