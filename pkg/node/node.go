@@ -1174,14 +1174,15 @@ func (s *Service) NodeGetInfo(ctx context.Context, _ *csi.NodeGetInfoRequest) (*
 	}
 
 	for _, arr := range s.Arrays() {
-		isNFSEnabled := false
-		if isNFSEnabled, err := common.IsNFSServiceEnabled(ctx, arr.GetClient()); err != nil {
+		isNFSEnabled, err := common.IsNFSServiceEnabled(ctx, arr.GetClient())
+		if err != nil {
 			log.Errorf("failed to validate NFS service for the array: %s", err.Error())
+			return // or handle the error appropriately
 		}
+
 		if isNFSEnabled {
 			log.Info("NFS service is enabled on the array ", arr.GetGlobalID())
-			_, err := getOutboundIP(arr.GetIP(), s.Fs)
-			if err == nil {
+			if _, err := getOutboundIP(arr.GetIP(), s.Fs); err == nil {
 				resp.AccessibleTopology.Segments[common.Name+"/"+arr.GetIP()+"-nfs"] = "true"
 			}
 		}
