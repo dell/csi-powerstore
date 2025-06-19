@@ -538,19 +538,21 @@ func GetMountFlags(vc *csi.VolumeCapability) []string {
 // IsNFSServiceEnabled checks if NFS service is enabled for the given PowerStore array.
 func IsNFSServiceEnabled(ctx context.Context, client gopowerstore.Client) (bool, error) {
 	nasList, err := client.GetNASServers(ctx)
-    log.Infof("list of nas severs %s", nasList)
+    log.Infof("list of nas severs %v", nasList)
 	if err != nil {
 		return false, fmt.Errorf("failed to get NAS servers: %w", err)
 	}
 
 	for _, nas := range nasList {
+		log.Infof("inside nas list")
 		for _, nasServer := range nas.NfsServers {
+			log.Infof("inside nfs servers %v", nasServer)
 			if nasServer.IsNFSv4Enabled || nasServer.IsNFSv3Enabled {
-				log.Infof("nfs disabled")
+				log.Infof("nfs enabled")
 				return true, nil
 			}
 		}
 	}
-	log.Infof("nfs enabled")
+	log.Infof("nfs disabled")
 	return false, nil
 }
