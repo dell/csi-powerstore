@@ -705,8 +705,14 @@ func (s *Service) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest
 // ControllerPublishVolume prepares Volume/FileSystem to be consumed by node by attaching/allowing access to the host.
 func (s *Service) ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
 	id := req.GetVolumeId()
+	nodeID := req.GetNodeId()
+
 	if id == "" {
 		return nil, status.Error(codes.InvalidArgument, "volume ID is required")
+	}
+
+	if nodeID == "" {
+		return nil, status.Error(codes.InvalidArgument, "Node ID is required")
 	}
 
 	volumeHandle, err := array.ParseVolumeID(ctx, id, s.DefaultArray(), req.VolumeCapability)
