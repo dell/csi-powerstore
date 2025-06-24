@@ -3613,18 +3613,6 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			})
 		})
 
-		ginkgo.When("Node id is empty", func() {
-			ginkgo.It("should fail", func() {
-				req := getTypicalControllerPublishVolumeRequest("single-writer", validNodeID, validBlockVolumeID)
-
-				req.NodeId = ""
-
-				_, err := ctrlSvc.ControllerPublishVolume(context.Background(), req)
-				gomega.Expect(err).ToNot(gomega.BeNil())
-				gomega.Expect(err.Error()).To(gomega.ContainSubstring("Node ID is required"))
-			})
-		})
-
 		ginkgo.When("volume capability is missing", func() {
 			ginkgo.It("should fail", func() {
 				req := getTypicalControllerPublishVolumeRequest("single-writer", validNodeID, validBlockVolumeID)
@@ -3669,7 +3657,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 
 				_, err := ctrlSvc.ControllerPublishVolume(context.Background(), req)
 				gomega.Expect(err).ToNot(gomega.BeNil())
-				gomega.Expect(err.Error()).To(gomega.ContainSubstring("Node ID is required"))
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("node ID is required"))
 			})
 		})
 
