@@ -283,6 +283,18 @@ func setDefaultNodeLabelsMock() {
 	nodeLabelsModifierMock.On("AddNVMeLabels", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 }
 
+
+nasData := []gopowerstore.NAS{
+	{
+	NfsServers: []gopowerstore.NFSServerInstance{
+	{
+	IsNFSv4Enabled: true,
+	IsNFSv3Enabled: false,
+	},
+	},
+	},
+	}
+	
 var _ = ginkgo.Describe("CSINodeService", func() {
 	ginkgo.BeforeEach(func() {
 		setVariables()
@@ -866,17 +878,9 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					}, nil)
 
 				arrays := getTestArrays()
+				
 				clientMock.On("GetNASServers", mock.Anything).
-					Return([]gopowerstore.NAS{
-						{
-							NfsServers: []gopowerstore.NFSServerInstance{
-								{
-									IsNFSv4Enabled: true,
-									IsNFSv3Enabled: false,
-								},
-							},
-						},
-					}, nil)
+					Return(nasData, nil)
 				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
 					Return([]gopowerstore.IPPoolAddress{}, nil)
 				clientMock.On("GetStorageNVMETCPTargetAddresses", mock.Anything).
@@ -3637,16 +3641,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 		ginkgo.When("managing multiple arrays", func() {
 			ginkgo.It("should return correct topology segments", func() {
 				clientMock.On("GetNASServers", mock.Anything).
-					Return([]gopowerstore.NAS{
-						{
-							NfsServers: []gopowerstore.NFSServerInstance{
-								{
-									IsNFSv4Enabled: true,
-									IsNFSv3Enabled: false,
-								},
-							},
-						},
-					}, nil)
+					Return(nasData, nil)
 				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
 					Return([]gopowerstore.IPPoolAddress{
 						{
@@ -3684,16 +3679,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 		ginkgo.When("node label max-powerstore-volumes-per-node is set and retrieved successfully", func() {
 			ginkgo.It("should return correct MaxVolumesPerNode in response", func() {
 				clientMock.On("GetNASServers", mock.Anything).
-					Return([]gopowerstore.NAS{
-						{
-							NfsServers: []gopowerstore.NFSServerInstance{
-								{
-									IsNFSv4Enabled: true,
-									IsNFSv3Enabled: false,
-								},
-							},
-						},
-					}, nil)
+					Return(nasData, nil)
 				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
 					Return([]gopowerstore.IPPoolAddress{
 						{
@@ -3735,16 +3721,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 		ginkgo.When("there is some issue while retrieving node labels", func() {
 			ginkgo.It("should return proper error", func() {
 				clientMock.On("GetNASServers", mock.Anything).
-					Return([]gopowerstore.NAS{
-						{
-							NfsServers: []gopowerstore.NFSServerInstance{
-								{
-									IsNFSv4Enabled: true,
-									IsNFSv3Enabled: false,
-								},
-							},
-						},
-					}, nil)
+					Return(nasData, nil)
 				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
 					Return([]gopowerstore.IPPoolAddress{
 						{
@@ -3785,16 +3762,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 		ginkgo.When("MaxVolumesPerNode is set via environment variable at the time of installation", func() {
 			ginkgo.It("should return correct MaxVolumesPerNode in response", func() {
 				clientMock.On("GetNASServers", mock.Anything).
-					Return([]gopowerstore.NAS{
-						{
-							NfsServers: []gopowerstore.NFSServerInstance{
-								{
-									IsNFSv4Enabled: true,
-									IsNFSv3Enabled: false,
-								},
-							},
-						},
-					}, nil)
+					Return(nasData, nil)
 				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
 					Return([]gopowerstore.IPPoolAddress{
 						{
@@ -3833,16 +3801,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 		ginkgo.When("Portals are not discoverable", func() {
 			ginkgo.It("should return correct topology segments", func() {
 				clientMock.On("GetNASServers", mock.Anything).
-					Return([]gopowerstore.NAS{
-						{
-							NfsServers: []gopowerstore.NFSServerInstance{
-								{
-									IsNFSv4Enabled: true,
-									IsNFSv3Enabled: false,
-								},
-							},
-						},
-					}, nil)
+					Return(nasData, nil)
 				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
 					Return([]gopowerstore.IPPoolAddress{
 						{
@@ -3880,16 +3839,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 			ginkgo.It("should not return iscsi topology key", func() {
 				e := "internal error"
 				clientMock.On("GetNASServers", mock.Anything).
-					Return([]gopowerstore.NAS{
-						{
-							NfsServers: []gopowerstore.NFSServerInstance{
-								{
-									IsNFSv4Enabled: true,
-									IsNFSv3Enabled: false,
-								},
-							},
-						},
-					}, nil)
+					Return(nasData, nil)
 				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
 					Return([]gopowerstore.IPPoolAddress{}, errors.New(e))
 				conn, _ := net.Dial("udp", "127.0.0.1:80")
@@ -3920,16 +3870,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				goiscsi.GOISCSIMock.InduceDiscoveryError = true
 				gonvme.GONVMEMock.InduceDiscoveryError = true
 				clientMock.On("GetNASServers", mock.Anything).
-					Return([]gopowerstore.NAS{
-						{
-							NfsServers: []gopowerstore.NFSServerInstance{
-								{
-									IsNFSv4Enabled: true,
-									IsNFSv3Enabled: false,
-								},
-							},
-						},
-					}, nil)
+					Return(nasData, nil)
 				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
 					Return([]gopowerstore.IPPoolAddress{
 						{
@@ -3965,16 +3906,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				nodeSvc.useFC[firstGlobalID] = true
 				conn, _ := net.Dial("udp", "127.0.0.1:80")
 				clientMock.On("GetNASServers", mock.Anything).
-					Return([]gopowerstore.NAS{
-						{
-							NfsServers: []gopowerstore.NFSServerInstance{
-								{
-									IsNFSv4Enabled: true,
-									IsNFSv3Enabled: false,
-								},
-							},
-						},
-					}, nil)
+					Return(nasData, nil)
 				fsMock.On("NetDial", mock.Anything).Return(
 					conn,
 					nil,
@@ -4028,16 +3960,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					nodeSvc.nodeID = nodeID + "-" + "192.168.0.1"
 					nodeSvc.reusedHost = true
 					clientMock.On("GetNASServers", mock.Anything).
-						Return([]gopowerstore.NAS{
-							{
-								NfsServers: []gopowerstore.NFSServerInstance{
-									{
-										IsNFSv4Enabled: true,
-										IsNFSv3Enabled: false,
-									},
-								},
-							},
-						}, nil)
+						Return(nasData, nil)
 					conn, _ := net.Dial("udp", "127.0.0.1:80")
 					fsMock.On("NetDial", mock.Anything).Return(
 						conn,
@@ -4093,16 +4016,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 						nodeSvc.reusedHost = true
 						conn, _ := net.Dial("udp", "127.0.0.1:80")
 						clientMock.On("GetNASServers", mock.Anything).
-							Return([]gopowerstore.NAS{
-								{
-									NfsServers: []gopowerstore.NFSServerInstance{
-										{
-											IsNFSv4Enabled: true,
-											IsNFSv3Enabled: false,
-										},
-									},
-								},
-							}, nil)
+							Return(nasData, nil)
 						fsMock.On("NetDial", mock.Anything).Return(
 							conn,
 							nil,
@@ -4155,16 +4069,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					nodeSvc.useFC[firstGlobalID] = true
 					e := "internal error"
 					clientMock.On("GetNASServers", mock.Anything).
-						Return([]gopowerstore.NAS{
-							{
-								NfsServers: []gopowerstore.NFSServerInstance{
-									{
-										IsNFSv4Enabled: true,
-										IsNFSv3Enabled: false,
-									},
-								},
-							},
-						}, nil)
+						Return(nasData, nil)
 					clientMock.On("GetHostByName", mock.Anything, nodeSvc.nodeID).
 						Return(gopowerstore.Host{}, errors.New(e))
 					conn, _ := net.Dial("udp", "127.0.0.1:80")
@@ -4193,16 +4098,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				ginkgo.It("should not return FC topology key", func() {
 					nodeSvc.useFC[firstGlobalID] = true
 					clientMock.On("GetNASServers", mock.Anything).
-						Return([]gopowerstore.NAS{
-							{
-								NfsServers: []gopowerstore.NFSServerInstance{
-									{
-										IsNFSv4Enabled: true,
-										IsNFSv3Enabled: false,
-									},
-								},
-							},
-						}, nil)
+						Return(nasData, nil)
 					clientMock.On("GetHostByName", mock.Anything, nodeSvc.nodeID).
 						Return(gopowerstore.Host{
 							ID:         "host-id",
@@ -4236,16 +4132,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					nodeSvc.useFC[firstGlobalID] = true
 					conn, _ := net.Dial("udp", "127.0.0.1:80")
 					clientMock.On("GetNASServers", mock.Anything).
-						Return([]gopowerstore.NAS{
-							{
-								NfsServers: []gopowerstore.NFSServerInstance{
-									{
-										IsNFSv4Enabled: true,
-										IsNFSv3Enabled: false,
-									},
-								},
-							},
-						}, nil)
+						Return(nasData, nil)
 					fsMock.On("NetDial", mock.Anything).Return(
 						conn,
 						nil,
@@ -4288,16 +4175,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				nodeSvc.useNVME[firstGlobalID] = true
 				nodeSvc.useFC[firstGlobalID] = true
 				clientMock.On("GetNASServers", mock.Anything).
-					Return([]gopowerstore.NAS{
-						{
-							NfsServers: []gopowerstore.NFSServerInstance{
-								{
-									IsNFSv4Enabled: true,
-									IsNFSv3Enabled: false,
-								},
-							},
-						},
-					}, nil)
+					Return(nasData, nil)
 				clientMock.On("GetCluster", mock.Anything).
 					Return(gopowerstore.Cluster{
 						Name:    validClusterName,
@@ -4338,16 +4216,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					nodeSvc.useNVME[firstGlobalID] = true
 					nodeSvc.useFC[firstGlobalID] = true
 					clientMock.On("GetNASServers", mock.Anything).
-						Return([]gopowerstore.NAS{
-							{
-								NfsServers: []gopowerstore.NFSServerInstance{
-									{
-										IsNFSv4Enabled: true,
-										IsNFSv3Enabled: false,
-									},
-								},
-							},
-						}, nil)
+						Return(nasData, nil)
 					clientMock.On("GetCluster", mock.Anything).
 						Return(gopowerstore.Cluster{
 							Name:    validClusterName,
@@ -4388,16 +4257,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				nodeSvc.useNVME[firstGlobalID] = true
 				nodeSvc.useFC[firstGlobalID] = false
 				clientMock.On("GetNASServers", mock.Anything).
-					Return([]gopowerstore.NAS{
-						{
-							NfsServers: []gopowerstore.NFSServerInstance{
-								{
-									IsNFSv4Enabled: true,
-									IsNFSv3Enabled: false,
-								},
-							},
-						},
-					}, nil)
+					Return(nasData, nil)
 				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).Return([]gopowerstore.IPPoolAddress{
 					{
 						Address: "192.168.1.1",
@@ -4445,16 +4305,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					nodeSvc.useNVME[firstGlobalID] = true
 					nodeSvc.useFC[firstGlobalID] = false
 					clientMock.On("GetNASServers", mock.Anything).
-						Return([]gopowerstore.NAS{
-							{
-								NfsServers: []gopowerstore.NFSServerInstance{
-									{
-										IsNFSv4Enabled: true,
-										IsNFSv3Enabled: false,
-									},
-								},
-							},
-						}, nil)
+						Return(nasData, nil)
 					clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).Return([]gopowerstore.IPPoolAddress{
 						{
 							Address: "192.168.1.1",
@@ -4502,16 +4353,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					nodeSvc.useFC[firstGlobalID] = false
 					e := "internalerror"
 					clientMock.On("GetNASServers", mock.Anything).
-						Return([]gopowerstore.NAS{
-							{
-								NfsServers: []gopowerstore.NFSServerInstance{
-									{
-										IsNFSv4Enabled: true,
-										IsNFSv3Enabled: false,
-									},
-								},
-							},
-						}, nil)
+						Return(nasData, nil)
 					clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).Return([]gopowerstore.IPPoolAddress{
 						{
 							Address: "192.168.1.1",
