@@ -705,8 +705,14 @@ func (s *Service) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest
 // ControllerPublishVolume prepares Volume/FileSystem to be consumed by node by attaching/allowing access to the host.
 func (s *Service) ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
 	id := req.GetVolumeId()
+	kubeNodeID := req.GetNodeId()
+
 	if id == "" {
 		return nil, status.Error(codes.InvalidArgument, "volume ID is required")
+	}
+
+	if kubeNodeID == "" {
+		return nil, status.Error(codes.InvalidArgument, "node ID is required")
 	}
 
 	volumeHandle, err := array.ParseVolumeID(ctx, id, s.DefaultArray(), req.VolumeCapability)
@@ -744,11 +750,6 @@ func (s *Service) ControllerPublishVolume(ctx context.Context, req *csi.Controll
 
 	if am.Mode == csi.VolumeCapability_AccessMode_UNKNOWN {
 		return nil, status.Error(codes.InvalidArgument, ErrUnknownAccessMode)
-	}
-
-	kubeNodeID := req.GetNodeId()
-	if kubeNodeID == "" {
-		return nil, status.Error(codes.InvalidArgument, "node ID is required")
 	}
 
 	var publisher VolumePublisher
