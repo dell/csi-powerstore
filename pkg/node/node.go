@@ -1189,7 +1189,7 @@ func (s *Service) NodeGetInfo(ctx context.Context, _ *csi.NodeGetInfoRequest) (*
 			_, err := getOutboundIP(arr.GetIP(), s.Fs)
 			if err == nil {
 				resp.AccessibleTopology.Segments[common.Name+"/"+arr.GetIP()+"-nfs"] = "true"
-			}else{
+			} else {
 				log.Errorf("Error: failed to get ip details: %s\n", err.Error())
 			}
 		}
