@@ -68,6 +68,10 @@ endif
 mocks:
 	mockery
 
+unit-test: go-code-tester
+	GITHUB_OUTPUT=/dev/null \
+	./go-code-tester 90 "." "" "true" "" "" "./mocks|./v2/core|./tests"
+
 test:
 	cd ./pkg; go test -race -cover -coverprofile=coverage.out ./...
 
@@ -83,6 +87,9 @@ else
 endif
 	@echo "Logs are stored at gosec.log, Outputfile at gosecresults.csv"
 
+go-code-tester:
+	curl -o go-code-tester -L https://raw.githubusercontent.com/dell/common-github-actions/main/go-code-tester/entrypoint.sh \
+	&& chmod +x go-code-tester
 
 .PHONY: actions action-help
 actions: ## Run all GitHub Action checks that run on a pull request creation
