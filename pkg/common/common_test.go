@@ -554,3 +554,47 @@ func TestGetMountFlags(t *testing.T) {
 		})
 	}
 }
+
+func TestIsNFSServiceEnabled(t *testing.T) {
+	// Define mock client
+	clientMock := new(gopowerstoremock.Client)
+
+	// Test cases
+	t.Run("nfs service is enabled", func(t *testing.T) {
+		clientMock.On("GetNASServers", mock.Anything, mock.Anything).Return(
+			[]gopowerstore.NAS{
+				{
+					NfsServers: []gopowerstore.NFSServerInstance{
+						{
+							ID:             "4444",
+							IsNFSv4Enabled: true,
+						},
+					},
+				},
+			},
+			nil,
+		)
+
+		_, err := common.IsNFSServiceEnabled(context.Background(), clientMock)
+		assert.NoError(t, err)
+	})
+
+	t.Run("nfs service is not enabled", func(t *testing.T) {
+		clientMock.On("GetNASServers", mock.Anything, mock.Anything).Return(
+			[]gopowerstore.NAS{
+				{
+					NfsServers: []gopowerstore.NFSServerInstance{
+						{
+							ID:             "4444",
+							IsNFSv4Enabled: true,
+						},
+					},
+				},
+			},
+			nil,
+		)
+
+		_, err := common.IsNFSServiceEnabled(context.Background(), clientMock)
+		assert.NoError(t, err)
+	})
+}
