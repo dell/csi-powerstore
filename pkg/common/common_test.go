@@ -573,14 +573,16 @@ func TestIsNFSServiceEnabled(t *testing.T) {
 	// Test cases
 	t.Run("nfs service is enabled", func(t *testing.T) {
 		clientMock.On("GetNASServers", mock.Anything, mock.Anything).Return(nasServers, nil)
-		_, err := common.IsNFSServiceEnabled(context.Background(), clientMock)
+		result, err := common.IsNFSServiceEnabled(context.Background(), clientMock)
 		assert.NoError(t, err)
+		assert.True(t, result, "Expected result to be true")
 	})
 
 	t.Run("nfs service is not enabled", func(t *testing.T) {
 		nasServers[0].NfsServers[0].IsNFSv4Enabled = false
 		clientMock.On("GetNASServers", mock.Anything, mock.Anything).Return(nasServers, nil)
-		_, err := common.IsNFSServiceEnabled(context.Background(), clientMock)
+		result, err := common.IsNFSServiceEnabled(context.Background(), clientMock)
 		assert.NoError(t, err)
+		assert.False(t, result, "Expected result to be false")
 	})
 }
