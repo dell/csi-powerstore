@@ -586,7 +586,7 @@ func TestIsNFSServiceEnabled(t *testing.T) {
 					NfsServers: []gopowerstore.NFSServerInstance{
 						{
 							ID:             "4444",
-							IsNFSv4Enabled: true,
+							IsNFSv4Enabled: false,
 						},
 					},
 				},
