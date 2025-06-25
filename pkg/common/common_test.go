@@ -561,14 +561,14 @@ func TestIsNFSServiceEnabled(t *testing.T) {
 	// Initialise variable for nas servers
 	nasServers := []gopowerstore.NAS{
 		{
-		NfsServers: []gopowerstore.NFSServerInstance{
-		{
-		ID: "4444",
-		IsNFSv4Enabled: true,
+			NfsServers: []gopowerstore.NFSServerInstance{
+				{
+					ID:             "4444",
+					IsNFSv4Enabled: true,
+				},
+			},
 		},
-		},
-		},
-		}
+	}
 
 	// Test cases
 	t.Run("nfs service is enabled", func(t *testing.T) {
