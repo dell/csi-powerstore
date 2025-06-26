@@ -3636,7 +3636,8 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 	ginkgo.Describe("calling NodeGetInfo()", func() {
 		ginkgo.When("managing multiple arrays", func() {
-			ginkgo.It("should return correct topology segments", func() {
+			ginkgo.It("should return correct topology segments when nfs is disabled", func() {
+				// disable nfs server to to check negetive behaviour
 				nasData[0].NfsServers[0].IsNFSv4Enabled = false
 				nasData[0].NfsServers[0].IsNFSv3Enabled = false
 				clientMock.On("GetNASServers", mock.Anything).
@@ -3672,9 +3673,11 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				}))
 			})
 		})
-		nasData[0].NfsServers[0].IsNFSv3Enabled = true
 		ginkgo.When("node label max-powerstore-volumes-per-node is set and retrieved successfully", func() {
 			ginkgo.It("should return correct MaxVolumesPerNode in response", func() {
+				// enabling back nfs servers
+				nasData[0].NfsServers[0].IsNFSv4Enabled = true
+				nasData[0].NfsServers[0].IsNFSv3Enabled = false
 				clientMock.On("GetNASServers", mock.Anything).
 					Return(nasData, nil)
 				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
