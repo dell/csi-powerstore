@@ -5078,9 +5078,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				gomega.Expect(res).To(gomega.Equal(&csi.NodeGetInfoResponse{
 					NodeId: nodeSvc.nodeID,
 					AccessibleTopology: &csi.Topology{
-						Segments: map[string]string{
-							common.Name + "/" + firstValidIP + "-iscsi": "true",
-						},
+						Segments: map[string]string{},
 					},
 					MaxVolumesPerNode: 0,
 				}))
