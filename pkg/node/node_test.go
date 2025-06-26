@@ -4388,6 +4388,44 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 		})
 	})
 
+	ginkgo.Describe("calling NodeGetInfo() when nfs is disabled", func() {
+		ginkgo.When("managing multiple arrays", func() {
+			ginkgo.It("should return correct topology segments", func() {
+				nasData[0].NfsServers[0].IsNFSv4Enabled = false
+				nasData[0].NfsServers[0].IsNFSv3Enabled = false
+				clientMock.On("GetNASServers", mock.Anything).
+					Return(nasData, nil)
+				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
+					Return([]gopowerstore.IPPoolAddress{
+						{
+							Address: "192.168.1.1",
+							IPPort:  gopowerstore.IPPortInstance{TargetIqn: "iqn"},
+						},
+						{
+							Address: "192.168.1.2",
+							IPPort:  gopowerstore.IPPortInstance{TargetIqn: "iqn2"},
+						},
+					}, nil)
+				conn, _ := net.Dial("udp", "127.0.0.1:80")
+				fsMock.On("NetDial", mock.Anything).Return(
+					conn,
+					nil,
+				)
+				setDefaultNodeLabelsMock()
+
+				res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.NodeGetInfoResponse{
+					NodeId: nodeSvc.nodeID,
+					AccessibleTopology: &csi.Topology{
+						Segments: map[string]string{},
+					},
+					MaxVolumesPerNode: 0,
+				}))
+			})
+		})
+	})
+
 	ginkgo.Describe("Calling NodeGetCapabilities()", func() {
 		ginkgo.It("should return predefined parameters with health monitor", func() {
 			csictx.Setenv(context.Background(), common.EnvIsHealthMonitorEnabled, "true")
@@ -5044,43 +5082,6 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 						Abnormal: true,
 						Message:  fmt.Sprintf("volume path %s not accessible for volume %s", validTargetPath, validBaseVolumeID),
 					},
-				}))
-			})
-		})
-	})
-	ginkgo.Describe("calling NodeGetInfo() when nfs is disabled", func() {
-		ginkgo.When("managing multiple arrays", func() {
-			ginkgo.It("should return correct topology segments", func() {
-				nasData[0].NfsServers[0].IsNFSv4Enabled = false
-				nasData[0].NfsServers[0].IsNFSv3Enabled = false
-				clientMock.On("GetNASServers", mock.Anything).
-					Return(nasData, nil)
-				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
-					Return([]gopowerstore.IPPoolAddress{
-						{
-							Address: "192.168.1.1",
-							IPPort:  gopowerstore.IPPortInstance{TargetIqn: "iqn"},
-						},
-						{
-							Address: "192.168.1.2",
-							IPPort:  gopowerstore.IPPortInstance{TargetIqn: "iqn2"},
-						},
-					}, nil)
-				conn, _ := net.Dial("udp", "127.0.0.1:80")
-				fsMock.On("NetDial", mock.Anything).Return(
-					conn,
-					nil,
-				)
-				setDefaultNodeLabelsMock()
-
-				res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
-				gomega.Expect(err).To(gomega.BeNil())
-				gomega.Expect(res).To(gomega.Equal(&csi.NodeGetInfoResponse{
-					NodeId: nodeSvc.nodeID,
-					AccessibleTopology: &csi.Topology{
-						Segments: map[string]string{},
-					},
-					MaxVolumesPerNode: 0,
 				}))
 			})
 		})
