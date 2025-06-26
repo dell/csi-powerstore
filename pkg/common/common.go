@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2021-2024 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2021-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -533,4 +533,21 @@ func GetMountFlags(vc *csi.VolumeCapability) []string {
 		}
 	}
 	return nil
+}
+
+// IsNFSServiceEnabled checks if NFS service is enabled for the given PowerStore array.
+func IsNFSServiceEnabled(ctx context.Context, client gopowerstore.Client) (bool, error) {
+	nasList, err := client.GetNASServers(ctx)
+	if err != nil {
+		return false, fmt.Errorf("failed to get NAS servers: %w", err)
+	}
+
+	for _, nas := range nasList {
+		for _, nasServer := range nas.NfsServers {
+			if nasServer.IsNFSv4Enabled || nasServer.IsNFSv3Enabled {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
 }

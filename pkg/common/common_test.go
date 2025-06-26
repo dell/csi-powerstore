@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2021-2024 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2021-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -553,4 +553,36 @@ func TestGetMountFlags(t *testing.T) {
 			assert.Equal(t, tt.expected, result)
 		})
 	}
+}
+
+func TestIsNFSServiceEnabled(t *testing.T) {
+	// Define mock client
+	clientMock := new(gopowerstoremock.Client)
+	// Initialise variable for nas servers
+	nasServers := []gopowerstore.NAS{
+		{
+			NfsServers: []gopowerstore.NFSServerInstance{
+				{
+					ID:             "4444",
+					IsNFSv4Enabled: true,
+				},
+			},
+		},
+	}
+
+	// Test cases
+	t.Run("nfs service is enabled", func(t *testing.T) {
+		clientMock.On("GetNASServers", mock.Anything, mock.Anything).Return(nasServers, nil)
+		result, err := common.IsNFSServiceEnabled(context.Background(), clientMock)
+		assert.NoError(t, err)
+		assert.True(t, result, "Expected result to be true")
+	})
+
+	t.Run("nfs service is not enabled", func(t *testing.T) {
+		nasServers[0].NfsServers[0].IsNFSv4Enabled = false
+		clientMock.On("GetNASServers", mock.Anything, mock.Anything).Return(nasServers, nil)
+		result, err := common.IsNFSServiceEnabled(context.Background(), clientMock)
+		assert.NoError(t, err)
+		assert.False(t, result, "Expected result to be false")
+	})
 }
