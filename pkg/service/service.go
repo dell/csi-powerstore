@@ -82,19 +82,21 @@ func (s *service) BeforeServe(ctx context.Context, sp *gocsi.StoragePlugin, lis 
 		nfs.NodeRoot = nodeRoot
 	}
 
+	log.Infof("Setting node name env to %s for NFS", nodeName)
 	err := os.Setenv("X_CSI_NODE_NAME", nodeName)
 	if err != nil {
 		log.Errorf("failed to set env X_CSI_NODE_NAME. err: %s", err.Error())
 		return err
 	}
 
-	log.Infof("Setting node name env to %s for NFS", nodeName)
-
-	err = nfssvc.BeforeServe(ctx, sp, lis)
-	if err != nil {
-		log.Errorf("unable to start up nfsserver: %s", err.Error())
-	}
-
+	// The block is commented out for performance issue caused by sharednfs.
+	// Remove the comment when enabling sharednfs feature.
+	/*
+		err = nfssvc.BeforeServe(ctx, sp, lis)
+		if err != nil {
+			log.Errorf("unable to start up nfsserver: %s", err.Error())
+		}
+	*/
 	return nil
 }
 
