@@ -4204,6 +4204,24 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 						Name: "arr2-vol1",
 					},
 				}, nil).Once()
+			clientMock.On("ListFS", mock.Anything).
+				Return([]gopowerstore.FileSystem{
+					{
+						ID:   "arr3-id1",
+						Name: "arr3-fs1",
+					},
+					{
+						ID:   "arr3-id2",
+						Name: "arr3-fs2",
+					},
+				}, nil).Once()
+			clientMock.On("ListFS", mock.Anything).
+				Return([]gopowerstore.FileSystem{
+					{
+						ID:   "arr4-id1",
+						Name: "arr4-fs1",
+					},
+				}, nil).Once()
 		}
 
 		ginkgo.When("there is no parameters", func() {
@@ -4228,6 +4246,21 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 						{
 							Volume: &csi.Volume{
 								VolumeId: "arr2-id1",
+							},
+						},
+						{
+							Volume: &csi.Volume{
+								VolumeId: "arr3-id1",
+							},
+						},
+						{
+							Volume: &csi.Volume{
+								VolumeId: "arr3-id2",
+							},
+						},
+						{
+							Volume: &csi.Volume{
+								VolumeId: "arr4-id1",
 							},
 						},
 					},
@@ -4311,7 +4344,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 
 				gomega.Expect(res).To(gomega.BeNil())
 				gomega.Expect(err).ToNot(gomega.BeNil())
-				gomega.Expect(err.Error()).To(gomega.ContainSubstring("startingToken=%d > len(volumes)=%d", tokenInt, 3))
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("startingToken=%d > len(volumes)=%d", tokenInt, 6))
 			})
 		})
 
@@ -4319,7 +4352,8 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			ginkgo.It("should fail]", func() {
 				clientMock.On("GetVolumes", mock.Anything).
 					Return([]gopowerstore.Volume{}, gopowerstore.NewNotFoundError())
-
+				clientMock.On("ListFS", mock.Anything).
+					Return([]gopowerstore.FileSystem{}, gopowerstore.NewNotFoundError())
 				req := &csi.ListVolumesRequest{}
 				res, err := ctrlSvc.ListVolumes(context.Background(), req)
 
