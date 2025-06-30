@@ -59,7 +59,7 @@ func New() nfs.Service {
 	return &service{}
 }
 
-func (s *service) BeforeServe(ctx context.Context, _ *gocsi.StoragePlugin, lis net.Listener) error {
+func (s *service) BeforeServe(ctx context.Context, _ *gocsi.StoragePlugin, _ net.Listener) error {
 	log.Info("-----Inside Before Serve-----")
 	// Get the SP's operating mode.
 	s.mode = csictx.Getenv(ctx, gocsi.EnvVarMode)
