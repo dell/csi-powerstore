@@ -1096,17 +1096,9 @@ func (s *Service) ListVolumes(ctx context.Context, req *csi.ListVolumesRequest) 
 	}
 
 	// Call the common listVolumes code
-	source, nextToken, err := s.listPowerStoreVolumes(ctx, startToken, maxEntries)
+	entries, nextToken, err := s.listPowerStoreVolumes(ctx, startToken, maxEntries)
 	if err != nil {
 		return nil, err
-	}
-
-	// Process the source volumes and make CSI Volumes
-	entries := make([]*csi.ListVolumesResponse_Entry, len(source))
-	for i, vol := range source {
-		entries[i] = &csi.ListVolumesResponse_Entry{
-			Volume: getCSIVolume(vol.ID, vol.Size),
-		}
 	}
 
 	return &csi.ListVolumesResponse{
@@ -1627,8 +1619,8 @@ func (s *Service) ProbeController(_ context.Context, _ *commonext.ProbeControlle
 	return rep, nil
 }
 
-func (s *Service) listPowerStoreVolumes(ctx context.Context, startToken, maxEntries int) ([]gopowerstore.Volume, string, error) {
-	var volumes []gopowerstore.Volume
+func (s *Service) listPowerStoreVolumes(ctx context.Context, startToken, maxEntries int) ([]*csi.ListVolumesResponse_Entry, string, error) {
+	var volResponse []*csi.ListVolumesResponse_Entry
 
 	// Get the volumes from the cache if we can
 	for _, arr := range s.Arrays() {
@@ -1636,15 +1628,33 @@ func (s *Service) listPowerStoreVolumes(ctx context.Context, startToken, maxEntr
 		if err != nil {
 			return nil, "", status.Errorf(codes.Internal, "unable to list volumes: %s", err.Error())
 		}
-
-		volumes = append(volumes, v...)
+		// Process the source volumes and make CSI Volumes
+		for _, vol := range v {
+			volResponse = append(volResponse, &csi.ListVolumesResponse_Entry{
+				Volume: getCSIVolume(vol.ID, vol.Size),
+			})
+		}
 	}
 
-	if startToken > len(volumes) {
-		return nil, "", status.Errorf(codes.Aborted, "startingToken=%d > len(volumes)=%d", startToken, len(volumes))
+	// Get the FileSystems from the cache if we can
+	for _, arr := range s.Arrays() {
+		fs, err := arr.GetClient().ListFS(ctx)
+		if err != nil {
+			return nil, "", status.Errorf(codes.Internal, "unable to list Filesystems: %s", err.Error())
+		}
+		// Process the source FileSystems and make CSI Volumes
+		for _, f := range fs {
+			volResponse = append(volResponse, &csi.ListVolumesResponse_Entry{
+				Volume: getCSIVolume(f.ID, f.SizeTotal),
+			})
+		}
 	}
+	if startToken > len(volResponse) {
+		return nil, "", status.Errorf(codes.Aborted, "startingToken=%d > len(volumes)=%d", startToken, len(volResponse))
+	}
+
 	// Discern the number of remaining entries.
-	rem := len(volumes) - startToken
+	rem := len(volResponse) - startToken
 
 	// If maxEntries is 0 or greater than the number of remaining entries then
 	// set max entries to the number of remaining entries.
@@ -1664,7 +1674,7 @@ func (s *Service) listPowerStoreVolumes(ctx context.Context, startToken, maxEntr
 		nextTokenStr = fmt.Sprintf("%d", nextToken)
 	}
 
-	return volumes[startToken : startToken+maxEntries], nextTokenStr, nil
+	return volResponse[startToken : startToken+maxEntries], nextTokenStr, nil
 }
 
 func (s *Service) listPowerStoreSnapshots(ctx context.Context, startToken, maxEntries int, snapID, srcID string) ([]GeneralSnapshot, string, error) {
