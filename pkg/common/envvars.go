@@ -16,7 +16,7 @@
  *
  */
 
-package powerstorecommon
+package common
 
 const (
 	// EnvDriverName is the name of the csi driver (provisioner)

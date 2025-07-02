@@ -16,7 +16,7 @@
  *
  */
 
-package powerstorecommon_test
+package common_test
 
 import (
 	"context"
@@ -28,7 +28,7 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-powerstore/v2/mocks"
-	"github.com/dell/csi-powerstore/v2/pkg/powerstorecommon"
+	"github.com/dell/csi-powerstore/v2/pkg/common"
 	csictx "github.com/dell/gocsi/context"
 	"github.com/dell/gocsi/utils"
 	"github.com/dell/gopowerstore"
@@ -40,7 +40,7 @@ import (
 
 func TestCustomLogger(_ *testing.T) {
 	log.SetLevel(log.DebugLevel)
-	lg := &powerstorecommon.CustomLogger{}
+	lg := &common.CustomLogger{}
 	ctx := context.Background()
 	lg.Info(ctx, "foo")
 	lg.Debug(ctx, "bar")
@@ -57,7 +57,7 @@ func TestRmSockFile(t *testing.T) {
 		fsMock.On("Stat", trimmedSockPath).Return(&mocks.FileInfo{}, nil)
 		fsMock.On("RemoveAll", trimmedSockPath).Return(nil)
 
-		powerstorecommon.RmSockFile(fsMock)
+		common.RmSockFile(fsMock)
 	})
 
 	t.Run("failed to remove socket", func(_ *testing.T) {
@@ -65,46 +65,46 @@ func TestRmSockFile(t *testing.T) {
 		fsMock.On("Stat", trimmedSockPath).Return(&mocks.FileInfo{}, nil)
 		fsMock.On("RemoveAll", trimmedSockPath).Return(fmt.Errorf("some error"))
 
-		powerstorecommon.RmSockFile(fsMock)
+		common.RmSockFile(fsMock)
 	})
 
 	t.Run("not found", func(_ *testing.T) {
 		fsMock := new(mocks.FsInterface)
 		fsMock.On("Stat", trimmedSockPath).Return(&mocks.FileInfo{}, os.ErrNotExist)
 
-		powerstorecommon.RmSockFile(fsMock)
+		common.RmSockFile(fsMock)
 	})
 
 	t.Run("may or may not exist", func(_ *testing.T) {
 		fsMock := new(mocks.FsInterface)
 		fsMock.On("Stat", trimmedSockPath).Return(&mocks.FileInfo{}, fmt.Errorf("some other error"))
 
-		powerstorecommon.RmSockFile(fsMock)
+		common.RmSockFile(fsMock)
 	})
 
 	t.Run("no endpoint set", func(_ *testing.T) {
 		fsMock := new(mocks.FsInterface)
 		_ = os.Setenv(utils.CSIEndpoint, "")
 
-		powerstorecommon.RmSockFile(fsMock)
+		common.RmSockFile(fsMock)
 	})
 }
 
 func TestSetLogFields(t *testing.T) {
 	t.Run("empty context", func(_ *testing.T) {
-		powerstorecommon.SetLogFields(nil, log.Fields{})
+		common.SetLogFields(nil, log.Fields{})
 	})
 }
 
 func TestGetLogFields(t *testing.T) {
 	t.Run("empty context", func(t *testing.T) {
-		fields := powerstorecommon.GetLogFields(nil)
+		fields := common.GetLogFields(nil)
 		assert.Equal(t, log.Fields{}, fields)
 	})
 
 	t.Run("req id", func(t *testing.T) {
 		ctx := context.WithValue(context.Background(), csictx.RequestIDKey, "1")
-		fields := powerstorecommon.GetLogFields(ctx)
+		fields := common.GetLogFields(ctx)
 		assert.Equal(t, log.Fields{"RequestID": "1"}, fields)
 	})
 }
@@ -114,7 +114,7 @@ func TestGetISCSITargetsInfoFromStorage(t *testing.T) {
 		e := errors.New("some error")
 		clientMock := new(gopowerstoremock.Client)
 		clientMock.On("GetStorageISCSITargetAddresses", context.Background()).Return([]gopowerstore.IPPoolAddress{}, e)
-		_, err := powerstorecommon.GetISCSITargetsInfoFromStorage(clientMock, "A1")
+		_, err := common.GetISCSITargetsInfoFromStorage(clientMock, "A1")
 		assert.EqualError(t, err, e.Error())
 	})
 
@@ -127,7 +127,7 @@ func TestGetISCSITargetsInfoFromStorage(t *testing.T) {
 					IPPort:  gopowerstore.IPPortInstance{TargetIqn: "iqn"},
 				},
 			}, nil)
-		iscsiTargetsInfo, err := powerstorecommon.GetISCSITargetsInfoFromStorage(clientMock, "")
+		iscsiTargetsInfo, err := common.GetISCSITargetsInfoFromStorage(clientMock, "")
 		assert.NotNil(t, iscsiTargetsInfo)
 		assert.NoError(t, err)
 	})
@@ -139,7 +139,7 @@ func TestGetNVMETCPTargetsInfoFromStorage(t *testing.T) {
 		clientMock := new(gopowerstoremock.Client)
 		clientMock.On("GetCluster", context.Background()).Return(gopowerstore.Cluster{}, e)
 		clientMock.On("GetStorageNVMETCPTargetAddresses", context.Background()).Return([]gopowerstore.IPPoolAddress{}, e)
-		_, err := powerstorecommon.GetNVMETCPTargetsInfoFromStorage(clientMock, "A1")
+		_, err := common.GetNVMETCPTargetsInfoFromStorage(clientMock, "A1")
 		assert.EqualError(t, err, e.Error())
 	})
 
@@ -153,7 +153,7 @@ func TestGetNVMETCPTargetsInfoFromStorage(t *testing.T) {
 					IPPort:  gopowerstore.IPPortInstance{TargetIqn: "iqn"},
 				},
 			}, nil)
-		nvmetcpTargetInfo, err := powerstorecommon.GetNVMETCPTargetsInfoFromStorage(clientMock, "")
+		nvmetcpTargetInfo, err := common.GetNVMETCPTargetsInfoFromStorage(clientMock, "")
 		assert.NotNil(t, nvmetcpTargetInfo)
 		assert.NoError(t, err)
 	})
@@ -164,7 +164,7 @@ func TestGetFCTargetsInfoFromStorage(t *testing.T) {
 		e := errors.New("some error")
 		clientMock := new(gopowerstoremock.Client)
 		clientMock.On("GetFCPorts", context.Background()).Return([]gopowerstore.FcPort{}, e)
-		_, err := powerstorecommon.GetFCTargetsInfoFromStorage(clientMock, "A1")
+		_, err := common.GetFCTargetsInfoFromStorage(clientMock, "A1")
 		assert.EqualError(t, err, e.Error())
 	})
 
@@ -178,7 +178,7 @@ func TestGetFCTargetsInfoFromStorage(t *testing.T) {
 					IsLinkUp:    true,
 				},
 			}, nil)
-		fcTargetInfo, err := powerstorecommon.GetFCTargetsInfoFromStorage(clientMock, "A1")
+		fcTargetInfo, err := common.GetFCTargetsInfoFromStorage(clientMock, "A1")
 		assert.NotNil(t, fcTargetInfo)
 		assert.NoError(t, err)
 	})
@@ -189,14 +189,14 @@ func TestIsK8sMetadataSupported(t *testing.T) {
 		e := errors.New("some error")
 		clientMock := new(gopowerstoremock.Client)
 		clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(0.0), e)
-		version := powerstorecommon.IsK8sMetadataSupported(clientMock)
+		version := common.IsK8sMetadataSupported(clientMock)
 		assert.Equal(t, version, false)
 	})
 
 	t.Run("no error", func(t *testing.T) {
 		clientMock := new(gopowerstoremock.Client)
 		clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
-		version := powerstorecommon.IsK8sMetadataSupported(clientMock)
+		version := common.IsK8sMetadataSupported(clientMock)
 		assert.Equal(t, version, true)
 	})
 }
@@ -207,7 +207,7 @@ func TestGetNVMEFCTargetInfoFromStorage(t *testing.T) {
 		clientMock := new(gopowerstoremock.Client)
 		clientMock.On("GetCluster", context.Background()).Return(gopowerstore.Cluster{}, e)
 		clientMock.On("GetFCPorts", context.Background()).Return([]gopowerstore.FcPort{}, e)
-		_, err := powerstorecommon.GetNVMEFCTargetInfoFromStorage(clientMock, "A1")
+		_, err := common.GetNVMEFCTargetInfoFromStorage(clientMock, "A1")
 		assert.EqualError(t, err, e.Error())
 	})
 
@@ -221,7 +221,7 @@ func TestGetNVMEFCTargetInfoFromStorage(t *testing.T) {
 					IsLinkUp: true,
 				},
 			}, nil)
-		nvmefcTargetInfo, err := powerstorecommon.GetNVMEFCTargetInfoFromStorage(clientMock, "")
+		nvmefcTargetInfo, err := common.GetNVMEFCTargetInfoFromStorage(clientMock, "")
 		assert.NotNil(t, nvmefcTargetInfo)
 		assert.NoError(t, err)
 	})
@@ -259,19 +259,19 @@ func TestHasRequiredTopology(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equalf(t, tt.want, powerstorecommon.HasRequiredTopology(tt.args.topologies, tt.args.arrIP, tt.args.requiredTopology), "HasRequiredTopology(%v, %v, %v)", tt.args.topologies, tt.args.arrIP, tt.args.requiredTopology)
+			assert.Equalf(t, tt.want, common.HasRequiredTopology(tt.args.topologies, tt.args.arrIP, tt.args.requiredTopology), "HasRequiredTopology(%v, %v, %v)", tt.args.topologies, tt.args.arrIP, tt.args.requiredTopology)
 		})
 	}
 }
 
 func TestGetNfsTopology(t *testing.T) {
 	t.Run("nfs topology is true", func(t *testing.T) {
-		topology := powerstorecommon.GetNfsTopology("10.0.0.0")
+		topology := common.GetNfsTopology("10.0.0.0")
 		assert.Equal(t, topology, []*csi.Topology{{Segments: map[string]string{"csi-powerstore.dellemc.com/10.0.0.0-nfs": "true"}}})
 	})
 
 	t.Run("nfs topology should not be false", func(t *testing.T) {
-		topology := powerstorecommon.GetNfsTopology("10.0.0.0")
+		topology := common.GetNfsTopology("10.0.0.0")
 		assert.NotEqual(t, topology, []*csi.Topology{{Segments: map[string]string{"csi-powerstore.dellemc.com/10.0.0.0-nfs": "false"}}})
 	})
 }
@@ -291,7 +291,7 @@ func Test_contains(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := powerstorecommon.Contains(tt.args.slice, tt.args.element); got != tt.want {
+			if got := common.Contains(tt.args.slice, tt.args.element); got != tt.want {
 				t.Errorf("contains() = %v, want %v", got, tt.want)
 			}
 		})
@@ -319,7 +319,7 @@ func TestExternalAccessAlreadyAdded(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := powerstorecommon.ExternalAccessAlreadyAdded(tt.args.export, tt.args.externalAccess); got != tt.want {
+			if got := common.ExternalAccessAlreadyAdded(tt.args.export, tt.args.externalAccess); got != tt.want {
 				t.Errorf("ExternalAccessAlreadyAdded() = %v, want %v", got, tt.want)
 			}
 		})
@@ -342,7 +342,7 @@ func TestParseCIDR(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := powerstorecommon.ParseCIDR(tt.args.externalAccessCIDR)
+			got, err := common.ParseCIDR(tt.args.externalAccessCIDR)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ParseCIDR() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -371,9 +371,9 @@ func TestSetPollingFrequency(t *testing.T) {
 			if i == 0 {
 				os.Setenv("X_CSI_PODMON_ARRAY_CONNECTIVITY_POLL_RATE", "100")
 			}
-			// need to import this function because the package name in this file is not powerstorecommon
-			// @TO-DO rename package name to powerstorecommon
-			if got := powerstorecommon.SetPollingFrequency(tt.args.ctx); got != tt.want {
+			// need to import this function because the package name in this file is not common
+			// @TO-DO rename package name to common
+			if got := common.SetPollingFrequency(tt.args.ctx); got != tt.want {
 				t.Errorf("SetPollingFrequency() = %v, want %v", got, tt.want)
 			}
 			os.Unsetenv("X_CSI_PODMON_ARRAY_CONNECTIVITY_POLL_RATE")
@@ -397,15 +397,15 @@ func Test_setAPIPort(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if i == 0 {
 				os.Setenv("X_CSI_PODMON_API_PORT", "8090")
-				powerstorecommon.SetAPIPort(tt.args.ctx)
-				if powerstorecommon.APIPort != ":8090" {
-					t.Errorf("setAPIPort() error, want 8090 port found %v", powerstorecommon.APIPort)
+				common.SetAPIPort(tt.args.ctx)
+				if common.APIPort != ":8090" {
+					t.Errorf("setAPIPort() error, want 8090 port found %v", common.APIPort)
 				}
 				os.Unsetenv("X_CSI_PODMON_API_PORT")
 			}
-			powerstorecommon.SetAPIPort(tt.args.ctx)
-			if powerstorecommon.APIPort != ":8083" {
-				t.Errorf("setAPIPort() error, want 8083 port found %v", powerstorecommon.APIPort)
+			common.SetAPIPort(tt.args.ctx)
+			if common.APIPort != ":8083" {
+				t.Errorf("setAPIPort() error, want 8083 port found %v", common.APIPort)
 			}
 		})
 	}
@@ -424,7 +424,7 @@ func TestRandomString(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Since each byte in the slice is represented by two hex characters in the resulting string, the length of the string returned by the function will be len * 2.
-			if got := powerstorecommon.RandomString(tt.args.len); len(got) != 5*2 {
+			if got := common.RandomString(tt.args.len); len(got) != 5*2 {
 				t.Errorf("RandomString() = %v, have len %d and want 5*2", got, len(got))
 			}
 		})
@@ -452,7 +452,7 @@ func TestGetIPListWithMaskFromString(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := powerstorecommon.GetIPListWithMaskFromString(tt.args.input)
+			got, err := common.GetIPListWithMaskFromString(tt.args.input)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("GetIPListWithMaskFromString() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -480,7 +480,7 @@ func TestGetIPListFromString(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := powerstorecommon.GetIPListFromString(tt.args.input); !reflect.DeepEqual(got, tt.want) {
+			if got := common.GetIPListFromString(tt.args.input); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("GetIPListFromString() = %v, want %v", got, tt.want)
 			}
 		})
@@ -500,7 +500,7 @@ func TestReachableEndPoint(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := powerstorecommon.ReachableEndPoint(tt.args.endpoint); got != tt.want {
+			if got := common.ReachableEndPoint(tt.args.endpoint); got != tt.want {
 				t.Errorf("ReachableEndPoint() = %v, want %v", got, tt.want)
 			}
 		})
@@ -549,7 +549,7 @@ func TestGetMountFlags(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := powerstorecommon.GetMountFlags(tt.vc)
+			result := common.GetMountFlags(tt.vc)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -573,7 +573,7 @@ func TestIsNFSServiceEnabled(t *testing.T) {
 	// Test cases
 	t.Run("nfs service is enabled", func(t *testing.T) {
 		clientMock.On("GetNASServers", mock.Anything, mock.Anything).Return(nasServers, nil)
-		result, err := powerstorecommon.IsNFSServiceEnabled(context.Background(), clientMock)
+		result, err := common.IsNFSServiceEnabled(context.Background(), clientMock)
 		assert.NoError(t, err)
 		assert.True(t, result, "Expected result to be true")
 	})
@@ -581,7 +581,7 @@ func TestIsNFSServiceEnabled(t *testing.T) {
 	t.Run("nfs service is not enabled", func(t *testing.T) {
 		nasServers[0].NfsServers[0].IsNFSv4Enabled = false
 		clientMock.On("GetNASServers", mock.Anything, mock.Anything).Return(nasServers, nil)
-		result, err := powerstorecommon.IsNFSServiceEnabled(context.Background(), clientMock)
+		result, err := common.IsNFSServiceEnabled(context.Background(), clientMock)
 		assert.NoError(t, err)
 		assert.False(t, result, "Expected result to be false")
 	})

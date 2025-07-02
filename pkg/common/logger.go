@@ -16,7 +16,7 @@
  *
  */
 
-package powerstorecommon
+package common
 
 import (
 	"context"

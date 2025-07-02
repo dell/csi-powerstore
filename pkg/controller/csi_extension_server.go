@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"github.com/dell/csi-powerstore/v2/pkg/array"
-	"github.com/dell/csi-powerstore/v2/pkg/powerstorecommon"
+	"github.com/dell/csi-powerstore/v2/pkg/common"
 	podmon "github.com/dell/dell-csi-extensions/podmon"
 	vgsext "github.com/dell/dell-csi-extensions/volumeGroupSnapshot"
 	"github.com/dell/gopowerstore"
@@ -261,14 +261,14 @@ func (s *Service) checkIfNodeIsConnected(ctx context.Context, arrayID string, no
 	var message string
 	rep.Connected = false
 
-	nodeIP := powerstorecommon.GetIPListFromString(nodeID)
+	nodeIP := common.GetIPListFromString(nodeID)
 	if len(nodeIP) == 0 {
 		log.Errorf("failed to parse node ID '%s'", nodeID)
 		return fmt.Errorf("failed to parse node ID")
 	}
 	ip := nodeIP[len(nodeIP)-1]
 	// form url to call array on node
-	url := "http://" + ip + powerstorecommon.APIPort + powerstorecommon.ArrayStatus + "/" + arrayID
+	url := "http://" + ip + common.APIPort + common.ArrayStatus + "/" + arrayID
 	connected, err := s.QueryArrayStatus(ctx, url)
 	if err != nil {
 		message = fmt.Sprintf("connectivity unknown for array %s to node %s due to %s", arrayID, nodeID, err)

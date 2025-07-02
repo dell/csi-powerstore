@@ -25,7 +25,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/dell/csi-powerstore/v2/pkg/powerstorecommon"
+	"github.com/dell/csi-powerstore/v2/pkg/common"
 	podmon "github.com/dell/dell-csi-extensions/podmon"
 	vgsext "github.com/dell/dell-csi-extensions/volumeGroupSnapshot"
 	"github.com/dell/gopowerstore"
@@ -116,8 +116,8 @@ var _ = ginkgo.Describe("csi-extension-server", func() {
 					VolumeIds: volID,
 					NodeId:    "csi-node-003c684ccb0c4ca0a9c99423563dfd2c-127.0.0.1",
 				}
-				powerstorecommon.APIPort = ":9028"
-				var status powerstorecommon.ArrayConnectivityStatus
+				common.APIPort = ":9028"
+				var status common.ArrayConnectivityStatus
 				status.LastAttempt = time.Now().Unix()
 				status.LastSuccess = time.Now().Unix()
 				input, _ := json.Marshal(status)
@@ -291,8 +291,8 @@ var _ = ginkgo.Describe("csi-extension-server", func() {
 
 		ginkgo.When("API call to the specified url to retrieve connection status for the array that is connected", func() {
 			ginkgo.It("should not fail", func() {
-				powerstorecommon.SetAPIPort(context.Background())
-				var status powerstorecommon.ArrayConnectivityStatus
+				common.SetAPIPort(context.Background())
+				var status common.ArrayConnectivityStatus
 				status.LastAttempt = time.Now().Unix()
 				status.LastSuccess = time.Now().Unix()
 				input, _ := json.Marshal(status)
@@ -318,8 +318,8 @@ var _ = ginkgo.Describe("csi-extension-server", func() {
 
 		ginkgo.When("API call to the specified url to retrieve connection status for the array that is not connected", func() {
 			ginkgo.It("should not fail", func() {
-				powerstorecommon.SetAPIPort(context.Background())
-				var status powerstorecommon.ArrayConnectivityStatus
+				common.SetAPIPort(context.Background())
+				var status common.ArrayConnectivityStatus
 				status.LastAttempt = time.Now().Unix()
 				status.LastSuccess = time.Now().Unix() - 100
 				input, _ := json.Marshal(status)
@@ -345,8 +345,8 @@ var _ = ginkgo.Describe("csi-extension-server", func() {
 
 		ginkgo.When("API call to the specified url to retrieve connection status for the array with diff diff error conditions", func() {
 			ginkgo.It("should not fail", func() {
-				powerstorecommon.SetAPIPort(context.Background())
-				var status powerstorecommon.ArrayConnectivityStatus
+				common.SetAPIPort(context.Background())
+				var status common.ArrayConnectivityStatus
 				status.LastAttempt = time.Now().Unix() - 200
 				status.LastSuccess = time.Now().Unix() - 200
 				input, _ := json.Marshal(status)

@@ -21,7 +21,7 @@ package mocks
 import (
 	context "context"
 
-	commonfs "github.com/dell/csi-powerstore/v2/pkg/powerstorecommon/fs"
+	commonfs "github.com/dell/csi-powerstore/v2/pkg/common/fs"
 
 	fs "io/fs"
 

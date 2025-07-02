@@ -24,8 +24,8 @@ import (
 	"time"
 
 	"github.com/dell/csi-powerstore/v2/core"
-	"github.com/dell/csi-powerstore/v2/pkg/powerstorecommon"
-	"github.com/dell/csi-powerstore/v2/pkg/powerstorecommon/fs"
+	"github.com/dell/csi-powerstore/v2/pkg/common"
+	"github.com/dell/csi-powerstore/v2/pkg/common/fs"
 	"github.com/dell/csi-powerstore/v2/pkg/controller"
 	"github.com/dell/csi-powerstore/v2/pkg/identity"
 	"github.com/dell/csi-powerstore/v2/pkg/interceptors"
@@ -48,7 +48,7 @@ import (
 
 func init() {
 	// We set X_CSI_DEBUG to false, because we don't want gocsi to override our logging level
-	_ = os.Setenv(powerstorecommon.EnvGOCSIDebug, "false")
+	_ = os.Setenv(common.EnvGOCSIDebug, "false")
 	// Enable X_CSI_REQ_LOGGING and X_CSI_REP_LOGGING to see gRPC request information
 	_ = os.Setenv(gocsi.EnvVarReqLogging, "true")
 	_ = os.Setenv(gocsi.EnvVarRepLogging, "true")
@@ -62,13 +62,13 @@ func init() {
 }
 
 func updateDriverName() {
-	if name, ok := csictx.LookupEnv(context.Background(), powerstorecommon.EnvDriverName); ok {
-		powerstorecommon.Name = name
+	if name, ok := csictx.LookupEnv(context.Background(), common.EnvDriverName); ok {
+		common.Name = name
 	}
 }
 
 func initilizeDriverConfigParams() {
-	paramsPath, ok := csictx.LookupEnv(context.Background(), powerstorecommon.EnvConfigParamsFilePath)
+	paramsPath, ok := csictx.LookupEnv(context.Background(), common.EnvConfigParamsFilePath)
 	if !ok {
 		log.Warnf("config path X_CSI_POWERSTORE_CONFIG_PARAMS_PATH is not specified")
 	}
@@ -94,23 +94,23 @@ func initilizeDriverConfigParams() {
 func main() {
 	f := &fs.Fs{Util: &gofsutil.FS{}}
 
-	powerstorecommon.RmSockFile(f)
+	common.RmSockFile(f)
 
-	identityService := identity.NewIdentityService(powerstorecommon.Name, core.SemVer, powerstorecommon.Manifest)
+	identityService := identity.NewIdentityService(common.Name, core.SemVer, common.Manifest)
 	var controllerService *controller.Service
 	var nodeService *node.Service
 
 	mode := csictx.Getenv(context.Background(), gocsi.EnvVarMode)
 
-	configPath, ok := csictx.LookupEnv(context.Background(), powerstorecommon.EnvArrayConfigFilePath)
+	configPath, ok := csictx.LookupEnv(context.Background(), common.EnvArrayConfigFilePath)
 	if !ok {
 		log.Fatalf("config path X_CSI_POWERSTORE_CONFIG_PATH is not specified")
 	}
 
-	if name, ok := csictx.LookupEnv(context.Background(), powerstorecommon.EnvDriverName); ok {
-		powerstorecommon.Name = name
+	if name, ok := csictx.LookupEnv(context.Background(), common.EnvDriverName); ok {
+		common.Name = name
 	}
-	powerstorecommon.SetAPIPort(context.Background())
+	common.SetAPIPort(context.Background())
 	if strings.EqualFold(mode, "controller") {
 		cs := &controller.Service{
 			Fs: f,
@@ -168,7 +168,7 @@ func main() {
 		interceptors.NewRewriteRequestIDInterceptor(),
 	}
 
-	if enableTracing, ok := csictx.LookupEnv(context.Background(), powerstorecommon.EnvDebugEnableTracing); ok && enableTracing != "" {
+	if enableTracing, ok := csictx.LookupEnv(context.Background(), common.EnvDebugEnableTracing); ok && enableTracing != "" {
 		log.Infof("Detected debug flag. Enabling Interceptors..")
 
 		t, closer, err := tracer.NewTracer(&config.Configuration{})
@@ -185,7 +185,7 @@ func main() {
 }
 
 var runCSIPlugin = func(storageProvider *gocsi.StoragePlugin) {
-	gocsi.Run(context.Background(), powerstorecommon.Name,
+	gocsi.Run(context.Background(), common.Name,
 		"A PowerStore Container Storage Interface (CSI) Driver",
 		usage,
 		storageProvider,

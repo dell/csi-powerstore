@@ -34,8 +34,8 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-powerstore/v2/core"
-	"github.com/dell/csi-powerstore/v2/pkg/powerstorecommon"
-	"github.com/dell/csi-powerstore/v2/pkg/powerstorecommon/fs"
+	"github.com/dell/csi-powerstore/v2/pkg/common"
+	"github.com/dell/csi-powerstore/v2/pkg/common/fs"
 	csictx "github.com/dell/gocsi/context"
 	"github.com/dell/gopowerstore"
 	log "github.com/sirupsen/logrus"
@@ -245,7 +245,7 @@ type PowerStoreArray struct {
 	Username      string               `yaml:"username"`
 	Password      string               `yaml:"password"`
 	NasName       string               `yaml:"nasName"`
-	BlockProtocol powerstorecommon.TransportType `yaml:"blockProtocol"`
+	BlockProtocol common.TransportType `yaml:"blockProtocol"`
 	Insecure      bool                 `yaml:"skipCertificateValidation"`
 	IsDefault     bool                 `yaml:"isDefault"`
 	NfsAcls       string               `yaml:"nfsAcls"`
@@ -322,7 +322,7 @@ func GetPowerStoreArrays(fs fs.Interface, filePath string) (map[string]*PowerSto
 		clientOptions := gopowerstore.NewClientOptions()
 		clientOptions.SetInsecure(array.Insecure)
 
-		if throttlingRateLimit, ok := csictx.LookupEnv(context.Background(), powerstorecommon.EnvThrottlingRateLimit); ok {
+		if throttlingRateLimit, ok := csictx.LookupEnv(context.Background(), common.EnvThrottlingRateLimit); ok {
 			rateLimit, err := strconv.Atoi(throttlingRateLimit)
 			if err != nil {
 				log.Errorf("can't get throttling rate limit, using default")
@@ -340,18 +340,18 @@ func GetPowerStoreArrays(fs fs.Interface, filePath string) (map[string]*PowerSto
 				"unable to create PowerStore client: %s", err.Error())
 		}
 		c.SetCustomHTTPHeaders(http.Header{
-			"Application-Type": {fmt.Sprintf("%s/%s", powerstorecommon.VerboseName, core.SemVer)},
+			"Application-Type": {fmt.Sprintf("%s/%s", common.VerboseName, core.SemVer)},
 		})
 
-		c.SetLogger(&powerstorecommon.CustomLogger{})
+		c.SetLogger(&common.CustomLogger{})
 		array.Client = c
 
 		if array.BlockProtocol == "" {
-			array.BlockProtocol = powerstorecommon.AutoDetectTransport
+			array.BlockProtocol = common.AutoDetectTransport
 		}
-		array.BlockProtocol = powerstorecommon.TransportType(strings.ToUpper(string(array.BlockProtocol)))
+		array.BlockProtocol = common.TransportType(strings.ToUpper(string(array.BlockProtocol)))
 		var ip string
-		ips := powerstorecommon.GetIPListFromString(array.Endpoint)
+		ips := common.GetIPListFromString(array.Endpoint)
 		if ips == nil {
 			log.Warnf("didn't found an IP from the provided endPoint, it could be a FQDN. Please make sure to enter a valid FQDN in https://abc.com/api/rest format")
 			sub := strings.Split(array.Endpoint, "/")
@@ -375,7 +375,7 @@ func GetPowerStoreArrays(fs fs.Interface, filePath string) (map[string]*PowerSto
 			foundDefault = true
 		}
 		failureThreshold := defaultMultiNasThreshold
-		if threshold, ok := csictx.LookupEnv(context.Background(), powerstorecommon.EnvMultiNASFailureThreshold); ok {
+		if threshold, ok := csictx.LookupEnv(context.Background(), common.EnvMultiNASFailureThreshold); ok {
 			if thresholdInt, err := strconv.Atoi(threshold); err != nil {
 				log.Warnf("can't parse multi NAS failure threshold, using default %d", failureThreshold)
 			} else if thresholdInt <= 0 {
@@ -386,7 +386,7 @@ func GetPowerStoreArrays(fs fs.Interface, filePath string) (map[string]*PowerSto
 			}
 		}
 		cooldownPeriod := defaultMultiNasCooldown
-		if cp, ok := csictx.LookupEnv(context.Background(), powerstorecommon.EnvMultiNASCooldownPeriod); ok {
+		if cp, ok := csictx.LookupEnv(context.Background(), common.EnvMultiNASCooldownPeriod); ok {
 			if duration, err := time.ParseDuration(cp); err != nil {
 				log.Warnf("can't parse multi NAS cooldown period, using default %v", cooldownPeriod)
 			} else if duration <= 0 {
@@ -502,7 +502,7 @@ func ParseVolumeID(ctx context.Context, volumeHandleRaw string,
 			}
 		}
 	} else {
-		if ips := powerstorecommon.GetIPListFromString(localVolumeHandle[1]); ips != nil {
+		if ips := common.GetIPListFromString(localVolumeHandle[1]); ips != nil {
 			// Legacy support where IP is used in the volume name in place of a PowerStore Global ID.
 			volumeHandle.LocalArrayGlobalID = IPToArray[ips[0]]
 		} else {

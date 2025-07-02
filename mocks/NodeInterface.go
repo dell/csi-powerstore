@@ -31,7 +31,7 @@ import (
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	array "github.com/dell/csi-powerstore/v2/pkg/array"
-	fs "github.com/dell/csi-powerstore/v2/pkg/powerstorecommon/fs"
+	fs "github.com/dell/csi-powerstore/v2/pkg/common/fs"
 	gomock "go.uber.org/mock/gomock"
 )
 

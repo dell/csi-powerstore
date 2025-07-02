@@ -24,7 +24,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/dell/csi-powerstore/v2/pkg/powerstorecommon"
+	"github.com/dell/csi-powerstore/v2/pkg/common"
 	"github.com/dell/gopowerstore"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -179,7 +179,7 @@ func checkValidAccessTypes(vcs []*csi.VolumeCapability) bool {
 }
 
 func getDescription(params map[string]string) string {
-	if description, ok := params[powerstorecommon.KeyVolumeDescription]; ok {
+	if description, ok := params[common.KeyVolumeDescription]; ok {
 		return description
 	}
 	return params[KeyCSIPVCName] + "-" + params[KeyCSIPVCNamespace]

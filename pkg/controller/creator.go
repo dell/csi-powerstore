@@ -23,7 +23,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/dell/csi-powerstore/v2/pkg/powerstorecommon"
+	"github.com/dell/csi-powerstore/v2/pkg/common"
 	"github.com/dell/gopowerstore/api"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
@@ -88,21 +88,21 @@ func setMetaData(reqParams map[string]string, createParams interface{}) {
 }
 
 func setVolumeCreateAttributes(reqParams map[string]string, createParams *gopowerstore.VolumeCreate) {
-	if applianceID, ok := reqParams[powerstorecommon.KeyApplianceID]; ok {
+	if applianceID, ok := reqParams[common.KeyApplianceID]; ok {
 		createParams.ApplianceID = applianceID
 	}
-	if description, ok := reqParams[powerstorecommon.KeyVolumeDescription]; ok {
+	if description, ok := reqParams[common.KeyVolumeDescription]; ok {
 		createParams.Description = description
 	}
-	if protectionPolicyID, ok := reqParams[powerstorecommon.KeyProtectionPolicyID]; ok {
+	if protectionPolicyID, ok := reqParams[common.KeyProtectionPolicyID]; ok {
 		createParams.ProtectionPolicyID = protectionPolicyID
 	}
-	if performancePolicyID, ok := reqParams[powerstorecommon.KeyPerformancePolicyID]; ok {
+	if performancePolicyID, ok := reqParams[common.KeyPerformancePolicyID]; ok {
 		createParams.PerformancePolicyID = performancePolicyID
 	}
-	if appType, ok := reqParams[powerstorecommon.KeyAppType]; ok {
+	if appType, ok := reqParams[common.KeyAppType]; ok {
 		createParams.AppType = gopowerstore.AppTypeEnum(appType)
-		if appTypeOther, ok := reqParams[powerstorecommon.KeyAppTypeOther]; ok {
+		if appTypeOther, ok := reqParams[common.KeyAppTypeOther]; ok {
 			createParams.AppTypeOther = appTypeOther
 		}
 	}
@@ -121,10 +121,10 @@ func validateHostIOSize(hostIOSize string) string {
 }
 
 func setFLRAttributes(reqParams map[string]string, createParams *gopowerstore.FsCreate) {
-	flrMode, flrModeFound := reqParams[powerstorecommon.KeyFlrCreateMode]
-	flrDefaultRetention, flrDefaultRetentionFound := reqParams[powerstorecommon.KeyFlrDefaultRetention]
-	flrMinimumRetention, flrMinimumRetentionFound := reqParams[powerstorecommon.KeyFlrMinRetention]
-	flrMaximumRetention, flrMaximumRetentionFound := reqParams[powerstorecommon.KeyFlrMaxRetention]
+	flrMode, flrModeFound := reqParams[common.KeyFlrCreateMode]
+	flrDefaultRetention, flrDefaultRetentionFound := reqParams[common.KeyFlrDefaultRetention]
+	flrMinimumRetention, flrMinimumRetentionFound := reqParams[common.KeyFlrMinRetention]
+	flrMaximumRetention, flrMaximumRetentionFound := reqParams[common.KeyFlrMaxRetention]
 
 	if flrModeFound ||
 		flrDefaultRetentionFound ||
@@ -148,33 +148,33 @@ func setFLRAttributes(reqParams map[string]string, createParams *gopowerstore.Fs
 }
 
 func setNFSCreateAttributes(reqParams map[string]string, createParams *gopowerstore.FsCreate) {
-	if description, ok := reqParams[powerstorecommon.KeyVolumeDescription]; ok {
+	if description, ok := reqParams[common.KeyVolumeDescription]; ok {
 		createParams.Description = description
 	}
-	if configType, ok := reqParams[powerstorecommon.KeyConfigType]; ok {
+	if configType, ok := reqParams[common.KeyConfigType]; ok {
 		createParams.ConfigType = configType
 	}
-	if accessPolicy, ok := reqParams[powerstorecommon.KeyAccessPolicy]; ok {
+	if accessPolicy, ok := reqParams[common.KeyAccessPolicy]; ok {
 		createParams.AccessPolicy = accessPolicy
 	}
-	if lockingPolicy, ok := reqParams[powerstorecommon.KeyLockingPolicy]; ok {
+	if lockingPolicy, ok := reqParams[common.KeyLockingPolicy]; ok {
 		createParams.LockingPolicy = lockingPolicy
 	}
-	if folderRenamePolicy, ok := reqParams[powerstorecommon.KeyFolderRenamePolicy]; ok {
+	if folderRenamePolicy, ok := reqParams[common.KeyFolderRenamePolicy]; ok {
 		createParams.FolderRenamePolicy = folderRenamePolicy
 	}
-	if isAsyncMTimeEnabled, ok := reqParams[powerstorecommon.KeyIsAsyncMtimeEnabled]; ok {
+	if isAsyncMTimeEnabled, ok := reqParams[common.KeyIsAsyncMtimeEnabled]; ok {
 		if val, err := strconv.ParseBool(isAsyncMTimeEnabled); err == nil {
 			createParams.IsAsyncMTimeEnabled = val
 		}
 	}
-	if protectionPolicyID, ok := reqParams[powerstorecommon.KeyProtectionPolicyID]; ok {
+	if protectionPolicyID, ok := reqParams[common.KeyProtectionPolicyID]; ok {
 		createParams.ProtectionPolicyID = protectionPolicyID
 	}
-	if fileEventsPublishingMode, ok := reqParams[powerstorecommon.KeyFileEventsPublishingMode]; ok {
+	if fileEventsPublishingMode, ok := reqParams[common.KeyFileEventsPublishingMode]; ok {
 		createParams.FileEventsPublishingMode = fileEventsPublishingMode
 	}
-	if hostIOSize, ok := reqParams[powerstorecommon.KeyHostIoSize]; ok {
+	if hostIOSize, ok := reqParams[common.KeyHostIoSize]; ok {
 		createParams.HostIOSize = validateHostIOSize(hostIOSize)
 	}
 	setFLRAttributes(reqParams, createParams)
@@ -239,7 +239,7 @@ func (sc *SCSICreator) Create(ctx context.Context, req *csi.CreateVolumeRequest,
 		defaultHeaders = api.NewSafeHeader().GetHeader()
 	}
 	customHeaders := defaultHeaders
-	k8sMetadataSupported := powerstorecommon.IsK8sMetadataSupported(client)
+	k8sMetadataSupported := common.IsK8sMetadataSupported(client)
 	if k8sMetadataSupported &&
 		metadata["k8s_pvol_name"] != "" &&
 		metadata["k8s_claim_name"] != "" &&
@@ -252,7 +252,7 @@ func (sc *SCSICreator) Create(ctx context.Context, req *csi.CreateVolumeRequest,
 	}
 	if sc.vg != nil {
 		reqParams.VolumeGroupID = sc.vg.ID
-	} else if vgID, ok := req.Parameters[powerstorecommon.KeyVolumeGroupID]; ok {
+	} else if vgID, ok := req.Parameters[common.KeyVolumeGroupID]; ok {
 		reqParams.VolumeGroupID = vgID
 	}
 	setMetaData(req.Parameters, reqParams)
