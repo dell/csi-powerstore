@@ -34,8 +34,8 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-powerstore/v2/mocks"
 	"github.com/dell/csi-powerstore/v2/pkg/array"
-	"github.com/dell/csi-powerstore/v2/pkg/common"
-	"github.com/dell/csi-powerstore/v2/pkg/common/k8sutils"
+	"github.com/dell/csi-powerstore/v2/pkg/powerstorecommon"
+	"github.com/dell/csi-powerstore/v2/pkg/powerstorecommon/k8sutils"
 	"github.com/dell/csi-powerstore/v2/pkg/controller"
 	"github.com/dell/gobrick"
 	csictx "github.com/dell/gocsi/context"
@@ -206,7 +206,7 @@ func getTestArrays() map[string]*array.PowerStoreArray {
 		Endpoint:      "https://192.168.0.1/api/rest",
 		Username:      "admin",
 		Password:      "pass",
-		BlockProtocol: common.ISCSITransport,
+		BlockProtocol: powerstorecommon.ISCSITransport,
 		Insecure:      true,
 		IsDefault:     true,
 		GlobalID:      firstGlobalID,
@@ -218,7 +218,7 @@ func getTestArrays() map[string]*array.PowerStoreArray {
 		Username:      "admin",
 		Password:      "pass",
 		NasName:       validNasName,
-		BlockProtocol: common.NoneTransport,
+		BlockProtocol: powerstorecommon.NoneTransport,
 		Insecure:      true,
 		GlobalID:      secondGlobalID,
 		Client:        clientMock,
@@ -475,7 +475,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 				ginkgo.It("should reuse host [CHAP]", func() {
 					nodeSvc.nodeID = ""
-					_ = csictx.Setenv(context.Background(), common.EnvEnableCHAP, "true")
+					_ = csictx.Setenv(context.Background(), powerstorecommon.EnvEnableCHAP, "true")
 					conn, _ := net.Dial("udp", "127.0.0.1:80")
 					fsMock.On("NetDial", mock.Anything).Return(
 						conn,
@@ -517,7 +517,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 		ginkgo.When("using FC", func() {
 			ginkgo.It("should create FC host", func() {
-				nodeSvc.Arrays()[firstValidIP].BlockProtocol = common.FcTransport
+				nodeSvc.Arrays()[firstValidIP].BlockProtocol = powerstorecommon.FcTransport
 				nodeSvc.nodeID = ""
 				nodeSvc.useFC[firstGlobalID] = true
 				conn, _ := net.Dial("udp", "127.0.0.1:80")
@@ -525,7 +525,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					conn,
 					nil,
 				)
-				_ = csictx.Setenv(context.Background(), common.EnvFCPortsFilterFilePath, "filter-path")
+				_ = csictx.Setenv(context.Background(), powerstorecommon.EnvFCPortsFilterFilePath, "filter-path")
 
 				fsMock.On("ReadFile", mock.Anything).Return([]byte("my-host-id"), nil).Once()
 				fsMock.On("ReadFile", "filter-path").
@@ -567,7 +567,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 		ginkgo.When("using NVMe", func() {
 			ginkgo.It("should create NVMe host", func() {
-				nodeSvc.Arrays()[firstValidIP].BlockProtocol = common.NVMEFCTransport
+				nodeSvc.Arrays()[firstValidIP].BlockProtocol = powerstorecommon.NVMEFCTransport
 				nodeSvc.nodeID = ""
 				nodeSvc.useNVME[firstGlobalID] = true
 				fsMock.On("ReadFile", mock.Anything).Return([]byte("my-host-id"), nil)
@@ -611,7 +611,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 			})
 
 			ginkgo.It("should create NVMe host and check for duplicate UUIDs", func() {
-				nodeSvc.Arrays()[firstValidIP].BlockProtocol = common.NVMEFCTransport
+				nodeSvc.Arrays()[firstValidIP].BlockProtocol = powerstorecommon.NVMEFCTransport
 				nodeSvc.nodeID = ""
 				nodeSvc.useNVME[firstGlobalID] = true
 				fsMock.On("ReadFile", mock.Anything).Return([]byte("my-host-id"), nil)
@@ -627,8 +627,8 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				fcConnectorMock.On("GetInitiatorPorts", mock.Anything).
 					Return(validFCTargetsWWPN, nil)
 
-				nodeSvc.opts.KubeNodeName = common.EnvKubeNodeName
-				nodeSvc.opts.KubeConfigPath = common.EnvKubeConfigPath
+				nodeSvc.opts.KubeNodeName = powerstorecommon.EnvKubeNodeName
+				nodeSvc.opts.KubeConfigPath = powerstorecommon.EnvKubeConfigPath
 				nodeLabelsRetrieverMock.On("GetNVMeUUIDs", mock.Anything).Return(
 					map[string]string{
 						"node1": "duplicate-uuid",
@@ -667,8 +667,8 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 		ginkgo.When("protocol flag initialization", func() {
 			ginkgo.It("should have correct entry for each array - NVMeTCP and iSCSI", func() {
-				nodeSvc.Arrays()[firstValidIP].BlockProtocol = common.NVMETCPTransport
-				nodeSvc.Arrays()[secondValidIP].BlockProtocol = common.ISCSITransport
+				nodeSvc.Arrays()[firstValidIP].BlockProtocol = powerstorecommon.NVMETCPTransport
+				nodeSvc.Arrays()[secondValidIP].BlockProtocol = powerstorecommon.ISCSITransport
 				nodeSvc.nodeID = ""
 				fsMock.On("ReadFile", mock.Anything).Return([]byte("my-host-id"), nil)
 				conn, _ := net.Dial("udp", "127.0.0.1:80")
@@ -711,8 +711,8 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 			})
 
 			ginkgo.It("should have correct entry for each array - iSCSI and NVMeFC", func() {
-				nodeSvc.Arrays()[firstValidIP].BlockProtocol = common.ISCSITransport
-				nodeSvc.Arrays()[secondValidIP].BlockProtocol = common.NVMEFCTransport
+				nodeSvc.Arrays()[firstValidIP].BlockProtocol = powerstorecommon.ISCSITransport
+				nodeSvc.Arrays()[secondValidIP].BlockProtocol = powerstorecommon.NVMEFCTransport
 				nodeSvc.nodeID = ""
 				fsMock.On("ReadFile", mock.Anything).Return([]byte("my-host-id"), nil)
 				conn, _ := net.Dial("udp", "127.0.0.1:80")
@@ -1301,8 +1301,8 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 				publishContext := getValidPublishContext()
 				publishContext["NfsExportPath"] = validNfsExportPath
-				publishContext[common.KeyNasName] = validNasName
-				publishContext[common.KeyNfsACL] = "0777"
+				publishContext[powerstorecommon.KeyNasName] = validNasName
+				publishContext[powerstorecommon.KeyNfsACL] = "0777"
 
 				nfsServers := []gopowerstore.NFSServerInstance{
 					{
@@ -1343,7 +1343,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 				publishContext := getValidPublishContext()
 				publishContext["NfsExportPath"] = validNfsExportPath
-				publishContext[common.KeyNfsACL] = "A::OWNER@:RWX"
+				publishContext[powerstorecommon.KeyNfsACL] = "A::OWNER@:RWX"
 
 				nfsServers := []gopowerstore.NFSServerInstance{
 					{
@@ -1585,7 +1585,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				res, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
 					VolumeId: validBlockVolumeID,
 					PublishContext: map[string]string{
-						common.PublishContextDeviceWWN: validDeviceWWN,
+						powerstorecommon.PublishContextDeviceWWN: validDeviceWWN,
 					},
 					StagingTargetPath: nodeStagePrivateDir,
 					VolumeCapability: getCapabilityWithVoltypeAccessFstype(
@@ -1600,8 +1600,8 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				res, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
 					VolumeId: validBlockVolumeID,
 					PublishContext: map[string]string{
-						common.PublishContextDeviceWWN:  validDeviceWWN,
-						common.PublishContextLUNAddress: validLUNID,
+						powerstorecommon.PublishContextDeviceWWN:  validDeviceWWN,
+						powerstorecommon.PublishContextLUNAddress: validLUNID,
 					},
 					StagingTargetPath: nodeStagePrivateDir,
 					VolumeCapability: getCapabilityWithVoltypeAccessFstype(
@@ -1618,8 +1618,8 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				res, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
 					VolumeId: validBlockVolumeID,
 					PublishContext: map[string]string{
-						common.PublishContextDeviceWWN:  validDeviceWWN,
-						common.PublishContextLUNAddress: validLUNID,
+						powerstorecommon.PublishContextDeviceWWN:  validDeviceWWN,
+						powerstorecommon.PublishContextLUNAddress: validLUNID,
 					},
 					StagingTargetPath: nodeStagePrivateDir,
 					VolumeCapability: getCapabilityWithVoltypeAccessFstype(
@@ -1636,8 +1636,8 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				res, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
 					VolumeId: validBlockVolumeID,
 					PublishContext: map[string]string{
-						common.PublishContextDeviceWWN:  validDeviceWWN,
-						common.PublishContextLUNAddress: validLUNID,
+						powerstorecommon.PublishContextDeviceWWN:  validDeviceWWN,
+						powerstorecommon.PublishContextLUNAddress: validLUNID,
 					},
 					StagingTargetPath: nodeStagePrivateDir,
 					VolumeCapability: getCapabilityWithVoltypeAccessFstype(
@@ -1653,8 +1653,8 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				res, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
 					VolumeId: validBlockVolumeID,
 					PublishContext: map[string]string{
-						common.PublishContextDeviceWWN:  validDeviceWWN,
-						common.PublishContextLUNAddress: validLUNID,
+						powerstorecommon.PublishContextDeviceWWN:  validDeviceWWN,
+						powerstorecommon.PublishContextLUNAddress: validLUNID,
 					},
 					StagingTargetPath: nodeStagePrivateDir,
 					VolumeCapability: getCapabilityWithVoltypeAccessFstype(
@@ -3118,7 +3118,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 						CapacityBytes: validVolSize,
 						VolumeId:      filepath.Join(validBaseVolumeID, firstValidIP, "scsi"),
 						VolumeContext: map[string]string{
-							common.KeyArrayID: firstValidIP,
+							powerstorecommon.KeyArrayID: firstValidIP,
 						},
 					},
 				}, nil)
@@ -3184,7 +3184,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 						CapacityBytes: validVolSize,
 						VolumeId:      filepath.Join(validBaseVolumeID, firstValidIP, "scsi"),
 						VolumeContext: map[string]string{
-							common.KeyArrayID: firstValidIP,
+							powerstorecommon.KeyArrayID: firstValidIP,
 						},
 					},
 				}, nil)
@@ -3192,7 +3192,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					VolumeId: validBlockVolumeID,
 					NodeId:   validNodeID,
 					VolumeContext: map[string]string{
-						common.KeyArrayID: firstValidIP,
+						powerstorecommon.KeyArrayID: firstValidIP,
 					},
 					VolumeCapability: getCapabilityWithVoltypeAccessFstype("mount", "single-writer", "ext4"),
 				}).Return(&csi.ControllerPublishVolumeResponse{
@@ -3248,7 +3248,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 						CapacityBytes: validVolSize,
 						VolumeId:      filepath.Join(validBaseVolumeID, firstValidIP, "scsi"),
 						VolumeContext: map[string]string{
-							common.KeyArrayID: firstValidIP,
+							powerstorecommon.KeyArrayID: firstValidIP,
 						},
 					},
 				}, nil)
@@ -3353,7 +3353,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 						CapacityBytes: validVolSize,
 						VolumeId:      filepath.Join(validBaseVolumeID, firstValidIP, "scsi"),
 						VolumeContext: map[string]string{
-							common.KeyArrayID: firstValidIP,
+							powerstorecommon.KeyArrayID: firstValidIP,
 						},
 					},
 				}, errors.New("Failed"))
@@ -3383,7 +3383,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 						CapacityBytes: validVolSize,
 						VolumeId:      filepath.Join(validBaseVolumeID, firstValidIP, "scsi"),
 						VolumeContext: map[string]string{
-							common.KeyArrayID: firstValidIP,
+							powerstorecommon.KeyArrayID: firstValidIP,
 						},
 					},
 				}, nil)
@@ -3413,7 +3413,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 						CapacityBytes: validVolSize,
 						VolumeId:      filepath.Join(validBaseVolumeID, firstValidIP, "scsi"),
 						VolumeContext: map[string]string{
-							common.KeyArrayID: firstValidIP,
+							powerstorecommon.KeyArrayID: firstValidIP,
 						},
 					},
 				}, nil)
@@ -3444,7 +3444,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					CapacityBytes: validVolSize,
 					VolumeId:      filepath.Join(validBaseVolumeID, firstValidIP, "scsi"),
 					VolumeContext: map[string]string{
-						common.KeyArrayID: firstValidIP,
+						powerstorecommon.KeyArrayID: firstValidIP,
 					},
 				},
 			}, nil)
@@ -3663,9 +3663,9 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					NodeId: nodeSvc.nodeID,
 					AccessibleTopology: &csi.Topology{
 						Segments: map[string]string{
-							common.Name + "/" + firstValidIP + "-nfs":   "true",
-							common.Name + "/" + firstValidIP + "-iscsi": "true",
-							common.Name + "/" + secondValidIP + "-nfs":  "true",
+							powerstorecommon.Name + "/" + firstValidIP + "-nfs":   "true",
+							powerstorecommon.Name + "/" + firstValidIP + "-iscsi": "true",
+							powerstorecommon.Name + "/" + secondValidIP + "-nfs":  "true",
 						},
 					},
 					MaxVolumesPerNode: 0,
@@ -3703,7 +3703,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					NodeId: nodeSvc.nodeID,
 					AccessibleTopology: &csi.Topology{
 						Segments: map[string]string{
-							common.Name + "/" + firstValidIP + "-iscsi": "true",
+							powerstorecommon.Name + "/" + firstValidIP + "-iscsi": "true",
 						},
 					},
 					MaxVolumesPerNode: 0,
@@ -3745,9 +3745,9 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					NodeId: nodeSvc.nodeID,
 					AccessibleTopology: &csi.Topology{
 						Segments: map[string]string{
-							common.Name + "/" + firstValidIP + "-nfs":   "true",
-							common.Name + "/" + firstValidIP + "-iscsi": "true",
-							common.Name + "/" + secondValidIP + "-nfs":  "true",
+							powerstorecommon.Name + "/" + firstValidIP + "-nfs":   "true",
+							powerstorecommon.Name + "/" + firstValidIP + "-iscsi": "true",
+							powerstorecommon.Name + "/" + secondValidIP + "-nfs":  "true",
 						},
 					},
 					MaxVolumesPerNode: 2,
@@ -3786,9 +3786,9 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					NodeId: nodeSvc.nodeID,
 					AccessibleTopology: &csi.Topology{
 						Segments: map[string]string{
-							common.Name + "/" + firstValidIP + "-nfs":   "true",
-							common.Name + "/" + firstValidIP + "-iscsi": "true",
-							common.Name + "/" + secondValidIP + "-nfs":  "true",
+							powerstorecommon.Name + "/" + firstValidIP + "-nfs":   "true",
+							powerstorecommon.Name + "/" + firstValidIP + "-iscsi": "true",
+							powerstorecommon.Name + "/" + secondValidIP + "-nfs":  "true",
 						},
 					},
 					MaxVolumesPerNode: 0,
@@ -3825,9 +3825,9 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					NodeId: nodeSvc.nodeID,
 					AccessibleTopology: &csi.Topology{
 						Segments: map[string]string{
-							common.Name + "/" + firstValidIP + "-nfs":   "true",
-							common.Name + "/" + firstValidIP + "-iscsi": "true",
-							common.Name + "/" + secondValidIP + "-nfs":  "true",
+							powerstorecommon.Name + "/" + firstValidIP + "-nfs":   "true",
+							powerstorecommon.Name + "/" + firstValidIP + "-iscsi": "true",
+							powerstorecommon.Name + "/" + secondValidIP + "-nfs":  "true",
 						},
 					},
 					MaxVolumesPerNode: 2,
@@ -3863,8 +3863,8 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					NodeId: nodeSvc.nodeID,
 					AccessibleTopology: &csi.Topology{
 						Segments: map[string]string{
-							common.Name + "/" + firstValidIP + "-nfs":  "true",
-							common.Name + "/" + secondValidIP + "-nfs": "true",
+							powerstorecommon.Name + "/" + firstValidIP + "-nfs":  "true",
+							powerstorecommon.Name + "/" + secondValidIP + "-nfs": "true",
 						},
 					},
 					MaxVolumesPerNode: 0,
@@ -3893,8 +3893,8 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					NodeId: nodeSvc.nodeID,
 					AccessibleTopology: &csi.Topology{
 						Segments: map[string]string{
-							common.Name + "/" + firstValidIP + "-nfs":  "true",
-							common.Name + "/" + secondValidIP + "-nfs": "true",
+							powerstorecommon.Name + "/" + firstValidIP + "-nfs":  "true",
+							powerstorecommon.Name + "/" + secondValidIP + "-nfs": "true",
 						},
 					},
 					MaxVolumesPerNode: 0,
@@ -3928,8 +3928,8 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					NodeId: nodeSvc.nodeID,
 					AccessibleTopology: &csi.Topology{
 						Segments: map[string]string{
-							common.Name + "/" + firstValidIP + "-nfs":  "true",
-							common.Name + "/" + secondValidIP + "-nfs": "true",
+							powerstorecommon.Name + "/" + firstValidIP + "-nfs":  "true",
+							powerstorecommon.Name + "/" + secondValidIP + "-nfs": "true",
 						},
 					},
 					MaxVolumesPerNode: 0,
@@ -3981,9 +3981,9 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					NodeId: nodeSvc.nodeID,
 					AccessibleTopology: &csi.Topology{
 						Segments: map[string]string{
-							common.Name + "/" + firstValidIP + "-nfs":  "true",
-							common.Name + "/" + firstValidIP + "-fc":   "true",
-							common.Name + "/" + secondValidIP + "-nfs": "true",
+							powerstorecommon.Name + "/" + firstValidIP + "-nfs":  "true",
+							powerstorecommon.Name + "/" + firstValidIP + "-fc":   "true",
+							powerstorecommon.Name + "/" + secondValidIP + "-nfs": "true",
 						},
 					},
 					MaxVolumesPerNode: 0,
@@ -4036,9 +4036,9 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 						NodeId: nodeSvc.nodeID,
 						AccessibleTopology: &csi.Topology{
 							Segments: map[string]string{
-								common.Name + "/" + firstValidIP + "-nfs":  "true",
-								common.Name + "/" + firstValidIP + "-fc":   "true",
-								common.Name + "/" + secondValidIP + "-nfs": "true",
+								powerstorecommon.Name + "/" + firstValidIP + "-nfs":  "true",
+								powerstorecommon.Name + "/" + firstValidIP + "-fc":   "true",
+								powerstorecommon.Name + "/" + secondValidIP + "-nfs": "true",
 							},
 						},
 						MaxVolumesPerNode: 0,
@@ -4091,8 +4091,8 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 							NodeId: nodeSvc.nodeID,
 							AccessibleTopology: &csi.Topology{
 								Segments: map[string]string{
-									common.Name + "/" + firstValidIP + "-nfs":  "true",
-									common.Name + "/" + secondValidIP + "-nfs": "true",
+									powerstorecommon.Name + "/" + firstValidIP + "-nfs":  "true",
+									powerstorecommon.Name + "/" + secondValidIP + "-nfs": "true",
 								},
 							},
 							MaxVolumesPerNode: 0,
@@ -4122,8 +4122,8 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 						NodeId: nodeSvc.nodeID,
 						AccessibleTopology: &csi.Topology{
 							Segments: map[string]string{
-								common.Name + "/" + firstValidIP + "-nfs":  "true",
-								common.Name + "/" + secondValidIP + "-nfs": "true",
+								powerstorecommon.Name + "/" + firstValidIP + "-nfs":  "true",
+								powerstorecommon.Name + "/" + secondValidIP + "-nfs": "true",
 							},
 						},
 						MaxVolumesPerNode: 0,
@@ -4155,8 +4155,8 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 						NodeId: nodeSvc.nodeID,
 						AccessibleTopology: &csi.Topology{
 							Segments: map[string]string{
-								common.Name + "/" + firstValidIP + "-nfs":  "true",
-								common.Name + "/" + secondValidIP + "-nfs": "true",
+								powerstorecommon.Name + "/" + firstValidIP + "-nfs":  "true",
+								powerstorecommon.Name + "/" + secondValidIP + "-nfs": "true",
 							},
 						},
 						MaxVolumesPerNode: 0,
@@ -4197,8 +4197,8 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 						NodeId: nodeSvc.nodeID,
 						AccessibleTopology: &csi.Topology{
 							Segments: map[string]string{
-								common.Name + "/" + firstValidIP + "-nfs":  "true",
-								common.Name + "/" + secondValidIP + "-nfs": "true",
+								powerstorecommon.Name + "/" + firstValidIP + "-nfs":  "true",
+								powerstorecommon.Name + "/" + secondValidIP + "-nfs": "true",
 							},
 						},
 						MaxVolumesPerNode: 0,
@@ -4239,9 +4239,9 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					NodeId: nodeSvc.nodeID,
 					AccessibleTopology: &csi.Topology{
 						Segments: map[string]string{
-							common.Name + "/" + firstValidIP + "-nfs":    "true",
-							common.Name + "/" + firstValidIP + "-nvmefc": "true",
-							common.Name + "/" + secondValidIP + "-nfs":   "true",
+							powerstorecommon.Name + "/" + firstValidIP + "-nfs":    "true",
+							powerstorecommon.Name + "/" + firstValidIP + "-nvmefc": "true",
+							powerstorecommon.Name + "/" + secondValidIP + "-nfs":   "true",
 						},
 					},
 					MaxVolumesPerNode: 0,
@@ -4279,8 +4279,8 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 						NodeId: nodeSvc.nodeID,
 						AccessibleTopology: &csi.Topology{
 							Segments: map[string]string{
-								common.Name + "/" + firstValidIP + "-nfs":  "true",
-								common.Name + "/" + secondValidIP + "-nfs": "true",
+								powerstorecommon.Name + "/" + firstValidIP + "-nfs":  "true",
+								powerstorecommon.Name + "/" + secondValidIP + "-nfs": "true",
 							},
 						},
 						MaxVolumesPerNode: 0,
@@ -4326,9 +4326,9 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					NodeId: nodeSvc.nodeID,
 					AccessibleTopology: &csi.Topology{
 						Segments: map[string]string{
-							common.Name + "/" + firstValidIP + "-nfs":     "true",
-							common.Name + "/" + firstValidIP + "-nvmetcp": "true",
-							common.Name + "/" + secondValidIP + "-nfs":    "true",
+							powerstorecommon.Name + "/" + firstValidIP + "-nfs":     "true",
+							powerstorecommon.Name + "/" + firstValidIP + "-nvmetcp": "true",
+							powerstorecommon.Name + "/" + secondValidIP + "-nfs":    "true",
 						},
 					},
 					MaxVolumesPerNode: 0,
@@ -4374,8 +4374,8 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 						NodeId: nodeSvc.nodeID,
 						AccessibleTopology: &csi.Topology{
 							Segments: map[string]string{
-								common.Name + "/" + firstValidIP + "-nfs":  "true",
-								common.Name + "/" + secondValidIP + "-nfs": "true",
+								powerstorecommon.Name + "/" + firstValidIP + "-nfs":  "true",
+								powerstorecommon.Name + "/" + secondValidIP + "-nfs": "true",
 							},
 						},
 						MaxVolumesPerNode: 0,
@@ -4417,8 +4417,8 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 						NodeId: nodeSvc.nodeID,
 						AccessibleTopology: &csi.Topology{
 							Segments: map[string]string{
-								common.Name + "/" + firstValidIP + "-nfs":  "true",
-								common.Name + "/" + secondValidIP + "-nfs": "true",
+								powerstorecommon.Name + "/" + firstValidIP + "-nfs":  "true",
+								powerstorecommon.Name + "/" + secondValidIP + "-nfs": "true",
 							},
 						},
 						MaxVolumesPerNode: 0,
@@ -4430,7 +4430,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 	ginkgo.Describe("Calling NodeGetCapabilities()", func() {
 		ginkgo.It("should return predefined parameters with health monitor", func() {
-			csictx.Setenv(context.Background(), common.EnvIsHealthMonitorEnabled, "true")
+			csictx.Setenv(context.Background(), powerstorecommon.EnvIsHealthMonitorEnabled, "true")
 
 			nodeSvc.nodeID = ""
 
@@ -5122,13 +5122,13 @@ func TestGetNodeOptions(t *testing.T) {
 	nodeSvc.SetArrays(arrays)
 	nodeSvc.SetDefaultArray(arrays[firstValidIP])
 	t.Run("success test", func(_ *testing.T) {
-		csictx.Setenv(context.Background(), common.EnvNodeIDFilePath, "")
-		csictx.Setenv(context.Background(), common.EnvNodeNamePrefix, "")
-		csictx.Setenv(context.Background(), common.EnvKubeNodeName, "")
-		csictx.Setenv(context.Background(), common.EnvNodeChrootPath, "")
-		csictx.Setenv(context.Background(), common.EnvTmpDir, "")
-		csictx.Setenv(context.Background(), common.EnvFCPortsFilterFilePath, "")
-		csictx.Setenv(context.Background(), common.EnvEnableCHAP, "")
+		csictx.Setenv(context.Background(), powerstorecommon.EnvNodeIDFilePath, "")
+		csictx.Setenv(context.Background(), powerstorecommon.EnvNodeNamePrefix, "")
+		csictx.Setenv(context.Background(), powerstorecommon.EnvKubeNodeName, "")
+		csictx.Setenv(context.Background(), powerstorecommon.EnvNodeChrootPath, "")
+		csictx.Setenv(context.Background(), powerstorecommon.EnvTmpDir, "")
+		csictx.Setenv(context.Background(), powerstorecommon.EnvFCPortsFilterFilePath, "")
+		csictx.Setenv(context.Background(), powerstorecommon.EnvEnableCHAP, "")
 		getNodeOptions()
 	})
 }

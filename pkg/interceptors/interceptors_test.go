@@ -29,7 +29,7 @@ import (
 	"github.com/akutz/gosync"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-metadata-retriever/retriever"
-	"github.com/dell/csi-powerstore/v2/pkg/common"
+	"github.com/dell/csi-powerstore/v2/pkg/powerstorecommon"
 	controller "github.com/dell/csi-powerstore/v2/pkg/controller"
 	csictx "github.com/dell/gocsi/context"
 	"github.com/dell/gocsi/middleware/serialvolume/types"
@@ -197,7 +197,7 @@ func TestCreateMetadataRetrieverClient(t *testing.T) {
 
 	// Create a new context with the environment variable set
 	ctx := context.WithValue(context.Background(), csictx.RequestIDKey, "requestID")
-	ctx = csictx.WithEnviron(ctx, []string{fmt.Sprintf("%s=%s", common.EnvMetadataRetrieverEndpoint, "endpoint")})
+	ctx = csictx.WithEnviron(ctx, []string{fmt.Sprintf("%s=%s", powerstorecommon.EnvMetadataRetrieverEndpoint, "endpoint")})
 
 	// Call the function
 	i.createMetadataRetrieverClient(ctx)

@@ -29,7 +29,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/dell/csi-powerstore/v2/pkg/common"
+	"github.com/dell/csi-powerstore/v2/pkg/powerstorecommon"
 )
 
 // QueryArrayStatus make API call to the specified url to retrieve connection status
@@ -40,7 +40,7 @@ func (s *Service) QueryArrayStatus(ctx context.Context, url string) (bool, error
 		}
 	}()
 	client := http.Client{
-		Timeout: common.Timeout,
+		Timeout: powerstorecommon.Timeout,
 	}
 	resp, err := client.Get(url)
 
@@ -59,7 +59,7 @@ func (s *Service) QueryArrayStatus(ctx context.Context, url string) (bool, error
 		log.Errorf("Found unexpected response from the server while fetching array status %d ", resp.StatusCode)
 		return false, fmt.Errorf("unexpected response from the server")
 	}
-	var statusResponse common.ArrayConnectivityStatus
+	var statusResponse powerstorecommon.ArrayConnectivityStatus
 	err = json.Unmarshal(bodyBytes, &statusResponse)
 	if err != nil {
 		log.Errorf("unable to unmarshal and determine connectivity due to %s ", err)
@@ -68,7 +68,7 @@ func (s *Service) QueryArrayStatus(ctx context.Context, url string) (bool, error
 	log.Infof("API Response received is %+v\n", statusResponse)
 	// responseObject has last success and last attempt timestamp in Unix format
 	timeDiff := statusResponse.LastAttempt - statusResponse.LastSuccess
-	tolerance := common.SetPollingFrequency(ctx)
+	tolerance := powerstorecommon.SetPollingFrequency(ctx)
 	currTime := time.Now().Unix()
 	// checking if the status response is stale and connectivity test is still running
 	// since nodeProbe is run at frequency tolerance/2, ideally below check should never be true

@@ -35,7 +35,7 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-powerstore/v2/pkg/array"
-	"github.com/dell/csi-powerstore/v2/pkg/common"
+	"github.com/dell/csi-powerstore/v2/pkg/powerstorecommon"
 	"github.com/dell/gopowerstore"
 	"github.com/dell/gopowerstore/api"
 	gopowerstoremock "github.com/dell/gopowerstore/mocks"
@@ -113,7 +113,7 @@ func setVariables() {
 		Username:           "admin",
 		GlobalID:           firstValidID,
 		Password:           "pass",
-		BlockProtocol:      common.ISCSITransport,
+		BlockProtocol:      powerstorecommon.ISCSITransport,
 		Insecure:           true,
 		IsDefault:          true,
 		Client:             clientMock,
@@ -126,7 +126,7 @@ func setVariables() {
 		GlobalID:           secondValidID,
 		Password:           "pass",
 		NasName:            validNasName,
-		BlockProtocol:      common.NoneTransport,
+		BlockProtocol:      powerstorecommon.NoneTransport,
 		Insecure:           true,
 		Client:             clientMock,
 		IP:                 "192.168.0.2",
@@ -136,8 +136,8 @@ func setVariables() {
 	arrays[firstValidID] = first
 	arrays[secondValidID] = second
 
-	csictx.Setenv(context.Background(), common.EnvReplicationPrefix, "replication.storage.dell.com")
-	csictx.Setenv(context.Background(), common.EnvNfsAcls, "A::OWNER@:RWX")
+	csictx.Setenv(context.Background(), powerstorecommon.EnvReplicationPrefix, "replication.storage.dell.com")
+	csictx.Setenv(context.Background(), powerstorecommon.EnvNfsAcls, "A::OWNER@:RWX")
 
 	ctrlSvc = &Service{Fs: fsMock}
 	ctrlSvc.SetArrays(arrays)
@@ -173,7 +173,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				clientMock.On("GetAppliance", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
 
 				req := getTypicalCreateVolumeRequest("my-vol", validVolSize)
-				req.Parameters[common.KeyArrayID] = firstValidID
+				req.Parameters[powerstorecommon.KeyArrayID] = firstValidID
 				req.Parameters[KeyCSIPVCName] = req.Name
 				req.Parameters[KeyCSIPVCNamespace] = validNamespaceName
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
@@ -184,13 +184,13 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 						CapacityBytes: validVolSize,
 						VolumeId:      filepath.Join(validBaseVolID, firstValidID, "scsi"),
 						VolumeContext: map[string]string{
-							common.KeyArrayID:           firstValidID,
-							common.KeyArrayVolumeName:   "my-vol",
-							common.KeyProtocol:          "scsi",
-							common.KeyVolumeDescription: req.Name + "-" + validNamespaceName,
+							powerstorecommon.KeyArrayID:           firstValidID,
+							powerstorecommon.KeyArrayVolumeName:   "my-vol",
+							powerstorecommon.KeyProtocol:          "scsi",
+							powerstorecommon.KeyVolumeDescription: req.Name + "-" + validNamespaceName,
 							KeyCSIPVCName:               req.Name,
 							KeyCSIPVCNamespace:          validNamespaceName,
-							common.KeyServiceTag:        validServiceTag,
+							powerstorecommon.KeyServiceTag:        validServiceTag,
 						},
 					},
 				}))
@@ -206,15 +206,15 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			clientMock.On("GetAppliance", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
 
 			req := getTypicalCreateVolumeRequest("my-vol", validVolSize)
-			req.Parameters[common.KeyArrayID] = firstValidID
+			req.Parameters[powerstorecommon.KeyArrayID] = firstValidID
 			req.Parameters[KeyCSIPVCName] = req.Name
 			req.Parameters[KeyCSIPVCNamespace] = validNamespaceName
-			req.Parameters[common.KeyVolumeDescription] = "Vol-description"
-			req.Parameters[common.KeyAppType] = "Other"
-			req.Parameters[common.KeyAppTypeOther] = "Android"
-			req.Parameters[common.KeyApplianceID] = "12345"
-			req.Parameters[common.KeyProtectionPolicyID] = "xyz"
-			req.Parameters[common.KeyPerformancePolicyID] = "abc"
+			req.Parameters[powerstorecommon.KeyVolumeDescription] = "Vol-description"
+			req.Parameters[powerstorecommon.KeyAppType] = "Other"
+			req.Parameters[powerstorecommon.KeyAppTypeOther] = "Android"
+			req.Parameters[powerstorecommon.KeyApplianceID] = "12345"
+			req.Parameters[powerstorecommon.KeyProtectionPolicyID] = "xyz"
+			req.Parameters[powerstorecommon.KeyPerformancePolicyID] = "abc"
 			res, err := ctrlSvc.CreateVolume(context.Background(), req)
 
 			gomega.Expect(err).To(gomega.BeNil())
@@ -223,18 +223,18 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 					CapacityBytes: validVolSize,
 					VolumeId:      filepath.Join(validBaseVolID, firstValidID, "scsi"),
 					VolumeContext: map[string]string{
-						common.KeyArrayID:             firstValidID,
-						common.KeyArrayVolumeName:     "my-vol",
-						common.KeyProtocol:            "scsi",
-						common.KeyVolumeDescription:   "Vol-description",
-						common.KeyAppType:             "Other",
-						common.KeyAppTypeOther:        "Android",
-						common.KeyApplianceID:         "12345",
-						common.KeyProtectionPolicyID:  "xyz",
-						common.KeyPerformancePolicyID: "abc",
+						powerstorecommon.KeyArrayID:             firstValidID,
+						powerstorecommon.KeyArrayVolumeName:     "my-vol",
+						powerstorecommon.KeyProtocol:            "scsi",
+						powerstorecommon.KeyVolumeDescription:   "Vol-description",
+						powerstorecommon.KeyAppType:             "Other",
+						powerstorecommon.KeyAppTypeOther:        "Android",
+						powerstorecommon.KeyApplianceID:         "12345",
+						powerstorecommon.KeyProtectionPolicyID:  "xyz",
+						powerstorecommon.KeyPerformancePolicyID: "abc",
 						KeyCSIPVCName:                 req.Name,
 						KeyCSIPVCNamespace:            validNamespaceName,
-						common.KeyServiceTag:          validServiceTag,
+						powerstorecommon.KeyServiceTag:          validServiceTag,
 					},
 				},
 			}))
@@ -244,7 +244,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 		var req *csi.CreateVolumeRequest
 		ginkgo.BeforeEach(func() {
 			req = getTypicalCreateVolumeRequest("my-vol", validVolSize)
-			req.Parameters[common.KeyArrayID] = firstValidID
+			req.Parameters[powerstorecommon.KeyArrayID] = firstValidID
 			req.Parameters[ctrlSvc.WithRP(KeyReplicationEnabled)] = "true"
 			req.Parameters[ctrlSvc.WithRP(KeyReplicationRPO)] = validRPO
 			req.Parameters[ctrlSvc.WithRP(KeyReplicationRemoteSystem)] = validRemoteSystemName
@@ -279,11 +279,11 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 					CapacityBytes: validVolSize,
 					VolumeId:      filepath.Join(validBaseVolID, firstValidID, "scsi"),
 					VolumeContext: map[string]string{
-						common.KeyArrayVolumeName:                      "my-vol",
-						common.KeyProtocol:                             "scsi",
-						common.KeyArrayID:                              firstValidID,
-						common.KeyVolumeDescription:                    req.Name + "-" + validNamespaceName,
-						common.KeyServiceTag:                           validServiceTag,
+						powerstorecommon.KeyArrayVolumeName:                      "my-vol",
+						powerstorecommon.KeyProtocol:                             "scsi",
+						powerstorecommon.KeyArrayID:                              firstValidID,
+						powerstorecommon.KeyVolumeDescription:                    req.Name + "-" + validNamespaceName,
+						powerstorecommon.KeyServiceTag:                           validServiceTag,
 						KeyCSIPVCName:                                  req.Name,
 						KeyCSIPVCNamespace:                             validNamespaceName,
 						ctrlSvc.WithRP(KeyReplicationEnabled):          "true",
@@ -325,11 +325,11 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 					CapacityBytes: validVolSize,
 					VolumeId:      filepath.Join(validBaseVolID, firstValidID, "scsi"),
 					VolumeContext: map[string]string{
-						common.KeyArrayVolumeName:                      "my-vol",
-						common.KeyProtocol:                             "scsi",
-						common.KeyArrayID:                              firstValidID,
-						common.KeyVolumeDescription:                    req.Name + "-" + validNamespaceName,
-						common.KeyServiceTag:                           validServiceTag,
+						powerstorecommon.KeyArrayVolumeName:                      "my-vol",
+						powerstorecommon.KeyProtocol:                             "scsi",
+						powerstorecommon.KeyArrayID:                              firstValidID,
+						powerstorecommon.KeyVolumeDescription:                    req.Name + "-" + validNamespaceName,
+						powerstorecommon.KeyServiceTag:                           validServiceTag,
 						KeyCSIPVCName:                                  req.Name,
 						KeyCSIPVCNamespace:                             validNamespaceName,
 						ctrlSvc.WithRP(KeyReplicationMode):             replicationModeSync,
@@ -381,11 +381,11 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 					CapacityBytes: validVolSize,
 					VolumeId:      filepath.Join(validBaseVolID, firstValidID, "scsi"),
 					VolumeContext: map[string]string{
-						common.KeyArrayVolumeName:                      "my-vol",
-						common.KeyProtocol:                             "scsi",
-						common.KeyArrayID:                              firstValidID,
-						common.KeyVolumeDescription:                    req.Name + "-" + validNamespaceName,
-						common.KeyServiceTag:                           validServiceTag,
+						powerstorecommon.KeyArrayVolumeName:                      "my-vol",
+						powerstorecommon.KeyProtocol:                             "scsi",
+						powerstorecommon.KeyArrayID:                              firstValidID,
+						powerstorecommon.KeyVolumeDescription:                    req.Name + "-" + validNamespaceName,
+						powerstorecommon.KeyServiceTag:                           validServiceTag,
 						KeyCSIPVCName:                                  req.Name,
 						KeyCSIPVCNamespace:                             validNamespaceName,
 						ctrlSvc.WithRP(KeyReplicationEnabled):          "true",
@@ -439,11 +439,11 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 					CapacityBytes: validVolSize,
 					VolumeId:      filepath.Join(validBaseVolID, firstValidID, "scsi"),
 					VolumeContext: map[string]string{
-						common.KeyArrayVolumeName:                      "my-vol",
-						common.KeyProtocol:                             "scsi",
-						common.KeyArrayID:                              firstValidID,
-						common.KeyVolumeDescription:                    req.Name + "-" + validNamespaceName,
-						common.KeyServiceTag:                           validServiceTag,
+						powerstorecommon.KeyArrayVolumeName:                      "my-vol",
+						powerstorecommon.KeyProtocol:                             "scsi",
+						powerstorecommon.KeyArrayID:                              firstValidID,
+						powerstorecommon.KeyVolumeDescription:                    req.Name + "-" + validNamespaceName,
+						powerstorecommon.KeyServiceTag:                           validServiceTag,
 						KeyCSIPVCName:                                  req.Name,
 						KeyCSIPVCNamespace:                             validNamespaceName,
 						ctrlSvc.WithRP(KeyReplicationMode):             replicationModeSync,
@@ -477,11 +477,11 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 					CapacityBytes: validVolSize,
 					VolumeId:      filepath.Join(validBaseVolID, firstValidID, "scsi"),
 					VolumeContext: map[string]string{
-						common.KeyArrayVolumeName:                      "my-vol",
-						common.KeyProtocol:                             "scsi",
-						common.KeyArrayID:                              firstValidID,
-						common.KeyVolumeDescription:                    req.Name + "-" + validNamespaceName,
-						common.KeyServiceTag:                           validServiceTag,
+						powerstorecommon.KeyArrayVolumeName:                      "my-vol",
+						powerstorecommon.KeyProtocol:                             "scsi",
+						powerstorecommon.KeyArrayID:                              firstValidID,
+						powerstorecommon.KeyVolumeDescription:                    req.Name + "-" + validNamespaceName,
+						powerstorecommon.KeyServiceTag:                           validServiceTag,
 						KeyCSIPVCName:                                  req.Name,
 						KeyCSIPVCNamespace:                             validNamespaceName,
 						ctrlSvc.WithRP(KeyReplicationEnabled):          "true",
@@ -517,11 +517,11 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 					CapacityBytes: validVolSize,
 					VolumeId:      filepath.Join(validBaseVolID, firstValidID, "scsi"),
 					VolumeContext: map[string]string{
-						common.KeyArrayVolumeName:                      "my-vol",
-						common.KeyProtocol:                             "scsi",
-						common.KeyArrayID:                              firstValidID,
-						common.KeyVolumeDescription:                    req.Name + "-" + validNamespaceName,
-						common.KeyServiceTag:                           validServiceTag,
+						powerstorecommon.KeyArrayVolumeName:                      "my-vol",
+						powerstorecommon.KeyProtocol:                             "scsi",
+						powerstorecommon.KeyArrayID:                              firstValidID,
+						powerstorecommon.KeyVolumeDescription:                    req.Name + "-" + validNamespaceName,
+						powerstorecommon.KeyServiceTag:                           validServiceTag,
 						KeyCSIPVCName:                                  req.Name,
 						KeyCSIPVCNamespace:                             validNamespaceName,
 						ctrlSvc.WithRP(KeyReplicationEnabled):          "true",
@@ -579,11 +579,11 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 					CapacityBytes: validVolSize,
 					VolumeId:      filepath.Join(validBaseVolID, firstValidID, "scsi"),
 					VolumeContext: map[string]string{
-						common.KeyArrayVolumeName:                      "my-vol",
-						common.KeyProtocol:                             "scsi",
-						common.KeyArrayID:                              firstValidID,
-						common.KeyVolumeDescription:                    req.Name + "-" + validNamespaceName,
-						common.KeyServiceTag:                           validServiceTag,
+						powerstorecommon.KeyArrayVolumeName:                      "my-vol",
+						powerstorecommon.KeyProtocol:                             "scsi",
+						powerstorecommon.KeyArrayID:                              firstValidID,
+						powerstorecommon.KeyVolumeDescription:                    req.Name + "-" + validNamespaceName,
+						powerstorecommon.KeyServiceTag:                           validServiceTag,
 						KeyCSIPVCName:                                  req.Name,
 						KeyCSIPVCNamespace:                             validNamespaceName,
 						ctrlSvc.WithRP(KeyReplicationEnabled):          "true",
@@ -621,11 +621,11 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 					CapacityBytes: validVolSize,
 					VolumeId:      filepath.Join(validBaseVolID, firstValidID, "scsi"),
 					VolumeContext: map[string]string{
-						common.KeyArrayVolumeName:                      "my-vol",
-						common.KeyProtocol:                             "scsi",
-						common.KeyArrayID:                              firstValidID,
-						common.KeyVolumeDescription:                    req.Name + "-" + validNamespaceName,
-						common.KeyServiceTag:                           validServiceTag,
+						powerstorecommon.KeyArrayVolumeName:                      "my-vol",
+						powerstorecommon.KeyProtocol:                             "scsi",
+						powerstorecommon.KeyArrayID:                              firstValidID,
+						powerstorecommon.KeyVolumeDescription:                    req.Name + "-" + validNamespaceName,
+						powerstorecommon.KeyServiceTag:                           validServiceTag,
 						KeyCSIPVCName:                                  req.Name,
 						KeyCSIPVCNamespace:                             validNamespaceName,
 						ctrlSvc.WithRP(KeyReplicationEnabled):          "true",
@@ -735,11 +735,11 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 					CapacityBytes: validVolSize,
 					VolumeId:      filepath.Join(validBaseVolID, firstValidID, "scsi"),
 					VolumeContext: map[string]string{
-						common.KeyArrayVolumeName:                      "my-vol",
-						common.KeyProtocol:                             "scsi",
-						common.KeyArrayID:                              firstValidID,
-						common.KeyVolumeDescription:                    req.Name + "-" + validNamespaceName,
-						common.KeyServiceTag:                           validServiceTag,
+						powerstorecommon.KeyArrayVolumeName:                      "my-vol",
+						powerstorecommon.KeyProtocol:                             "scsi",
+						powerstorecommon.KeyArrayID:                              firstValidID,
+						powerstorecommon.KeyVolumeDescription:                    req.Name + "-" + validNamespaceName,
+						powerstorecommon.KeyServiceTag:                           validServiceTag,
 						KeyCSIPVCName:                                  req.Name,
 						KeyCSIPVCNamespace:                             validNamespaceName,
 						ctrlSvc.WithRP(KeyReplicationEnabled):          "true",
@@ -860,11 +860,11 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 						CapacityBytes: validVolSize,
 						VolumeId:      fmt.Sprintf("%s/%s/%s:%s/%s", validBaseVolID, firstValidID, "scsi", validRemoteVolID, secondValidID),
 						VolumeContext: map[string]string{
-							common.KeyArrayVolumeName:                  "my-vol",
-							common.KeyProtocol:                         "scsi",
-							common.KeyArrayID:                          firstValidID,
-							common.KeyVolumeDescription:                req.Name + "-" + validNamespaceName,
-							common.KeyServiceTag:                       validServiceTag,
+							powerstorecommon.KeyArrayVolumeName:                  "my-vol",
+							powerstorecommon.KeyProtocol:                         "scsi",
+							powerstorecommon.KeyArrayID:                          firstValidID,
+							powerstorecommon.KeyVolumeDescription:                req.Name + "-" + validNamespaceName,
+							powerstorecommon.KeyServiceTag:                       validServiceTag,
 							KeyCSIPVCName:                              req.Name,
 							KeyCSIPVCNamespace:                         validNamespaceName,
 							ctrlSvc.WithRP(KeyReplicationEnabled):      "true",
@@ -903,11 +903,11 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 						CapacityBytes: validVolSize,
 						VolumeId:      fmt.Sprintf("%s/%s/%s:%s/%s", validBaseVolID, firstValidID, "scsi", validRemoteVolID, secondValidID),
 						VolumeContext: map[string]string{
-							common.KeyArrayVolumeName:                  "my-vol",
-							common.KeyProtocol:                         "scsi",
-							common.KeyArrayID:                          firstValidID,
-							common.KeyVolumeDescription:                req.Name + "-" + validNamespaceName,
-							common.KeyServiceTag:                       validServiceTag,
+							powerstorecommon.KeyArrayVolumeName:                  "my-vol",
+							powerstorecommon.KeyProtocol:                         "scsi",
+							powerstorecommon.KeyArrayID:                          firstValidID,
+							powerstorecommon.KeyVolumeDescription:                req.Name + "-" + validNamespaceName,
+							powerstorecommon.KeyServiceTag:                       validServiceTag,
 							KeyCSIPVCName:                              req.Name,
 							KeyCSIPVCNamespace:                         validNamespaceName,
 							ctrlSvc.WithRP(KeyReplicationEnabled):      "true",
@@ -990,7 +990,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			clientMock.On("GetApplianceByName", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
 
 			req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
-			req.Parameters[common.KeyArrayID] = secondValidID
+			req.Parameters[powerstorecommon.KeyArrayID] = secondValidID
 
 			req.Parameters[KeyCSIPVCName] = req.Name
 			req.Parameters[KeyCSIPVCNamespace] = validNamespaceName
@@ -1002,17 +1002,17 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 					CapacityBytes: validVolSize,
 					VolumeId:      filepath.Join(validBaseVolID, secondValidID, "nfs"),
 					VolumeContext: map[string]string{
-						common.KeyArrayVolumeName:   "my-vol",
-						common.KeyProtocol:          "nfs",
-						common.KeyArrayID:           secondValidID,
-						common.KeyNfsACL:            "A::OWNER@:RWX",
-						common.KeyNasName:           validNasName,
-						common.KeyVolumeDescription: req.Name + "-" + validNamespaceName,
-						common.KeyServiceTag:        validServiceTag,
+						powerstorecommon.KeyArrayVolumeName:   "my-vol",
+						powerstorecommon.KeyProtocol:          "nfs",
+						powerstorecommon.KeyArrayID:           secondValidID,
+						powerstorecommon.KeyNfsACL:            "A::OWNER@:RWX",
+						powerstorecommon.KeyNasName:           validNasName,
+						powerstorecommon.KeyVolumeDescription: req.Name + "-" + validNamespaceName,
+						powerstorecommon.KeyServiceTag:        validServiceTag,
 						KeyCSIPVCName:               req.Name,
 						KeyCSIPVCNamespace:          validNamespaceName,
 					},
-					AccessibleTopology: []*csi.Topology{{Segments: map[string]string{common.Name + "/" + ctrlSvc.Arrays()[secondValidID].GetIP() + "-nfs": "true"}}},
+					AccessibleTopology: []*csi.Topology{{Segments: map[string]string{powerstorecommon.Name + "/" + ctrlSvc.Arrays()[secondValidID].GetIP() + "-nfs": "true"}}},
 				},
 			}))
 		})
@@ -1025,23 +1025,23 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			clientMock.On("GetApplianceByName", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
 
 			req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
-			req.Parameters[common.KeyArrayID] = secondValidID
+			req.Parameters[powerstorecommon.KeyArrayID] = secondValidID
 
 			req.Parameters[KeyCSIPVCName] = req.Name
 			req.Parameters[KeyCSIPVCNamespace] = validNamespaceName
-			req.Parameters[common.KeyVolumeDescription] = "Vol-description"
-			req.Parameters[common.KeyConfigType] = "ConfigType_A"
-			req.Parameters[common.KeyAccessPolicy] = "AccessPolicy_A"
-			req.Parameters[common.KeyLockingPolicy] = "KeyLockingPolicy_A"
-			req.Parameters[common.KeyFolderRenamePolicy] = "KeyFolderRenamePolicy"
-			req.Parameters[common.KeyIsAsyncMtimeEnabled] = "true"
-			req.Parameters[common.KeyProtectionPolicyID] = "KeyProtectionPolicyID"
-			req.Parameters[common.KeyFileEventsPublishingMode] = "KeyFileEventsPublishingMode"
-			req.Parameters[common.KeyHostIoSize] = "VMware_16K"
-			req.Parameters[common.KeyFlrCreateMode] = "KeyFlrCreateMode"
-			req.Parameters[common.KeyFlrDefaultRetention] = "KeyFlrDefaultRetention"
-			req.Parameters[common.KeyFlrMinRetention] = "KeyFlrMinRetention"
-			req.Parameters[common.KeyFlrMaxRetention] = "KeyFlrMaxRetention"
+			req.Parameters[powerstorecommon.KeyVolumeDescription] = "Vol-description"
+			req.Parameters[powerstorecommon.KeyConfigType] = "ConfigType_A"
+			req.Parameters[powerstorecommon.KeyAccessPolicy] = "AccessPolicy_A"
+			req.Parameters[powerstorecommon.KeyLockingPolicy] = "KeyLockingPolicy_A"
+			req.Parameters[powerstorecommon.KeyFolderRenamePolicy] = "KeyFolderRenamePolicy"
+			req.Parameters[powerstorecommon.KeyIsAsyncMtimeEnabled] = "true"
+			req.Parameters[powerstorecommon.KeyProtectionPolicyID] = "KeyProtectionPolicyID"
+			req.Parameters[powerstorecommon.KeyFileEventsPublishingMode] = "KeyFileEventsPublishingMode"
+			req.Parameters[powerstorecommon.KeyHostIoSize] = "VMware_16K"
+			req.Parameters[powerstorecommon.KeyFlrCreateMode] = "KeyFlrCreateMode"
+			req.Parameters[powerstorecommon.KeyFlrDefaultRetention] = "KeyFlrDefaultRetention"
+			req.Parameters[powerstorecommon.KeyFlrMinRetention] = "KeyFlrMinRetention"
+			req.Parameters[powerstorecommon.KeyFlrMaxRetention] = "KeyFlrMaxRetention"
 
 			res, err := ctrlSvc.CreateVolume(context.Background(), req)
 			gomega.Expect(err).To(gomega.BeNil())
@@ -1050,29 +1050,29 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 					CapacityBytes: validVolSize,
 					VolumeId:      filepath.Join(validBaseVolID, secondValidID, "nfs"),
 					VolumeContext: map[string]string{
-						common.KeyArrayVolumeName:          "my-vol",
-						common.KeyProtocol:                 "nfs",
-						common.KeyArrayID:                  secondValidID,
-						common.KeyNfsACL:                   "A::OWNER@:RWX",
-						common.KeyNasName:                  validNasName,
-						common.KeyVolumeDescription:        "Vol-description",
-						common.KeyConfigType:               "ConfigType_A",
-						common.KeyAccessPolicy:             "AccessPolicy_A",
-						common.KeyLockingPolicy:            "KeyLockingPolicy_A",
-						common.KeyFolderRenamePolicy:       "KeyFolderRenamePolicy",
-						common.KeyIsAsyncMtimeEnabled:      "true",
-						common.KeyProtectionPolicyID:       "KeyProtectionPolicyID",
-						common.KeyFileEventsPublishingMode: "KeyFileEventsPublishingMode",
-						common.KeyHostIoSize:               "VMware_16K",
-						common.KeyFlrCreateMode:            "KeyFlrCreateMode",
-						common.KeyFlrDefaultRetention:      "KeyFlrDefaultRetention",
-						common.KeyFlrMinRetention:          "KeyFlrMinRetention",
-						common.KeyFlrMaxRetention:          "KeyFlrMaxRetention",
-						common.KeyServiceTag:               validServiceTag,
+						powerstorecommon.KeyArrayVolumeName:          "my-vol",
+						powerstorecommon.KeyProtocol:                 "nfs",
+						powerstorecommon.KeyArrayID:                  secondValidID,
+						powerstorecommon.KeyNfsACL:                   "A::OWNER@:RWX",
+						powerstorecommon.KeyNasName:                  validNasName,
+						powerstorecommon.KeyVolumeDescription:        "Vol-description",
+						powerstorecommon.KeyConfigType:               "ConfigType_A",
+						powerstorecommon.KeyAccessPolicy:             "AccessPolicy_A",
+						powerstorecommon.KeyLockingPolicy:            "KeyLockingPolicy_A",
+						powerstorecommon.KeyFolderRenamePolicy:       "KeyFolderRenamePolicy",
+						powerstorecommon.KeyIsAsyncMtimeEnabled:      "true",
+						powerstorecommon.KeyProtectionPolicyID:       "KeyProtectionPolicyID",
+						powerstorecommon.KeyFileEventsPublishingMode: "KeyFileEventsPublishingMode",
+						powerstorecommon.KeyHostIoSize:               "VMware_16K",
+						powerstorecommon.KeyFlrCreateMode:            "KeyFlrCreateMode",
+						powerstorecommon.KeyFlrDefaultRetention:      "KeyFlrDefaultRetention",
+						powerstorecommon.KeyFlrMinRetention:          "KeyFlrMinRetention",
+						powerstorecommon.KeyFlrMaxRetention:          "KeyFlrMaxRetention",
+						powerstorecommon.KeyServiceTag:               validServiceTag,
 						KeyCSIPVCName:                      req.Name,
 						KeyCSIPVCNamespace:                 validNamespaceName,
 					},
-					AccessibleTopology: []*csi.Topology{{Segments: map[string]string{common.Name + "/" + ctrlSvc.Arrays()[secondValidID].GetIP() + "-nfs": "true"}}},
+					AccessibleTopology: []*csi.Topology{{Segments: map[string]string{powerstorecommon.Name + "/" + ctrlSvc.Arrays()[secondValidID].GetIP() + "-nfs": "true"}}},
 				},
 			}))
 		})
@@ -1089,8 +1089,8 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				ctrlSvc.Arrays()[secondValidID].NfsAcls = "A::GROUP@:RWX"
 
 				req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
-				req.Parameters[common.KeyNfsACL] = "0777"
-				req.Parameters[common.KeyArrayID] = secondValidID
+				req.Parameters[powerstorecommon.KeyNfsACL] = "0777"
+				req.Parameters[powerstorecommon.KeyArrayID] = secondValidID
 				req.Parameters[KeyCSIPVCName] = req.Name
 				req.Parameters[KeyCSIPVCNamespace] = validNamespaceName
 
@@ -1101,17 +1101,17 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 						CapacityBytes: validVolSize,
 						VolumeId:      filepath.Join(validBaseVolID, secondValidID, "nfs"),
 						VolumeContext: map[string]string{
-							common.KeyArrayVolumeName:   "my-vol",
-							common.KeyProtocol:          "nfs",
-							common.KeyArrayID:           secondValidID,
-							common.KeyNfsACL:            "0777",
-							common.KeyNasName:           validNasName,
-							common.KeyVolumeDescription: req.Name + "-" + validNamespaceName,
-							common.KeyServiceTag:        validServiceTag,
+							powerstorecommon.KeyArrayVolumeName:   "my-vol",
+							powerstorecommon.KeyProtocol:          "nfs",
+							powerstorecommon.KeyArrayID:           secondValidID,
+							powerstorecommon.KeyNfsACL:            "0777",
+							powerstorecommon.KeyNasName:           validNasName,
+							powerstorecommon.KeyVolumeDescription: req.Name + "-" + validNamespaceName,
+							powerstorecommon.KeyServiceTag:        validServiceTag,
 							KeyCSIPVCName:               req.Name,
 							KeyCSIPVCNamespace:          validNamespaceName,
 						},
-						AccessibleTopology: []*csi.Topology{{Segments: map[string]string{common.Name + "/" + ctrlSvc.Arrays()[secondValidID].GetIP() + "-nfs": "true"}}},
+						AccessibleTopology: []*csi.Topology{{Segments: map[string]string{powerstorecommon.Name + "/" + ctrlSvc.Arrays()[secondValidID].GetIP() + "-nfs": "true"}}},
 					},
 				}))
 			})
@@ -1129,7 +1129,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				ctrlSvc.Arrays()[secondValidID].NfsAcls = "A::GROUP@:RWX"
 
 				req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
-				req.Parameters[common.KeyArrayID] = secondValidID
+				req.Parameters[powerstorecommon.KeyArrayID] = secondValidID
 				req.Parameters[KeyCSIPVCName] = req.Name
 				req.Parameters[KeyCSIPVCNamespace] = validNamespaceName
 
@@ -1140,17 +1140,17 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 						CapacityBytes: validVolSize,
 						VolumeId:      filepath.Join(validBaseVolID, secondValidID, "nfs"),
 						VolumeContext: map[string]string{
-							common.KeyArrayVolumeName:   "my-vol",
-							common.KeyProtocol:          "nfs",
-							common.KeyArrayID:           secondValidID,
-							common.KeyNfsACL:            "A::GROUP@:RWX",
-							common.KeyNasName:           validNasName,
-							common.KeyVolumeDescription: req.Name + "-" + validNamespaceName,
-							common.KeyServiceTag:        validServiceTag,
+							powerstorecommon.KeyArrayVolumeName:   "my-vol",
+							powerstorecommon.KeyProtocol:          "nfs",
+							powerstorecommon.KeyArrayID:           secondValidID,
+							powerstorecommon.KeyNfsACL:            "A::GROUP@:RWX",
+							powerstorecommon.KeyNasName:           validNasName,
+							powerstorecommon.KeyVolumeDescription: req.Name + "-" + validNamespaceName,
+							powerstorecommon.KeyServiceTag:        validServiceTag,
 							KeyCSIPVCName:               req.Name,
 							KeyCSIPVCNamespace:          validNamespaceName,
 						},
-						AccessibleTopology: []*csi.Topology{{Segments: map[string]string{common.Name + "/" + ctrlSvc.Arrays()[secondValidID].GetIP() + "-nfs": "true"}}},
+						AccessibleTopology: []*csi.Topology{{Segments: map[string]string{powerstorecommon.Name + "/" + ctrlSvc.Arrays()[secondValidID].GetIP() + "-nfs": "true"}}},
 					},
 				}))
 			})
@@ -1166,7 +1166,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				clientMock.On("GetApplianceByName", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
 
 				req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
-				req.Parameters[common.KeyArrayID] = secondValidID
+				req.Parameters[powerstorecommon.KeyArrayID] = secondValidID
 				req.Parameters[KeyCSIPVCName] = req.Name
 				req.Parameters[KeyCSIPVCNamespace] = validNamespaceName
 
@@ -1177,17 +1177,17 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 						CapacityBytes: validVolSize,
 						VolumeId:      filepath.Join(validBaseVolID, secondValidID, "nfs"),
 						VolumeContext: map[string]string{
-							common.KeyArrayVolumeName:   "my-vol",
-							common.KeyProtocol:          "nfs",
-							common.KeyArrayID:           secondValidID,
-							common.KeyNfsACL:            "A::OWNER@:RWX",
-							common.KeyNasName:           validNasName,
-							common.KeyVolumeDescription: req.Name + "-" + validNamespaceName,
-							common.KeyServiceTag:        validServiceTag,
+							powerstorecommon.KeyArrayVolumeName:   "my-vol",
+							powerstorecommon.KeyProtocol:          "nfs",
+							powerstorecommon.KeyArrayID:           secondValidID,
+							powerstorecommon.KeyNfsACL:            "A::OWNER@:RWX",
+							powerstorecommon.KeyNasName:           validNasName,
+							powerstorecommon.KeyVolumeDescription: req.Name + "-" + validNamespaceName,
+							powerstorecommon.KeyServiceTag:        validServiceTag,
 							KeyCSIPVCName:               req.Name,
 							KeyCSIPVCNamespace:          validNamespaceName,
 						},
-						AccessibleTopology: []*csi.Topology{{Segments: map[string]string{common.Name + "/" + ctrlSvc.Arrays()[secondValidID].GetIP() + "-nfs": "true"}}},
+						AccessibleTopology: []*csi.Topology{{Segments: map[string]string{powerstorecommon.Name + "/" + ctrlSvc.Arrays()[secondValidID].GetIP() + "-nfs": "true"}}},
 					},
 				}))
 			})
@@ -1203,12 +1203,12 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				clientMock.On("GetApplianceByName", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
 
 				req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
-				req.Parameters[common.KeyArrayID] = secondValidID
+				req.Parameters[powerstorecommon.KeyArrayID] = secondValidID
 				req.Parameters[KeyCSIPVCName] = req.Name
 				req.Parameters[KeyCSIPVCNamespace] = validNamespaceName
 
 				ctrlSvc.Arrays()[secondValidID].NfsAcls = ""
-				csictx.Setenv(context.Background(), common.EnvNfsAcls, "")
+				csictx.Setenv(context.Background(), powerstorecommon.EnvNfsAcls, "")
 
 				_ = ctrlSvc.Init()
 
@@ -1219,17 +1219,17 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 						CapacityBytes: validVolSize,
 						VolumeId:      filepath.Join(validBaseVolID, secondValidID, "nfs"),
 						VolumeContext: map[string]string{
-							common.KeyArrayVolumeName:   "my-vol",
-							common.KeyProtocol:          "nfs",
-							common.KeyArrayID:           secondValidID,
-							common.KeyNfsACL:            "",
-							common.KeyNasName:           validNasName,
-							common.KeyVolumeDescription: req.Name + "-" + validNamespaceName,
-							common.KeyServiceTag:        validServiceTag,
+							powerstorecommon.KeyArrayVolumeName:   "my-vol",
+							powerstorecommon.KeyProtocol:          "nfs",
+							powerstorecommon.KeyArrayID:           secondValidID,
+							powerstorecommon.KeyNfsACL:            "",
+							powerstorecommon.KeyNasName:           validNasName,
+							powerstorecommon.KeyVolumeDescription: req.Name + "-" + validNamespaceName,
+							powerstorecommon.KeyServiceTag:        validServiceTag,
 							KeyCSIPVCName:               req.Name,
 							KeyCSIPVCNamespace:          validNamespaceName,
 						},
-						AccessibleTopology: []*csi.Topology{{Segments: map[string]string{common.Name + "/" + ctrlSvc.Arrays()[secondValidID].GetIP() + "-nfs": "true"}}},
+						AccessibleTopology: []*csi.Topology{{Segments: map[string]string{powerstorecommon.Name + "/" + ctrlSvc.Arrays()[secondValidID].GetIP() + "-nfs": "true"}}},
 					},
 				}))
 			})
@@ -1238,12 +1238,12 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 		ginkgo.When("creating nfs volume without nfs topology in AccessibilityRequirements", func() {
 			ginkgo.It("should fail", func() {
 				req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
-				req.Parameters[common.KeyArrayID] = secondValidID
+				req.Parameters[powerstorecommon.KeyArrayID] = secondValidID
 
 				req.Parameters[KeyCSIPVCName] = req.Name
 				req.Parameters[KeyCSIPVCNamespace] = validNamespaceName
 
-				iscsiTopology := &csi.Topology{Segments: map[string]string{common.Name + "/" + ctrlSvc.Arrays()[secondValidID].GetIP() + "-iscsi": "true"}}
+				iscsiTopology := &csi.Topology{Segments: map[string]string{powerstorecommon.Name + "/" + ctrlSvc.Arrays()[secondValidID].GetIP() + "-iscsi": "true"}}
 				preferred := []*csi.Topology{iscsiTopology}
 				accessibilityRequirements := &csi.TopologyRequirement{Preferred: preferred}
 				req.AccessibilityRequirements = accessibilityRequirements
@@ -1265,12 +1265,12 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				clientMock.On("GetApplianceByName", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
 
 				req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
-				req.Parameters[common.KeyArrayID] = secondValidID
+				req.Parameters[powerstorecommon.KeyArrayID] = secondValidID
 
 				req.Parameters[KeyCSIPVCName] = req.Name
 				req.Parameters[KeyCSIPVCNamespace] = validNamespaceName
 
-				iscsiTopology := &csi.Topology{Segments: map[string]string{common.Name + "/" + ctrlSvc.Arrays()[secondValidID].GetIP() + "-iscis": "true"}}
+				iscsiTopology := &csi.Topology{Segments: map[string]string{powerstorecommon.Name + "/" + ctrlSvc.Arrays()[secondValidID].GetIP() + "-iscis": "true"}}
 				req.AccessibilityRequirements.Preferred = append(req.AccessibilityRequirements.Preferred, iscsiTopology)
 
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
@@ -1280,17 +1280,17 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 						CapacityBytes: validVolSize,
 						VolumeId:      filepath.Join(validBaseVolID, secondValidID, "nfs"),
 						VolumeContext: map[string]string{
-							common.KeyArrayVolumeName:   "my-vol",
-							common.KeyProtocol:          "nfs",
-							common.KeyArrayID:           secondValidID,
-							common.KeyNfsACL:            "A::OWNER@:RWX",
-							common.KeyNasName:           validNasName,
-							common.KeyVolumeDescription: req.Name + "-" + validNamespaceName,
-							common.KeyServiceTag:        validServiceTag,
+							powerstorecommon.KeyArrayVolumeName:   "my-vol",
+							powerstorecommon.KeyProtocol:          "nfs",
+							powerstorecommon.KeyArrayID:           secondValidID,
+							powerstorecommon.KeyNfsACL:            "A::OWNER@:RWX",
+							powerstorecommon.KeyNasName:           validNasName,
+							powerstorecommon.KeyVolumeDescription: req.Name + "-" + validNamespaceName,
+							powerstorecommon.KeyServiceTag:        validServiceTag,
 							KeyCSIPVCName:               req.Name,
 							KeyCSIPVCNamespace:          validNamespaceName,
 						},
-						AccessibleTopology: []*csi.Topology{{Segments: map[string]string{common.Name + "/" + ctrlSvc.Arrays()[secondValidID].GetIP() + "-nfs": "true"}}},
+						AccessibleTopology: []*csi.Topology{{Segments: map[string]string{powerstorecommon.Name + "/" + ctrlSvc.Arrays()[secondValidID].GetIP() + "-nfs": "true"}}},
 					},
 				}))
 			})
@@ -1318,7 +1318,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				clientMock.On("GetAppliance", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
 
 				req := getTypicalCreateVolumeRequest(volName, validVolSize)
-				req.Parameters[common.KeyArrayID] = firstValidID
+				req.Parameters[powerstorecommon.KeyArrayID] = firstValidID
 				req.Parameters[KeyCSIPVCName] = req.Name
 				req.Parameters[KeyCSIPVCNamespace] = validNamespaceName
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
@@ -1329,11 +1329,11 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 						CapacityBytes: validVolSize,
 						VolumeId:      filepath.Join(validBaseVolID, firstValidID, "scsi"),
 						VolumeContext: map[string]string{
-							common.KeyArrayVolumeName:   "my-vol",
-							common.KeyProtocol:          "scsi",
-							common.KeyArrayID:           firstValidID,
-							common.KeyVolumeDescription: req.Name + "-" + validNamespaceName,
-							common.KeyServiceTag:        validServiceTag,
+							powerstorecommon.KeyArrayVolumeName:   "my-vol",
+							powerstorecommon.KeyProtocol:          "scsi",
+							powerstorecommon.KeyArrayID:           firstValidID,
+							powerstorecommon.KeyVolumeDescription: req.Name + "-" + validNamespaceName,
+							powerstorecommon.KeyServiceTag:        validServiceTag,
 							KeyCSIPVCName:               req.Name,
 							KeyCSIPVCNamespace:          validNamespaceName,
 						},
@@ -1361,7 +1361,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				clientMock.On("GetApplianceByName", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
 
 				req := getTypicalCreateVolumeNFSRequest(volName, validVolSize)
-				req.Parameters[common.KeyArrayID] = secondValidID
+				req.Parameters[powerstorecommon.KeyArrayID] = secondValidID
 				req.Parameters[KeyCSIPVCName] = req.Name
 				req.Parameters[KeyCSIPVCNamespace] = validNamespaceName
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
@@ -1372,17 +1372,17 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 						CapacityBytes: validVolSize,
 						VolumeId:      filepath.Join(validBaseVolID, secondValidID, "nfs"),
 						VolumeContext: map[string]string{
-							common.KeyArrayVolumeName:   "my-vol",
-							common.KeyProtocol:          "nfs",
-							common.KeyArrayID:           secondValidID,
-							common.KeyNfsACL:            "A::OWNER@:RWX",
-							common.KeyNasName:           validNasName,
-							common.KeyVolumeDescription: req.Name + "-" + validNamespaceName,
-							common.KeyServiceTag:        validServiceTag,
+							powerstorecommon.KeyArrayVolumeName:   "my-vol",
+							powerstorecommon.KeyProtocol:          "nfs",
+							powerstorecommon.KeyArrayID:           secondValidID,
+							powerstorecommon.KeyNfsACL:            "A::OWNER@:RWX",
+							powerstorecommon.KeyNasName:           validNasName,
+							powerstorecommon.KeyVolumeDescription: req.Name + "-" + validNamespaceName,
+							powerstorecommon.KeyServiceTag:        validServiceTag,
 							KeyCSIPVCName:               req.Name,
 							KeyCSIPVCNamespace:          validNamespaceName,
 						},
-						AccessibleTopology: []*csi.Topology{{Segments: map[string]string{common.Name + "/" + ctrlSvc.Arrays()[secondValidID].GetIP() + "-nfs": "true"}}},
+						AccessibleTopology: []*csi.Topology{{Segments: map[string]string{powerstorecommon.Name + "/" + ctrlSvc.Arrays()[secondValidID].GetIP() + "-nfs": "true"}}},
 					},
 				}))
 			})
@@ -1407,7 +1407,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 					}, nil)
 
 					req := getTypicalCreateVolumeRequest(volName, validVolSize)
-					req.Parameters[common.KeyArrayID] = firstValidID
+					req.Parameters[powerstorecommon.KeyArrayID] = firstValidID
 					res, err := ctrlSvc.CreateVolume(context.Background(), req)
 
 					gomega.Expect(res).To(gomega.BeNil())
@@ -1434,7 +1434,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 					}, nil)
 
 					req := getTypicalCreateVolumeNFSRequest(volName, validVolSize)
-					req.Parameters[common.KeyArrayID] = secondValidID
+					req.Parameters[powerstorecommon.KeyArrayID] = secondValidID
 					res, err := ctrlSvc.CreateVolume(context.Background(), req)
 
 					gomega.Expect(res).To(gomega.BeNil())
@@ -1466,7 +1466,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 
 				req := getTypicalCreateVolumeRequest("my-vol", validVolSize)
 				req.VolumeContentSource = contentSource
-				req.Parameters[common.KeyArrayID] = firstValidID
+				req.Parameters[powerstorecommon.KeyArrayID] = firstValidID
 
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
 
@@ -1476,7 +1476,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 						CapacityBytes: validVolSize,
 						VolumeId:      filepath.Join(validBaseVolID, firstValidID, "scsi"),
 						VolumeContext: map[string]string{
-							common.KeyArrayID: firstValidID,
+							powerstorecommon.KeyArrayID: firstValidID,
 						},
 						ContentSource: contentSource,
 					},
@@ -1492,7 +1492,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 
 				req := getTypicalCreateVolumeRequest("my-vol", validVolSize)
 				req.VolumeContentSource = contentSource
-				req.Parameters[common.KeyArrayID] = firstValidID
+				req.Parameters[powerstorecommon.KeyArrayID] = firstValidID
 				req.Parameters[ctrlSvc.WithRP(KeyReplicationEnabled)] = "true"
 				req.Parameters[ctrlSvc.WithRP(KeyReplicationMode)] = "METRO"
 
@@ -1527,7 +1527,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 
 				req := getTypicalCreateVolumeNFSRequest(volName, validVolSize)
 				req.VolumeContentSource = contentSource
-				req.Parameters[common.KeyArrayID] = secondValidID
+				req.Parameters[powerstorecommon.KeyArrayID] = secondValidID
 
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
 
@@ -1537,10 +1537,10 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 						CapacityBytes: validVolSize,
 						VolumeId:      filepath.Join(validBaseVolID, secondValidID, "nfs"),
 						VolumeContext: map[string]string{
-							common.KeyArrayID: secondValidID,
+							powerstorecommon.KeyArrayID: secondValidID,
 						},
 						ContentSource:      contentSource,
-						AccessibleTopology: []*csi.Topology{{Segments: map[string]string{common.Name + "/" + ctrlSvc.Arrays()[secondValidID].GetIP() + "-nfs": "true"}}},
+						AccessibleTopology: []*csi.Topology{{Segments: map[string]string{powerstorecommon.Name + "/" + ctrlSvc.Arrays()[secondValidID].GetIP() + "-nfs": "true"}}},
 					},
 				}))
 			})
@@ -1571,7 +1571,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 
 				req := getTypicalCreateVolumeRequest(volName, validVolSize)
 				req.VolumeContentSource = contentSource
-				req.Parameters[common.KeyArrayID] = firstValidID
+				req.Parameters[powerstorecommon.KeyArrayID] = firstValidID
 
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
 
@@ -1581,7 +1581,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 						CapacityBytes: validVolSize,
 						VolumeId:      filepath.Join(validBaseVolID, firstValidID, "scsi"),
 						VolumeContext: map[string]string{
-							common.KeyArrayID: firstValidID,
+							powerstorecommon.KeyArrayID: firstValidID,
 						},
 						ContentSource: contentSource,
 					},
@@ -1600,7 +1600,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 
 				req := getTypicalCreateVolumeRequest(volName, validVolSize)
 				req.VolumeContentSource = contentSource
-				req.Parameters[common.KeyArrayID] = firstValidID
+				req.Parameters[powerstorecommon.KeyArrayID] = firstValidID
 				req.Parameters[ctrlSvc.WithRP(KeyReplicationEnabled)] = "true"
 				req.Parameters[ctrlSvc.WithRP(KeyReplicationMode)] = "METRO"
 
@@ -1635,7 +1635,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 
 				req := getTypicalCreateVolumeNFSRequest(volName, validVolSize)
 				req.VolumeContentSource = contentSource
-				req.Parameters[common.KeyArrayID] = secondValidID
+				req.Parameters[powerstorecommon.KeyArrayID] = secondValidID
 
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
 
@@ -1645,10 +1645,10 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 						CapacityBytes: validVolSize,
 						VolumeId:      filepath.Join(validBaseVolID, secondValidID, "nfs"),
 						VolumeContext: map[string]string{
-							common.KeyArrayID: secondValidID,
+							powerstorecommon.KeyArrayID: secondValidID,
 						},
 						ContentSource:      contentSource,
-						AccessibleTopology: []*csi.Topology{{Segments: map[string]string{common.Name + "/" + ctrlSvc.Arrays()[secondValidID].GetIP() + "-nfs": "true"}}},
+						AccessibleTopology: []*csi.Topology{{Segments: map[string]string{powerstorecommon.Name + "/" + ctrlSvc.Arrays()[secondValidID].GetIP() + "-nfs": "true"}}},
 					},
 				}))
 			})
@@ -1672,11 +1672,11 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 						CapacityBytes: validVolSize,
 						VolumeId:      filepath.Join(validBaseVolID, firstValidID, "scsi"),
 						VolumeContext: map[string]string{
-							common.KeyArrayVolumeName:   "my-vol",
-							common.KeyProtocol:          "scsi",
-							common.KeyArrayID:           firstValidID,
-							common.KeyVolumeDescription: "-",
-							common.KeyServiceTag:        validServiceTag,
+							powerstorecommon.KeyArrayVolumeName:   "my-vol",
+							powerstorecommon.KeyProtocol:          "scsi",
+							powerstorecommon.KeyArrayID:           firstValidID,
+							powerstorecommon.KeyVolumeDescription: "-",
+							powerstorecommon.KeyServiceTag:        validServiceTag,
 						},
 					},
 				}))
@@ -1686,7 +1686,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 		ginkgo.When("there array IP passed to storage class is not config", func() {
 			ginkgo.It("should fail", func() {
 				req := getTypicalCreateVolumeRequest("my-vol", validVolSize)
-				req.Parameters[common.KeyArrayID] = "127.0.0.1"
+				req.Parameters[powerstorecommon.KeyArrayID] = "127.0.0.1"
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
 
 				gomega.Expect(res).To(gomega.BeNil())
@@ -1701,7 +1701,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				req.VolumeCapabilities[0].AccessType = &csi.VolumeCapability_Block{
 					Block: &csi.VolumeCapability_BlockVolume{},
 				}
-				req.Parameters[common.KeyArrayID] = secondValidID
+				req.Parameters[powerstorecommon.KeyArrayID] = secondValidID
 				req.Parameters[KeyFsType] = "nfs"
 
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
@@ -1715,7 +1715,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				req.VolumeCapabilities[0].AccessType = &csi.VolumeCapability_Block{
 					Block: &csi.VolumeCapability_BlockVolume{},
 				}
-				req.Parameters[common.KeyArrayID] = secondValidID
+				req.Parameters[powerstorecommon.KeyArrayID] = secondValidID
 				req.Parameters[KeyFsTypeOld] = "nfs"
 
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
@@ -1754,7 +1754,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 		ginkgo.When("nfs replication", func() {
 			ginkgo.It("should fail", func() {
 				req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
-				req.Parameters[common.KeyArrayID] = secondValidID
+				req.Parameters[powerstorecommon.KeyArrayID] = secondValidID
 				req.Parameters[ctrlSvc.WithRP(KeyReplicationEnabled)] = "true"
 
 				res, err := ctrlSvc.CreateVolume(context.Background(), req)
@@ -1804,11 +1804,11 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			clientMock.On("GetApplianceByName", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
 
 			req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
-			req.Parameters[common.KeyArrayID] = secondValidID
+			req.Parameters[powerstorecommon.KeyArrayID] = secondValidID
 
 			req.Parameters[KeyCSIPVCName] = req.Name
 			req.Parameters[KeyCSIPVCNamespace] = validNamespaceName
-			req.Parameters[common.KeyNasName] = "nasA, nasB, nasC, nasX"
+			req.Parameters[powerstorecommon.KeyNasName] = "nasA, nasB, nasC, nasX"
 
 			res, err := ctrlSvc.CreateVolume(context.Background(), req)
 			gomega.Expect(err).To(gomega.BeNil())
@@ -1817,17 +1817,17 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 					CapacityBytes: validVolSize,
 					VolumeId:      filepath.Join(validBaseVolID, secondValidID, "nfs"),
 					VolumeContext: map[string]string{
-						common.KeyArrayVolumeName:   "my-vol",
-						common.KeyProtocol:          "nfs",
-						common.KeyArrayID:           secondValidID,
-						common.KeyNfsACL:            "A::OWNER@:RWX",
-						common.KeyNasName:           "nasA",
-						common.KeyVolumeDescription: req.Name + "-" + validNamespaceName,
-						common.KeyServiceTag:        validServiceTag,
+						powerstorecommon.KeyArrayVolumeName:   "my-vol",
+						powerstorecommon.KeyProtocol:          "nfs",
+						powerstorecommon.KeyArrayID:           secondValidID,
+						powerstorecommon.KeyNfsACL:            "A::OWNER@:RWX",
+						powerstorecommon.KeyNasName:           "nasA",
+						powerstorecommon.KeyVolumeDescription: req.Name + "-" + validNamespaceName,
+						powerstorecommon.KeyServiceTag:        validServiceTag,
 						KeyCSIPVCName:               req.Name,
 						KeyCSIPVCNamespace:          validNamespaceName,
 					},
-					AccessibleTopology: []*csi.Topology{{Segments: map[string]string{common.Name + "/" + ctrlSvc.Arrays()[secondValidID].GetIP() + "-nfs": "true"}}},
+					AccessibleTopology: []*csi.Topology{{Segments: map[string]string{powerstorecommon.Name + "/" + ctrlSvc.Arrays()[secondValidID].GetIP() + "-nfs": "true"}}},
 				},
 			}))
 		})
@@ -1840,11 +1840,11 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			clientMock.On("GetApplianceByName", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
 
 			req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
-			req.Parameters[common.KeyArrayID] = secondValidID
+			req.Parameters[powerstorecommon.KeyArrayID] = secondValidID
 
 			req.Parameters[KeyCSIPVCName] = req.Name
 			req.Parameters[KeyCSIPVCNamespace] = validNamespaceName
-			req.Parameters[common.KeyNasName] = "nasA"
+			req.Parameters[powerstorecommon.KeyNasName] = "nasA"
 
 			res, err := ctrlSvc.CreateVolume(context.Background(), req)
 			gomega.Expect(err).To(gomega.BeNil())
@@ -1853,17 +1853,17 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 					CapacityBytes: validVolSize,
 					VolumeId:      filepath.Join(validBaseVolID, secondValidID, "nfs"),
 					VolumeContext: map[string]string{
-						common.KeyArrayVolumeName:   "my-vol",
-						common.KeyProtocol:          "nfs",
-						common.KeyArrayID:           secondValidID,
-						common.KeyNfsACL:            "A::OWNER@:RWX",
-						common.KeyNasName:           "nasA",
-						common.KeyVolumeDescription: req.Name + "-" + validNamespaceName,
-						common.KeyServiceTag:        validServiceTag,
+						powerstorecommon.KeyArrayVolumeName:   "my-vol",
+						powerstorecommon.KeyProtocol:          "nfs",
+						powerstorecommon.KeyArrayID:           secondValidID,
+						powerstorecommon.KeyNfsACL:            "A::OWNER@:RWX",
+						powerstorecommon.KeyNasName:           "nasA",
+						powerstorecommon.KeyVolumeDescription: req.Name + "-" + validNamespaceName,
+						powerstorecommon.KeyServiceTag:        validServiceTag,
 						KeyCSIPVCName:               req.Name,
 						KeyCSIPVCNamespace:          validNamespaceName,
 					},
-					AccessibleTopology: []*csi.Topology{{Segments: map[string]string{common.Name + "/" + ctrlSvc.Arrays()[secondValidID].GetIP() + "-nfs": "true"}}},
+					AccessibleTopology: []*csi.Topology{{Segments: map[string]string{powerstorecommon.Name + "/" + ctrlSvc.Arrays()[secondValidID].GetIP() + "-nfs": "true"}}},
 				},
 			}))
 		})
@@ -1872,11 +1872,11 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			clientMock.On("GetNASServers", mock.Anything).Return([]gopowerstore.NAS{invalidNAS4}, nil)
 
 			req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
-			req.Parameters[common.KeyArrayID] = secondValidID
+			req.Parameters[powerstorecommon.KeyArrayID] = secondValidID
 
 			req.Parameters[KeyCSIPVCName] = req.Name
 			req.Parameters[KeyCSIPVCNamespace] = validNamespaceName
-			req.Parameters[common.KeyNasName] = "nasA, nasB, nasC, nasX"
+			req.Parameters[powerstorecommon.KeyNasName] = "nasA, nasB, nasC, nasX"
 
 			res, err := ctrlSvc.CreateVolume(context.Background(), req)
 			gomega.Expect(err.Error()).To(gomega.ContainSubstring("no suitable NAS server found, please ensure the NAS is running and healthy"))
@@ -1896,11 +1896,11 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			clientMock.On("GetFSByName", mock.Anything, "my-vol").Return(gopowerstore.FileSystem{}, errors.New("not nil"))
 
 			req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
-			req.Parameters[common.KeyArrayID] = secondValidID
+			req.Parameters[powerstorecommon.KeyArrayID] = secondValidID
 
 			req.Parameters[KeyCSIPVCName] = req.Name
 			req.Parameters[KeyCSIPVCNamespace] = validNamespaceName
-			req.Parameters[common.KeyNasName] = "nasA, nasB, nasC, nasX"
+			req.Parameters[powerstorecommon.KeyNasName] = "nasA, nasB, nasC, nasX"
 
 			res, err := ctrlSvc.CreateVolume(context.Background(), req)
 			gomega.Expect(err.Error()).To(gomega.ContainSubstring("The limit of 125 file systems for the NAS server"))
@@ -1921,11 +1921,11 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				})
 
 			req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
-			req.Parameters[common.KeyArrayID] = secondValidID
+			req.Parameters[powerstorecommon.KeyArrayID] = secondValidID
 
 			req.Parameters[KeyCSIPVCName] = req.Name
 			req.Parameters[KeyCSIPVCNamespace] = validNamespaceName
-			req.Parameters[common.KeyNasName] = "nasA, nasB, nasC, nasX"
+			req.Parameters[powerstorecommon.KeyNasName] = "nasA, nasB, nasC, nasX"
 
 			res, err := ctrlSvc.CreateVolume(context.Background(), req)
 			gomega.Expect(err.Error()).To(gomega.ContainSubstring("some error message"))
@@ -1940,11 +1940,11 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			clientMock.On("CreateFS", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{}, errors.New("some error message"))
 
 			req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
-			req.Parameters[common.KeyArrayID] = secondValidID
+			req.Parameters[powerstorecommon.KeyArrayID] = secondValidID
 
 			req.Parameters[KeyCSIPVCName] = req.Name
 			req.Parameters[KeyCSIPVCNamespace] = validNamespaceName
-			req.Parameters[common.KeyNasName] = "nasA, nasB, nasC, nasX"
+			req.Parameters[powerstorecommon.KeyNasName] = "nasA, nasB, nasC, nasX"
 
 			res, err := ctrlSvc.CreateVolume(context.Background(), req)
 			gomega.Expect(err.Error()).To(gomega.ContainSubstring("some error message"))
@@ -1975,10 +1975,10 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			clientMock.On("GetApplianceByName", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
 
 			req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
-			req.Parameters[common.KeyArrayID] = secondValidID
+			req.Parameters[powerstorecommon.KeyArrayID] = secondValidID
 			req.Parameters[KeyCSIPVCName] = req.Name
 			req.Parameters[KeyCSIPVCNamespace] = validNamespaceName
-			req.Parameters[common.KeyNasName] = "nasA, nasB, nasC, nasX"
+			req.Parameters[powerstorecommon.KeyNasName] = "nasA, nasB, nasC, nasX"
 
 			var err error
 			var res *csi.CreateVolumeResponse
@@ -1991,7 +1991,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			gomega.Expect(err).To(gomega.BeNil())
 			tracker := ctrlSvc.Arrays()[secondValidID].NASCooldownTracker.(*array.NASCooldown)
 			gomega.Expect(tracker.IsInCooldown("nasA")).To(gomega.BeTrue())
-			gomega.Expect(res.GetVolume().GetVolumeContext()[common.KeyNasName]).To(gomega.Equal("nasB"))
+			gomega.Expect(res.GetVolume().GetVolumeContext()[powerstorecommon.KeyNasName]).To(gomega.Equal("nasB"))
 		})
 
 		ginkgo.It("should be eligible for NAS selection in FS creation, after cooldown period has ended", func() {
@@ -2005,10 +2005,10 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				Return(gopowerstore.CreateResponse{}, errors.New("some error message")).Once()
 
 			req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
-			req.Parameters[common.KeyArrayID] = secondValidID
+			req.Parameters[powerstorecommon.KeyArrayID] = secondValidID
 			req.Parameters[KeyCSIPVCName] = req.Name
 			req.Parameters[KeyCSIPVCNamespace] = validNamespaceName
-			req.Parameters[common.KeyNasName] = "nasA, nasB, nasC, nasX"
+			req.Parameters[powerstorecommon.KeyNasName] = "nasA, nasB, nasC, nasX"
 
 			// First attempt - fails and triggers cooldown
 			res, err := ctrlSvc.CreateVolume(context.Background(), req)
@@ -2030,7 +2030,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 
 			res, err = ctrlSvc.CreateVolume(context.Background(), req)
 			gomega.Expect(err).To(gomega.BeNil())
-			gomega.Expect(res.GetVolume().GetVolumeContext()[common.KeyNasName]).To(gomega.Equal("nasA"))
+			gomega.Expect(res.GetVolume().GetVolumeContext()[powerstorecommon.KeyNasName]).To(gomega.Equal("nasA"))
 		})
 	})
 
@@ -3117,7 +3117,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			})
 			ginkgo.It("should succeed [NFS] with externalAccess", func() {
 				// setting externalAccess environment variable
-				err := csictx.Setenv(context.Background(), common.EnvExternalAccess, "10.0.0.0/24")
+				err := csictx.Setenv(context.Background(), powerstorecommon.EnvExternalAccess, "10.0.0.0/24")
 				gomega.Expect(err).To(gomega.BeNil())
 				_ = ctrlSvc.Init()
 
@@ -3170,17 +3170,17 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				gomega.Expect(err).To(gomega.BeNil())
 				gomega.Expect(res).To(gomega.Equal(&csi.ControllerPublishVolumeResponse{
 					PublishContext: map[string]string{
-						common.KeyNasName:       validNasName,
-						common.KeyNfsExportPath: secondValidID + ":/",
-						common.KeyExportID:      nfsID,
-						common.KeyAllowRoot:     "",
-						common.KeyHostIP:        "127.0.0.1",
-						common.KeyNfsACL:        "",
-						common.KeyNatIP:         "10.0.0.0/255.255.255.0",
+						powerstorecommon.KeyNasName:       validNasName,
+						powerstorecommon.KeyNfsExportPath: secondValidID + ":/",
+						powerstorecommon.KeyExportID:      nfsID,
+						powerstorecommon.KeyAllowRoot:     "",
+						powerstorecommon.KeyHostIP:        "127.0.0.1",
+						powerstorecommon.KeyNfsACL:        "",
+						powerstorecommon.KeyNatIP:         "10.0.0.0/255.255.255.0",
 					},
 				}))
 				// Removing externalAccess environment variable after our tests are completed
-				err = csictx.Setenv(context.Background(), common.EnvExternalAccess, "")
+				err = csictx.Setenv(context.Background(), powerstorecommon.EnvExternalAccess, "")
 				gomega.Expect(err).To(gomega.BeNil())
 				_ = ctrlSvc.Init()
 			})
@@ -3258,7 +3258,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 		ginkgo.When("using nfs nat feature", func() {
 			ginkgo.It("should succeed", func() {
 				externalAccess := "10.0.0.1"
-				_ = csictx.Setenv(context.Background(), common.EnvExternalAccess, externalAccess)
+				_ = csictx.Setenv(context.Background(), powerstorecommon.EnvExternalAccess, externalAccess)
 				_ = ctrlSvc.Init()
 
 				clientMock.On("GetFS", mock.Anything, validBaseVolID).
@@ -3802,7 +3802,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 
 			ginkgo.It("should succeed [NFS] with external access", func() {
 				// setting externalAccess environment variable
-				err := csictx.Setenv(context.Background(), common.EnvExternalAccess, "10.0.0.0/24")
+				err := csictx.Setenv(context.Background(), powerstorecommon.EnvExternalAccess, "10.0.0.0/24")
 				gomega.Expect(err).To(gomega.BeNil())
 				_ = ctrlSvc.Init()
 
@@ -3830,7 +3830,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				gomega.Expect(res).To(gomega.Equal(&csi.ControllerUnpublishVolumeResponse{}))
 
 				// setting externalAccess environment variable
-				err = csictx.Setenv(context.Background(), common.EnvExternalAccess, "")
+				err = csictx.Setenv(context.Background(), powerstorecommon.EnvExternalAccess, "")
 				gomega.Expect(err).To(gomega.BeNil())
 				_ = ctrlSvc.Init()
 			})
@@ -3838,7 +3838,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 
 		ginkgo.It("should succeed [NFS] by removing external access from the HostAccessList", func() {
 			// setting externalAccess environment variable
-			err := csictx.Setenv(context.Background(), common.EnvExternalAccess, "10.0.0.0/16")
+			err := csictx.Setenv(context.Background(), powerstorecommon.EnvExternalAccess, "10.0.0.0/16")
 			gomega.Expect(err).To(gomega.BeNil())
 			_ = ctrlSvc.Init()
 			clientMock.On("GetFsSnapshotsByVolumeID", mock.Anything, validBaseVolID).Return([]gopowerstore.FileSystem{}, nil)
@@ -3871,7 +3871,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			gomega.Expect(res).To(gomega.Equal(&csi.DeleteVolumeResponse{}))
 
 			// setting externalAccess environment variable
-			err = csictx.Setenv(context.Background(), common.EnvExternalAccess, "")
+			err = csictx.Setenv(context.Background(), powerstorecommon.EnvExternalAccess, "")
 
 			gomega.Expect(err).To(gomega.BeNil())
 			_ = ctrlSvc.Init()
@@ -3879,7 +3879,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 
 		ginkgo.It("should return error since HostAccessList contain external as well as Host IP too", func() {
 			// setting externalAccess environment variable
-			err := csictx.Setenv(context.Background(), common.EnvExternalAccess, "10.0.0.0/16")
+			err := csictx.Setenv(context.Background(), powerstorecommon.EnvExternalAccess, "10.0.0.0/16")
 			gomega.Expect(err).To(gomega.BeNil())
 			_ = ctrlSvc.Init()
 			clientMock.On("GetFsSnapshotsByVolumeID", mock.Anything, validBaseVolID).Return([]gopowerstore.FileSystem{}, nil)
@@ -3904,7 +3904,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			gomega.Expect(err).ToNot(gomega.BeNil())
 			gomega.Expect(err.Error()).To(gomega.ContainSubstring("cannot be deleted as it has associated NFS or SMB shares"))
 			// setting externalAccess environment variable
-			err = csictx.Setenv(context.Background(), common.EnvExternalAccess, "")
+			err = csictx.Setenv(context.Background(), powerstorecommon.EnvExternalAccess, "")
 
 			gomega.Expect(err).To(gomega.BeNil())
 			_ = ctrlSvc.Init()
@@ -5011,7 +5011,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 	ginkgo.Describe("calling ControllerGetCapabilities()", func() {
 		ginkgo.When("plugin functions correctly with health monitor capabilities", func() {
 			ginkgo.It("should return supported capabilities", func() {
-				csictx.Setenv(context.Background(), common.EnvIsHealthMonitorEnabled, "true")
+				csictx.Setenv(context.Background(), powerstorecommon.EnvIsHealthMonitorEnabled, "true")
 				ctrlSvc.Init()
 				res, err := ctrlSvc.ControllerGetCapabilities(context.Background(), &csi.ControllerGetCapabilitiesRequest{})
 				gomega.Expect(err).To(gomega.BeNil())
@@ -5107,7 +5107,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 		})
 		ginkgo.When("plugin functions correctly without health monitor capabilities", func() {
 			ginkgo.It("should return supported capabilities", func() {
-				csictx.Setenv(context.Background(), common.EnvIsHealthMonitorEnabled, "false")
+				csictx.Setenv(context.Background(), powerstorecommon.EnvIsHealthMonitorEnabled, "false")
 				ctrlSvc.Init()
 				res, err := ctrlSvc.ControllerGetCapabilities(context.Background(), &csi.ControllerGetCapabilitiesRequest{})
 				gomega.Expect(err).To(gomega.BeNil())
@@ -5897,7 +5897,7 @@ func getTypicalCreateVolumeNFSRequest(name string, size int64) *csi.CreateVolume
 	capabilities = append(capabilities, getVolumeCapabilityNFS())
 	req.VolumeCapabilities = capabilities
 
-	nfsTopology := &csi.Topology{Segments: map[string]string{common.Name + "/" + ctrlSvc.Arrays()[secondValidID].GetIP() + "-nfs": "true"}}
+	nfsTopology := &csi.Topology{Segments: map[string]string{powerstorecommon.Name + "/" + ctrlSvc.Arrays()[secondValidID].GetIP() + "-nfs": "true"}}
 	preferred := []*csi.Topology{nfsTopology}
 	accessibilityRequirements := &csi.TopologyRequirement{Preferred: preferred}
 	req.AccessibilityRequirements = accessibilityRequirements

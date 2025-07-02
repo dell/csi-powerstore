@@ -28,7 +28,7 @@ import (
 
 	"github.com/akutz/gosync"
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/dell/csi-powerstore/v2/pkg/common"
+	"github.com/dell/csi-powerstore/v2/pkg/powerstorecommon"
 	controller "github.com/dell/csi-powerstore/v2/pkg/controller"
 	"github.com/dell/gocsi/middleware/serialvolume"
 	"google.golang.org/grpc"
@@ -148,7 +148,7 @@ func (i *interceptor) createMetadataRetrieverClient(ctx context.Context) {
 	metricsManager := metrics.NewCSIMetricsManagerWithOptions("csi-metadata-retriever",
 		metrics.WithProcessStartTime(false),
 		metrics.WithSubsystem(metrics.SubsystemSidecar))
-	if retrieverAddress, ok := csictx.LookupEnv(ctx, common.EnvMetadataRetrieverEndpoint); ok {
+	if retrieverAddress, ok := csictx.LookupEnv(ctx, powerstorecommon.EnvMetadataRetrieverEndpoint); ok {
 		rpcConn, err := connection.Connect(retrieverAddress, metricsManager, connection.OnConnectionLoss(connection.ExitOnConnectionLoss()))
 		if err != nil {
 			log.Error(err.Error())
@@ -161,7 +161,7 @@ func (i *interceptor) createMetadataRetrieverClient(ctx context.Context) {
 
 		i.opts.MetadataSidecarClient = retrieverClient
 	} else {
-		log.Warn("env var not found: ", common.EnvMetadataRetrieverEndpoint)
+		log.Warn("env var not found: ", powerstorecommon.EnvMetadataRetrieverEndpoint)
 	}
 }
 

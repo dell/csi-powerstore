@@ -23,8 +23,8 @@ import (
 	"testing"
 
 	"github.com/dell/csi-powerstore/v2/pkg/array"
-	"github.com/dell/csi-powerstore/v2/pkg/common"
-	"github.com/dell/csi-powerstore/v2/pkg/common/fs"
+	"github.com/dell/csi-powerstore/v2/pkg/powerstorecommon"
+	"github.com/dell/csi-powerstore/v2/pkg/powerstorecommon/fs"
 	"github.com/dell/csm-sharednfs/nfs"
 	csiext "github.com/dell/dell-csi-extensions/replication"
 	"github.com/dell/gopowerstore"
@@ -1159,7 +1159,7 @@ func TestService_CreateRemoteVolume(t *testing.T) {
 		GlobalID:      powerstoreDefaultGID,
 		Username:      "user",
 		Password:      "password",
-		BlockProtocol: common.ISCSITransport,
+		BlockProtocol: powerstorecommon.ISCSITransport,
 		Insecure:      true,
 		IsDefault:     true,
 		Client:        nil,

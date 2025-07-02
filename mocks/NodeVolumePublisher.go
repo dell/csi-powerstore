@@ -22,7 +22,7 @@ import (
 	context "context"
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
-	fs "github.com/dell/csi-powerstore/v2/pkg/common/fs"
+	fs "github.com/dell/csi-powerstore/v2/pkg/powerstorecommon/fs"
 
 	logrus "github.com/sirupsen/logrus"
 
