@@ -28,7 +28,7 @@ import (
 	"time"
 
 	"github.com/dell/csi-powerstore/v2/pkg/array"
-	"github.com/dell/csi-powerstore/v2/pkg/common"
+	"github.com/dell/csi-powerstore/v2/pkg/identifiers"
 	"github.com/dell/goiscsi"
 	"github.com/dell/gonvme"
 	"github.com/dell/gopowerstore"
@@ -48,26 +48,26 @@ func (s *Service) startAPIService(ctx context.Context) {
 		log.Info("podmon is not enabled")
 		return
 	}
-	pollingFrequencyInSeconds = common.SetPollingFrequency(ctx)
+	pollingFrequencyInSeconds = identifiers.SetPollingFrequency(ctx)
 	s.startNodeToArrayConnectivityCheck(ctx)
 	s.apiRouter(ctx)
 }
 
 // apiRouter serves http requests
 func (s *Service) apiRouter(_ context.Context) {
-	log.Infof("starting http server on port %s", common.APIPort)
+	log.Infof("starting http server on port %s", identifiers.APIPort)
 	// create a new mux router
 	router := mux.NewRouter()
 	// route to connectivity status
 	// connectivityStatus is the handlers
-	router.HandleFunc(common.ArrayStatus, connectivityStatus).Methods("GET")
-	router.HandleFunc(common.ArrayStatus+"/"+"{arrayId}", getArrayConnectivityStatus).Methods("GET")
+	router.HandleFunc(identifiers.ArrayStatus, connectivityStatus).Methods("GET")
+	router.HandleFunc(identifiers.ArrayStatus+"/"+"{arrayId}", getArrayConnectivityStatus).Methods("GET")
 	// start http server to serve requests
 	server := &http.Server{
-		Addr:         common.APIPort,
+		Addr:         identifiers.APIPort,
 		Handler:      router,
-		ReadTimeout:  common.Timeout,
-		WriteTimeout: common.Timeout,
+		ReadTimeout:  identifiers.Timeout,
+		WriteTimeout: identifiers.Timeout,
 	}
 	err := server.ListenAndServe()
 	if err != nil {
@@ -106,12 +106,12 @@ func connectivityStatus(w http.ResponseWriter, _ *http.Request) {
 
 // MarshalSyncMapToJSON marshal the sync Map to Json
 func MarshalSyncMapToJSON(m *sync.Map) ([]byte, error) {
-	tmpMap := make(map[string]common.ArrayConnectivityStatus)
+	tmpMap := make(map[string]identifiers.ArrayConnectivityStatus)
 	m.Range(func(k, value interface{}) bool {
 		// this check is not necessary but just in case is someone in future play around this
 		switch value.(type) {
-		case common.ArrayConnectivityStatus:
-			tmpMap[k.(string)] = value.(common.ArrayConnectivityStatus)
+		case identifiers.ArrayConnectivityStatus:
+			tmpMap[k.(string)] = value.(identifiers.ArrayConnectivityStatus)
 			return true
 		default:
 			log.Errorf("invalid data is stored in cache")
@@ -164,7 +164,7 @@ func (s *Service) startNodeToArrayConnectivityCheck(ctx context.Context) {
 	for _, array := range powerStoreArray {
 		// start one goroutine for each array, so each array's nodeProbe run concurrently
 		// should we really store the status of all array instead of default one, currently podman query only default array?
-		go s.testConnectivityAndUpdateStatus(ctx, array, common.Timeout)
+		go s.testConnectivityAndUpdateStatus(ctx, array, identifiers.Timeout)
 	}
 	log.Infof("startNodeToArrayConnectivityCheck is running probes at pollingFrequency %d ", pollingFrequencyInSeconds/2)
 }
@@ -179,7 +179,7 @@ func (s *Service) testConnectivityAndUpdateStatus(ctx context.Context, array *ar
 		// if panic occurs restart new goroutine
 		go s.testConnectivityAndUpdateStatus(ctx, array, timeout)
 	}()
-	var status common.ArrayConnectivityStatus
+	var status identifiers.ArrayConnectivityStatus
 	for {
 		// add timeout to context
 		timeOutCtx, cancel := context.WithTimeout(ctx, timeout)
@@ -187,7 +187,7 @@ func (s *Service) testConnectivityAndUpdateStatus(ctx context.Context, array *ar
 		if existingStatus, ok := probeStatus.Load(array.GlobalID); !ok {
 			log.Debugf("%s not in probeStatus ", array.GlobalID)
 		} else {
-			if status, ok = existingStatus.(common.ArrayConnectivityStatus); !ok {
+			if status, ok = existingStatus.(identifiers.ArrayConnectivityStatus); !ok {
 				log.Errorf("failed to extract ArrayConnectivityStatus for array '%s'", array.GlobalID)
 			}
 		}
@@ -288,7 +288,7 @@ func (s *Service) populateTargetsInCache(array *array.PowerStoreArray) {
 		}
 		// for NVMeFC
 		if s.useFC[array.GlobalID] {
-			nvmefcInfo, err := common.GetNVMEFCTargetInfoFromStorage(array.GetClient(), "")
+			nvmefcInfo, err := identifiers.GetNVMEFCTargetInfoFromStorage(array.GetClient(), "")
 			if err != nil {
 				log.Errorf("couldn't get targets from the array: %s", err.Error())
 				return
@@ -307,7 +307,7 @@ func (s *Service) populateTargetsInCache(array *array.PowerStoreArray) {
 			}
 		} else {
 			// for NVMeTCP
-			infoList, err := common.GetNVMETCPTargetsInfoFromStorage(array.GetClient(), "")
+			infoList, err := identifiers.GetNVMETCPTargetsInfoFromStorage(array.GetClient(), "")
 			if err != nil {
 				log.Errorf("couldn't get targets from array: %s", err.Error())
 				return
@@ -333,7 +333,7 @@ func (s *Service) populateTargetsInCache(array *array.PowerStoreArray) {
 		if len(s.iscsiTargets[array.GlobalID]) != 0 {
 			return
 		}
-		infoList, err := common.GetISCSITargetsInfoFromStorage(array.GetClient(), "")
+		infoList, err := identifiers.GetISCSITargetsInfoFromStorage(array.GetClient(), "")
 		if err != nil {
 			log.Errorf("couldn't get targets from array: %s", err.Error())
 			return

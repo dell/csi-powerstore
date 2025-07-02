@@ -16,7 +16,7 @@
  *
  */
 
-package common
+package identifiers
 
 const (
 	// EnvDriverName is the name of the csi driver (provisioner)

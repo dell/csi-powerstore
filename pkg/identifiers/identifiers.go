@@ -16,8 +16,8 @@
  *
  */
 
-// Package common provides common constants, variables and function used in both controller and node services.
-package common
+// Package identifiers provides common constants, variables and function used in both controller and node services.
+package identifiers
 
 import (
 	"bytes"
@@ -37,7 +37,7 @@ import (
 	"github.com/apparentlymart/go-cidr/cidr"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-powerstore/v2/core"
-	"github.com/dell/csi-powerstore/v2/pkg/common/fs"
+	"github.com/dell/csi-powerstore/v2/pkg/identifiers/fs"
 	"github.com/dell/gobrick"
 	csictx "github.com/dell/gocsi/context"
 	"github.com/dell/gocsi/utils"

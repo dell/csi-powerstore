@@ -4,7 +4,7 @@ package mocks
 
 import (
 	array "github.com/dell/csi-powerstore/v2/pkg/array"
-	fs "github.com/dell/csi-powerstore/v2/pkg/common/fs"
+	fs "github.com/dell/csi-powerstore/v2/pkg/identifiers/fs"
 
 	mock "github.com/stretchr/testify/mock"
 )
