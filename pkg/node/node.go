@@ -665,8 +665,7 @@ func (s *Service) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolume
 	}
 
 	if !filepath.IsAbs(volumePath) {
-		return nil, status.Error(codes.NotFound,
-			"no volume Path provided")
+		return nil, status.Error(codes.NotFound, "no volume Path provided")
 	}
 
 	// parse volume Id
