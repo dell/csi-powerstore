@@ -36,10 +36,10 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-powerstore/v2/pkg/array"
-	"github.com/dell/csi-powerstore/v2/pkg/common"
-	"github.com/dell/csi-powerstore/v2/pkg/common/fs"
-	"github.com/dell/csi-powerstore/v2/pkg/common/k8sutils"
 	"github.com/dell/csi-powerstore/v2/pkg/controller"
+	"github.com/dell/csi-powerstore/v2/pkg/identifiers"
+	"github.com/dell/csi-powerstore/v2/pkg/identifiers/fs"
+	"github.com/dell/csi-powerstore/v2/pkg/identifiers/k8sutils"
 	"github.com/dell/gobrick"
 	csictx "github.com/dell/gocsi/context"
 	"github.com/dell/gofsutil"
@@ -123,7 +123,7 @@ func (s *Service) Init() error {
 		return fmt.Errorf("can't get initiators of the node: %s", err.Error())
 	}
 
-	if isPodmonEnabled, ok := csictx.LookupEnv(ctx, common.EnvPodmonEnabled); ok {
+	if isPodmonEnabled, ok := csictx.LookupEnv(ctx, identifiers.EnvPodmonEnabled); ok {
 		// in case of any error in reading/parsing the env variable default value will be false
 		s.isPodmonEnabled, _ = strconv.ParseBool(isPodmonEnabled)
 	}
@@ -143,7 +143,7 @@ func (s *Service) Init() error {
 
 	// Setup host on each of available arrays
 	for _, arr := range s.Arrays() {
-		if arr.BlockProtocol == common.NoneTransport {
+		if arr.BlockProtocol == identifiers.NoneTransport {
 			continue
 		}
 
@@ -151,25 +151,25 @@ func (s *Service) Init() error {
 		var useNVME, useFC bool
 
 		switch arr.BlockProtocol {
-		case common.NVMETCPTransport:
+		case identifiers.NVMETCPTransport:
 			if len(nvmeInitiators) == 0 {
 				log.Errorf("NVMeTCP transport was requested but NVMe initiator is not available")
 			}
 			useNVME = true
 			useFC = false
-		case common.NVMEFCTransport:
+		case identifiers.NVMEFCTransport:
 			if len(nvmeInitiators) == 0 {
 				log.Errorf("NVMeFC transport was requested but NVMe initiator is not available")
 			}
 			useNVME = true
 			useFC = true
-		case common.ISCSITransport:
+		case identifiers.ISCSITransport:
 			if len(iscsiInitiators) == 0 {
 				log.Errorf("iSCSI transport was requested but iSCSI initiator is not available")
 			}
 			useNVME = false
 			useFC = false
-		case common.FcTransport:
+		case identifiers.FcTransport:
 			if len(fcInitiators) == 0 {
 				log.Errorf("FC transport was requested but FC initiator is not available")
 			}
@@ -204,7 +204,7 @@ func (s *Service) Init() error {
 		}
 	}
 
-	if isHealthMonitorEnabled, ok := csictx.LookupEnv(ctx, common.EnvIsHealthMonitorEnabled); ok {
+	if isHealthMonitorEnabled, ok := csictx.LookupEnv(ctx, identifiers.EnvIsHealthMonitorEnabled); ok {
 		s.isHealthMonitorEnabled, _ = strconv.ParseBool(isHealthMonitorEnabled)
 	}
 
@@ -213,7 +213,7 @@ func (s *Service) Init() error {
 }
 
 func (s *Service) initConnectors() {
-	gobrick.SetLogger(&common.CustomLogger{})
+	gobrick.SetLogger(&identifiers.CustomLogger{})
 
 	if s.iscsiConnector == nil {
 		s.iscsiConnector = gobrick.NewISCSIConnector(
@@ -281,7 +281,7 @@ func (s *Service) checkForDuplicateUUIDs() {
 
 // NodeStageVolume prepares volume to be consumed by node publish by connecting volume to the node
 func (s *Service) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
-	logFields := common.GetLogFields(ctx)
+	logFields := identifiers.GetLogFields(ctx)
 
 	if req.GetVolumeCapability() == nil {
 		return nil, status.Error(codes.InvalidArgument, "volume capability is required")
@@ -345,7 +345,7 @@ func (s *Service) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeR
 
 // NodeUnstageVolume reverses steps done in NodeStage by disconnecting volume from the node
 func (s *Service) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest) (*csi.NodeUnstageVolumeResponse, error) {
-	logFields := common.GetLogFields(ctx)
+	logFields := identifiers.GetLogFields(ctx)
 	var err error
 
 	id := req.GetVolumeId()
@@ -416,7 +416,7 @@ func (s *Service) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVol
 
 	f := log.Fields{"Device": device}
 
-	connectorCtx := common.SetLogFields(context.Background(), logFields)
+	connectorCtx := identifiers.SetLogFields(context.Background(), logFields)
 
 	if s.useNVME[arr.GlobalID] {
 		err = s.nvmeConnector.DisconnectVolumeByDeviceName(connectorCtx, device)
@@ -442,7 +442,7 @@ func (s *Service) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVol
 func unstageVolume(ctx context.Context, stagingPath, id string, logFields log.Fields, err error, fs fs.Interface) (string, error) {
 	logFields["ID"] = id
 	logFields["StagingPath"] = stagingPath
-	ctx = common.SetLogFields(ctx, logFields)
+	ctx = identifiers.SetLogFields(ctx, logFields)
 
 	log.WithFields(logFields).Info("calling unstage")
 
@@ -511,7 +511,7 @@ func removeRemnantMounts(ctx context.Context, stagingPath string, fs fs.Interfac
 
 // NodePublishVolume publishes volume to the node by mounting it to the target path
 func (s *Service) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
-	logFields := common.GetLogFields(ctx)
+	logFields := identifiers.GetLogFields(ctx)
 	var ephemeralVolume bool
 	isHBN := nfs.IsNFSVolumeID(req.VolumeId)
 	if isHBN {
@@ -562,7 +562,7 @@ func (s *Service) NodePublishVolume(ctx context.Context, req *csi.NodePublishVol
 	logFields["TargetPath"] = targetPath
 	logFields["StagingPath"] = stagingPath
 	logFields["ReadOnly"] = req.GetReadonly()
-	ctx = common.SetLogFields(ctx, logFields)
+	ctx = identifiers.SetLogFields(ctx, logFields)
 
 	log.WithFields(logFields).Info("calling publish")
 
@@ -586,7 +586,7 @@ func (s *Service) NodePublishVolume(ctx context.Context, req *csi.NodePublishVol
 
 // NodeUnpublishVolume unpublishes volume from the node by unmounting it from the target path
 func (s *Service) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) {
-	logFields := common.GetLogFields(ctx)
+	logFields := identifiers.GetLogFields(ctx)
 	var err error
 
 	targetPath := req.GetTargetPath()
@@ -607,7 +607,7 @@ func (s *Service) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublis
 	}
 	logFields["ID"] = volID
 	logFields["TargetPath"] = targetPath
-	ctx = common.SetLogFields(ctx, logFields)
+	ctx = identifiers.SetLogFields(ctx, logFields)
 	log.WithFields(logFields).Info("calling unpublish")
 
 	_, found, err := getTargetMount(ctx, targetPath, s.Fs)
@@ -662,6 +662,10 @@ func (s *Service) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolume
 	volumePath := req.GetVolumePath()
 	if len(volumePath) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "no volume Path provided")
+	}
+
+	if !filepath.IsAbs(volumePath) {
+		return nil, status.Error(codes.NotFound, "no volume Path provided")
 	}
 
 	// parse volume Id
@@ -950,7 +954,7 @@ func (s *Service) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolum
 				fmt.Sprintf("Failed to find mount info for (%s) with error (%s)", vol.Name, err.Error()))
 		}
 
-		mntFlags := common.GetMountFlags(req.GetVolumeCapability())
+		mntFlags := identifiers.GetMountFlags(req.GetVolumeCapability())
 		err = s.Fs.GetUtil().Mount(ctx, disklocation, targetmount, "", mntFlags...)
 		if err != nil {
 			return nil, status.Error(codes.Internal,
@@ -1182,21 +1186,21 @@ func (s *Service) NodeGetInfo(ctx context.Context, _ *csi.NodeGetInfoRequest) (*
 	}
 
 	for _, arr := range s.Arrays() {
-		if isNFSEnabled, err := common.IsNFSServiceEnabled(ctx, arr.GetClient()); err != nil {
+		if isNFSEnabled, err := identifiers.IsNFSServiceEnabled(ctx, arr.GetClient()); err != nil {
 			log.Errorf("failed to validate NFS service for the array: %s", err.Error())
 		} else if isNFSEnabled {
 			log.Info("NFS service is enabled on the array ", arr.GetGlobalID())
 			_, err := getOutboundIP(arr.GetIP(), s.Fs)
 			if err == nil {
-				resp.AccessibleTopology.Segments[common.Name+"/"+arr.GetIP()+"-nfs"] = "true"
+				resp.AccessibleTopology.Segments[identifiers.Name+"/"+arr.GetIP()+"-nfs"] = "true"
 			} else {
 				log.Errorf("Error: failed to get ip details: %s\n", err.Error())
 			}
 		}
-		if arr.BlockProtocol != common.NoneTransport {
+		if arr.BlockProtocol != identifiers.NoneTransport {
 			if s.useNVME[arr.GlobalID] {
 				if s.useFC[arr.GlobalID] {
-					nvmefcInfo, err := common.GetNVMEFCTargetInfoFromStorage(arr.GetClient(), "")
+					nvmefcInfo, err := identifiers.GetNVMEFCTargetInfoFromStorage(arr.GetClient(), "")
 					if err != nil {
 						log.Errorf("couldn't get targets from the array: %s", err.Error())
 						continue
@@ -1222,11 +1226,11 @@ func (s *Service) NodeGetInfo(ctx context.Context, _ *csi.NodeGetInfoRequest) (*
 						}
 					}
 					if nvmefcConnectCount != 0 {
-						resp.AccessibleTopology.Segments[common.Name+"/"+arr.GetIP()+"-nvmefc"] = "true"
+						resp.AccessibleTopology.Segments[identifiers.Name+"/"+arr.GetIP()+"-nvmefc"] = "true"
 					}
 				} else {
 					// useNVME/TCP
-					infoList, err := common.GetNVMETCPTargetsInfoFromStorage(arr.GetClient(), "")
+					infoList, err := identifiers.GetNVMETCPTargetsInfoFromStorage(arr.GetClient(), "")
 					if err != nil {
 						log.Errorf("couldn't get targets from array: %s", err.Error())
 						continue
@@ -1256,7 +1260,7 @@ func (s *Service) NodeGetInfo(ctx context.Context, _ *csi.NodeGetInfoRequest) (*
 						loginToAtleastOneTarget = true
 					}
 					if loginToAtleastOneTarget {
-						resp.AccessibleTopology.Segments[common.Name+"/"+arr.GetIP()+"-nvmetcp"] = "true"
+						resp.AccessibleTopology.Segments[identifiers.Name+"/"+arr.GetIP()+"-nvmetcp"] = "true"
 					} else {
 						s.useNFS = true
 					}
@@ -1265,7 +1269,7 @@ func (s *Service) NodeGetInfo(ctx context.Context, _ *csi.NodeGetInfoRequest) (*
 				// Check node initiators connection to array
 				nodeID := s.nodeID
 				if s.reusedHost {
-					ipList := common.GetIPListFromString(nodeID)
+					ipList := identifiers.GetIPListFromString(nodeID)
 					if ipList == nil || len(ipList) == 0 {
 						log.Errorf("can't find ip in nodeID %s", nodeID)
 						continue
@@ -1289,7 +1293,7 @@ func (s *Service) NodeGetInfo(ctx context.Context, _ *csi.NodeGetInfoRequest) (*
 				}
 
 				if len(host.Initiators[0].ActiveSessions) != 0 {
-					resp.AccessibleTopology.Segments[common.Name+"/"+arr.GetIP()+"-fc"] = "true"
+					resp.AccessibleTopology.Segments[identifiers.Name+"/"+arr.GetIP()+"-fc"] = "true"
 				} else {
 					log.WithFields(log.Fields{
 						"hostName":  host.Name,
@@ -1298,7 +1302,7 @@ func (s *Service) NodeGetInfo(ctx context.Context, _ *csi.NodeGetInfoRequest) (*
 					continue
 				}
 			} else {
-				infoList, err := common.GetISCSITargetsInfoFromStorage(arr.GetClient(), "")
+				infoList, err := identifiers.GetISCSITargetsInfoFromStorage(arr.GetClient(), "")
 				if err != nil {
 					log.Errorf("couldn't get targets from array: %s", err.Error())
 					continue
@@ -1329,7 +1333,7 @@ func (s *Service) NodeGetInfo(ctx context.Context, _ *csi.NodeGetInfoRequest) (*
 				}
 				// login is also performed as a part of ConnectVolume by using dynamically created chap credentials, In case if it fails here
 				if len(iscsiTargets) > 0 {
-					resp.AccessibleTopology.Segments[common.Name+"/"+arr.GetIP()+"-iscsi"] = "true"
+					resp.AccessibleTopology.Segments[identifiers.Name+"/"+arr.GetIP()+"-iscsi"] = "true"
 				}
 				loginToAtleastOneTarget := false
 				for _, target := range iscsiTargets {
@@ -2075,7 +2079,7 @@ func (s *Service) registerHost(
 		HostConnectivity: connType,
 	}
 
-	if s.opts.KubeNodeName != "" && common.IsK8sMetadataSupported(client) {
+	if s.opts.KubeNodeName != "" && identifiers.IsK8sMetadataSupported(client) {
 		metadata := map[string]string{"k8s_node_name": s.opts.KubeNodeName}
 		createParams.Metadata = &metadata
 

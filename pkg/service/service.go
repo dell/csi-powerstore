@@ -22,8 +22,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dell/csi-powerstore/v2/pkg/common"
 	"github.com/dell/csi-powerstore/v2/pkg/controller"
+	"github.com/dell/csi-powerstore/v2/pkg/identifiers"
 	"github.com/dell/csi-powerstore/v2/pkg/node"
 	"github.com/dell/csm-sharednfs/nfs"
 	"github.com/dell/gocsi"
@@ -59,13 +59,13 @@ func New() nfs.Service {
 	return &service{}
 }
 
-func (s *service) BeforeServe(ctx context.Context, sp *gocsi.StoragePlugin, lis net.Listener) error {
+func (s *service) BeforeServe(ctx context.Context, _ *gocsi.StoragePlugin, _ net.Listener) error {
 	log.Info("-----Inside Before Serve-----")
 	// Get the SP's operating mode.
 	s.mode = csictx.Getenv(ctx, gocsi.EnvVarMode)
 	log.Info("Driver Mode:", s.mode)
 	// TODO: add nfs code here
-	nodeName := os.Getenv(common.EnvKubeNodeName)
+	nodeName := os.Getenv(identifiers.EnvKubeNodeName)
 	if nodeName == "" {
 		nodeName = os.Getenv("KUBE_NODE_NAME")
 	}
@@ -75,26 +75,28 @@ func (s *service) BeforeServe(ctx context.Context, sp *gocsi.StoragePlugin, lis 
 	}
 
 	if s.mode == "node" {
-		nodeRoot := os.Getenv(common.EnvNodeChrootPath)
+		nodeRoot := os.Getenv(identifiers.EnvNodeChrootPath)
 		if nodeRoot == "" {
 			return fmt.Errorf("X_CSI_POWERSTORE_NODE_CHROOT_PATH environment variable not set")
 		}
 		nfs.NodeRoot = nodeRoot
 	}
 
+	log.Infof("Setting node name env to %s for NFS", nodeName)
 	err := os.Setenv("X_CSI_NODE_NAME", nodeName)
 	if err != nil {
 		log.Errorf("failed to set env X_CSI_NODE_NAME. err: %s", err.Error())
 		return err
 	}
 
-	log.Infof("Setting node name env to %s for NFS", nodeName)
-
-	err = nfssvc.BeforeServe(ctx, sp, lis)
-	if err != nil {
-		log.Errorf("unable to start up nfsserver: %s", err.Error())
-	}
-
+	// The block is commented out for performance issue caused by sharednfs even when it's disabled.
+	// Remove the comment when enabling sharednfs feature.
+	/*
+		err = nfssvc.BeforeServe(ctx, sp, lis)
+		if err != nil {
+			log.Errorf("unable to start up nfsserver: %s", err.Error())
+		}
+	*/
 	return nil
 }
 
@@ -106,7 +108,7 @@ func (s *service) ProcessMapSecretChange() error {
 	// Update dynamic config params
 	vc := viper.New()
 	vc.AutomaticEnv()
-	paramsPath, ok := csictx.LookupEnv(context.Background(), common.EnvConfigParamsFilePath)
+	paramsPath, ok := csictx.LookupEnv(context.Background(), identifiers.EnvConfigParamsFilePath)
 	if !ok {
 		log.Warnf("config path X_CSI_POWERSTORE_CONFIG_PARAMS_PATH is not specified")
 	}

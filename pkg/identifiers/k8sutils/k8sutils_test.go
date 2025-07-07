@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	"github.com/dell/csi-powerstore/v2/mocks"
-	"github.com/dell/csi-powerstore/v2/pkg/common/k8sutils"
+	"github.com/dell/csi-powerstore/v2/pkg/identifiers/k8sutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	corev1 "k8s.io/api/core/v1"

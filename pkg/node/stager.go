@@ -30,8 +30,8 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-powerstore/v2/pkg/array"
-	"github.com/dell/csi-powerstore/v2/pkg/common"
-	"github.com/dell/csi-powerstore/v2/pkg/common/fs"
+	"github.com/dell/csi-powerstore/v2/pkg/identifiers"
+	"github.com/dell/csi-powerstore/v2/pkg/identifiers/fs"
 	"github.com/dell/gobrick"
 	"github.com/dell/gopowerstore"
 	log "github.com/sirupsen/logrus"
@@ -50,7 +50,7 @@ type VolumeStager interface {
 }
 
 // ReachableEndPoint checks if the endpoint is reachable or not
-var ReachableEndPoint = common.ReachableEndPoint
+var ReachableEndPoint = identifiers.ReachableEndPoint
 
 // SCSIStager implementation of NodeVolumeStager for SCSI based (FC, iSCSI) volumes
 type SCSIStager struct {
@@ -86,7 +86,7 @@ func (s *SCSIStager) Stage(ctx context.Context, req *csi.NodeStageVolumeRequest,
 	logFields["WWN"] = publishContext.deviceWWN
 	logFields["Lun"] = publishContext.volumeLUNAddress
 	logFields["StagingPath"] = stagingPath
-	ctx = common.SetLogFields(ctx, logFields)
+	ctx = identifiers.SetLogFields(ctx, logFields)
 
 	found, ready, err := isReadyToPublish(ctx, stagingPath, fs)
 	if err != nil {
@@ -118,7 +118,7 @@ func (s *SCSIStager) Stage(ctx context.Context, req *csi.NodeStageVolumeRequest,
 	}
 	log.WithFields(logFields).Info("target path successfully created")
 
-	mntFlags := common.GetMountFlags(req.GetVolumeCapability())
+	mntFlags := identifiers.GetMountFlags(req.GetVolumeCapability())
 	if err := fs.GetUtil().BindMount(ctx, devicePath, stagingPath, mntFlags...); err != nil {
 		return nil, status.Errorf(codes.Internal,
 			"error bind disk %s to target path: %s", devicePath, err.Error())
@@ -141,14 +141,14 @@ func (n *NFSStager) Stage(ctx context.Context, req *csi.NodeStageVolumeRequest,
 
 	id, stagingPath = getStagingPath(ctx, stagingPath, id)
 
-	hostIP := req.PublishContext[common.KeyHostIP]
-	exportID := req.PublishContext[common.KeyExportID]
-	nfsExport := req.PublishContext[common.KeyNfsExportPath]
-	allowRoot := req.PublishContext[common.KeyAllowRoot]
-	nasName := req.PublishContext[common.KeyNasName]
+	hostIP := req.PublishContext[identifiers.KeyHostIP]
+	exportID := req.PublishContext[identifiers.KeyExportID]
+	nfsExport := req.PublishContext[identifiers.KeyNfsExportPath]
+	allowRoot := req.PublishContext[identifiers.KeyAllowRoot]
+	nasName := req.PublishContext[identifiers.KeyNasName]
 
 	natIP := ""
-	if ip, ok := req.PublishContext[common.KeyNatIP]; ok {
+	if ip, ok := req.PublishContext[identifiers.KeyNatIP]; ok {
 		natIP = ip
 	}
 
@@ -159,9 +159,9 @@ func (n *NFSStager) Stage(ctx context.Context, req *csi.NodeStageVolumeRequest,
 	logFields["ExportID"] = exportID
 	logFields["HostIP"] = hostIP
 	logFields["NatIP"] = natIP
-	logFields["NFSv4ACLs"] = req.PublishContext[common.KeyNfsACL]
+	logFields["NFSv4ACLs"] = req.PublishContext[identifiers.KeyNfsACL]
 	logFields["NasName"] = nasName
-	ctx = common.SetLogFields(ctx, logFields)
+	ctx = identifiers.SetLogFields(ctx, logFields)
 
 	found, err := isReadyToPublishNFS(ctx, stagingPath, fs)
 	if err != nil {
@@ -179,7 +179,7 @@ func (n *NFSStager) Stage(ctx context.Context, req *csi.NodeStageVolumeRequest,
 	}
 	log.WithFields(logFields).Info("stage path successfully created")
 
-	mntFlags := common.GetMountFlags(req.GetVolumeCapability())
+	mntFlags := identifiers.GetMountFlags(req.GetVolumeCapability())
 	if err := fs.GetUtil().Mount(ctx, nfsExport, stagingPath, "", mntFlags...); err != nil {
 		return nil, status.Errorf(codes.Internal,
 			"error mount nfs share %s to target path: %s", nfsExport, err.Error())
@@ -192,7 +192,7 @@ func (n *NFSStager) Stage(ctx context.Context, req *csi.NodeStageVolumeRequest,
 	}
 
 	mode := os.ModePerm
-	acls := req.PublishContext[common.KeyNfsACL]
+	acls := req.PublishContext[identifiers.KeyNfsACL]
 	aclsConfigured := false
 	if acls != "" {
 		if posixMode(acls) {
@@ -258,11 +258,11 @@ type scsiPublishContextData struct {
 func readSCSIInfoFromPublishContext(publishContext map[string]string, useFC bool, useNVMe bool, isRemote bool) (scsiPublishContextData, error) {
 	// Get publishContext
 	var data scsiPublishContextData
-	deviceWwnKey := common.PublishContextDeviceWWN
-	lunAddressKey := common.PublishContextLUNAddress
+	deviceWwnKey := identifiers.PublishContextDeviceWWN
+	lunAddressKey := identifiers.PublishContextLUNAddress
 	if isRemote {
-		deviceWwnKey = common.PublishContextRemoteDeviceWWN
-		lunAddressKey = common.PublishContextRemoteLUNAddress
+		deviceWwnKey = identifiers.PublishContextRemoteDeviceWWN
+		lunAddressKey = identifiers.PublishContextRemoteLUNAddress
 	}
 
 	deviceWWN, ok := publishContext[deviceWwnKey]
@@ -298,11 +298,11 @@ func readSCSIInfoFromPublishContext(publishContext map[string]string, useFC bool
 
 func readISCSITargetsFromPublishContext(pc map[string]string, isRemote bool) []gobrick.ISCSITargetInfo {
 	var targets []gobrick.ISCSITargetInfo
-	iscsiTargetsKey := common.PublishContextISCSITargetsPrefix
-	iscsiPortalsKey := common.PublishContextISCSIPortalsPrefix
+	iscsiTargetsKey := identifiers.PublishContextISCSITargetsPrefix
+	iscsiPortalsKey := identifiers.PublishContextISCSIPortalsPrefix
 	if isRemote {
-		iscsiTargetsKey = common.PublishContextRemoteISCSITargetsPrefix
-		iscsiPortalsKey = common.PublishContextRemoteISCSIPortalsPrefix
+		iscsiTargetsKey = identifiers.PublishContextRemoteISCSITargetsPrefix
+		iscsiPortalsKey = identifiers.PublishContextRemoteISCSIPortalsPrefix
 	}
 	for i := 0; ; i++ {
 		target := gobrick.ISCSITargetInfo{}
@@ -329,11 +329,11 @@ func readISCSITargetsFromPublishContext(pc map[string]string, isRemote bool) []g
 
 func readNVMETCPTargetsFromPublishContext(pc map[string]string, isRemote bool) []gobrick.NVMeTargetInfo {
 	var targets []gobrick.NVMeTargetInfo
-	nvmeTCPTargetsKey := common.PublishContextNVMETCPTargetsPrefix
-	nvmeTCPPortalsKey := common.PublishContextNVMETCPPortalsPrefix
+	nvmeTCPTargetsKey := identifiers.PublishContextNVMETCPTargetsPrefix
+	nvmeTCPPortalsKey := identifiers.PublishContextNVMETCPPortalsPrefix
 	if isRemote {
-		nvmeTCPTargetsKey = common.PublishContextRemoteNVMETCPTargetsPrefix
-		nvmeTCPPortalsKey = common.PublishContextRemoteNVMETCPPortalsPrefix
+		nvmeTCPTargetsKey = identifiers.PublishContextRemoteNVMETCPTargetsPrefix
+		nvmeTCPPortalsKey = identifiers.PublishContextRemoteNVMETCPPortalsPrefix
 	}
 	for i := 0; ; i++ {
 		target := gobrick.NVMeTargetInfo{}
@@ -356,11 +356,11 @@ func readNVMETCPTargetsFromPublishContext(pc map[string]string, isRemote bool) [
 
 func readNVMEFCTargetsFromPublishContext(pc map[string]string, isRemote bool) []gobrick.NVMeTargetInfo {
 	var targets []gobrick.NVMeTargetInfo
-	nvmeFcTargetsKey := common.PublishContextNVMEFCTargetsPrefix
-	nvmeFcPortalsKey := common.PublishContextNVMEFCPortalsPrefix
+	nvmeFcTargetsKey := identifiers.PublishContextNVMEFCTargetsPrefix
+	nvmeFcPortalsKey := identifiers.PublishContextNVMEFCPortalsPrefix
 	if isRemote {
-		nvmeFcTargetsKey = common.PublishContextRemoteNVMEFCTargetsPrefix
-		nvmeFcPortalsKey = common.PublishContextRemoteNVMEFCPortalsPrefix
+		nvmeFcTargetsKey = identifiers.PublishContextRemoteNVMEFCTargetsPrefix
+		nvmeFcPortalsKey = identifiers.PublishContextRemoteNVMEFCPortalsPrefix
 	}
 	for i := 0; ; i++ {
 		target := gobrick.NVMeTargetInfo{}
@@ -383,9 +383,9 @@ func readNVMEFCTargetsFromPublishContext(pc map[string]string, isRemote bool) []
 
 func readFCTargetsFromPublishContext(pc map[string]string, isRemote bool) []gobrick.FCTargetInfo {
 	var targets []gobrick.FCTargetInfo
-	fcWwpnKey := common.PublishContextFCWWPNPrefix
+	fcWwpnKey := identifiers.PublishContextFCWWPNPrefix
 	if isRemote {
-		fcWwpnKey = common.PublishContextRemoteFCWWPNPrefix
+		fcWwpnKey = identifiers.PublishContextRemoteFCWWPNPrefix
 	}
 	for i := 0; ; i++ {
 		wwpn, tfound := pc[fmt.Sprintf("%s%d", fcWwpnKey, i)]
@@ -399,7 +399,7 @@ func readFCTargetsFromPublishContext(pc map[string]string, isRemote bool) []gobr
 }
 
 func (s *SCSIStager) connectDevice(ctx context.Context, data scsiPublishContextData) (string, error) {
-	logFields := common.GetLogFields(ctx)
+	logFields := identifiers.GetLogFields(ctx)
 	var err error
 	lun, err := strconv.Atoi(data.volumeLUNAddress)
 	if err != nil {
@@ -429,7 +429,7 @@ func (s *SCSIStager) connectDevice(ctx context.Context, data scsiPublishContextD
 func (s *SCSIStager) connectISCSIDevice(ctx context.Context,
 	lun int, data scsiPublishContextData,
 ) (gobrick.Device, error) {
-	logFields := common.GetLogFields(ctx)
+	logFields := identifiers.GetLogFields(ctx)
 	var targets []gobrick.ISCSITargetInfo
 	for _, t := range data.iscsiTargets {
 		targets = append(targets, gobrick.ISCSITargetInfo{Target: t.Target, Portal: t.Portal})
@@ -438,7 +438,7 @@ func (s *SCSIStager) connectISCSIDevice(ctx context.Context,
 	connectorCtx, cFunc := context.WithTimeout(context.Background(), time.Second*120)
 	defer cFunc()
 
-	connectorCtx = common.SetLogFields(connectorCtx, logFields)
+	connectorCtx = identifiers.SetLogFields(connectorCtx, logFields)
 	return s.iscsiConnector.ConnectVolume(connectorCtx, gobrick.ISCSIVolumeInfo{
 		Targets: targets,
 		Lun:     lun,
@@ -448,7 +448,7 @@ func (s *SCSIStager) connectISCSIDevice(ctx context.Context,
 func (s *SCSIStager) connectNVMEDevice(ctx context.Context,
 	wwn string, data scsiPublishContextData, useFC bool,
 ) (gobrick.Device, error) {
-	logFields := common.GetLogFields(ctx)
+	logFields := identifiers.GetLogFields(ctx)
 	var targets []gobrick.NVMeTargetInfo
 
 	if useFC {
@@ -464,7 +464,7 @@ func (s *SCSIStager) connectNVMEDevice(ctx context.Context,
 	connectorCtx, cFunc := context.WithTimeout(context.Background(), time.Second*120)
 	defer cFunc()
 
-	connectorCtx = common.SetLogFields(connectorCtx, logFields)
+	connectorCtx = identifiers.SetLogFields(connectorCtx, logFields)
 	return s.nvmeConnector.ConnectVolume(connectorCtx, gobrick.NVMeVolumeInfo{
 		Targets: targets,
 		WWN:     wwn,
@@ -474,7 +474,7 @@ func (s *SCSIStager) connectNVMEDevice(ctx context.Context,
 func (s *SCSIStager) connectFCDevice(ctx context.Context,
 	lun int, data scsiPublishContextData,
 ) (gobrick.Device, error) {
-	logFields := common.GetLogFields(ctx)
+	logFields := identifiers.GetLogFields(ctx)
 	var targets []gobrick.FCTargetInfo
 
 	for _, t := range data.fcTargets {
@@ -484,7 +484,7 @@ func (s *SCSIStager) connectFCDevice(ctx context.Context,
 	connectorCtx, cFunc := context.WithTimeout(context.Background(), time.Second*120)
 	defer cFunc()
 
-	connectorCtx = common.SetLogFields(connectorCtx, logFields)
+	connectorCtx = identifiers.SetLogFields(connectorCtx, logFields)
 	return s.fcConnector.ConnectVolume(connectorCtx, gobrick.FCVolumeInfo{
 		Targets: targets,
 		Lun:     lun,
@@ -492,7 +492,7 @@ func (s *SCSIStager) connectFCDevice(ctx context.Context,
 }
 
 func isReadyToPublish(ctx context.Context, stagingPath string, fs fs.Interface) (bool, bool, error) {
-	logFields := common.GetLogFields(ctx)
+	logFields := identifiers.GetLogFields(ctx)
 	stageInfo, found, err := getTargetMount(ctx, stagingPath, fs)
 	if err != nil {
 		return found, false, err
@@ -515,7 +515,7 @@ func isReadyToPublish(ctx context.Context, stagingPath string, fs fs.Interface) 
 }
 
 func isReadyToPublishNFS(ctx context.Context, stagingPath string, fs fs.Interface) (bool, error) {
-	logFields := common.GetLogFields(ctx)
+	logFields := identifiers.GetLogFields(ctx)
 	stageInfo, found, err := getTargetMount(ctx, stagingPath, fs)
 	if err != nil {
 		return found, err
