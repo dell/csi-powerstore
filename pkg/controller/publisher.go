@@ -26,7 +26,7 @@ import (
 	"strings"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/dell/csi-powerstore/v2/pkg/common"
+	commonutils "github.com/dell/csi-powerstore/v2/pkg/commonutils"
 	"github.com/dell/gopowerstore"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
@@ -62,7 +62,7 @@ func (s *SCSIPublisher) Publish(ctx context.Context, publishContext map[string]s
 	if err != nil {
 		if apiError, ok := err.(gopowerstore.APIError); ok && apiError.HostIsNotExist() {
 			// We need additional check here since we can just have host without ip in it
-			ipList := common.GetIPListFromString(kubeNodeID)
+			ipList := commonutils.GetIPListFromString(kubeNodeID)
 			if ipList == nil || len(ipList) == 0 {
 				return nil, status.Errorf(codes.NotFound, "can't find IP in node ID")
 			}
@@ -161,35 +161,35 @@ func (s *SCSIPublisher) addLUNIDToPublishContext(
 	isRemote bool,
 ) {
 	if !isRemote {
-		publishContext[common.PublishContextDeviceWWN] = strings.TrimPrefix(volume.Wwn, common.WWNPrefix)
-		publishContext[common.PublishContextLUNAddress] = strconv.FormatInt(mapping.LogicalUnitNumber, 10)
+		publishContext[commonutils.PublishContextDeviceWWN] = strings.TrimPrefix(volume.Wwn, commonutils.WWNPrefix)
+		publishContext[commonutils.PublishContextLUNAddress] = strconv.FormatInt(mapping.LogicalUnitNumber, 10)
 	} else {
-		publishContext[common.PublishContextRemoteDeviceWWN] = strings.TrimPrefix(volume.Wwn, common.WWNPrefix)
-		publishContext[common.PublishContextRemoteLUNAddress] = strconv.FormatInt(mapping.LogicalUnitNumber, 10)
+		publishContext[commonutils.PublishContextRemoteDeviceWWN] = strings.TrimPrefix(volume.Wwn, commonutils.WWNPrefix)
+		publishContext[commonutils.PublishContextRemoteLUNAddress] = strconv.FormatInt(mapping.LogicalUnitNumber, 10)
 	}
 }
 
 func (s *SCSIPublisher) addTargetsInfoToPublishContext(
 	publishContext map[string]string, volumeApplianceID string, client gopowerstore.Client, isRemote bool,
 ) error {
-	iscsiPortalsKey := common.PublishContextISCSIPortalsPrefix
-	iscsiTargetsKey := common.PublishContextISCSITargetsPrefix
-	fcWwpnKey := common.PublishContextFCWWPNPrefix
-	nvmeFcPortalsKey := common.PublishContextNVMEFCPortalsPrefix
-	nvmeFcTargetsKey := common.PublishContextNVMEFCTargetsPrefix
-	nvmeTCPPortalsKey := common.PublishContextNVMETCPPortalsPrefix
-	nvmeTCPTargetsKey := common.PublishContextNVMETCPTargetsPrefix
+	iscsiPortalsKey := commonutils.PublishContextISCSIPortalsPrefix
+	iscsiTargetsKey := commonutils.PublishContextISCSITargetsPrefix
+	fcWwpnKey := commonutils.PublishContextFCWWPNPrefix
+	nvmeFcPortalsKey := commonutils.PublishContextNVMEFCPortalsPrefix
+	nvmeFcTargetsKey := commonutils.PublishContextNVMEFCTargetsPrefix
+	nvmeTCPPortalsKey := commonutils.PublishContextNVMETCPPortalsPrefix
+	nvmeTCPTargetsKey := commonutils.PublishContextNVMETCPTargetsPrefix
 	if isRemote {
-		iscsiPortalsKey = common.PublishContextRemoteISCSIPortalsPrefix
-		iscsiTargetsKey = common.PublishContextRemoteISCSITargetsPrefix
-		fcWwpnKey = common.PublishContextRemoteFCWWPNPrefix
-		nvmeFcPortalsKey = common.PublishContextRemoteNVMEFCPortalsPrefix
-		nvmeFcTargetsKey = common.PublishContextRemoteNVMEFCTargetsPrefix
-		nvmeTCPPortalsKey = common.PublishContextRemoteNVMETCPPortalsPrefix
-		nvmeTCPTargetsKey = common.PublishContextRemoteNVMETCPTargetsPrefix
+		iscsiPortalsKey = commonutils.PublishContextRemoteISCSIPortalsPrefix
+		iscsiTargetsKey = commonutils.PublishContextRemoteISCSITargetsPrefix
+		fcWwpnKey = commonutils.PublishContextRemoteFCWWPNPrefix
+		nvmeFcPortalsKey = commonutils.PublishContextRemoteNVMEFCPortalsPrefix
+		nvmeFcTargetsKey = commonutils.PublishContextRemoteNVMEFCTargetsPrefix
+		nvmeTCPPortalsKey = commonutils.PublishContextRemoteNVMETCPPortalsPrefix
+		nvmeTCPTargetsKey = commonutils.PublishContextRemoteNVMETCPTargetsPrefix
 	}
 
-	iscsiTargetsInfo, err := common.GetISCSITargetsInfoFromStorage(client, volumeApplianceID)
+	iscsiTargetsInfo, err := commonutils.GetISCSITargetsInfoFromStorage(client, volumeApplianceID)
 	if err != nil {
 		log.Error("error unable to get iSCSI targets from array", err)
 	}
@@ -197,7 +197,7 @@ func (s *SCSIPublisher) addTargetsInfoToPublishContext(
 		publishContext[fmt.Sprintf("%s%d", iscsiPortalsKey, i)] = t.Portal
 		publishContext[fmt.Sprintf("%s%d", iscsiTargetsKey, i)] = t.Target
 	}
-	fcTargetsInfo, err := common.GetFCTargetsInfoFromStorage(client, volumeApplianceID)
+	fcTargetsInfo, err := commonutils.GetFCTargetsInfoFromStorage(client, volumeApplianceID)
 	if err != nil {
 		log.Error("error unable to get FC targets from array", err)
 	}
@@ -205,7 +205,7 @@ func (s *SCSIPublisher) addTargetsInfoToPublishContext(
 		publishContext[fmt.Sprintf("%s%d", fcWwpnKey, i)] = t.WWPN
 	}
 
-	nvmefcTargetInfo, err := common.GetNVMEFCTargetInfoFromStorage(client, volumeApplianceID)
+	nvmefcTargetInfo, err := commonutils.GetNVMEFCTargetInfoFromStorage(client, volumeApplianceID)
 	if err != nil {
 		log.Error("error unable to get NVMeFC targets from array", err)
 	}
@@ -214,7 +214,7 @@ func (s *SCSIPublisher) addTargetsInfoToPublishContext(
 		publishContext[fmt.Sprintf("%s%d", nvmeFcTargetsKey, i)] = t.Target
 	}
 
-	nvmetcpTargetInfo, err := common.GetNVMETCPTargetsInfoFromStorage(client, volumeApplianceID)
+	nvmetcpTargetInfo, err := commonutils.GetNVMETCPTargetsInfoFromStorage(client, volumeApplianceID)
 	if err != nil {
 		log.Error("error unable to get NVMeTCP targets from array", err)
 	}
@@ -248,7 +248,7 @@ func (n *NfsPublisher) Publish(ctx context.Context, publishContext map[string]st
 		return nil, status.Errorf(codes.Internal, "failure checking volume status for volume publishing: %s", err.Error())
 	}
 
-	ipList := common.GetIPListFromString(kubeNodeID)
+	ipList := commonutils.GetIPListFromString(kubeNodeID)
 	if ipList == nil || len(ipList) == 0 {
 		return nil, errors.New("can't find IP in node ID")
 	}
@@ -280,8 +280,8 @@ func (n *NfsPublisher) Publish(ctx context.Context, publishContext map[string]st
 		return nil, status.Errorf(codes.Internal, "failure getting nfs export: %s", err.Error())
 	}
 
-	if n.ExternalAccess != "" && !common.ExternalAccessAlreadyAdded(export, n.ExternalAccess) {
-		externalAccess, err := common.GetIPListWithMaskFromString(n.ExternalAccess)
+	if n.ExternalAccess != "" && !commonutils.ExternalAccessAlreadyAdded(export, n.ExternalAccess) {
+		externalAccess, err := commonutils.GetIPListWithMaskFromString(n.ExternalAccess)
 		if err != nil {
 			return nil, status.Errorf(codes.InvalidArgument, "can't find IP in X_CSI_POWERSTORE_EXTERNAL_ACCESS variable")
 		}
@@ -308,15 +308,15 @@ func (n *NfsPublisher) Publish(ctx context.Context, publishContext map[string]st
 		return nil, status.Errorf(codes.Internal, "failure getting file interface %s", err.Error())
 	}
 	publishContext[KeyNasName] = nas.Name // we need to pass that to node part of the driver
-	publishContext[common.KeyNfsExportPath] = fileInterface.IPAddress + ":/" + export.Name
-	publishContext[common.KeyHostIP] = ipWithNat[0]
+	publishContext[commonutils.KeyNfsExportPath] = fileInterface.IPAddress + ":/" + export.Name
+	publishContext[commonutils.KeyHostIP] = ipWithNat[0]
 	if n.ExternalAccess != "" {
-		parsedExternalAccess, _ := common.GetIPListWithMaskFromString(n.ExternalAccess)
-		publishContext[common.KeyNatIP] = parsedExternalAccess
+		parsedExternalAccess, _ := commonutils.GetIPListWithMaskFromString(n.ExternalAccess)
+		publishContext[commonutils.KeyNatIP] = parsedExternalAccess
 	}
-	publishContext[common.KeyExportID] = export.ID
-	publishContext[common.KeyAllowRoot] = req.VolumeContext[common.KeyAllowRoot]
-	publishContext[common.KeyNfsACL] = req.VolumeContext[common.KeyNfsACL]
+	publishContext[commonutils.KeyExportID] = export.ID
+	publishContext[commonutils.KeyAllowRoot] = req.VolumeContext[commonutils.KeyAllowRoot]
+	publishContext[commonutils.KeyNfsACL] = req.VolumeContext[commonutils.KeyNfsACL]
 	return &csi.ControllerPublishVolumeResponse{PublishContext: publishContext}, nil
 }
 

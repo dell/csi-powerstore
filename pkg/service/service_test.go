@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	"github.com/dell/csi-powerstore/v2/mocks"
-	"github.com/dell/csi-powerstore/v2/pkg/common"
+	commonutils "github.com/dell/csi-powerstore/v2/pkg/commonutils"
 	nfsmock "github.com/dell/csm-sharednfs/nfs/mocks"
 	"github.com/dell/gocsi"
 	csictx "github.com/dell/gocsi/context"
@@ -87,7 +87,7 @@ func TestBeforeServe(t *testing.T) {
 		os.Setenv("X_CSI_NODE_NAME", "test")
 		ctx := context.Background()
 		csictx.Setenv(ctx, gocsi.EnvVarMode, "node")
-		os.Setenv(common.EnvNodeChrootPath, "test-path")
+		os.Setenv(commonutils.EnvNodeChrootPath, "test-path")
 		mockNfs := nfsmock.NewMockService(ctrl)
 		mockNfs.EXPECT().BeforeServe(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return(nil)
 		PutNfsService(mockNfs)

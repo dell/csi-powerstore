@@ -30,8 +30,8 @@ import (
 	"strings"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/dell/csi-powerstore/v2/pkg/common"
-	"github.com/dell/csi-powerstore/v2/pkg/common/fs"
+	commonutils "github.com/dell/csi-powerstore/v2/pkg/commonutils"
+	"github.com/dell/csi-powerstore/v2/pkg/commonutils/fs"
 	"github.com/dell/csm-sharednfs/nfs"
 	"github.com/dell/gobrick"
 	csictx "github.com/dell/gocsi/context"
@@ -85,15 +85,15 @@ func getNodeOptions() Opts {
 	var opts Opts
 	ctx := context.Background()
 
-	if path, ok := csictx.LookupEnv(ctx, common.EnvNodeIDFilePath); ok {
+	if path, ok := csictx.LookupEnv(ctx, commonutils.EnvNodeIDFilePath); ok {
 		opts.NodeIDFilePath = path
 	}
 
-	if kubeConfigPath, ok := csictx.LookupEnv(ctx, common.EnvKubeConfigPath); ok {
+	if kubeConfigPath, ok := csictx.LookupEnv(ctx, commonutils.EnvKubeConfigPath); ok {
 		opts.KubeConfigPath = kubeConfigPath
 	}
 
-	if prefix, ok := csictx.LookupEnv(ctx, common.EnvNodeNamePrefix); ok {
+	if prefix, ok := csictx.LookupEnv(ctx, commonutils.EnvNodeNamePrefix); ok {
 		opts.NodeNamePrefix = prefix
 	}
 
@@ -101,11 +101,11 @@ func getNodeOptions() Opts {
 		opts.NodeNamePrefix = defaultNodeNamePrefix
 	}
 
-	if kubeNodeName, ok := csictx.LookupEnv(ctx, common.EnvKubeNodeName); ok {
+	if kubeNodeName, ok := csictx.LookupEnv(ctx, commonutils.EnvKubeNodeName); ok {
 		opts.KubeNodeName = kubeNodeName
 	}
 
-	if nodeChrootPath, ok := csictx.LookupEnv(ctx, common.EnvNodeChrootPath); ok {
+	if nodeChrootPath, ok := csictx.LookupEnv(ctx, commonutils.EnvNodeChrootPath); ok {
 		opts.NodeChrootPath = nodeChrootPath
 	}
 
@@ -113,7 +113,7 @@ func getNodeOptions() Opts {
 		opts.NodeChrootPath = defaultNodeChrootPath
 	}
 
-	if maxVolumesPerNodeStr, ok := csictx.LookupEnv(ctx, common.EnvMaxVolumesPerNode); ok {
+	if maxVolumesPerNodeStr, ok := csictx.LookupEnv(ctx, commonutils.EnvMaxVolumesPerNode); ok {
 		maxVolumesPerNode, err := strconv.ParseInt(maxVolumesPerNodeStr, 10, 64)
 		if err != nil {
 			log.Warn("error while parsing the value of maxPowerstoreVolumesPerNode, using default value 0")
@@ -123,7 +123,7 @@ func getNodeOptions() Opts {
 		}
 	}
 
-	if tmpDir, ok := csictx.LookupEnv(ctx, common.EnvTmpDir); ok {
+	if tmpDir, ok := csictx.LookupEnv(ctx, commonutils.EnvTmpDir); ok {
 		opts.TmpDir = tmpDir
 	}
 
@@ -131,7 +131,7 @@ func getNodeOptions() Opts {
 		opts.TmpDir = defaultTmpDir
 	}
 
-	if fcPortsFilterFilePath, ok := csictx.LookupEnv(ctx, common.EnvFCPortsFilterFilePath); ok {
+	if fcPortsFilterFilePath, ok := csictx.LookupEnv(ctx, commonutils.EnvFCPortsFilterFilePath); ok {
 		opts.FCPortsFilterFilePath = fcPortsFilterFilePath
 	}
 
@@ -149,11 +149,11 @@ func getNodeOptions() Opts {
 		return false
 	}
 
-	opts.EnableCHAP = pb(common.EnvEnableCHAP)
+	opts.EnableCHAP = pb(commonutils.EnvEnableCHAP)
 
 	if opts.EnableCHAP {
 		opts.CHAPUsername = "admin"
-		opts.CHAPPassword = common.RandomString(12)
+		opts.CHAPPassword = commonutils.RandomString(12)
 	}
 
 	return opts
@@ -210,7 +210,7 @@ func getStagingPath(ctx context.Context, sp string, volID string) (string, strin
 	if nfs.IsNFSVolumeID(volID) {
 		return nfs.ToArrayVolumeID(volID), sp
 	}
-	logFields := common.GetLogFields(ctx)
+	logFields := commonutils.GetLogFields(ctx)
 	if sp == "" || volID == "" {
 		return volID, sp
 	}
@@ -220,7 +220,7 @@ func getStagingPath(ctx context.Context, sp string, volID string) (string, strin
 }
 
 func getRemnantTargetMounts(ctx context.Context, target string, fs fs.Interface) ([]gofsutil.Info, bool, error) {
-	logFields := common.GetLogFields(ctx)
+	logFields := commonutils.GetLogFields(ctx)
 	var targetMounts []gofsutil.Info
 	var found bool
 	mounts, err := getMounts(ctx, fs)
@@ -239,7 +239,7 @@ func getRemnantTargetMounts(ctx context.Context, target string, fs fs.Interface)
 }
 
 func getTargetMount(ctx context.Context, target string, fs fs.Interface) (gofsutil.Info, bool, error) {
-	logFields := common.GetLogFields(ctx)
+	logFields := commonutils.GetLogFields(ctx)
 	var targetMount gofsutil.Info
 	var found bool
 	mounts, err := getMounts(ctx, fs)

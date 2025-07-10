@@ -82,7 +82,7 @@ For example, here is the output of a request to build an offline bundle for the 
    quay.io/dell/container-storage-module/csi-metadata-retriever:v1.10.0
    quay.io/dell/container-storage-module/csipowermax-reverseproxy:v2.13.0
    quay.io/dell/container-storage-module/csi-powermax:v2.14.0
-   quay.io/dell/container-storage-module/csi-powerstore:v2.14.0
+   quay.io/dell/container-storage-module/csi-powerstore:v2.14.1
    quay.io/dell/container-storage-module/csi-unity:v2.14.0
    quay.io/dell/container-storage-module/csi-vxflexos:v2.14.0
    quay.io/dell/container-storage-module/csm-authorization-sidecar:v1.14.0

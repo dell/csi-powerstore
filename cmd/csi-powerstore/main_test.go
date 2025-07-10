@@ -24,7 +24,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dell/csi-powerstore/v2/pkg/common"
+	commonutils "github.com/dell/csi-powerstore/v2/pkg/commonutils"
 	"github.com/dell/gocsi"
 	"github.com/fsnotify/fsnotify"
 	log "github.com/sirupsen/logrus"
@@ -53,14 +53,14 @@ func TestUpdateDriverName(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			err := os.Setenv(common.EnvDriverName, tc.envVar)
+			err := os.Setenv(commonutils.EnvDriverName, tc.envVar)
 			if err != nil {
 				t.Fatalf("Failed to set environment variable: %v", err)
 			}
 
 			updateDriverName()
 
-			assert.Equal(t, tc.expected, common.Name)
+			assert.Equal(t, tc.expected, commonutils.Name)
 		})
 	}
 }
@@ -70,7 +70,7 @@ func TestInitilizeDriverConfigParams(t *testing.T) {
 	content := `CSI_LOG_FORMAT: "JSON"`
 	driverConfigParams := filepath.Join(tmpDir, "driver-config-params.yaml")
 	writeToFile(t, driverConfigParams, content)
-	os.Setenv(common.EnvConfigParamsFilePath, driverConfigParams)
+	os.Setenv(commonutils.EnvConfigParamsFilePath, driverConfigParams)
 	initilizeDriverConfigParams()
 	assert.Equal(t, log.DebugLevel, log.GetLevel())
 	writeToFile(t, driverConfigParams, "CSI_LOG_LEVEL: \"info\"")
@@ -83,10 +83,10 @@ func TestMainControllerMode(t *testing.T) {
 	config := copyConfigFileToTmpDir(t, "../../pkg/array/testdata/one-arr.yaml", tmpDir)
 
 	// Set required environment variables
-	os.Setenv(common.EnvArrayConfigFilePath, config)
+	os.Setenv(commonutils.EnvArrayConfigFilePath, config)
 	os.Setenv("CSI_ENDPOINT", "mock_endpoint")
-	os.Setenv(common.EnvDriverName, "test")
-	os.Setenv(common.EnvDebugEnableTracing, "true")
+	os.Setenv(commonutils.EnvDriverName, "test")
+	os.Setenv(commonutils.EnvDebugEnableTracing, "true")
 	os.Setenv("JAEGER_SERVICE_NAME", "controller-test")
 	os.Setenv(string(gocsi.EnvVarMode), "controller")
 
@@ -126,9 +126,9 @@ func TestMainNodeMode(t *testing.T) {
 	config := copyConfigFileToTmpDir(t, "../../pkg/array/testdata/one-arr.yaml", tmpDir)
 
 	// Set required environment variables
-	os.Setenv(common.EnvArrayConfigFilePath, config)
+	os.Setenv(commonutils.EnvArrayConfigFilePath, config)
 	os.Setenv(gocsi.EnvVarMode, "node")
-	os.Setenv(common.EnvDebugEnableTracing, "")
+	os.Setenv(commonutils.EnvDebugEnableTracing, "")
 	tempNodeIDFile, err := os.CreateTemp("", "node-id")
 	require.NoError(t, err)
 	defer os.Remove(tempNodeIDFile.Name())

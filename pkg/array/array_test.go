@@ -30,8 +30,8 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-powerstore/v2/mocks"
 	"github.com/dell/csi-powerstore/v2/pkg/array"
-	"github.com/dell/csi-powerstore/v2/pkg/common"
-	"github.com/dell/csi-powerstore/v2/pkg/common/fs"
+	commonutils "github.com/dell/csi-powerstore/v2/pkg/commonutils"
+	"github.com/dell/csi-powerstore/v2/pkg/commonutils/fs"
 	sharednfs "github.com/dell/csm-sharednfs/nfs"
 	"github.com/dell/gofsutil"
 	"github.com/dell/gopowerstore"
@@ -75,9 +75,9 @@ func TestGetPowerStoreArrays(t *testing.T) {
 		fs   fs.Interface
 		data string
 	}
-	_ = os.Setenv(common.EnvThrottlingRateLimit, "1000")
-	_ = os.Setenv(common.EnvMultiNASFailureThreshold, "10")
-	_ = os.Setenv(common.EnvMultiNASCooldownPeriod, "2m")
+	_ = os.Setenv(commonutils.EnvThrottlingRateLimit, "1000")
+	_ = os.Setenv(commonutils.EnvMultiNASFailureThreshold, "10")
+	_ = os.Setenv(commonutils.EnvMultiNASCooldownPeriod, "2m")
 
 	tests := []struct {
 		name    string
@@ -96,7 +96,7 @@ func TestGetPowerStoreArrays(t *testing.T) {
 					Password:      "password",
 					Insecure:      true,
 					IsDefault:     true,
-					BlockProtocol: common.ISCSITransport,
+					BlockProtocol: commonutils.ISCSITransport,
 				},
 				"gid2": {
 					Endpoint:      "https://127.0.0.2/api/rest",
@@ -104,7 +104,7 @@ func TestGetPowerStoreArrays(t *testing.T) {
 					Password:      "password",
 					Insecure:      true,
 					IsDefault:     false,
-					BlockProtocol: common.AutoDetectTransport,
+					BlockProtocol: commonutils.AutoDetectTransport,
 				},
 			},
 		},
@@ -119,7 +119,7 @@ func TestGetPowerStoreArrays(t *testing.T) {
 					Password:      "password",
 					Insecure:      true,
 					IsDefault:     true,
-					BlockProtocol: common.AutoDetectTransport,
+					BlockProtocol: commonutils.AutoDetectTransport,
 				},
 			},
 		},
@@ -195,15 +195,15 @@ func TestGetPowerStoreArrays(t *testing.T) {
 	})
 
 	t.Run("incorrect throttling limit", func(t *testing.T) {
-		_ = os.Setenv(common.EnvThrottlingRateLimit, "abc")
+		_ = os.Setenv(commonutils.EnvThrottlingRateLimit, "abc")
 		f := &fs.Fs{Util: &gofsutil.FS{}}
 		_, _, _, err := array.GetPowerStoreArrays(f, "./testdata/one-arr.yaml")
 		assert.NoError(t, err)
 	})
 
 	t.Run("incorrect EnvMultiNASFailureThreshold & EnvMultiNASCooldownPeriod value", func(t *testing.T) {
-		_ = os.Setenv(common.EnvMultiNASFailureThreshold, "0")
-		_ = os.Setenv(common.EnvMultiNASCooldownPeriod, "0m")
+		_ = os.Setenv(commonutils.EnvMultiNASFailureThreshold, "0")
+		_ = os.Setenv(commonutils.EnvMultiNASCooldownPeriod, "0m")
 		f := &fs.Fs{Util: &gofsutil.FS{}}
 		got, _, _, err := array.GetPowerStoreArrays(f, "./testdata/one-arr.yaml")
 		assert.NoError(t, err)
@@ -212,8 +212,8 @@ func TestGetPowerStoreArrays(t *testing.T) {
 	})
 
 	t.Run("invalid format EnvMultiNASFailureThreshold & EnvMultiNASCooldownPeriod", func(t *testing.T) {
-		_ = os.Setenv(common.EnvMultiNASFailureThreshold, "abc")
-		_ = os.Setenv(common.EnvMultiNASCooldownPeriod, "abc")
+		_ = os.Setenv(commonutils.EnvMultiNASFailureThreshold, "abc")
+		_ = os.Setenv(commonutils.EnvMultiNASCooldownPeriod, "abc")
 
 		f := &fs.Fs{Util: &gofsutil.FS{}}
 		got, _, _, err := array.GetPowerStoreArrays(f, "./testdata/one-arr.yaml")

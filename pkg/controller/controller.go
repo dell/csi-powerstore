@@ -31,8 +31,8 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-powerstore/v2/core"
 	"github.com/dell/csi-powerstore/v2/pkg/array"
-	"github.com/dell/csi-powerstore/v2/pkg/common"
-	"github.com/dell/csi-powerstore/v2/pkg/common/fs"
+	commonutils "github.com/dell/csi-powerstore/v2/pkg/commonutils"
+	"github.com/dell/csi-powerstore/v2/pkg/commonutils/fs"
 	commonext "github.com/dell/dell-csi-extensions/common"
 	podmon "github.com/dell/dell-csi-extensions/podmon"
 	csiext "github.com/dell/dell-csi-extensions/replication"
@@ -79,30 +79,30 @@ var mutex = &sync.Mutex{}
 // Init is a method that initializes internal variables of controller service
 func (s *Service) Init() error {
 	ctx := context.Background()
-	if nat, ok := csictx.LookupEnv(ctx, common.EnvExternalAccess); ok {
+	if nat, ok := csictx.LookupEnv(ctx, commonutils.EnvExternalAccess); ok {
 		s.externalAccess = nat
 	}
 
-	if replicationContextPrefix, ok := csictx.LookupEnv(ctx, common.EnvReplicationContextPrefix); ok {
+	if replicationContextPrefix, ok := csictx.LookupEnv(ctx, commonutils.EnvReplicationContextPrefix); ok {
 		s.replicationContextPrefix = replicationContextPrefix + "/"
 	}
 
-	if replicationPrefix, ok := csictx.LookupEnv(ctx, common.EnvReplicationPrefix); ok {
+	if replicationPrefix, ok := csictx.LookupEnv(ctx, commonutils.EnvReplicationPrefix); ok {
 		s.replicationPrefix = replicationPrefix
 	}
 
-	if isHealthMonitorEnabled, ok := csictx.LookupEnv(ctx, common.EnvIsHealthMonitorEnabled); ok {
+	if isHealthMonitorEnabled, ok := csictx.LookupEnv(ctx, commonutils.EnvIsHealthMonitorEnabled); ok {
 		s.isHealthMonitorEnabled, _ = strconv.ParseBool(isHealthMonitorEnabled)
 	}
 
 	s.nfsAcls = ""
-	if nfsAcls, ok := csictx.LookupEnv(ctx, common.EnvNfsAcls); ok {
+	if nfsAcls, ok := csictx.LookupEnv(ctx, commonutils.EnvNfsAcls); ok {
 		if nfsAcls != "" {
 			s.nfsAcls = nfsAcls
 		}
 	}
 
-	if isAutoRoundOffFsSizeEnabled, ok := csictx.LookupEnv(ctx, common.EnvAllowAutoRoundOffFilesystemSize); ok {
+	if isAutoRoundOffFsSizeEnabled, ok := csictx.LookupEnv(ctx, commonutils.EnvAllowAutoRoundOffFilesystemSize); ok {
 		log.Warn("Auto round off Filesystem size has been enabled! This will round off NFS PVC size to 3Gi when the requested size is less than 3Gi.")
 		s.isAutoRoundOffFsSizeEnabled, _ = strconv.ParseBool(isAutoRoundOffFsSizeEnabled)
 	}
@@ -115,7 +115,7 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 	params := req.GetParameters()
 
 	// Get array from map
-	arrayID, ok := params[common.KeyArrayID]
+	arrayID, ok := params[commonutils.KeyArrayID]
 
 	var arr *array.PowerStoreArray
 	// If no ArrayID was provided in storage class we just use default array
@@ -153,7 +153,7 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 
 	// Prevent user from creating an NFS volume with incorrect topology(e.g. iscsi, nvme). At least one entry for nfs should be present in the topology, otherwise return an error
 	if useNFS && req.AccessibilityRequirements != nil {
-		if ok := common.HasRequiredTopology(req.AccessibilityRequirements.Preferred, arr.GetIP(), "nfs"); !ok {
+		if ok := commonutils.HasRequiredTopology(req.AccessibilityRequirements.Preferred, arr.GetIP(), "nfs"); !ok {
 			return nil, status.Errorf(codes.InvalidArgument, "invalid topology requested for NFS Volume. Please validate your storage class has nfs topology.")
 		}
 	}
@@ -195,8 +195,8 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 			nasName: selectedNasName,
 		}
 
-		if params[common.KeyNfsACL] != "" {
-			nfsAcls = params[common.KeyNfsACL] // Storage class takes precedence
+		if params[commonutils.KeyNfsACL] != "" {
+			nfsAcls = params[commonutils.KeyNfsACL] // Storage class takes precedence
 		} else if arr.NfsAcls != "" {
 			nfsAcls = arr.NfsAcls // Secrets next
 		}
@@ -223,7 +223,7 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 	repMode := params[s.WithRP(KeyReplicationMode)]
 	// Default to ASYNC for backward compatibility
 	if repMode == "" {
-		repMode = common.AsyncMode
+		repMode = commonutils.AsyncMode
 	}
 	repMode = strings.ToUpper(repMode)
 
@@ -234,7 +234,7 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 		// Configuring Metro is not allowed on clones or volumes created from Metro snapshot.
 		// So, fail the request if the requested volume is to be placed in Metro storage class.
 		// However, one can place the volume in a non-Metro storage class.
-		if replicationEnabled == "true" && repMode == common.MetroMode {
+		if replicationEnabled == "true" && repMode == commonutils.MetroMode {
 			return nil, status.Errorf(codes.InvalidArgument,
 				"Configuring Metro is not supported on clones or volumes created from Metro snapshot. Choose a non-Metro storage class.")
 		}
@@ -271,7 +271,7 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 		}
 		volResp.VolumeId = volResp.VolumeId + "/" + arr.GetGlobalID() + "/" + protocol
 		if useNFS {
-			topology = common.GetNfsTopology(arr.GetIP())
+			topology = commonutils.GetNfsTopology(arr.GetIP())
 			log.Infof("Modified topology to nfs for %s", req.GetName())
 		}
 		volResp.AccessibleTopology = topology
@@ -298,7 +298,7 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 		}
 
 		switch repMode {
-		case common.SyncMode, common.AsyncMode:
+		case commonutils.SyncMode, commonutils.AsyncMode:
 			// handle Sync and Async modes where protection policy with replication rule is applied on volume group
 			log.Infof("%s replication mode requested", repMode)
 			vgPrefix, ok := params[s.WithRP(KeyReplicationVGPrefix)]
@@ -309,11 +309,11 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 			rpo, ok := params[s.WithRP(KeyReplicationRPO)]
 			if !ok {
 				// If Replication mode is ASYNC and there is no RPO specified, returning an error
-				if repMode == common.AsyncMode {
+				if repMode == commonutils.AsyncMode {
 					return nil, status.Error(codes.InvalidArgument, "replication mode is ASYNC but no RPO specified in storage class")
 				}
 				// If Replication mode is SYNC and there is no RPO, defaulting the value to Zero
-				rpo = common.Zero
+				rpo = commonutils.Zero
 			}
 			rpoEnum := gopowerstore.RPOEnum(rpo)
 			if err := rpoEnum.IsValid(); err != nil {
@@ -321,13 +321,13 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 			}
 
 			// Validating RPO to be non Zero when replication mode is ASYNC
-			if repMode == common.AsyncMode && rpo == common.Zero {
+			if repMode == commonutils.AsyncMode && rpo == commonutils.Zero {
 				log.Errorf("RPO value for %s cannot be : %s", repMode, rpo)
 				return nil, status.Error(codes.InvalidArgument, "replication mode ASYNC requires RPO value to be non Zero")
 			}
 
 			// Validating RPO to be Zero whe replication mode is SYNC
-			if repMode == common.SyncMode && rpo != common.Zero {
+			if repMode == commonutils.SyncMode && rpo != commonutils.Zero {
 				return nil, status.Error(codes.InvalidArgument, "replication mode SYNC requires RPO value to be Zero")
 			}
 			namespace := ""
@@ -372,7 +372,7 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 				}
 			} else {
 				// if Replication mode is SYNC, check if the VolumeGroup is write-order consistent
-				if repMode == common.SyncMode {
+				if repMode == commonutils.SyncMode {
 					if !vg.IsWriteOrderConsistent {
 						return nil, status.Errorf(codes.Internal, "can't apply protection policy with sync rule if volume group is not write-order consistent")
 					}
@@ -395,7 +395,7 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 			if c, ok := creator.(*SCSICreator); ok {
 				c.vg = &vg
 			}
-		case common.MetroMode:
+		case commonutils.MetroMode:
 			// handle Metro mode where metro is configured directly on the volume
 			// Note: Metro on volume group support is not added
 			log.Info("Metro replication mode requested")
@@ -412,7 +412,7 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 		}
 	}
 
-	params[common.KeyVolumeDescription] = getDescription(req.GetParameters())
+	params[commonutils.KeyVolumeDescription] = getDescription(req.GetParameters())
 
 	var volumeResponse *csi.Volume
 	resp, createError := creator.Create(ctx, req, sizeInBytes, arr.GetClient())
@@ -477,15 +477,15 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 	serviceTag := GetServiceTag(ctx, req, arr, volumeResponse.VolumeId, protocol)
 
 	volumeResponse.VolumeContext = req.Parameters
-	volumeResponse.VolumeContext[common.KeyArrayID] = arr.GetGlobalID()
-	volumeResponse.VolumeContext[common.KeyArrayVolumeName] = req.Name
-	volumeResponse.VolumeContext[common.KeyProtocol] = protocol
-	volumeResponse.VolumeContext[common.KeyServiceTag] = serviceTag
+	volumeResponse.VolumeContext[commonutils.KeyArrayID] = arr.GetGlobalID()
+	volumeResponse.VolumeContext[commonutils.KeyArrayVolumeName] = req.Name
+	volumeResponse.VolumeContext[commonutils.KeyProtocol] = protocol
+	volumeResponse.VolumeContext[commonutils.KeyServiceTag] = serviceTag
 
 	if useNFS {
-		volumeResponse.VolumeContext[common.KeyNfsACL] = nfsAcls
-		volumeResponse.VolumeContext[common.KeyNasName] = selectedNasName
-		topology = common.GetNfsTopology(arr.GetIP())
+		volumeResponse.VolumeContext[commonutils.KeyNfsACL] = nfsAcls
+		volumeResponse.VolumeContext[commonutils.KeyNasName] = selectedNasName
+		topology = commonutils.GetNfsTopology(arr.GetIP())
 		log.Infof("Modified topology to nfs for %s", req.GetName())
 	}
 
@@ -543,7 +543,7 @@ func (s *Service) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest
 			// if one entry is there for RWRootHosts or RWHosts, check if this is the same externalAccess defined in value.yaml
 			// if yes modifyNFSExport and remove externalAccess from the HostAcceesList on the array
 			if (len(nfsExportResp.RWRootHosts) == 1 || len(nfsExportResp.RWHosts) == 1) && s.externalAccess != "" {
-				externalAccess, err := common.ParseCIDR(s.externalAccess)
+				externalAccess, err := commonutils.ParseCIDR(s.externalAccess)
 				if err != nil {
 					log.Debug("error occurred  while parsing externalAccess: ", err.Error(), s.externalAccess)
 					return nil, status.Errorf(codes.FailedPrecondition,
@@ -795,7 +795,7 @@ func (s *Service) ControllerUnpublishVolume(ctx context.Context, req *csi.Contro
 		if err != nil {
 			if apiError, ok := err.(gopowerstore.APIError); ok && apiError.HostIsNotExist() {
 				// We need additional check here since we can just have host without ip in it
-				ipList := common.GetIPListFromString(kubeNodeID)
+				ipList := commonutils.GetIPListFromString(kubeNodeID)
 				if ipList == nil {
 					return nil, errors.New("can't find IP in nodeID")
 				}
@@ -839,7 +839,7 @@ func (s *Service) ControllerUnpublishVolume(ctx context.Context, req *csi.Contro
 		}
 
 		// Parse volumeID to get an IP
-		ipList := common.GetIPListFromString(kubeNodeID)
+		ipList := commonutils.GetIPListFromString(kubeNodeID)
 		if ipList == nil {
 			return nil, errors.New("can't find IP in nodeID")
 		}
@@ -874,12 +874,12 @@ func (s *Service) ControllerUnpublishVolume(ctx context.Context, req *csi.Contro
 			}
 		}
 
-		if common.Contains(export.RWHosts, ip+"/255.255.255.255") {
+		if commonutils.Contains(export.RWHosts, ip+"/255.255.255.255") {
 			modifyHostPayload.RemoveRWHosts = []string{ip + "/255.255.255.255"} // we can't remove without netmask
 			log.Debug("Going to remove IP from RWHosts: ", modifyHostPayload.RemoveRWHosts[0])
 		}
 
-		if common.Contains(export.RWRootHosts, ip+"/255.255.255.255") {
+		if commonutils.Contains(export.RWRootHosts, ip+"/255.255.255.255") {
 			modifyHostPayload.RemoveRWRootHosts = []string{ip + "/255.255.255.255"} // we can't remove without netmask
 			log.Debug("Going to remove IP from RWRootHosts: ", modifyHostPayload.RemoveRWRootHosts[0])
 		}
@@ -1093,7 +1093,7 @@ func (s *Service) GetCapacity(ctx context.Context, req *csi.GetCapacityRequest) 
 	params := req.GetParameters()
 
 	// Get array from map
-	arrayID, ok := params[common.KeyArrayID]
+	arrayID, ok := params[commonutils.KeyArrayID]
 
 	var arr *array.PowerStoreArray
 	// If no ArrayIP was provided in storage class we just use default array
@@ -1592,9 +1592,9 @@ func (s *Service) ProbeController(_ context.Context, _ *commonext.ProbeControlle
 	ready.Value = true
 	rep := new(commonext.ProbeControllerResponse)
 	rep.Ready = ready
-	rep.Name = common.Name
+	rep.Name = commonutils.Name
 	rep.VendorVersion = core.SemVer
-	rep.Manifest = common.Manifest
+	rep.Manifest = commonutils.Manifest
 
 	log.Debug(fmt.Sprintf("ProbeController returning: %v", rep.Ready.GetValue()))
 	return rep, nil

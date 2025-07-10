@@ -134,7 +134,9 @@ func CreateDeployment() (ns string, ss *apps.Deployment, c clientset.Interface) 
 
 	_, err := c.AppsV1().Deployments(ns).Create(ctx, ss, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
-	deployment.WaitForDeploymentComplete(c, ss)
+	if err := deployment.WaitForDeploymentComplete(c, ss); err != nil {
+		framework.Logf("Failed to wait for deployment to complete: %v", err)
+	}
 	return
 }
 

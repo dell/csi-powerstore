@@ -26,14 +26,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dell/csi-powerstore/v2/pkg/common"
+	commonutils "github.com/dell/csi-powerstore/v2/pkg/commonutils"
 	"github.com/dell/gopowerstore"
 	"github.com/stretchr/testify/mock"
 )
 
 func TestApiRouter2(t *testing.T) {
 	// server should not be up and running
-	common.APIPort = "abc"
+	commonutils.APIPort = "abc"
 	setVariables()
 	nodeSvc.apiRouter(context.Background())
 
@@ -44,7 +44,7 @@ func TestApiRouter2(t *testing.T) {
 }
 
 func TestApiRouter(t *testing.T) {
-	common.SetAPIPort(context.Background())
+	commonutils.SetAPIPort(context.Background())
 	setVariables()
 	go nodeSvc.apiRouter(context.Background())
 	time.Sleep(2 * time.Second)
@@ -63,7 +63,7 @@ func TestApiRouter(t *testing.T) {
 	}
 
 	// fill some dummy data in the cache and try to fetch
-	var status common.ArrayConnectivityStatus
+	var status commonutils.ArrayConnectivityStatus
 	status.LastSuccess = time.Now().Unix()
 	status.LastAttempt = time.Now().Unix()
 	probeStatus = new(sync.Map)
@@ -97,7 +97,7 @@ func TestMarshalSyncMapToJSON(t *testing.T) {
 	}
 	sample := new(sync.Map)
 	sample2 := new(sync.Map)
-	var status common.ArrayConnectivityStatus
+	var status commonutils.ArrayConnectivityStatus
 	status.LastSuccess = time.Now().Unix()
 	status.LastAttempt = time.Now().Unix()
 

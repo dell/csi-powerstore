@@ -24,7 +24,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/dell/csi-powerstore/v2/pkg/common"
+	commonutils "github.com/dell/csi-powerstore/v2/pkg/commonutils"
 	"github.com/dell/gopowerstore"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -291,7 +291,7 @@ func checkExternalAccessPresence(ctx context.Context, clientForArray gopowerstor
 	nfsExport, err := clientForArray.GetNFSExportByName(ctx, vol)
 	gomega.Expect(err).NotTo(gomega.HaveOccurred(),
 		fmt.Sprintf("Failed to GET NFS export details from Array, err: %v", err))
-	present := common.ExternalAccessAlreadyAdded(nfsExport, externalAccessIP)
+	present := commonutils.ExternalAccessAlreadyAdded(nfsExport, externalAccessIP)
 	if shouldBePresent && !present {
 		gomega.Expect(present).NotTo(gomega.BeFalse(),
 			"External access should be present on host access list on array")
