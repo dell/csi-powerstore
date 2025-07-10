@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dell/csi-powerstore/v2/pkg/common"
+	commonutils "github.com/dell/csi-powerstore/v2/pkg/commonutils"
 	"github.com/dell/csi-powerstore/v2/pkg/controller"
 	"github.com/dell/csi-powerstore/v2/pkg/node"
 	"github.com/dell/csm-sharednfs/nfs"
@@ -65,7 +65,7 @@ func (s *service) BeforeServe(ctx context.Context, _ *gocsi.StoragePlugin, _ net
 	s.mode = csictx.Getenv(ctx, gocsi.EnvVarMode)
 	log.Info("Driver Mode:", s.mode)
 	// TODO: add nfs code here
-	nodeName := os.Getenv(common.EnvKubeNodeName)
+	nodeName := os.Getenv(commonutils.EnvKubeNodeName)
 	if nodeName == "" {
 		nodeName = os.Getenv("KUBE_NODE_NAME")
 	}
@@ -75,7 +75,7 @@ func (s *service) BeforeServe(ctx context.Context, _ *gocsi.StoragePlugin, _ net
 	}
 
 	if s.mode == "node" {
-		nodeRoot := os.Getenv(common.EnvNodeChrootPath)
+		nodeRoot := os.Getenv(commonutils.EnvNodeChrootPath)
 		if nodeRoot == "" {
 			return fmt.Errorf("X_CSI_POWERSTORE_NODE_CHROOT_PATH environment variable not set")
 		}
@@ -108,7 +108,7 @@ func (s *service) ProcessMapSecretChange() error {
 	// Update dynamic config params
 	vc := viper.New()
 	vc.AutomaticEnv()
-	paramsPath, ok := csictx.LookupEnv(context.Background(), common.EnvConfigParamsFilePath)
+	paramsPath, ok := csictx.LookupEnv(context.Background(), commonutils.EnvConfigParamsFilePath)
 	if !ok {
 		log.Warnf("config path X_CSI_POWERSTORE_CONFIG_PARAMS_PATH is not specified")
 	}

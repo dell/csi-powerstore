@@ -17,7 +17,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/dell/csi-powerstore/v2/pkg/common"
+	commonutils "github.com/dell/csi-powerstore/v2/pkg/commonutils"
 	"github.com/dell/csi-powerstore/v2/pkg/controller"
 	"github.com/dell/csi-powerstore/v2/pkg/identity"
 	"github.com/dell/csi-powerstore/v2/pkg/node"
@@ -38,14 +38,14 @@ func New(controllerSvc controller.Interface, identitySvc *identity.Service, node
 	svc := service.New()
 	service.PutControllerService(controllerSvc)
 	service.PutNodeService(nodeSvc)
-	nfssvc := nfs.New(common.Name)
+	nfssvc := nfs.New(commonutils.Name)
 	service.PutNfsService(nfssvc)
 	nfs.PutVcsiService(svc)
-	nfs.DriverName = common.Name
+	nfs.DriverName = commonutils.Name
 
-	driverNamespace := os.Getenv(common.EnvDriverNamespace)
+	driverNamespace := os.Getenv(commonutils.EnvDriverNamespace)
 	if driverNamespace != "" {
-		Log.Infof("Reading driver namespace from env variable %s", common.EnvDriverNamespace)
+		Log.Infof("Reading driver namespace from env variable %s", commonutils.EnvDriverNamespace)
 		nfs.DriverNamespace = driverNamespace
 	} else {
 		// Read the namespace associated with the service account
@@ -58,7 +58,7 @@ func New(controllerSvc controller.Interface, identitySvc *identity.Service, node
 		}
 	}
 
-	nfs.NfsExportDirectory = os.Getenv(common.EnvNFSExportDirectory)
+	nfs.NfsExportDirectory = os.Getenv(commonutils.EnvNFSExportDirectory)
 	if nfs.NfsExportDirectory == "" {
 		Log.Infof("NFS export directory not set. using default directory")
 		nfs.NfsExportDirectory = "/var/lib/dell/nfs"

@@ -16,7 +16,7 @@
  *
  */
 
-package common_test
+package commonutils_test
 
 import (
 	"context"
@@ -28,7 +28,7 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-powerstore/v2/mocks"
-	"github.com/dell/csi-powerstore/v2/pkg/common"
+	commonutils "github.com/dell/csi-powerstore/v2/pkg/commonutils"
 	csictx "github.com/dell/gocsi/context"
 	"github.com/dell/gocsi/utils"
 	"github.com/dell/gopowerstore"
@@ -40,7 +40,7 @@ import (
 
 func TestCustomLogger(_ *testing.T) {
 	log.SetLevel(log.DebugLevel)
-	lg := &common.CustomLogger{}
+	lg := &commonutils.CustomLogger{}
 	ctx := context.Background()
 	lg.Info(ctx, "foo")
 	lg.Debug(ctx, "bar")
@@ -57,7 +57,7 @@ func TestRmSockFile(t *testing.T) {
 		fsMock.On("Stat", trimmedSockPath).Return(&mocks.FileInfo{}, nil)
 		fsMock.On("RemoveAll", trimmedSockPath).Return(nil)
 
-		common.RmSockFile(fsMock)
+		commonutils.RmSockFile(fsMock)
 	})
 
 	t.Run("failed to remove socket", func(_ *testing.T) {
@@ -65,46 +65,46 @@ func TestRmSockFile(t *testing.T) {
 		fsMock.On("Stat", trimmedSockPath).Return(&mocks.FileInfo{}, nil)
 		fsMock.On("RemoveAll", trimmedSockPath).Return(fmt.Errorf("some error"))
 
-		common.RmSockFile(fsMock)
+		commonutils.RmSockFile(fsMock)
 	})
 
 	t.Run("not found", func(_ *testing.T) {
 		fsMock := new(mocks.FsInterface)
 		fsMock.On("Stat", trimmedSockPath).Return(&mocks.FileInfo{}, os.ErrNotExist)
 
-		common.RmSockFile(fsMock)
+		commonutils.RmSockFile(fsMock)
 	})
 
 	t.Run("may or may not exist", func(_ *testing.T) {
 		fsMock := new(mocks.FsInterface)
 		fsMock.On("Stat", trimmedSockPath).Return(&mocks.FileInfo{}, fmt.Errorf("some other error"))
 
-		common.RmSockFile(fsMock)
+		commonutils.RmSockFile(fsMock)
 	})
 
 	t.Run("no endpoint set", func(_ *testing.T) {
 		fsMock := new(mocks.FsInterface)
 		_ = os.Setenv(utils.CSIEndpoint, "")
 
-		common.RmSockFile(fsMock)
+		commonutils.RmSockFile(fsMock)
 	})
 }
 
 func TestSetLogFields(t *testing.T) {
 	t.Run("empty context", func(_ *testing.T) {
-		common.SetLogFields(nil, log.Fields{})
+		commonutils.SetLogFields(nil, log.Fields{})
 	})
 }
 
 func TestGetLogFields(t *testing.T) {
 	t.Run("empty context", func(t *testing.T) {
-		fields := common.GetLogFields(nil)
+		fields := commonutils.GetLogFields(nil)
 		assert.Equal(t, log.Fields{}, fields)
 	})
 
 	t.Run("req id", func(t *testing.T) {
 		ctx := context.WithValue(context.Background(), csictx.RequestIDKey, "1")
-		fields := common.GetLogFields(ctx)
+		fields := commonutils.GetLogFields(ctx)
 		assert.Equal(t, log.Fields{"RequestID": "1"}, fields)
 	})
 }
@@ -114,7 +114,7 @@ func TestGetISCSITargetsInfoFromStorage(t *testing.T) {
 		e := errors.New("some error")
 		clientMock := new(gopowerstoremock.Client)
 		clientMock.On("GetStorageISCSITargetAddresses", context.Background()).Return([]gopowerstore.IPPoolAddress{}, e)
-		_, err := common.GetISCSITargetsInfoFromStorage(clientMock, "A1")
+		_, err := commonutils.GetISCSITargetsInfoFromStorage(clientMock, "A1")
 		assert.EqualError(t, err, e.Error())
 	})
 
@@ -127,7 +127,7 @@ func TestGetISCSITargetsInfoFromStorage(t *testing.T) {
 					IPPort:  gopowerstore.IPPortInstance{TargetIqn: "iqn"},
 				},
 			}, nil)
-		iscsiTargetsInfo, err := common.GetISCSITargetsInfoFromStorage(clientMock, "")
+		iscsiTargetsInfo, err := commonutils.GetISCSITargetsInfoFromStorage(clientMock, "")
 		assert.NotNil(t, iscsiTargetsInfo)
 		assert.NoError(t, err)
 	})
@@ -139,7 +139,7 @@ func TestGetNVMETCPTargetsInfoFromStorage(t *testing.T) {
 		clientMock := new(gopowerstoremock.Client)
 		clientMock.On("GetCluster", context.Background()).Return(gopowerstore.Cluster{}, e)
 		clientMock.On("GetStorageNVMETCPTargetAddresses", context.Background()).Return([]gopowerstore.IPPoolAddress{}, e)
-		_, err := common.GetNVMETCPTargetsInfoFromStorage(clientMock, "A1")
+		_, err := commonutils.GetNVMETCPTargetsInfoFromStorage(clientMock, "A1")
 		assert.EqualError(t, err, e.Error())
 	})
 
@@ -153,7 +153,7 @@ func TestGetNVMETCPTargetsInfoFromStorage(t *testing.T) {
 					IPPort:  gopowerstore.IPPortInstance{TargetIqn: "iqn"},
 				},
 			}, nil)
-		nvmetcpTargetInfo, err := common.GetNVMETCPTargetsInfoFromStorage(clientMock, "")
+		nvmetcpTargetInfo, err := commonutils.GetNVMETCPTargetsInfoFromStorage(clientMock, "")
 		assert.NotNil(t, nvmetcpTargetInfo)
 		assert.NoError(t, err)
 	})
@@ -164,7 +164,7 @@ func TestGetFCTargetsInfoFromStorage(t *testing.T) {
 		e := errors.New("some error")
 		clientMock := new(gopowerstoremock.Client)
 		clientMock.On("GetFCPorts", context.Background()).Return([]gopowerstore.FcPort{}, e)
-		_, err := common.GetFCTargetsInfoFromStorage(clientMock, "A1")
+		_, err := commonutils.GetFCTargetsInfoFromStorage(clientMock, "A1")
 		assert.EqualError(t, err, e.Error())
 	})
 
@@ -178,7 +178,7 @@ func TestGetFCTargetsInfoFromStorage(t *testing.T) {
 					IsLinkUp:    true,
 				},
 			}, nil)
-		fcTargetInfo, err := common.GetFCTargetsInfoFromStorage(clientMock, "A1")
+		fcTargetInfo, err := commonutils.GetFCTargetsInfoFromStorage(clientMock, "A1")
 		assert.NotNil(t, fcTargetInfo)
 		assert.NoError(t, err)
 	})
@@ -189,14 +189,14 @@ func TestIsK8sMetadataSupported(t *testing.T) {
 		e := errors.New("some error")
 		clientMock := new(gopowerstoremock.Client)
 		clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(0.0), e)
-		version := common.IsK8sMetadataSupported(clientMock)
+		version := commonutils.IsK8sMetadataSupported(clientMock)
 		assert.Equal(t, version, false)
 	})
 
 	t.Run("no error", func(t *testing.T) {
 		clientMock := new(gopowerstoremock.Client)
 		clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
-		version := common.IsK8sMetadataSupported(clientMock)
+		version := commonutils.IsK8sMetadataSupported(clientMock)
 		assert.Equal(t, version, true)
 	})
 }
@@ -207,7 +207,7 @@ func TestGetNVMEFCTargetInfoFromStorage(t *testing.T) {
 		clientMock := new(gopowerstoremock.Client)
 		clientMock.On("GetCluster", context.Background()).Return(gopowerstore.Cluster{}, e)
 		clientMock.On("GetFCPorts", context.Background()).Return([]gopowerstore.FcPort{}, e)
-		_, err := common.GetNVMEFCTargetInfoFromStorage(clientMock, "A1")
+		_, err := commonutils.GetNVMEFCTargetInfoFromStorage(clientMock, "A1")
 		assert.EqualError(t, err, e.Error())
 	})
 
@@ -221,7 +221,7 @@ func TestGetNVMEFCTargetInfoFromStorage(t *testing.T) {
 					IsLinkUp: true,
 				},
 			}, nil)
-		nvmefcTargetInfo, err := common.GetNVMEFCTargetInfoFromStorage(clientMock, "")
+		nvmefcTargetInfo, err := commonutils.GetNVMEFCTargetInfoFromStorage(clientMock, "")
 		assert.NotNil(t, nvmefcTargetInfo)
 		assert.NoError(t, err)
 	})
@@ -259,19 +259,19 @@ func TestHasRequiredTopology(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equalf(t, tt.want, common.HasRequiredTopology(tt.args.topologies, tt.args.arrIP, tt.args.requiredTopology), "HasRequiredTopology(%v, %v, %v)", tt.args.topologies, tt.args.arrIP, tt.args.requiredTopology)
+			assert.Equalf(t, tt.want, commonutils.HasRequiredTopology(tt.args.topologies, tt.args.arrIP, tt.args.requiredTopology), "HasRequiredTopology(%v, %v, %v)", tt.args.topologies, tt.args.arrIP, tt.args.requiredTopology)
 		})
 	}
 }
 
 func TestGetNfsTopology(t *testing.T) {
 	t.Run("nfs topology is true", func(t *testing.T) {
-		topology := common.GetNfsTopology("10.0.0.0")
+		topology := commonutils.GetNfsTopology("10.0.0.0")
 		assert.Equal(t, topology, []*csi.Topology{{Segments: map[string]string{"csi-powerstore.dellemc.com/10.0.0.0-nfs": "true"}}})
 	})
 
 	t.Run("nfs topology should not be false", func(t *testing.T) {
-		topology := common.GetNfsTopology("10.0.0.0")
+		topology := commonutils.GetNfsTopology("10.0.0.0")
 		assert.NotEqual(t, topology, []*csi.Topology{{Segments: map[string]string{"csi-powerstore.dellemc.com/10.0.0.0-nfs": "false"}}})
 	})
 }
@@ -291,7 +291,7 @@ func Test_contains(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := common.Contains(tt.args.slice, tt.args.element); got != tt.want {
+			if got := commonutils.Contains(tt.args.slice, tt.args.element); got != tt.want {
 				t.Errorf("contains() = %v, want %v", got, tt.want)
 			}
 		})
@@ -319,7 +319,7 @@ func TestExternalAccessAlreadyAdded(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := common.ExternalAccessAlreadyAdded(tt.args.export, tt.args.externalAccess); got != tt.want {
+			if got := commonutils.ExternalAccessAlreadyAdded(tt.args.export, tt.args.externalAccess); got != tt.want {
 				t.Errorf("ExternalAccessAlreadyAdded() = %v, want %v", got, tt.want)
 			}
 		})
@@ -342,7 +342,7 @@ func TestParseCIDR(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := common.ParseCIDR(tt.args.externalAccessCIDR)
+			got, err := commonutils.ParseCIDR(tt.args.externalAccessCIDR)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ParseCIDR() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -371,9 +371,9 @@ func TestSetPollingFrequency(t *testing.T) {
 			if i == 0 {
 				os.Setenv("X_CSI_PODMON_ARRAY_CONNECTIVITY_POLL_RATE", "100")
 			}
-			// need to import this function because the package name in this file is not common
-			// @TO-DO rename package name to common
-			if got := common.SetPollingFrequency(tt.args.ctx); got != tt.want {
+			// need to import this function because the package name in this file is not commonutils
+			// @TO-DO rename package name to commonutils
+			if got := commonutils.SetPollingFrequency(tt.args.ctx); got != tt.want {
 				t.Errorf("SetPollingFrequency() = %v, want %v", got, tt.want)
 			}
 			os.Unsetenv("X_CSI_PODMON_ARRAY_CONNECTIVITY_POLL_RATE")
@@ -397,15 +397,15 @@ func Test_setAPIPort(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if i == 0 {
 				os.Setenv("X_CSI_PODMON_API_PORT", "8090")
-				common.SetAPIPort(tt.args.ctx)
-				if common.APIPort != ":8090" {
-					t.Errorf("setAPIPort() error, want 8090 port found %v", common.APIPort)
+				commonutils.SetAPIPort(tt.args.ctx)
+				if commonutils.APIPort != ":8090" {
+					t.Errorf("setAPIPort() error, want 8090 port found %v", commonutils.APIPort)
 				}
 				os.Unsetenv("X_CSI_PODMON_API_PORT")
 			}
-			common.SetAPIPort(tt.args.ctx)
-			if common.APIPort != ":8083" {
-				t.Errorf("setAPIPort() error, want 8083 port found %v", common.APIPort)
+			commonutils.SetAPIPort(tt.args.ctx)
+			if commonutils.APIPort != ":8083" {
+				t.Errorf("setAPIPort() error, want 8083 port found %v", commonutils.APIPort)
 			}
 		})
 	}
@@ -424,7 +424,7 @@ func TestRandomString(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Since each byte in the slice is represented by two hex characters in the resulting string, the length of the string returned by the function will be len * 2.
-			if got := common.RandomString(tt.args.len); len(got) != 5*2 {
+			if got := commonutils.RandomString(tt.args.len); len(got) != 5*2 {
 				t.Errorf("RandomString() = %v, have len %d and want 5*2", got, len(got))
 			}
 		})
@@ -452,7 +452,7 @@ func TestGetIPListWithMaskFromString(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := common.GetIPListWithMaskFromString(tt.args.input)
+			got, err := commonutils.GetIPListWithMaskFromString(tt.args.input)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("GetIPListWithMaskFromString() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -480,7 +480,7 @@ func TestGetIPListFromString(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := common.GetIPListFromString(tt.args.input); !reflect.DeepEqual(got, tt.want) {
+			if got := commonutils.GetIPListFromString(tt.args.input); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("GetIPListFromString() = %v, want %v", got, tt.want)
 			}
 		})
@@ -500,7 +500,7 @@ func TestReachableEndPoint(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := common.ReachableEndPoint(tt.args.endpoint); got != tt.want {
+			if got := commonutils.ReachableEndPoint(tt.args.endpoint); got != tt.want {
 				t.Errorf("ReachableEndPoint() = %v, want %v", got, tt.want)
 			}
 		})
@@ -549,7 +549,7 @@ func TestGetMountFlags(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := common.GetMountFlags(tt.vc)
+			result := commonutils.GetMountFlags(tt.vc)
 			assert.Equal(t, tt.expected, result)
 		})
 	}

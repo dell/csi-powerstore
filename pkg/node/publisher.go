@@ -22,8 +22,8 @@ import (
 	"context"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/dell/csi-powerstore/v2/pkg/common"
-	"github.com/dell/csi-powerstore/v2/pkg/common/fs"
+	commonutils "github.com/dell/csi-powerstore/v2/pkg/commonutils"
+	"github.com/dell/csi-powerstore/v2/pkg/commonutils/fs"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -93,7 +93,7 @@ func (sp *SCSIPublisher) publishMount(ctx context.Context, logFields log.Fields,
 	var opts []string
 	mountCap := vc.GetMount()
 	mountFsType := mountCap.GetFsType()
-	mntFlags := common.GetMountFlags(vc)
+	mntFlags := commonutils.GetMountFlags(vc)
 	if mountFsType == "xfs" {
 		mntFlags = append(mntFlags, "nouuid")
 	}
@@ -168,7 +168,7 @@ func (np *NFSPublisher) Publish(ctx context.Context, logFields log.Fields, fs fs
 	}
 	log.WithFields(logFields).Info("target path successfully created")
 
-	mntFlags := common.GetMountFlags(vc)
+	mntFlags := commonutils.GetMountFlags(vc)
 
 	if isRO {
 		mntFlags = append(mntFlags, "ro")
