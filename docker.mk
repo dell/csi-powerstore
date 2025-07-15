@@ -51,6 +51,11 @@ docker: download-csm-common
 	$(eval include csm-common.mk)
 	$(BUILDER) build --pull -t "$(DOCKER_REGISTRY)/$(DOCKER_IMAGE_NAME):$(IMAGETAG)" --build-arg GOIMAGE=$(DEFAULT_GOIMAGE) --build-arg BASEIMAGE=$(CSM_BASEIMAGE) .
 
+skaffold-debug: download-csm-common
+	$(eval include csm-common.mk)
+	$(BUILDER) build --pull -t $(IMAGE) --build-arg GOIMAGE=$(DEFAULT_GOIMAGE) --build-arg BASEIMAGE=$(CSM_BASEIMAGE) -f ./Dockerfile.debug
+	if [[ ${PUSH_IMAGE} ]]; then $(BUILDER) push $(IMAGE); fi
+
 docker-no-cache: download-csm-common
 	$(eval include csm-common.mk)
 	$(BUILDER) build --pull --no-cache -t "$(DOCKER_REGISTRY)/$(DOCKER_IMAGE_NAME):$(IMAGETAG)" --build-arg GOIMAGE=$(DEFAULT_GOIMAGE) --build-arg BASEIMAGE=$(CSM_BASEIMAGE) .
