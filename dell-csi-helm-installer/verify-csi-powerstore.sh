@@ -20,6 +20,7 @@ function verify-csi-powerstore() {
   verify_nvmetcp_installation
   verify_nvmefc_installation
   verify_helm_3
+  verify_authorization_proxy_server
 }
 
 function verify_optional_replication_requirements() {
