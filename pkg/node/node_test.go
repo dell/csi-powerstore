@@ -194,6 +194,16 @@ var (
 	}
 )
 
+// default empty usage
+var usage = []*csi.VolumeUsage{
+	{
+		Available: 0,
+		Total:     0,
+		Used:      0,
+		Unit:      csi.VolumeUsage_BYTES,
+	},
+}
+
 func TestCSINodeService(t *testing.T) {
 	gomega.RegisterFailHandler(ginkgo.Fail)
 	junitReporter := reporters.NewJUnitReporter("node-svc.xml")
@@ -4787,6 +4797,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 				gomega.Expect(err).To(gomega.BeNil())
 				gomega.Expect(res).To(gomega.Equal(&csi.NodeGetVolumeStatsResponse{
+					Usage: usage,
 					VolumeCondition: &csi.VolumeCondition{
 						Abnormal: true,
 						Message:  fmt.Sprintf("Volume %s is not found", validBaseVolumeID),
@@ -4809,6 +4820,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 				gomega.Expect(err).To(gomega.BeNil())
 				gomega.Expect(res).To(gomega.Equal(&csi.NodeGetVolumeStatsResponse{
+					Usage: usage,
 					VolumeCondition: &csi.VolumeCondition{
 						Abnormal: true,
 						Message:  fmt.Sprintf("host %s is not attached to volume %s", validNodeID, validBaseVolumeID),
@@ -4865,6 +4877,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 				gomega.Expect(err).To(gomega.BeNil())
 				gomega.Expect(res).To(gomega.Equal(&csi.NodeGetVolumeStatsResponse{
+					Usage: usage,
 					VolumeCondition: &csi.VolumeCondition{
 						Abnormal: true,
 						Message:  fmt.Sprintf("host %s is not attached to volume %s", validNodeID, validBaseVolumeID),
@@ -4917,6 +4930,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 				gomega.Expect(err).To(gomega.BeNil())
 				gomega.Expect(res).To(gomega.Equal(&csi.NodeGetVolumeStatsResponse{
+					Usage: usage,
 					VolumeCondition: &csi.VolumeCondition{
 						Abnormal: true,
 						Message:  fmt.Sprintf("Filesystem %s is not found", validBaseVolumeID),
@@ -4937,6 +4951,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 				gomega.Expect(err).To(gomega.BeNil())
 				gomega.Expect(res).To(gomega.Equal(&csi.NodeGetVolumeStatsResponse{
+					Usage: usage,
 					VolumeCondition: &csi.VolumeCondition{
 						Abnormal: true,
 						Message:  fmt.Sprintf("NFS export for volume %s is not found", validBaseVolumeID),
@@ -4960,6 +4975,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 				gomega.Expect(err).To(gomega.BeNil())
 				gomega.Expect(res).To(gomega.Equal(&csi.NodeGetVolumeStatsResponse{
+					Usage: usage,
 					VolumeCondition: &csi.VolumeCondition{
 						Abnormal: true,
 						Message:  fmt.Sprintf("host %s is not attached to NFS export for filesystem %s", validNodeID, validBaseVolumeID),
@@ -5020,6 +5036,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 				gomega.Expect(err).To(gomega.BeNil())
 				gomega.Expect(res).To(gomega.Equal(&csi.NodeGetVolumeStatsResponse{
+					Usage: usage,
 					VolumeCondition: &csi.VolumeCondition{
 						Abnormal: true,
 						Message:  fmt.Sprintf("staging target path %s not mounted for volume %s", nodeStagePrivateDir, validBaseVolumeID),
@@ -5055,6 +5072,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 				gomega.Expect(err).To(gomega.BeNil())
 				gomega.Expect(res).To(gomega.Equal(&csi.NodeGetVolumeStatsResponse{
+					Usage: usage,
 					VolumeCondition: &csi.VolumeCondition{
 						Abnormal: true,
 						Message:  fmt.Sprintf("volume path %s not mounted for volume %s", validTargetPath, validBaseVolumeID),
@@ -5080,6 +5098,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 				gomega.Expect(err).To(gomega.BeNil())
 				gomega.Expect(res).To(gomega.Equal(&csi.NodeGetVolumeStatsResponse{
+					Usage: usage,
 					VolumeCondition: &csi.VolumeCondition{
 						Abnormal: true,
 						Message:  fmt.Sprintf("volume path %s not accessible for volume %s", validTargetPath, validBaseVolumeID),

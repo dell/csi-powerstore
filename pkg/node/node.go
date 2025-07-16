@@ -684,7 +684,15 @@ func (s *Service) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolume
 	if !ok {
 		return nil, status.Error(codes.InvalidArgument, "failed to find array with given ID")
 	}
-
+	// default empty usage
+	usage := []*csi.VolumeUsage{
+		{
+			Available: 0,
+			Total:     0,
+			Used:      0,
+			Unit:      csi.VolumeUsage_BYTES,
+		},
+	}
 	// Validate if volume exists
 	if protocol == "nfs" {
 		fs, err := arr.Client.GetFS(ctx, id)
@@ -693,6 +701,7 @@ func (s *Service) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolume
 				return nil, status.Errorf(codes.NotFound, "failed to find filesystem %s with error: %v", id, err.Error())
 			}
 			resp := &csi.NodeGetVolumeStatsResponse{
+				Usage: usage,
 				VolumeCondition: &csi.VolumeCondition{
 					Abnormal: true,
 					Message:  fmt.Sprintf("Filesystem %s is not found", id),
@@ -706,6 +715,7 @@ func (s *Service) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolume
 				return nil, status.Errorf(codes.NotFound, "failed to find nfs export for filesystem with error: %v", err.Error())
 			}
 			resp := &csi.NodeGetVolumeStatsResponse{
+				Usage: usage,
 				VolumeCondition: &csi.VolumeCondition{
 					Abnormal: true,
 					Message:  fmt.Sprintf("NFS export for volume %s is not found", id),
@@ -725,6 +735,7 @@ func (s *Service) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolume
 		}
 		if !attached {
 			resp := &csi.NodeGetVolumeStatsResponse{
+				Usage: usage,
 				VolumeCondition: &csi.VolumeCondition{
 					Abnormal: true,
 					Message:  fmt.Sprintf("host %s is not attached to NFS export for filesystem %s", s.nodeID, id),
@@ -739,6 +750,7 @@ func (s *Service) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolume
 				return nil, status.Errorf(codes.NotFound, "failed to find volume %s with error: %v", id, err.Error())
 			}
 			resp := &csi.NodeGetVolumeStatsResponse{
+				Usage: usage,
 				VolumeCondition: &csi.VolumeCondition{
 					Abnormal: true,
 					Message:  fmt.Sprintf("Volume %s is not found", id),
@@ -759,6 +771,7 @@ func (s *Service) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolume
 					return nil, status.Errorf(codes.NotFound, "failed to get host: %s with error: %v", hostMapping.HostID, err.Error())
 				}
 				resp := &csi.NodeGetVolumeStatsResponse{
+					Usage: usage,
 					VolumeCondition: &csi.VolumeCondition{
 						Abnormal: true,
 						Message:  fmt.Sprintf("host %s is not attached to volume %s", s.nodeID, id),
@@ -789,6 +802,7 @@ func (s *Service) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolume
 		}
 		if !hostMapped {
 			resp := &csi.NodeGetVolumeStatsResponse{
+				Usage: usage,
 				VolumeCondition: &csi.VolumeCondition{
 					Abnormal: true,
 					Message:  fmt.Sprintf("host %s is not attached to volume %s", s.nodeID, id),
@@ -803,10 +817,11 @@ func (s *Service) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolume
 		// Check if staging target path is mounted
 		_, found, err := getTargetMount(ctx, stagingPath, s.Fs)
 		if err != nil {
-			return nil, status.Errorf(codes.Internal, "can't check mounts for path %s: %s", volumePath, err.Error())
+			return nil, status.Errorf(codes.Internal, "can't check mounts for path %s: %s", stagingPath, err.Error())
 		}
 		if !found {
 			resp := &csi.NodeGetVolumeStatsResponse{
+				Usage: usage,
 				VolumeCondition: &csi.VolumeCondition{
 					Abnormal: true,
 					Message:  fmt.Sprintf("staging target path %s not mounted for volume %s", stagingPath, id),
@@ -823,6 +838,7 @@ func (s *Service) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolume
 	}
 	if !found {
 		resp := &csi.NodeGetVolumeStatsResponse{
+			Usage: usage,
 			VolumeCondition: &csi.VolumeCondition{
 				Abnormal: true,
 				Message:  fmt.Sprintf("volume path %s not mounted for volume %s", volumePath, id),
@@ -835,6 +851,7 @@ func (s *Service) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolume
 	_, err = os.ReadDir(volumePath)
 	if err != nil {
 		resp := &csi.NodeGetVolumeStatsResponse{
+			Usage: usage,
 			VolumeCondition: &csi.VolumeCondition{
 				Abnormal: true,
 				Message:  fmt.Sprintf("volume path %s not accessible for volume %s", volumePath, id),
