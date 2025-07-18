@@ -28,6 +28,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -198,7 +199,17 @@ func (fs *Fs) ParseProcMounts(
 
 // NetDial is a wrapper for net.Dial func. Uses UDP and 80 port.
 func (fs *Fs) NetDial(endpoint string) (net.Conn, error) {
-	return net.Dial("udp", fmt.Sprintf("%s:80", endpoint))
+	// Default port to use if none is specified
+	defaultPort := "80"
+
+	// Check if the endpoint includes a port
+	if !strings.Contains(endpoint, ":") {
+		log.Debugf("++++++Using default port %s for endpoint %s", defaultPort, endpoint)
+		endpoint = fmt.Sprintf("%s:%s", endpoint, defaultPort)
+	}
+	log.Debugf("++++++Using endpoint %s", endpoint)
+	// Dial using UDP
+	return net.Dial("udp", endpoint)
 }
 
 // MkFileIdempotent creates file if there is none
