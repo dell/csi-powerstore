@@ -28,6 +28,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -198,6 +199,10 @@ func (fs *Fs) ParseProcMounts(
 
 // NetDial is a wrapper for net.Dial func. Uses UDP and 80 port.
 func (fs *Fs) NetDial(endpoint string) (net.Conn, error) {
+	if strings.Contains(endpoint, "localhost") || strings.Contains(endpoint, "127.0.0.1") {
+		// If the endpoint is localhost or 127.0.0.1, in case of Authorization V2 module we will just return a UDP connection
+		return net.Dial("udp", fmt.Sprintf("%s", endpoint))
+	}
 	return net.Dial("udp", fmt.Sprintf("%s:80", endpoint))
 }
 
