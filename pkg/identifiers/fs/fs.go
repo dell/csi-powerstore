@@ -199,11 +199,17 @@ func (fs *Fs) ParseProcMounts(
 
 // NetDial is a wrapper for net.Dial func. Uses UDP and 80 port.
 func (fs *Fs) NetDial(endpoint string) (net.Conn, error) {
-	if strings.Contains(endpoint, "localhost") || strings.Contains(endpoint, "127.0.0.1") {
-		// If the endpoint is localhost or 127.0.0.1, in case of Authorization V2 module we will just return a UDP connection
-		return net.Dial("udp", fmt.Sprintf("%s", endpoint))
+	// Default port to use if none is specified
+	defaultPort := "80"
+
+	// Check if the endpoint includes a port
+	if !strings.Contains(endpoint, ":") {
+		log.Debugf("++++++Using default port %s for endpoint %s", defaultPort, endpoint)
+		endpoint = fmt.Sprintf("%s:%s", endpoint, defaultPort)
 	}
-	return net.Dial("udp", fmt.Sprintf("%s:80", endpoint))
+	log.Debugf("++++++Using endpoint %s", endpoint)
+	// Dial using UDP
+	return net.Dial("udp", endpoint)
 }
 
 // MkFileIdempotent creates file if there is none
