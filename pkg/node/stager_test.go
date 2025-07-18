@@ -25,7 +25,7 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-powerstore/v2/mocks"
-	"github.com/dell/csi-powerstore/v2/pkg/common"
+	commonutils "github.com/dell/csi-powerstore/v2/pkg/commonutils"
 	"github.com/dell/gobrick"
 	"github.com/dell/gofsutil"
 	"github.com/golang/mock/gomock"
@@ -36,35 +36,35 @@ import (
 
 func getValidPublishContext() map[string]string {
 	return map[string]string{
-		common.PublishContextLUNAddress:                 validLUNID,
-		common.PublishContextDeviceWWN:                  validDeviceWWN,
-		common.PublishContextISCSIPortalsPrefix + "0":   validISCSIPortals[0],
-		common.PublishContextISCSIPortalsPrefix + "1":   validISCSIPortals[1],
-		common.PublishContextISCSITargetsPrefix + "0":   validISCSITargets[0],
-		common.PublishContextISCSITargetsPrefix + "1":   validISCSITargets[1],
-		common.PublishContextNVMEFCPortalsPrefix + "0":  validNVMEFCPortals[0],
-		common.PublishContextNVMEFCPortalsPrefix + "1":  validNVMEFCPortals[1],
-		common.PublishContextNVMEFCTargetsPrefix + "0":  validNVMEFCTargets[0],
-		common.PublishContextNVMEFCTargetsPrefix + "1":  validNVMEFCTargets[1],
-		common.PublishContextNVMETCPPortalsPrefix + "0": validNVMETCPPortals[0],
-		common.PublishContextNVMETCPPortalsPrefix + "1": validNVMETCPPortals[1],
-		common.PublishContextNVMETCPTargetsPrefix + "0": validNVMETCPTargets[0],
-		common.PublishContextNVMETCPTargetsPrefix + "1": validNVMETCPTargets[1],
-		common.PublishContextFCWWPNPrefix + "0":         validFCTargetsWWPN[0],
-		common.PublishContextFCWWPNPrefix + "1":         validFCTargetsWWPN[1],
+		commonutils.PublishContextLUNAddress:                 validLUNID,
+		commonutils.PublishContextDeviceWWN:                  validDeviceWWN,
+		commonutils.PublishContextISCSIPortalsPrefix + "0":   validISCSIPortals[0],
+		commonutils.PublishContextISCSIPortalsPrefix + "1":   validISCSIPortals[1],
+		commonutils.PublishContextISCSITargetsPrefix + "0":   validISCSITargets[0],
+		commonutils.PublishContextISCSITargetsPrefix + "1":   validISCSITargets[1],
+		commonutils.PublishContextNVMEFCPortalsPrefix + "0":  validNVMEFCPortals[0],
+		commonutils.PublishContextNVMEFCPortalsPrefix + "1":  validNVMEFCPortals[1],
+		commonutils.PublishContextNVMEFCTargetsPrefix + "0":  validNVMEFCTargets[0],
+		commonutils.PublishContextNVMEFCTargetsPrefix + "1":  validNVMEFCTargets[1],
+		commonutils.PublishContextNVMETCPPortalsPrefix + "0": validNVMETCPPortals[0],
+		commonutils.PublishContextNVMETCPPortalsPrefix + "1": validNVMETCPPortals[1],
+		commonutils.PublishContextNVMETCPTargetsPrefix + "0": validNVMETCPTargets[0],
+		commonutils.PublishContextNVMETCPTargetsPrefix + "1": validNVMETCPTargets[1],
+		commonutils.PublishContextFCWWPNPrefix + "0":         validFCTargetsWWPN[0],
+		commonutils.PublishContextFCWWPNPrefix + "1":         validFCTargetsWWPN[1],
 	}
 }
 
 func getValidRemoteMetroPublishContext() map[string]string {
 	publishContext := getValidPublishContext()
-	publishContext[common.PublishContextRemoteLUNAddress] = validLUNID
-	publishContext[common.PublishContextRemoteDeviceWWN] = validDeviceWWN
-	publishContext[common.PublishContextRemoteISCSIPortalsPrefix+"0"] = validRemoteISCSIPortals[0]
-	publishContext[common.PublishContextRemoteISCSIPortalsPrefix+"1"] = validRemoteISCSIPortals[1]
-	publishContext[common.PublishContextRemoteISCSITargetsPrefix+"0"] = validRemoteISCSITargets[0]
-	publishContext[common.PublishContextRemoteISCSITargetsPrefix+"1"] = validRemoteISCSITargets[1]
-	publishContext[common.PublishContextRemoteFCWWPNPrefix+"0"] = validRemoteFCTargetsWWPN[0]
-	publishContext[common.PublishContextRemoteFCWWPNPrefix+"1"] = validRemoteFCTargetsWWPN[1]
+	publishContext[commonutils.PublishContextRemoteLUNAddress] = validLUNID
+	publishContext[commonutils.PublishContextRemoteDeviceWWN] = validDeviceWWN
+	publishContext[commonutils.PublishContextRemoteISCSIPortalsPrefix+"0"] = validRemoteISCSIPortals[0]
+	publishContext[commonutils.PublishContextRemoteISCSIPortalsPrefix+"1"] = validRemoteISCSIPortals[1]
+	publishContext[commonutils.PublishContextRemoteISCSITargetsPrefix+"0"] = validRemoteISCSITargets[0]
+	publishContext[commonutils.PublishContextRemoteISCSITargetsPrefix+"1"] = validRemoteISCSITargets[1]
+	publishContext[commonutils.PublishContextRemoteFCWWPNPrefix+"0"] = validRemoteFCTargetsWWPN[0]
+	publishContext[commonutils.PublishContextRemoteFCWWPNPrefix+"1"] = validRemoteFCTargetsWWPN[1]
 
 	return publishContext
 }

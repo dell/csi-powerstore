@@ -23,7 +23,7 @@ import (
 	"testing"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/dell/csi-powerstore/v2/pkg/common"
+	commonutils "github.com/dell/csi-powerstore/v2/pkg/commonutils"
 	ginkgo "github.com/onsi/ginkgo"
 	"github.com/onsi/ginkgo/reporters"
 	gomega "github.com/onsi/gomega"
@@ -39,7 +39,7 @@ func TestCSIIdentityService(t *testing.T) {
 }
 
 func setVariables() {
-	idntySvc = NewIdentityService(common.Name, "v1.3.0", common.Manifest)
+	idntySvc = NewIdentityService(commonutils.Name, "v1.3.0", commonutils.Manifest)
 }
 
 var _ = ginkgo.Describe("CSIIdentityService", func() {
