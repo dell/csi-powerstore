@@ -30,7 +30,7 @@ import (
 	"github.com/dell/csi-powerstore/v2/mocks"
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers"
 	csictx "github.com/dell/gocsi/context"
-	"github.com/dell/gocsi/utils"
+	csiutils "github.com/dell/gocsi/utils/csi"
 	"github.com/dell/gopowerstore"
 	gopowerstoremock "github.com/dell/gopowerstore/mocks"
 	log "github.com/sirupsen/logrus"
@@ -50,7 +50,7 @@ func TestCustomLogger(_ *testing.T) {
 func TestRmSockFile(t *testing.T) {
 	sockPath := "unix:///var/run/csi/csi.sock"
 	trimmedSockPath := "/var/run/csi/csi.sock"
-	_ = os.Setenv(utils.CSIEndpoint, sockPath)
+	_ = os.Setenv(csiutils.CSIEndpoint, sockPath)
 
 	t.Run("removed socket", func(_ *testing.T) {
 		fsMock := new(mocks.FsInterface)
@@ -84,7 +84,7 @@ func TestRmSockFile(t *testing.T) {
 
 	t.Run("no endpoint set", func(_ *testing.T) {
 		fsMock := new(mocks.FsInterface)
-		_ = os.Setenv(utils.CSIEndpoint, "")
+		_ = os.Setenv(csiutils.CSIEndpoint, "")
 
 		identifiers.RmSockFile(fsMock)
 	})

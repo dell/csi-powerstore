@@ -40,7 +40,7 @@ import (
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers/fs"
 	"github.com/dell/gobrick"
 	csictx "github.com/dell/gocsi/context"
-	"github.com/dell/gocsi/utils"
+	csiutils "github.com/dell/gocsi/utils/csi"
 	"github.com/dell/gopowerstore"
 	log "github.com/sirupsen/logrus"
 )
@@ -207,7 +207,7 @@ type TransportType string
 
 // RmSockFile removes socket files that left after previous installation
 func RmSockFile(f fs.Interface) {
-	proto, addr, err := utils.GetCSIEndpoint()
+	proto, addr, err := csiutils.GetCSIEndpoint()
 	if err != nil {
 		log.Errorf("Error: failed to get CSI endpoint: %s\n", err.Error())
 	}

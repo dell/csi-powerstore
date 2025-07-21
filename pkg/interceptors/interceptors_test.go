@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2021-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,7 +32,7 @@ import (
 	controller "github.com/dell/csi-powerstore/v2/pkg/controller"
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers"
 	csictx "github.com/dell/gocsi/context"
-	"github.com/dell/gocsi/middleware/serialvolume/types"
+	lockprovider "github.com/dell/gocsi/middleware/serialvolume/lockprovider"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"google.golang.org/grpc"
@@ -210,7 +210,7 @@ func TestCreateMetadataRetrieverClient(t *testing.T) {
 
 // Define the options struct
 type options struct {
-	locker                types.VolumeLockerProvider
+	locker                lockprovider.VolumeLockerProvider
 	MetadataSidecarClient MetadataSidecarClient
 	timeout               time.Duration
 }
