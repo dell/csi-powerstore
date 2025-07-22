@@ -3702,11 +3702,6 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					nil,
 				)
 				setDefaultNodeLabelsMock()
-				//oneArray, err := nodeSvc.GetOneArray(firstValidIP)
-				//gomega.Expect(err, gomega.BeNil())
-				//oneArray.Endpoint = "127.0.0.1"
-				//oneArray.GlobalID = "127.0.0.1"
-				//nodeSvc.arrays = append(nodeSvc.arrays, oneArray)
 
 				res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
 				gomega.Expect(err).To(gomega.BeNil())
