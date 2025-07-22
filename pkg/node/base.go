@@ -177,8 +177,13 @@ func formatWWPN(data string) (string, error) {
 }
 
 // Get preferred outbound ip of this machine
-func getOutboundIP(endpoint string, fs fs.Interface) (net.IP, error) {
-	conn, err := fs.NetDial(endpoint)
+func getOutboundIP(endpoint string, port string, fs fs.Interface) (net.IP, error) {
+	finalEndpoint := endpoint
+	if port != "" {
+		// this means the port is set in the URL and should be used (In case of Auth v2 enablement)
+		finalEndpoint = endpoint + ":" + port
+	}
+	conn, err := fs.NetDial(finalEndpoint)
 	if err != nil {
 		return nil, err
 	}

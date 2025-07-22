@@ -160,6 +160,19 @@ func (suite *FsTestSuite) TestNetDial() {
 	conn.Close()
 }
 
+func (suite *FsTestSuite) TestNetDialWithPort() {
+	conn, err := suite.fs.NetDial("localhost:9400")
+	suite.Assert().NoError(err)
+	suite.Assert().NotNil(conn)
+	defer conn.Close()
+}
+
+func (suite *FsTestSuite) TestNetDialWithHttpsPort() {
+	conn, err := suite.fs.NetDial("https://localhost:9400")
+	suite.Assert().Error(err)
+	suite.Assert().Nil(conn)
+}
+
 func (suite *FsTestSuite) TestGetUtil() {
 	util := suite.fs.GetUtil()
 	suite.Assert().NotNil(util)

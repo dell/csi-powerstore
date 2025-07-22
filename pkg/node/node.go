@@ -23,6 +23,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -1207,7 +1208,9 @@ func (s *Service) NodeGetInfo(ctx context.Context, _ *csi.NodeGetInfoRequest) (*
 			log.Errorf("failed to validate NFS service for the array: %s", err.Error())
 		} else if isNFSEnabled {
 			log.Info("NFS service is enabled on the array ", arr.GetGlobalID())
-			_, err := getOutboundIP(arr.GetIP(), s.Fs)
+			// we will chop off port from the host if present.
+			port, err := ExtractPort(arr.Endpoint)
+			_, err = getOutboundIP(arr.GetIP(), port, s.Fs)
 			if err == nil {
 				resp.AccessibleTopology.Segments[identifiers.Name+"/"+arr.GetIP()+"-nfs"] = "true"
 			} else {
@@ -1431,7 +1434,9 @@ func (s *Service) updateNodeID() error {
 		if defaultArray == nil {
 			return status.Errorf(codes.FailedPrecondition, "Could not fetch default PowerStore array")
 		}
-		ip, err := getOutboundIP(s.DefaultArray().GetIP(), s.Fs)
+		// we will chop off port from the host if present.
+		port, err := ExtractPort(defaultArray.Endpoint)
+		ip, err := getOutboundIP(defaultArray.GetIP(), port, s.Fs)
 		if err != nil {
 			log.WithFields(log.Fields{
 				"endpoint": s.DefaultArray().GetIP(),
@@ -2253,4 +2258,19 @@ func (s *Service) fileExists(filename string) bool {
 // and returns a slice containing the hostname and port.
 func splitIPAddress(address string) []string {
 	return strings.Split(address, ":")
+}
+
+// ExtractPort extracts the port from a URL.
+func ExtractPort(urlString string) (string, error) {
+	u, err := url.Parse(urlString)
+	if err != nil {
+		return "", err
+	}
+
+	port := u.Port()
+	if port == "" {
+		return "", errors.New("port not specified in URL")
+	}
+
+	return port, nil
 }

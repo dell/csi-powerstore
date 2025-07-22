@@ -224,7 +224,7 @@ func getTestArrays() map[string]*array.PowerStoreArray {
 		IP:            firstValidIP,
 	}
 	second := &array.PowerStoreArray{
-		Endpoint:      "https://192.168.0.2/api/rest",
+		Endpoint:      "https://192.168.0.2:9400/api/rest",
 		Username:      "admin",
 		Password:      "pass",
 		NasName:       validNasName,
@@ -237,6 +237,7 @@ func getTestArrays() map[string]*array.PowerStoreArray {
 
 	arrays[firstValidIP] = first
 	arrays[secondValidIP] = second
+
 	return arrays
 }
 
@@ -3661,6 +3662,41 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 						},
 					}, nil)
 				conn, _ := net.Dial("udp", "127.0.0.1:80")
+				fsMock.On("NetDial", mock.Anything).Return(
+					conn,
+					nil,
+				)
+				setDefaultNodeLabelsMock()
+
+				res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.NodeGetInfoResponse{
+					NodeId: nodeSvc.nodeID,
+					AccessibleTopology: &csi.Topology{
+						Segments: map[string]string{
+							identifiers.Name + "/" + firstValidIP + "-nfs":   "true",
+							identifiers.Name + "/" + firstValidIP + "-iscsi": "true",
+							identifiers.Name + "/" + secondValidIP + "-nfs":  "true",
+						},
+					},
+					MaxVolumesPerNode: 0,
+				}))
+			})
+			ginkgo.It("should return correct topology segments when Auth V2 is enabled", func() {
+				clientMock.On("GetNASServers", mock.Anything).
+					Return(nasData, nil)
+				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
+					Return([]gopowerstore.IPPoolAddress{
+						{
+							Address: "192.168.1.1",
+							IPPort:  gopowerstore.IPPortInstance{TargetIqn: "iqn"},
+						},
+						{
+							Address: "192.168.1.2",
+							IPPort:  gopowerstore.IPPortInstance{TargetIqn: "iqn2"},
+						},
+					}, nil)
+				conn, _ := net.Dial("udp", "127.0.0.1:9400")
 				fsMock.On("NetDial", mock.Anything).Return(
 					conn,
 					nil,
