@@ -199,16 +199,12 @@ func (fs *Fs) ParseProcMounts(
 
 // NetDial is a wrapper for net.Dial func. Uses UDP and 80 port.
 func (fs *Fs) NetDial(endpoint string) (net.Conn, error) {
-	// Default port to use if none is specified
-	defaultPort := "80"
-
-	// Check if the endpoint includes a port
-	if !strings.Contains(endpoint, ":") {
-		log.Debugf("++++++Using default port %s for endpoint %s", defaultPort, endpoint)
-		endpoint = fmt.Sprintf("%s:%s", endpoint, defaultPort)
+	splittedUrl := strings.Split(endpoint, ":")
+	if len(splittedUrl) == 1 {
+		// if we are here then its plain driver installation
+		endpoint = fmt.Sprintf("%s:%s", endpoint, "80")
 	}
-	log.Debugf("++++++Using endpoint %s", endpoint)
-	// Dial using UDP
+	log.Infof("Using final endpoint %s", endpoint)
 	return net.Dial("udp", endpoint)
 }
 
