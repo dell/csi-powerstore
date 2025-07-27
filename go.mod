@@ -8,13 +8,13 @@ require (
 	github.com/akutz/gosync v0.1.0
 	github.com/apparentlymart/go-cidr v1.1.0
 	github.com/container-storage-interface/spec v1.6.0
-	github.com/dell/csi-metadata-retriever v1.11.1-0.20250719075353-a093d9aeb9eb
+	github.com/dell/csi-metadata-retriever v1.11.1-0.20250721043443-1ab0d3f4a48e
 	github.com/dell/csm-sharednfs v1.0.0
 	github.com/dell/dell-csi-extensions/common v1.8.1-0.20250717054012-23ceaf9c9606
 	github.com/dell/dell-csi-extensions/podmon v1.8.1-0.20250717054012-23ceaf9c9606
 	github.com/dell/dell-csi-extensions/replication v1.11.1-0.20250717054012-23ceaf9c9606
 	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.8.1
-	github.com/dell/gobrick v1.14.1-0.20250624004701-1c68c8c05f2f
+	github.com/dell/gobrick v1.14.1-0.20250725130813-61399ef9776b
 	github.com/dell/gocsi v1.14.1-0.20250718150756-9e598eb9e012
 	github.com/dell/gofsutil v1.19.1-0.20250715050132-d6bd228cbcb0
 	github.com/dell/goiscsi v1.12.0
