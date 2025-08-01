@@ -195,12 +195,12 @@ const (
 	// DefaultPodmonPollRate is the default polling frequency to check for array connectivity
 	DefaultPodmonPollRate = 60
 
-	// Timeout for making http requests
-	Timeout = time.Second * 5
-
 	// ArrayStatus is the endPoint for polling to check array status
 	ArrayStatus = "/array-status"
 )
+
+// Timeout for making http requests
+var Timeout = getArrayConnectivityTimeout()
 
 // TransportType differentiates different SCSI transport protocols (FC, iSCSI, Auto, None)
 type TransportType string
@@ -550,4 +550,18 @@ func IsNFSServiceEnabled(ctx context.Context, client gopowerstore.Client) (bool,
 		}
 	}
 	return false, nil
+}
+
+func getArrayConnectivityTimeout() time.Duration {
+	if timeout, ok := csictx.LookupEnv(context.Background(), EnvDriverAPITimeout); ok {
+		log.Infof("[Bharath-Debug] timeout from env var read as %s", timeout)
+		duration, err := strconv.Atoi(timeout)
+		if err != nil {
+			log.Infof("[Bharath-Debug] invalid timeout specified, returning default")
+			return time.Second * 5
+		}
+		log.Infof("[Bharath-Debug] timeout set to %d", duration)
+		return time.Second * time.Duration(duration)
+	}
+	return time.Second * 5
 }
