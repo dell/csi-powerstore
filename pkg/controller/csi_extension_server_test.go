@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"path/filepath"
 	"time"
 
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers"
@@ -36,12 +37,55 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-const stateReady = "Ready"
+const (
+	stateReady = "Ready"
+)
+
+var nodeConnectivityServer = struct {
+	port       string
+	statusPath string
+}{
+	port:       "9028",
+	statusPath: "/array-status",
+}
+
+var arrayOneStatusEndpoint = filepath.Join(nodeConnectivityServer.statusPath, firstValidID)
+
+func startNodeConnectivityCheckerServer(port string, endpoints ...string) {
+	identifiers.APIPort = ":" + port
+	var status identifiers.ArrayConnectivityStatus
+	status.LastAttempt = time.Now().Unix()
+	status.LastSuccess = time.Now().Unix()
+	input, _ := json.Marshal(status)
+	// responding with some dummy response that is for the case when array is connected and LastSuccess check was just finished
+	for _, endpoint := range endpoints {
+		http.HandleFunc(endpoint, func(w http.ResponseWriter, _ *http.Request) {
+			_, err := w.Write(input)
+			if err != nil {
+				fmt.Printf("error encountered when handling incoming request to mock node connectivity checker server: %s\n", err)
+			}
+		})
+	}
+
+	fmt.Printf("Starting server at port %s\n", port)
+
+	go func() {
+		err := http.ListenAndServe(identifiers.APIPort, nil) // #nosec G114
+		if err != nil {
+			fmt.Printf("error encountered serving mock node connectivity checker server: %s\n", err)
+		}
+	}()
+}
 
 var _ = ginkgo.Describe("csi-extension-server", func() {
+	ginkgo.BeforeSuite(func() {
+		startNodeConnectivityCheckerServer(nodeConnectivityServer.port, arrayOneStatusEndpoint)
+	})
+
 	ginkgo.BeforeEach(func() {
 		setVariables()
 	})
+
 	ginkgo.Describe("calling ValidateVolumeHostConnectivity()", func() {
 		ginkgo.When("checking if ValidateVolumeHostConnectivity is implemented ", func() {
 			ginkgo.It("should return a message that ValidateVolumeHostConnectivity is implemented", func() {
@@ -54,7 +98,7 @@ var _ = ginkgo.Describe("csi-extension-server", func() {
 
 		ginkgo.When("nodeId is not provided ", func() {
 			ginkgo.It("should return error", func() {
-				volID := []string{validBaseVolID}
+				volID := []string{validLegacyVolID}
 				req := &podmon.ValidateVolumeHostConnectivityRequest{
 					ArrayId:   "default",
 					VolumeIds: volID,
@@ -65,9 +109,9 @@ var _ = ginkgo.Describe("csi-extension-server", func() {
 			})
 		})
 
-		ginkgo.When("array status is not fetched so server will not respond ", func() {
+		ginkgo.When("array ID provided in the request and arrayID in the volumeID do not match", func() {
 			ginkgo.It("should return error", func() {
-				volID := []string{validBaseVolID}
+				volID := []string{validLegacyVolID}
 				req := &podmon.ValidateVolumeHostConnectivityRequest{
 					ArrayId:   "default",
 					VolumeIds: volID,
@@ -105,29 +149,17 @@ var _ = ginkgo.Describe("csi-extension-server", func() {
 			ginkgo.It("should not return error but IO in response should be false", func() {
 				clientMock.On("GetVolume", context.Background(), mock.Anything).Return(gopowerstore.Volume{ApplianceID: validApplianceID}, nil)
 				var resp []gopowerstore.PerformanceMetricsByVolumeResponse
-				clientMock.On("PerformanceMetricsByVolume", context.Background(), mock.Anything, mock.Anything).
+				clientMock.On("PerformanceMetricsByVolume", mock.Anything, mock.Anything, mock.Anything).
 					Return(resp, gopowerstore.APIError{
 						ErrorMsg: &api.ErrorMsg{
 							StatusCode: http.StatusInternalServerError,
 						},
 					})
-				volID := []string{validBaseVolID}
+				volID := []string{validLegacyVolID}
 				req := &podmon.ValidateVolumeHostConnectivityRequest{
 					VolumeIds: volID,
 					NodeId:    "csi-node-003c684ccb0c4ca0a9c99423563dfd2c-127.0.0.1",
 				}
-				identifiers.APIPort = ":9028"
-				var status identifiers.ArrayConnectivityStatus
-				status.LastAttempt = time.Now().Unix()
-				status.LastSuccess = time.Now().Unix()
-				input, _ := json.Marshal(status)
-				// responding with some dummy response that is for the case when array is connected and LastSuccess check was just finished
-				http.HandleFunc("/array-status/globalvolid1", func(w http.ResponseWriter, _ *http.Request) {
-					w.Write(input)
-				})
-
-				fmt.Printf("Starting server at port 9028\n")
-				go http.ListenAndServe(":9028", nil) // #nosec G114
 
 				response, err := ctrlSvc.ValidateVolumeHostConnectivity(context.Background(), req)
 				gomega.Expect(err).To(gomega.BeNil())
@@ -155,9 +187,9 @@ var _ = ginkgo.Describe("csi-extension-server", func() {
 				resp2[4].TotalIops = 4.6
 				resp2[4].CommonMetricsFields.Timestamp = freshTime
 				resp2[5].TotalIops = 0.0
-				clientMock.On("PerformanceMetricsByVolume", context.Background(), mock.Anything, mock.Anything).
+				clientMock.On("PerformanceMetricsByVolume", mock.Anything, mock.Anything, mock.Anything).
 					Return(resp2, nil)
-				volID2 := []string{validBaseVolID}
+				volID2 := []string{validLegacyVolID}
 				req2 := &podmon.ValidateVolumeHostConnectivityRequest{
 					VolumeIds: volID2,
 					NodeId:    "csi-node-003c684ccb0c4ca0a9c99423563dfd2c-127.0.0.1",
