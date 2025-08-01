@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/dell/csi-powerstore/v2/pkg/array"
@@ -253,30 +254,30 @@ func (s *Service) ValidateVolumeHostConnectivity(ctx context.Context, req *podmo
 				}
 
 				ioCtx, ioCtxCancel := context.WithTimeout(ctx, identifiers.Timeout)
-				var errChs []chan error
-				localCh := make(chan error)
-				errChs = append(errChs, localCh)
 
+				errCh := make(chan error)
+				wg := &sync.WaitGroup{}
+				wg.Add(1)
 				// check if any IO is inProgress for the current globalID/array
-				go goIsIoInProgress(ioCtx, localCh, volume.LocalUUID, *localArray, volume.Protocol)
+				go goIsIoInProgress(ioCtx, errCh, wg, volume.LocalUUID, *localArray, volume.Protocol)
 
 				if remoteArray != nil {
-					remoteCh := make(chan error)
-					errChs = append(errChs, remoteCh)
-
-					go goIsIoInProgress(ioCtx, remoteCh, volume.RemoteUUID, *remoteArray, volume.Protocol)
+					wg.Add(1)
+					go goIsIoInProgress(ioCtx, errCh, wg, volume.RemoteUUID, *remoteArray, volume.Protocol)
 				}
 
-				for _, errCh := range errChs {
-					for err := range errCh {
-						close(errCh)
-						// should report when at least one volume has IO in-progress
-						// in order to abort any potential migration operations
-						if err == nil {
-							ioCtxCancel() // cancel any pending requests
-							rep.IosInProgress = true
-							return rep, nil
-						}
+				go func() {
+					wg.Wait()
+					close(errCh)
+				}()
+
+				for err := range errCh {
+					// should report when at least one volume has IO in-progress
+					// in order to abort any potential migration operations
+					if err == nil {
+						ioCtxCancel() // cancel any pending requests
+						rep.IosInProgress = true
+						return rep, nil
 					}
 				}
 				// cancel any pending requests from this iteration
@@ -288,7 +289,8 @@ func (s *Service) ValidateVolumeHostConnectivity(ctx context.Context, req *podmo
 	return rep, nil
 }
 
-func goIsIoInProgress(ctx context.Context, ch chan<- error, volID string, array array.PowerStoreArray, protocol string) {
+func goIsIoInProgress(ctx context.Context, ch chan<- error, wg *sync.WaitGroup, volID string, array array.PowerStoreArray, protocol string) {
+	defer wg.Done()
 	select {
 	case ch <- IsIOInProgress(ctx, volID, array, protocol):
 	// we only care if the error is nil

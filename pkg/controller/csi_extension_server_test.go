@@ -21,6 +21,7 @@ package controller
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"path/filepath"
@@ -275,6 +276,24 @@ var _ = ginkgo.Describe("csi-extension-server", func() {
 					Return(metroMetricsPreferred, nil)
 				clientMock.On("PerformanceMetricsByVolume", mock.Anything, validRemoteVolID, mock.Anything).Times(1).
 					Return(metroMetricsNonPreferred, nil)
+
+				req := &podmon.ValidateVolumeHostConnectivityRequest{
+					VolumeIds: []string{validMetroBlockVolumeID},
+					NodeId:    validNodeID,
+				}
+
+				response, err := ctrlSvc.ValidateVolumeHostConnectivity(context.Background(), req)
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(response.IosInProgress).To(gomega.BeFalse())
+			})
+		})
+
+		ginkgo.When("context times out for both arrays of a metro volume", func() {
+			ginkgo.It("should report IO is not in-progress", func() {
+				clientMock.On("PerformanceMetricsByVolume", mock.Anything, validBaseVolID, mock.Anything).After(time.Second*identifiers.Timeout-1).Times(1).
+					Return(nil, errors.New("timeout"))
+				clientMock.On("PerformanceMetricsByVolume", mock.Anything, validRemoteVolID, mock.Anything).After(time.Second*identifiers.Timeout-1).Times(1).
+					Return(nil, errors.New("timeout"))
 
 				req := &podmon.ValidateVolumeHostConnectivityRequest{
 					VolumeIds: []string{validMetroBlockVolumeID},
