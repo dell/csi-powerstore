@@ -228,30 +228,74 @@ func (s *Service) ValidateVolumeHostConnectivity(ctx context.Context, req *podmo
 		if len(req.GetVolumeIds()) > 0 {
 			// Get array config
 			for _, volID := range req.GetVolumeIds() {
-				volumeHandle, _ := array.ParseVolumeID(ctx, volID, s.DefaultArray(), nil)
-				id := volumeHandle.LocalUUID
-				globalIDForVol := volumeHandle.LocalArrayGlobalID
-				protocol := volumeHandle.Protocol
-				if globalIDForVol != globalID {
-					log.Errorf("Recived globalId from podman is %s and retrieved from array is %s ", globalID, globalIDForVol)
+				volume, err := array.ParseVolumeID(ctx, volID, s.DefaultArray(), nil)
+				if err != nil {
+					log.Errorf("failed to parse volumeID, %s, for querying IO metrics. err: %s", volID, err.Error())
+					return nil, err
+				}
+
+				if volume.LocalArrayGlobalID != globalID {
+					log.Errorf("Recived globalId from podman is %s and retrieved from array is %s ", globalID, volume.LocalArrayGlobalID)
 					return nil, fmt.Errorf("invalid globalId %s is provided", globalID)
 				}
-				arraysConfig, err := s.GetOneArray(globalID)
-				if err != nil || arraysConfig == nil {
+
+				localArray, err := s.GetOneArray(volume.LocalArrayGlobalID)
+				if err != nil || localArray == nil {
 					log.Error("Failed to get array config with error ", err.Error())
 					return nil, err
 				}
-				// check if any IO is inProgress for the current globalID/array
-				err = s.IsIOInProgress(ctx, id, arraysConfig, protocol)
-				if err == nil {
-					rep.IosInProgress = true
-					return rep, nil
+				var remoteArray *array.PowerStoreArray
+				if volume.RemoteArrayGlobalID != "" {
+					remoteArray, err = s.GetOneArray(volume.RemoteArrayGlobalID)
+					if err != nil {
+						fmt.Println("oops")
+					}
 				}
+
+				ioCtx, ioCtxCancel := context.WithTimeout(ctx, identifiers.Timeout)
+				var errChs []chan error
+				localCh := make(chan error)
+				errChs = append(errChs, localCh)
+
+				// check if any IO is inProgress for the current globalID/array
+				go goIsIoInProgress(ioCtx, localCh, volume.LocalUUID, *localArray, volume.Protocol)
+
+				if remoteArray != nil {
+					remoteCh := make(chan error)
+					errChs = append(errChs, remoteCh)
+
+					go goIsIoInProgress(ioCtx, remoteCh, volume.RemoteUUID, *remoteArray, volume.Protocol)
+				}
+
+				for _, errCh := range errChs {
+					for err := range errCh {
+						close(errCh)
+						// should report when at least one volume has IO in-progress
+						// in order to abort any potential migration operations
+						if err == nil {
+							ioCtxCancel() // cancel any pending requests
+							rep.IosInProgress = true
+							return rep, nil
+						}
+					}
+				}
+				// cancel any pending requests from this iteration
+				ioCtxCancel()
 			}
 		}
 	}
 	log.Infof("ValidateVolumeHostConnectivity reply %+v", rep)
 	return rep, nil
+}
+
+func goIsIoInProgress(ctx context.Context, ch chan<- error, volID string, array array.PowerStoreArray, protocol string) {
+	select {
+	case ch <- IsIOInProgress(ctx, volID, array, protocol):
+	// we only care if the error is nil
+	// because the array may be unreachable
+	// so no need to return context errors.
+	case <-ctx.Done():
+	}
 }
 
 // checkIfNodeIsConnected looks at the 'nodeId' to determine if there is connectivity to the 'arrayId' array.
@@ -289,7 +333,7 @@ func (s *Service) checkIfNodeIsConnected(ctx context.Context, arrayID string, no
 }
 
 // IsIOInProgress function check the IO operation status on array
-func (s *Service) IsIOInProgress(ctx context.Context, volID string, arrayConfig *array.PowerStoreArray, protocol string) (err error) {
+func IsIOInProgress(ctx context.Context, volID string, arrayConfig array.PowerStoreArray, protocol string) (err error) {
 	// Call PerformanceMetricsByVolume  or  PerformanceMetricsByFileSystem in gopowerstore based on the volume type
 	if protocol == "scsi" {
 		resp, err := arrayConfig.Client.PerformanceMetricsByVolume(ctx, volID, gopowerstore.TwentySec)
