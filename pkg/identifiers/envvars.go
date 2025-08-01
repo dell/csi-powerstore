@@ -118,4 +118,7 @@ const (
 
 	// EnvDriverNamespace is the namespace where the powerstore driver is deployed
 	EnvDriverNamespace = "X_CSI_DRIVER_NAMESPACE"
+
+	// EnvDriverAPITimeout specifies the timeout for API calls
+	EnvDriverAPITimeout = "X_CSI_POWERSTORE_API_TIMEOUT"
 )
