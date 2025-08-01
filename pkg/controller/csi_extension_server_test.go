@@ -51,6 +51,48 @@ var nodeConnectivityServer = struct {
 
 var arrayOneStatusEndpoint = filepath.Join(nodeConnectivityServer.statusPath, firstValidID)
 
+func getActiveIOVolumeMetrics() []gopowerstore.PerformanceMetricsByVolumeResponse {
+	volumeMetrics := make([]gopowerstore.PerformanceMetricsByVolumeResponse, 6)
+	freshTime, _ := strfmt.ParseDateTime(fmt.Sprint(time.Now().UTC().Format("2006-01-02T15:04:05Z")))
+	volumeMetrics[0].TotalIops = 0.0
+	volumeMetrics[0].WriteIops = 0.0
+	volumeMetrics[0].ReadIops = 0.0
+	volumeMetrics[1].TotalIops = 0.0
+	volumeMetrics[1].WriteIops = 0.0
+	volumeMetrics[1].ReadIops = 0.0
+	volumeMetrics[2].TotalIops = 4.9
+	volumeMetrics[2].WriteIops = 2.6
+	volumeMetrics[2].CommonMetricsFields.Timestamp = freshTime
+	volumeMetrics[2].ReadIops = 2.3
+	volumeMetrics[3].TotalIops = 0.0
+	volumeMetrics[3].CommonMetricsFields.Timestamp = freshTime
+	volumeMetrics[4].TotalIops = 4.6
+	volumeMetrics[4].CommonMetricsFields.Timestamp = freshTime
+	volumeMetrics[5].TotalIops = 0.0
+	return volumeMetrics
+}
+
+func getInactiveIOVolumeMetrics() []gopowerstore.PerformanceMetricsByVolumeResponse {
+	volumeMetrics := make([]gopowerstore.PerformanceMetricsByVolumeResponse, 6)
+	freshTime, _ := strfmt.ParseDateTime(fmt.Sprint(time.Now().UTC().Format("2006-01-02T15:04:05Z")))
+	volumeMetrics[0].TotalIops = 0.0
+	volumeMetrics[0].WriteIops = 0.0
+	volumeMetrics[0].ReadIops = 0.0
+	volumeMetrics[1].TotalIops = 0.0
+	volumeMetrics[1].WriteIops = 0.0
+	volumeMetrics[1].ReadIops = 0.0
+	volumeMetrics[2].TotalIops = 0.0
+	volumeMetrics[2].WriteIops = 0.0
+	volumeMetrics[2].CommonMetricsFields.Timestamp = freshTime
+	volumeMetrics[2].ReadIops = 0.0
+	volumeMetrics[3].TotalIops = 0.0
+	volumeMetrics[3].CommonMetricsFields.Timestamp = freshTime
+	volumeMetrics[4].TotalIops = 0.0
+	volumeMetrics[4].CommonMetricsFields.Timestamp = freshTime
+	volumeMetrics[5].TotalIops = 0.0
+	return volumeMetrics
+}
+
 func startNodeConnectivityCheckerServer(port string, endpoints ...string) {
 	identifiers.APIPort = ":" + port
 	var status identifiers.ArrayConnectivityStatus
@@ -198,6 +240,50 @@ var _ = ginkgo.Describe("csi-extension-server", func() {
 				response, err := ctrlSvc.ValidateVolumeHostConnectivity(context.Background(), req2)
 				gomega.Expect(err).To(gomega.BeNil())
 				gomega.Expect(response.IosInProgress).To(gomega.BeTrue())
+			})
+		})
+
+		ginkgo.When("the preferred array of a metro volume is disconnected, but the non-preferred is connected", func() {
+			ginkgo.It("should report IO is in-progress", func() {
+				// preferred side will have no IO in-progress
+				metroMetricsPreferred := getInactiveIOVolumeMetrics()
+				metroMetricsNonPreferred := getActiveIOVolumeMetrics()
+
+				clientMock.On("PerformanceMetricsByVolume", mock.Anything, validBaseVolID, mock.Anything).Times(1).
+					Return(metroMetricsPreferred, nil)
+				clientMock.On("PerformanceMetricsByVolume", mock.Anything, validRemoteVolID, mock.Anything).Times(1).
+					Return(metroMetricsNonPreferred, nil)
+
+				req := &podmon.ValidateVolumeHostConnectivityRequest{
+					VolumeIds: []string{validMetroBlockVolumeID},
+					NodeId:    validNodeID,
+				}
+
+				response, err := ctrlSvc.ValidateVolumeHostConnectivity(context.Background(), req)
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(response.IosInProgress).To(gomega.BeTrue())
+			})
+		})
+
+		ginkgo.When("the both arrays of a metro volume are disconnected", func() {
+			ginkgo.It("should report IO is not in-progress", func() {
+				// preferred side will have no IO in-progress
+				metroMetricsPreferred := getInactiveIOVolumeMetrics()
+				metroMetricsNonPreferred := getInactiveIOVolumeMetrics()
+
+				clientMock.On("PerformanceMetricsByVolume", mock.Anything, validBaseVolID, mock.Anything).Times(1).
+					Return(metroMetricsPreferred, nil)
+				clientMock.On("PerformanceMetricsByVolume", mock.Anything, validRemoteVolID, mock.Anything).Times(1).
+					Return(metroMetricsNonPreferred, nil)
+
+				req := &podmon.ValidateVolumeHostConnectivityRequest{
+					VolumeIds: []string{validMetroBlockVolumeID},
+					NodeId:    validNodeID,
+				}
+
+				response, err := ctrlSvc.ValidateVolumeHostConnectivity(context.Background(), req)
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(response.IosInProgress).To(gomega.BeFalse())
 			})
 		})
 	})
