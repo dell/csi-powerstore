@@ -553,15 +553,15 @@ func IsNFSServiceEnabled(ctx context.Context, client gopowerstore.Client) (bool,
 }
 
 func getArrayConnectivityTimeout() time.Duration {
-	if timeout, ok := csictx.LookupEnv(context.Background(), EnvDriverAPITimeout); ok {
-		log.Infof("[Bharath-Debug] timeout from env var read as %s", timeout)
-		duration, err := strconv.Atoi(timeout)
+	var timeout time.Duration = time.Second * 5
+	if duration, ok := csictx.LookupEnv(context.Background(), EnvDriverAPITimeout); ok {
+		duration, err := strconv.Atoi(duration)
 		if err != nil {
-			log.Infof("[Bharath-Debug] invalid timeout specified, returning default")
-			return time.Second * 5
+			log.Infof("Setting default timeout for API request")
+		} else {
+			timeout = time.Second * time.Duration(duration)
 		}
-		log.Infof("[Bharath-Debug] timeout set to %d", duration)
-		return time.Second * time.Duration(duration)
 	}
-	return time.Second * 5
+	log.Infof("API request timeout: %s", timeout.String())
+	return timeout
 }
