@@ -2284,7 +2284,7 @@ func removeVolumePrefixFromName(volumeName string) string {
 	// Remove the tenant-prefix (Auth v2) from the volume name if exists so that the mount will not fail
 	extracted := ""
 	if strings.HasPrefix(volumeName, "csivol") {
-		log.Debugf("The string starts with 'csivol':%s", volumeName)
+		log.Debugf("The volume name starts with 'csivol':%s", volumeName)
 	} else {
 		index := strings.Index(volumeName, "csivol")
 		if index != -1 {
