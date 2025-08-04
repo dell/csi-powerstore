@@ -936,22 +936,17 @@ func (s *Service) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolum
 	}
 
 	isBlock := strings.Contains(targetPath, blockVolumePathMarker)
-	log.Info("=====NodeExpandVolume called with parameters: ")
-	fmt.Println("=====NodeExpandVolume called with parameters: ")
 	// Parse the CSI VolumeId and validate against the volume
 	vol, err := arr.Client.GetVolume(ctx, id)
 	if err != nil {
 		// If the volume isn't found, we cannot stage it
 		return nil, status.Error(codes.NotFound, "Volume not found")
 	}
-	log.Info("=====Volume found: ", vol.Name)
-	fmt.Println("=====Volume found: ", vol.Name)
 
 	// If the volume is created from Auth v2 using a prefix then we need to remove that while publishing, otherwise mount will fail
 	finalVolName := removeVolumePrefixFromName(vol.Name)
-	fmt.Println("=====Final Volume Name: ", finalVolName)
-	log.Info("=====Final Volume Name: ", finalVolName)
 	vol.Name = finalVolName
+	log.Debug("Volume name after trimming: ", vol.Name)
 
 	volumeWWN := vol.Wwn
 
@@ -2289,14 +2284,13 @@ func removeVolumePrefixFromName(volumeName string) string {
 	// Remove the tenant-prefix (Auth v2) from the volume name if exists so that the mount will not fail
 	extracted := ""
 	if strings.HasPrefix(volumeName, "csivol") {
-		fmt.Println("The string starts with 'csivol':", volumeName)
+		log.Debugf("The string starts with 'csivol':%s", volumeName)
 	} else {
 		index := strings.Index(volumeName, "csivol")
 		if index != -1 {
 			extracted = volumeName[index:]
-			fmt.Println("Extracted from 'csivol':", extracted)
 		} else {
-			fmt.Println("'csivol' not found in the string.")
+			log.Info("'csivol' not found in the volume name.")
 		}
 	}
 	return extracted
