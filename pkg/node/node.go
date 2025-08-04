@@ -2283,14 +2283,15 @@ func ExtractPort(urlString string) (string, error) {
 func removeVolumePrefixFromName(volumeName string) string {
 	// Remove the tenant-prefix (Auth v2) from the volume name if exists so that the mount will not fail
 	extracted := ""
-	if strings.HasPrefix(volumeName, "csivol") {
+	volPrefix := os.Getenv("X_CSI_VOL_PREFIX") // We will read the volume-prefix set by the user from the env variable
+	if strings.HasPrefix(volumeName, volPrefix) {
 		extracted = volumeName
 	} else {
-		index := strings.Index(volumeName, "csivol")
+		index := strings.Index(volumeName, volPrefix)
 		if index != -1 {
 			extracted = volumeName[index:]
 		} else {
-			log.Info("'csivol' not found in the volume name.")
+			log.Info(volPrefix + ":not found in the volume name.")
 		}
 	}
 	return extracted
