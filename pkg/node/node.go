@@ -2285,6 +2285,7 @@ func removeVolumePrefixFromName(volumeName string) string {
 	extracted := ""
 	if strings.HasPrefix(volumeName, "csivol") {
 		log.Debugf("The volume name starts with 'csivol':%s", volumeName)
+		extracted = volumeName
 	} else {
 		index := strings.Index(volumeName, "csivol")
 		if index != -1 {
