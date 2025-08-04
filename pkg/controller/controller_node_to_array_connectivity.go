@@ -43,7 +43,6 @@ func (s *Service) QueryArrayStatus(ctx context.Context, url string) (bool, error
 		Timeout: identifiers.Timeout,
 	}
 
-	log.Infof("[Bharath-Debug] - Setting array connectivity timeout to %s", identifiers.Timeout.String())
 	resp, err := client.Get(url)
 
 	log.Debugf("Received response %+v for url %s", resp, url)
