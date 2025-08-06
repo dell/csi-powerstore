@@ -33,6 +33,7 @@ import (
 	"github.com/dell/gopowerstore"
 	"github.com/dell/gopowerstore/api"
 	"github.com/go-openapi/strfmt"
+	"github.com/google/uuid"
 	ginkgo "github.com/onsi/ginkgo"
 	gomega "github.com/onsi/gomega"
 	"github.com/stretchr/testify/mock"
@@ -290,19 +291,51 @@ var _ = ginkgo.Describe("csi-extension-server", func() {
 
 		ginkgo.When("context times out for both arrays of a metro volume", func() {
 			ginkgo.It("should report IO is not in-progress", func() {
-				clientMock.On("PerformanceMetricsByVolume", mock.Anything, validBaseVolID, mock.Anything).After(time.Second*identifiers.Timeout-1).Times(1).
-					Return(nil, errors.New("timeout"))
-				clientMock.On("PerformanceMetricsByVolume", mock.Anything, validRemoteVolID, mock.Anything).After(time.Second*identifiers.Timeout-1).Times(1).
-					Return(nil, errors.New("timeout"))
+				clientMock.On("PerformanceMetricsByVolume", mock.Anything, validBaseVolID, mock.Anything).Times(1).
+					Return(nil, errors.New("a long delay occurred"))
+				clientMock.On("PerformanceMetricsByVolume", mock.Anything, validRemoteVolID, mock.Anything).Times(1).
+					Return(nil, errors.New("a long delay occurred"))
 
 				req := &podmon.ValidateVolumeHostConnectivityRequest{
 					VolumeIds: []string{validMetroBlockVolumeID},
 					NodeId:    validNodeID,
 				}
 
-				response, err := ctrlSvc.ValidateVolumeHostConnectivity(context.Background(), req)
+				// create a context with a deadline that's already expired
+				ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(time.Second*-1))
+				defer cancel()
+
+				response, err := ctrlSvc.ValidateVolumeHostConnectivity(ctx, req)
 				gomega.Expect(err).To(gomega.BeNil())
 				gomega.Expect(response.IosInProgress).To(gomega.BeFalse())
+			})
+		})
+
+		ginkgo.When("at least one volume has IO in-progress", func() {
+			ginkgo.It("should report IO is in-progress", func() {
+				activeVolumeMetrics := getActiveIOVolumeMetrics()
+				inactiveVolumeMetrics := getInactiveIOVolumeMetrics()
+
+				// Return at least one volume with IO in-progress
+				clientMock.On("PerformanceMetricsByVolume", mock.Anything, validBaseVolID, mock.Anything).Times(1).
+					Return(activeVolumeMetrics, nil)
+				clientMock.On("PerformanceMetricsByVolume", mock.Anything, validRemoteVolID, mock.Anything).Times(1).
+					Return(inactiveVolumeMetrics, nil)
+
+				testVolUUID := uuid.New()
+				testVolID := filepath.Join(testVolUUID.String(), firstValidID, "scsi")
+				clientMock.On("PerformanceMetricsByVolume", mock.Anything, testVolUUID.String(), mock.Anything).Times(1).
+					Return(inactiveVolumeMetrics, nil)
+
+				req := &podmon.ValidateVolumeHostConnectivityRequest{
+					// create a request that checks more than one volume
+					VolumeIds: []string{testVolID, validMetroBlockVolumeID},
+					NodeId:    validNodeID,
+				}
+
+				response, err := ctrlSvc.ValidateVolumeHostConnectivity(context.Background(), req)
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(response.IosInProgress).To(gomega.BeTrue())
 			})
 		})
 	})
