@@ -242,45 +242,48 @@ func (s *Service) ValidateVolumeHostConnectivity(ctx context.Context, req *podmo
 
 				localArray, err := s.GetOneArray(volume.LocalArrayGlobalID)
 				if err != nil || localArray == nil {
-					log.Error("Failed to get array config with error ", err.Error())
+					log.Errorf("failed to get local array configuration for array \"%s\" for volume activity validation: %s",
+						volume.LocalArrayGlobalID, err.Error())
 					return nil, err
 				}
-				var remoteArray *array.PowerStoreArray
+
+				// set to nil to avoid unnecessary API calls by subsequent iterations
+				var remoteArray *array.PowerStoreArray = nil
 				if volume.RemoteArrayGlobalID != "" {
 					remoteArray, err = s.GetOneArray(volume.RemoteArrayGlobalID)
 					if err != nil {
-						fmt.Println("oops")
+						log.Errorf("failed to get remote array configuration for array \"%s\" for volume activity validation: %s",
+							volume.RemoteArrayGlobalID, err.Error())
 					}
 				}
 
-				ioCtx, ioCtxCancel := context.WithTimeout(ctx, identifiers.Timeout)
+				ioCtx, ioCtxCancel := context.WithCancel(ctx)
 
 				errCh := make(chan error)
 				wg := &sync.WaitGroup{}
 				wg.Add(1)
-				// check if any IO is inProgress for the current globalID/array
+				// check if any IO is inProgress for the current local globalID/array
 				go goIsIoInProgress(ioCtx, errCh, wg, volume.LocalUUID, *localArray, volume.Protocol)
 
 				if remoteArray != nil {
+					// check if any IO is inProgress for the current remote globalID/array
 					wg.Add(1)
 					go goIsIoInProgress(ioCtx, errCh, wg, volume.RemoteUUID, *remoteArray, volume.Protocol)
 				}
 
-				go func() {
-					wg.Wait()
-					close(errCh)
-				}()
+				go waitAndClose(wg, errCh)
 
-				for err := range errCh {
-					// should report when at least one volume has IO in-progress
-					// in order to abort any potential migration operations
-					if err == nil {
-						ioCtxCancel() // cancel any pending requests
-						rep.IosInProgress = true
-						return rep, nil
-					}
+				if isIOInProgress(ioCtx, errCh) {
+					// so long as at least one volume has IO in-progress
+					// we should report it
+					ioCtxCancel()
+					rep.IosInProgress = true
+					log.Infof("IO detected for volume %s", volID)
+					return rep, nil
 				}
-				// cancel any pending requests from this iteration
+
+				// make sure to cancel any pending requests from this iteration
+				// so no goroutines are left running.
 				ioCtxCancel()
 			}
 		}
@@ -289,14 +292,54 @@ func (s *Service) ValidateVolumeHostConnectivity(ctx context.Context, req *podmo
 	return rep, nil
 }
 
-func goIsIoInProgress(ctx context.Context, ch chan<- error, wg *sync.WaitGroup, volID string, array array.PowerStoreArray, protocol string) {
+func waitAndClose(wg *sync.WaitGroup, ch chan error) {
+	log.Debugf("waiting to IO in-progress queries to complete")
+	wg.Wait()
+	// close the channel to signal there are no more results
+	// to be processed and the receiver can move on
+	log.Debugf("all goroutines complete; closing the channel")
+	close(ch)
+}
+
+func isIOInProgress(ctx context.Context, ch <-chan error) bool {
+	for {
+		select {
+		case <-ctx.Done():
+			log.Errorf("timeout reached while checking if IO is in-progress: %s", ctx.Err())
+			return false
+		case err, ok := <-ch:
+			// if the channel is closed before returning a non-nil error
+			// indicate no IO is in-progress
+			if !ok {
+				log.Infof("no IO detected")
+				return false
+			}
+			if err == nil {
+				log.Infof("IO detected")
+				return true
+			} else {
+				// the error is not truly an error, but has valuable info
+				// about which volume reported no IO in-progress, so log
+				// it as "info"
+				log.Info(err.Error())
+			}
+		}
+	}
+}
+
+func goIsIoInProgress(ctx context.Context, repCh chan<- error, wg *sync.WaitGroup, volID string, array array.PowerStoreArray, protocol string) {
 	defer wg.Done()
+
+	log.Infof("checking if IO is in-progress for volume %s on array %s", volID, array.GlobalID)
+	err := IsIOInProgress(ctx, volID, array, protocol)
 	select {
-	case ch <- IsIOInProgress(ctx, volID, array, protocol):
-	// we only care if the error is nil
-	// because the array may be unreachable
-	// so no need to return context errors.
+	case repCh <- err:
+
+	// we only care if the error is nil,
+	// because the array may be unreachable.
+	// No need to return context errors upon timeout.
 	case <-ctx.Done():
+		log.Errorf("context deadline exceeded while querying for IOs in-progress for volume %s on array %s", volID, array.GlobalID)
 	}
 }
 
@@ -349,7 +392,7 @@ func IsIOInProgress(ctx context.Context, volID string, arrayConfig array.PowerSt
 				return nil
 			}
 		}
-		return fmt.Errorf("no IOInProgress")
+		return fmt.Errorf("no IOInProgress for volume %s on array %s", volID, arrayConfig.GlobalID)
 	}
 	// nfs volume type logic
 	resp, err := arrayConfig.Client.PerformanceMetricsByFileSystem(ctx, volID, gopowerstore.TwentySec)
@@ -363,7 +406,7 @@ func IsIOInProgress(ctx context.Context, volID string, arrayConfig array.PowerSt
 			return nil
 		}
 	}
-	return fmt.Errorf("no IOInProgress")
+	return fmt.Errorf("no IOInProgress for volume %s on array %s", volID, arrayConfig.GlobalID)
 }
 
 func checkIfEntryIsLatest(timestamp strfmt.DateTime) bool {
