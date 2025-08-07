@@ -1774,6 +1774,7 @@ func (s *Service) createHost(
 	if err != nil {
 		return "", fmt.Errorf("failed to get node labels for node %s: %v", s.opts.KubeNodeName, err)
 	}
+	log.Infof("Node labels = %v", nodeLabels)
 	var primaryArrayID string
 
 	// Step 1: Check if this node matches at least one labeled Metro array
@@ -1788,7 +1789,7 @@ func (s *Service) createHost(
 	}
 
 	for _, arr := range getArrayfn(s) {
-		log.Infof("[createHost] Processing array %s (%s)", arr.GlobalID, arr.IP)
+		log.Infof("[createHost] Processing array %s (%s) with labels %v", arr.GlobalID, arr.IP, arr.Labels)
 		// 1) Skip if already registered
 		if getIsHostAlreadyRegistered(s, ctx, arr.GetClient(), initiators) {
 			log.Infof("[createHost] Already registered on %s, skipping", arr.GlobalID)
@@ -1799,7 +1800,7 @@ func (s *Service) createHost(
 		}
 
 		// 2) Metro vs Non‑Metro
-		if strings.ToLower(arr.MetroTopology) != "uniform" {
+		if strings.ToLower(arr.MetroTopology) != "uniform" && arr.Labels["topology.kubernetes.io/zone"] != "" && (nodeLabels["topology.kubernetes.io/zone"] == arr.Labels["topology.kubernetes.io/zone"]) {
 			log.Infof("[createHost] Non‑Metro array %s → registering LocalOnly", arr.GlobalID)
 			if err := s.registerHost(
 				ctx, arr.GetClient(), arr.GlobalID, initiators,
@@ -2187,6 +2188,7 @@ func (s *Service) registerHost(
 
 func labelsMatch(arrayLabels, nodeLabels map[string]string) bool {
 	for key, val := range arrayLabels {
+		log.Infof("Checking label %s=%s", key, val)
 		if nodeVal, exists := nodeLabels[key]; !exists || nodeVal != val {
 			return false
 		}
