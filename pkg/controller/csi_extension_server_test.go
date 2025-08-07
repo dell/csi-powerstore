@@ -350,7 +350,7 @@ var _ = ginkgo.Describe("csi-extension-server", func() {
 							StatusCode: http.StatusInternalServerError,
 						},
 					})
-				err := IsIOInProgress(context.Background(), validBlockVolumeID, *ctrlSvc.DefaultArray(), "scsi")
+				err := getIOInProgress(context.Background(), validBlockVolumeID, *ctrlSvc.DefaultArray(), "scsi")
 				gomega.Expect(err).ToNot(gomega.BeNil())
 			})
 		})
@@ -364,7 +364,7 @@ var _ = ginkgo.Describe("csi-extension-server", func() {
 							StatusCode: http.StatusInternalServerError,
 						},
 					})
-				err := IsIOInProgress(context.Background(), validBlockVolumeID, *ctrlSvc.DefaultArray(), "nfs")
+				err := getIOInProgress(context.Background(), validBlockVolumeID, *ctrlSvc.DefaultArray(), "nfs")
 				gomega.Expect(err).ToNot(gomega.BeNil())
 			})
 		})
@@ -380,7 +380,7 @@ var _ = ginkgo.Describe("csi-extension-server", func() {
 				resp[5].TotalIops = 0.0
 				clientMock.On("PerformanceMetricsByVolume", context.Background(), mock.Anything, mock.Anything).
 					Return(resp, nil)
-				err := IsIOInProgress(context.Background(), validBlockVolumeID, *ctrlSvc.DefaultArray(), "scsi")
+				err := getIOInProgress(context.Background(), validBlockVolumeID, *ctrlSvc.DefaultArray(), "scsi")
 				gomega.Expect(err).ToNot(gomega.BeNil())
 			})
 		})
@@ -399,7 +399,7 @@ var _ = ginkgo.Describe("csi-extension-server", func() {
 				resp[5].TotalIops = 0.0
 				clientMock.On("PerformanceMetricsByVolume", context.Background(), mock.Anything, mock.Anything).
 					Return(resp, nil)
-				err := IsIOInProgress(context.Background(), validBlockVolumeID, *ctrlSvc.DefaultArray(), "scsi")
+				err := getIOInProgress(context.Background(), validBlockVolumeID, *ctrlSvc.DefaultArray(), "scsi")
 				gomega.Expect(err).To(gomega.BeNil())
 			})
 		})
@@ -419,7 +419,7 @@ var _ = ginkgo.Describe("csi-extension-server", func() {
 				resp[5].TotalIops = 0.0
 				clientMock.On("PerformanceMetricsByVolume", context.Background(), mock.Anything, mock.Anything).
 					Return(resp, nil)
-				err := IsIOInProgress(context.Background(), validBlockVolumeID, *ctrlSvc.DefaultArray(), "scsi")
+				err := getIOInProgress(context.Background(), validBlockVolumeID, *ctrlSvc.DefaultArray(), "scsi")
 				gomega.Expect(err).ToNot(gomega.BeNil())
 			})
 		})
@@ -435,7 +435,7 @@ var _ = ginkgo.Describe("csi-extension-server", func() {
 				resp[5].TotalIops = 0.0
 				clientMock.On("PerformanceMetricsByFileSystem", context.Background(), mock.Anything, mock.Anything).
 					Return(resp, nil)
-				err := IsIOInProgress(context.Background(), validBlockVolumeID, *ctrlSvc.DefaultArray(), "nfs")
+				err := getIOInProgress(context.Background(), validBlockVolumeID, *ctrlSvc.DefaultArray(), "nfs")
 				gomega.Expect(err).ToNot(gomega.BeNil())
 			})
 		})
@@ -454,7 +454,7 @@ var _ = ginkgo.Describe("csi-extension-server", func() {
 				resp[5].TotalIops = 0.0
 				clientMock.On("PerformanceMetricsByFileSystem", context.Background(), mock.Anything, mock.Anything).
 					Return(resp, nil)
-				err := IsIOInProgress(context.Background(), validBlockVolumeID, *ctrlSvc.DefaultArray(), "nfs")
+				err := getIOInProgress(context.Background(), validBlockVolumeID, *ctrlSvc.DefaultArray(), "nfs")
 				gomega.Expect(err).To(gomega.BeNil())
 			})
 		})
