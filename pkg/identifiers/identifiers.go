@@ -200,7 +200,7 @@ const (
 )
 
 // Timeout for making http requests
-var Timeout = getArrayConnectivityTimeout()
+var Timeout = GetArrayConnectivityTimeout()
 
 // TransportType differentiates different SCSI transport protocols (FC, iSCSI, Auto, None)
 type TransportType string
@@ -552,7 +552,7 @@ func IsNFSServiceEnabled(ctx context.Context, client gopowerstore.Client) (bool,
 	return false, nil
 }
 
-func getArrayConnectivityTimeout() time.Duration {
+func GetArrayConnectivityTimeout() time.Duration {
 	var timeout time.Duration = time.Second * 5
 	if duration, ok := csictx.LookupEnv(context.Background(), EnvDriverAPITimeout); ok {
 		duration, err := strconv.Atoi(duration)
