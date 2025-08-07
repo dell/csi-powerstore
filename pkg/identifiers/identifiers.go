@@ -552,6 +552,7 @@ func IsNFSServiceEnabled(ctx context.Context, client gopowerstore.Client) (bool,
 	return false, nil
 }
 
+// GetArrayConnectivityTimeout get array connectivity timeout from environment variable or sets default value
 func GetArrayConnectivityTimeout() time.Duration {
 	var timeout time.Duration = time.Second * 5
 	if duration, ok := csictx.LookupEnv(context.Background(), EnvDriverAPITimeout); ok {
