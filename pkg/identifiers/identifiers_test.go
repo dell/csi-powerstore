@@ -614,13 +614,6 @@ func TestGetArrayConnectivityTimeout(t *testing.T) {
 			setupFunc:    func() { os.Setenv("X_CSI_POWERSTORE_API_TIMEOUT", "abc") },
 			teardownFunc: func() { os.Unsetenv("X_CSI_POWERSTORE_API_TIMEOUT") },
 		},
-		// {
-		// 	name:         "env variable is set to negative value",
-		// 	envValue:     "-1",
-		// 	expected:     5 * time.Second,
-		// 	setupFunc:    func() { os.Setenv("X_CSI_POWERSTORE_API_TIMEOUT", "-1") },
-		// 	teardownFunc: func() { os.Unsetenv("X_CSI_POWERSTORE_API_TIMEOUT") },
-		// },
 	}
 
 	for _, tt := range tests {
