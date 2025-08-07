@@ -259,21 +259,19 @@ func (s *Service) ValidateVolumeHostConnectivity(ctx context.Context, req *podmo
 
 				ioCtx, ioCtxCancel := context.WithCancel(ctx)
 
-				errCh := make(chan error)
-				wg := &sync.WaitGroup{}
-				wg.Add(1)
+				// channels for receiving responses from async requests
+				reqChs := make([]<-chan error, 0)
 				// check if any IO is inProgress for the current local globalID/array
-				go goIsIoInProgress(ioCtx, errCh, wg, volume.LocalUUID, *localArray, volume.Protocol)
+				reqLocalCh := asyncGetIOInProgress(ioCtx, volume.LocalUUID, *localArray, volume.Protocol)
+				reqChs = append(reqChs, reqLocalCh)
 
 				if remoteArray != nil {
 					// check if any IO is inProgress for the current remote globalID/array
-					wg.Add(1)
-					go goIsIoInProgress(ioCtx, errCh, wg, volume.RemoteUUID, *remoteArray, volume.Protocol)
+					reqRemoteCh := asyncGetIOInProgress(ioCtx, volume.RemoteUUID, *remoteArray, volume.Protocol)
+					reqChs = append(reqChs, reqRemoteCh)
 				}
 
-				go waitAndClose(wg, errCh)
-
-				if isIOInProgress(ioCtx, errCh) {
+				if isIOInProgress(reqChs...) {
 					// so long as at least one volume has IO in-progress
 					// we should report it
 					ioCtxCancel()
@@ -301,46 +299,56 @@ func waitAndClose(wg *sync.WaitGroup, ch chan error) {
 	close(ch)
 }
 
-func isIOInProgress(ctx context.Context, ch <-chan error) bool {
-	for {
-		select {
-		case <-ctx.Done():
-			log.Errorf("timeout reached while checking if IO is in-progress: %s", ctx.Err())
-			return false
-		case err, ok := <-ch:
-			// if the channel is closed before returning a non-nil error
-			// indicate no IO is in-progress
-			if !ok {
-				log.Infof("no IO detected")
-				return false
+// isIOInProgress listens for responses on channels returned by asyncGetIOInProgress and
+// returns true if at least one response is a nil error, denoting IO is in-progress.
+func isIOInProgress(chs ...<-chan error) bool {
+	errCh := make(chan error)
+	wg := sync.WaitGroup{}
+
+	wg.Add(len(chs))
+	// read results as soon as they're available
+	// so the channels can be closed and goroutines can exit
+	for _, ch := range chs {
+		go func() {
+			defer wg.Done()
+			for err := range ch {
+				errCh <- err
 			}
-			if err == nil {
-				log.Infof("IO detected")
-				return true
-			} else {
-				// the error is not truly an error, but has valuable info
-				// about which volume reported no IO in-progress, so log
-				// it as "info"
-				log.Info(err.Error())
-			}
+		}()
+	}
+
+	go waitAndClose(&wg, errCh)
+
+	// Read results as they're ready.
+	// If the errCh channel is closed before a nil error is
+	// received, assume there is no IO in-progress.
+	for err := range errCh {
+		if err == nil {
+			return true
 		}
 	}
+
+	return false
 }
 
-func goIsIoInProgress(ctx context.Context, repCh chan<- error, wg *sync.WaitGroup, volID string, array array.PowerStoreArray, protocol string) {
-	defer wg.Done()
+// asyncGetIOInProgress starts an async request to getIOInProgress and returns a channel
+// on which the result can be received.
+// It can be used to dispatch multiple requests in parallel for situations such as metro
+// volumes where multiple volumes need to be checked for IO to determine if the volume is active.
+func asyncGetIOInProgress(ctx context.Context, volID string, array array.PowerStoreArray, protocol string) <-chan error {
+	errCh := make(chan error)
+	go func() {
+		defer close(errCh)
+		log.Infof("checking if IO is in-progress for volume %s on array %s", volID, array.GlobalID)
 
-	log.Infof("checking if IO is in-progress for volume %s on array %s", volID, array.GlobalID)
-	err := IsIOInProgress(ctx, volID, array, protocol)
-	select {
-	case repCh <- err:
-
-	// we only care if the error is nil,
-	// because the array may be unreachable.
-	// No need to return context errors upon timeout.
-	case <-ctx.Done():
-		log.Errorf("context deadline exceeded while querying for IOs in-progress for volume %s on array %s", volID, array.GlobalID)
-	}
+		select {
+		case errCh <- getIOInProgress(ctx, volID, array, protocol):
+		case <-ctx.Done():
+			errCh <- ctx.Err()
+			log.Errorf("context deadline exceeded while querying for IOs in-progress for volume %s on array %s", volID, array.GlobalID)
+		}
+	}()
+	return errCh
 }
 
 // checkIfNodeIsConnected looks at the 'nodeId' to determine if there is connectivity to the 'arrayId' array.
@@ -377,8 +385,9 @@ func (s *Service) checkIfNodeIsConnected(ctx context.Context, arrayID string, no
 	return nil
 }
 
-// IsIOInProgress function check the IO operation status on array
-func IsIOInProgress(ctx context.Context, volID string, arrayConfig array.PowerStoreArray, protocol string) (err error) {
+// getIOInProgress attempts to determine if IO has recently occurred for a given volume, volID,
+// and returns a nil error if IO has occurred.
+func getIOInProgress(ctx context.Context, volID string, arrayConfig array.PowerStoreArray, protocol string) (err error) {
 	// Call PerformanceMetricsByVolume  or  PerformanceMetricsByFileSystem in gopowerstore based on the volume type
 	if protocol == "scsi" {
 		resp, err := arrayConfig.Client.PerformanceMetricsByVolume(ctx, volID, gopowerstore.TwentySec)
