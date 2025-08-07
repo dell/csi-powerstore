@@ -936,13 +936,18 @@ func (s *Service) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolum
 	}
 
 	isBlock := strings.Contains(targetPath, blockVolumePathMarker)
-
 	// Parse the CSI VolumeId and validate against the volume
 	vol, err := arr.Client.GetVolume(ctx, id)
 	if err != nil {
 		// If the volume isn't found, we cannot stage it
 		return nil, status.Error(codes.NotFound, "Volume not found")
 	}
+
+	// If the volume is created from Auth v2 using a prefix then we need to remove that while publishing, otherwise mount will fail
+	finalVolName := removeVolumePrefixFromName(vol.Name)
+	vol.Name = finalVolName
+	log.Debug("Volume name after trimming: ", vol.Name)
+
 	volumeWWN := vol.Wwn
 
 	// Locate and fetch all (multipath/regular) mounted paths using this volume
@@ -2273,4 +2278,14 @@ func ExtractPort(urlString string) (string, error) {
 	}
 
 	return port, nil
+}
+
+func removeVolumePrefixFromName(volumeName string) string {
+	// Remove the tenant-prefix (Auth v2) from the volume name if exists so that the mount will not fail
+	volPrefix := os.Getenv("X_CSI_VOL_PREFIX") // We will read the volume-prefix set by the user from the env variable
+	lastIndex := strings.LastIndex(volumeName, volPrefix)
+	if lastIndex != -1 {
+		return volumeName[lastIndex:]
+	}
+	return ""
 }
