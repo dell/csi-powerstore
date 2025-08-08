@@ -294,6 +294,8 @@ func (s *Service) ValidateVolumeHostConnectivity(ctx context.Context, req *podmo
 	return rep, nil
 }
 
+// waitAndClose waits for all goroutines to complete by waiting on the WaitGroup, wg,
+// then closes the provided channel, ch.
 func waitAndClose(wg *sync.WaitGroup, ch chan error) {
 	log.Debugf("waiting to IO in-progress queries to complete")
 	wg.Wait()

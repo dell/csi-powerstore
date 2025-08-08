@@ -834,15 +834,22 @@ func Test_isIOInProgress(t *testing.T) {
 				ctx: context.Background(),
 				chs: func() []<-chan error {
 					var chs []<-chan error
+
+					// provide a channel that will immediately write a non-nil error
+					// as soon as the receiver is ready to receive.
 					nilErrCh := func() <-chan error {
 						ch := make(chan error)
 						go func() {
-							// defer close(ch)
+							defer close(ch)
 							ch <- nil
 						}()
 						return ch
 					}()
 					chs = append(chs, nilErrCh)
+
+					// add a channel on which nothing will ever be written
+					// causing one of the goroutines to block until the context
+					// is cancelled
 					canceledCh := make(chan error)
 					chs = append(chs, canceledCh)
 
@@ -857,6 +864,8 @@ func Test_isIOInProgress(t *testing.T) {
 				ctx: context.Background(),
 				chs: func() []<-chan error {
 					var chs []<-chan error
+					// provide a channel that immediately writes a non-nil error
+					// and closes the channel, signaling to the goroutine to exit.
 					nonNilErrors := func() <-chan error {
 						ch := make(chan error)
 						go func() {
