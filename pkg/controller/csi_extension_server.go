@@ -248,7 +248,7 @@ func (s *Service) ValidateVolumeHostConnectivity(ctx context.Context, req *podmo
 				}
 
 				// set to nil to avoid unnecessary API calls by subsequent iterations
-				var remoteArray *array.PowerStoreArray = nil
+				var remoteArray *array.PowerStoreArray
 				if volume.RemoteArrayGlobalID != "" {
 					remoteArray, err = s.GetOneArray(volume.RemoteArrayGlobalID)
 					if err != nil {
