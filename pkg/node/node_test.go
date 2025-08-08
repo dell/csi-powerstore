@@ -7339,6 +7339,12 @@ func TestRemoveVolumePrefixFromName(t *testing.T) {
 			prefix:         "",
 			expectedResult: "volume-name",
 		},
+		{
+			name:           "emultiple occurrences of prefix",
+			volumeName:     "testtesttestvolume-name",
+			prefix:         "test",
+			expectedResult: "testtestvolume-name",
+		},
 	}
 
 	for _, tt := range tests {
