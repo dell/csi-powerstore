@@ -257,6 +257,9 @@ func (s *Service) ValidateVolumeHostConnectivity(ctx context.Context, req *podmo
 					}
 				}
 
+				// This context is for the set of requests for the current volume.
+				// Used to cancel any pending requests before checking for IO on any
+				// subsequent volumes.
 				ioCtx, ioCtxCancel := context.WithCancel(ctx)
 
 				// channels for receiving responses from async requests
@@ -271,10 +274,11 @@ func (s *Service) ValidateVolumeHostConnectivity(ctx context.Context, req *podmo
 					reqChs = append(reqChs, reqRemoteCh)
 				}
 
-				if isIOInProgress(reqChs...) {
-					// so long as at least one volume has IO in-progress
-					// we should report it
+				if isIOInProgress(ioCtx, reqChs...) {
 					ioCtxCancel()
+					// so long as at least one volume has IO in-progress
+					// we should report it.
+					// This status is effectively a logical OR of all the volumes
 					rep.IosInProgress = true
 					log.Infof("IO detected for volume %s", volID)
 					return rep, nil
@@ -299,36 +303,64 @@ func waitAndClose(wg *sync.WaitGroup, ch chan error) {
 	close(ch)
 }
 
-// isIOInProgress listens for responses on channels returned by asyncGetIOInProgress and
-// returns true if at least one response is a nil error, denoting IO is in-progress.
-func isIOInProgress(chs ...<-chan error) bool {
+// isIOInProgress listens for responses on channels returned by asyncGetIOInProgress using the
+// fan-in concurrency pattern and returns true if at least one response is a nil error,
+// denoting IO is in-progress.
+func isIOInProgress(ctx context.Context, chs ...<-chan error) bool {
+	// single channel on which the channels in "chs" will write their results
 	errCh := make(chan error)
-	wg := sync.WaitGroup{}
+	wg := &sync.WaitGroup{}
 
-	wg.Add(len(chs))
-	// read results as soon as they're available
-	// so the channels can be closed and goroutines can exit
-	for _, ch := range chs {
-		go func() {
-			defer wg.Done()
-			for err := range ch {
+	// writes results from all channels to a single channel so the results can be
+	// received as they're made available
+	asyncReceiveWithCtx := func(ctx context.Context, errCh chan<- error, repCh <-chan error, wg *sync.WaitGroup) {
+		defer wg.Done()
+		for {
+			select {
+			case <-ctx.Done():
+				errCh <- ctx.Err()
+				return
+			// read the channel until it is closed
+			case err, ok := <-repCh:
+				if !ok {
+					return
+				}
 				errCh <- err
 			}
-		}()
+		}
 	}
 
-	go waitAndClose(&wg, errCh)
+	// Used to exit early if there is no IO in-progress
+	ioCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	wg.Add(len(chs))
+	for _, ch := range chs {
+		go asyncReceiveWithCtx(ioCtx, errCh, ch, wg)
+	}
+
+	// make sure to close errCh when all asyncReceiveWithCtx goroutines are done
+	// to signal to the range statement below that there are no more results.
+	go waitAndClose(wg, errCh)
 
 	// Read results as they're ready.
 	// If the errCh channel is closed before a nil error is
 	// received, assume there is no IO in-progress.
+	ioInProgress := false
 	for err := range errCh {
-		if err == nil {
-			return true
+		if err != nil {
+			log.Debugf("error received while validating volume connectivity: %s", err.Error())
+			continue
 		}
+
+		// cancel any remaining goroutines so we can report IO in-progress ASAP
+		cancel()
+		log.Info("IO in-progress detected while validating volume connectivity")
+		ioInProgress = true
 	}
 
-	return false
+	log.Info("no IO in-progress was detected while validating volume connectivity")
+	return ioInProgress
 }
 
 // asyncGetIOInProgress starts an async request to getIOInProgress and returns a channel
@@ -341,10 +373,14 @@ func asyncGetIOInProgress(ctx context.Context, volID string, array array.PowerSt
 		defer close(errCh)
 		log.Infof("checking if IO is in-progress for volume %s on array %s", volID, array.GlobalID)
 
+		// This blocks until both functions have been evaluated, which can be slow.
+		// Only then can the select statement determine which case to execute. If context has
+		// been canceled when the function returns, don't try to write anything to the channel
+		// because there will likely be no listeners and the select will block forever
+		// if the channel is not read.
 		select {
 		case errCh <- getIOInProgress(ctx, volID, array, protocol):
 		case <-ctx.Done():
-			errCh <- ctx.Err()
 			log.Errorf("context deadline exceeded while querying for IOs in-progress for volume %s on array %s", volID, array.GlobalID)
 		}
 	}()
