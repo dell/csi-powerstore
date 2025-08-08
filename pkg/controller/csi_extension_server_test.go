@@ -21,27 +21,120 @@ package controller
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
+	"path/filepath"
+	"sync"
+	"testing"
 	"time"
 
+	"github.com/dell/csi-powerstore/v2/pkg/array"
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers"
 	podmon "github.com/dell/dell-csi-extensions/podmon"
 	vgsext "github.com/dell/dell-csi-extensions/volumeGroupSnapshot"
 	"github.com/dell/gopowerstore"
 	"github.com/dell/gopowerstore/api"
+	gopowerstoremock "github.com/dell/gopowerstore/mocks"
 	"github.com/go-openapi/strfmt"
+	"github.com/google/uuid"
 	ginkgo "github.com/onsi/ginkgo"
 	gomega "github.com/onsi/gomega"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
-const stateReady = "Ready"
+const (
+	stateReady = "Ready"
+)
+
+var nodeConnectivityServer = struct {
+	port       string
+	statusPath string
+}{
+	port:       "9028",
+	statusPath: "/array-status",
+}
+
+var arrayOneStatusEndpoint = filepath.Join(nodeConnectivityServer.statusPath, firstValidID)
+
+func getActiveIOVolumeMetrics() []gopowerstore.PerformanceMetricsByVolumeResponse {
+	volumeMetrics := make([]gopowerstore.PerformanceMetricsByVolumeResponse, 6)
+	freshTime, _ := strfmt.ParseDateTime(fmt.Sprint(time.Now().UTC().Format("2006-01-02T15:04:05Z")))
+	volumeMetrics[0].TotalIops = 0.0
+	volumeMetrics[0].WriteIops = 0.0
+	volumeMetrics[0].ReadIops = 0.0
+	volumeMetrics[1].TotalIops = 0.0
+	volumeMetrics[1].WriteIops = 0.0
+	volumeMetrics[1].ReadIops = 0.0
+	volumeMetrics[2].TotalIops = 4.9
+	volumeMetrics[2].WriteIops = 2.6
+	volumeMetrics[2].CommonMetricsFields.Timestamp = freshTime
+	volumeMetrics[2].ReadIops = 2.3
+	volumeMetrics[3].TotalIops = 0.0
+	volumeMetrics[3].CommonMetricsFields.Timestamp = freshTime
+	volumeMetrics[4].TotalIops = 4.6
+	volumeMetrics[4].CommonMetricsFields.Timestamp = freshTime
+	volumeMetrics[5].TotalIops = 0.0
+	return volumeMetrics
+}
+
+func getInactiveIOVolumeMetrics() []gopowerstore.PerformanceMetricsByVolumeResponse {
+	volumeMetrics := make([]gopowerstore.PerformanceMetricsByVolumeResponse, 6)
+	freshTime, _ := strfmt.ParseDateTime(fmt.Sprint(time.Now().UTC().Format("2006-01-02T15:04:05Z")))
+	volumeMetrics[0].TotalIops = 0.0
+	volumeMetrics[0].WriteIops = 0.0
+	volumeMetrics[0].ReadIops = 0.0
+	volumeMetrics[1].TotalIops = 0.0
+	volumeMetrics[1].WriteIops = 0.0
+	volumeMetrics[1].ReadIops = 0.0
+	volumeMetrics[2].TotalIops = 0.0
+	volumeMetrics[2].WriteIops = 0.0
+	volumeMetrics[2].CommonMetricsFields.Timestamp = freshTime
+	volumeMetrics[2].ReadIops = 0.0
+	volumeMetrics[3].TotalIops = 0.0
+	volumeMetrics[3].CommonMetricsFields.Timestamp = freshTime
+	volumeMetrics[4].TotalIops = 0.0
+	volumeMetrics[4].CommonMetricsFields.Timestamp = freshTime
+	volumeMetrics[5].TotalIops = 0.0
+	return volumeMetrics
+}
+
+func startNodeConnectivityCheckerServer(port string, endpoints ...string) {
+	identifiers.APIPort = ":" + port
+	var status identifiers.ArrayConnectivityStatus
+	status.LastAttempt = time.Now().Unix()
+	status.LastSuccess = time.Now().Unix()
+	input, _ := json.Marshal(status)
+	// responding with some dummy response that is for the case when array is connected and LastSuccess check was just finished
+	for _, endpoint := range endpoints {
+		http.HandleFunc(endpoint, func(w http.ResponseWriter, _ *http.Request) {
+			_, err := w.Write(input)
+			if err != nil {
+				fmt.Printf("error encountered when handling incoming request to mock node connectivity checker server: %s\n", err)
+			}
+		})
+	}
+
+	fmt.Printf("Starting server at port %s\n", port)
+
+	go func() {
+		err := http.ListenAndServe(identifiers.APIPort, nil) // #nosec G114
+		if err != nil {
+			fmt.Printf("error encountered serving mock node connectivity checker server: %s\n", err)
+		}
+	}()
+}
 
 var _ = ginkgo.Describe("csi-extension-server", func() {
+	ginkgo.BeforeSuite(func() {
+		startNodeConnectivityCheckerServer(nodeConnectivityServer.port, arrayOneStatusEndpoint)
+	})
+
 	ginkgo.BeforeEach(func() {
 		setVariables()
 	})
+
 	ginkgo.Describe("calling ValidateVolumeHostConnectivity()", func() {
 		ginkgo.When("checking if ValidateVolumeHostConnectivity is implemented ", func() {
 			ginkgo.It("should return a message that ValidateVolumeHostConnectivity is implemented", func() {
@@ -54,7 +147,7 @@ var _ = ginkgo.Describe("csi-extension-server", func() {
 
 		ginkgo.When("nodeId is not provided ", func() {
 			ginkgo.It("should return error", func() {
-				volID := []string{validBaseVolID}
+				volID := []string{validLegacyVolID}
 				req := &podmon.ValidateVolumeHostConnectivityRequest{
 					ArrayId:   "default",
 					VolumeIds: volID,
@@ -65,9 +158,9 @@ var _ = ginkgo.Describe("csi-extension-server", func() {
 			})
 		})
 
-		ginkgo.When("array status is not fetched so server will not respond ", func() {
+		ginkgo.When("array ID provided in the request and arrayID in the volumeID do not match", func() {
 			ginkgo.It("should return error", func() {
-				volID := []string{validBaseVolID}
+				volID := []string{validLegacyVolID}
 				req := &podmon.ValidateVolumeHostConnectivityRequest{
 					ArrayId:   "default",
 					VolumeIds: volID,
@@ -105,29 +198,17 @@ var _ = ginkgo.Describe("csi-extension-server", func() {
 			ginkgo.It("should not return error but IO in response should be false", func() {
 				clientMock.On("GetVolume", context.Background(), mock.Anything).Return(gopowerstore.Volume{ApplianceID: validApplianceID}, nil)
 				var resp []gopowerstore.PerformanceMetricsByVolumeResponse
-				clientMock.On("PerformanceMetricsByVolume", context.Background(), mock.Anything, mock.Anything).
+				clientMock.On("PerformanceMetricsByVolume", mock.Anything, mock.Anything, mock.Anything).
 					Return(resp, gopowerstore.APIError{
 						ErrorMsg: &api.ErrorMsg{
 							StatusCode: http.StatusInternalServerError,
 						},
 					})
-				volID := []string{validBaseVolID}
+				volID := []string{validLegacyVolID}
 				req := &podmon.ValidateVolumeHostConnectivityRequest{
 					VolumeIds: volID,
 					NodeId:    "csi-node-003c684ccb0c4ca0a9c99423563dfd2c-127.0.0.1",
 				}
-				identifiers.APIPort = ":9028"
-				var status identifiers.ArrayConnectivityStatus
-				status.LastAttempt = time.Now().Unix()
-				status.LastSuccess = time.Now().Unix()
-				input, _ := json.Marshal(status)
-				// responding with some dummy response that is for the case when array is connected and LastSuccess check was just finished
-				http.HandleFunc("/array-status/globalvolid1", func(w http.ResponseWriter, _ *http.Request) {
-					w.Write(input)
-				})
-
-				fmt.Printf("Starting server at port 9028\n")
-				go http.ListenAndServe(":9028", nil) // #nosec G114
 
 				response, err := ctrlSvc.ValidateVolumeHostConnectivity(context.Background(), req)
 				gomega.Expect(err).To(gomega.BeNil())
@@ -155,15 +236,109 @@ var _ = ginkgo.Describe("csi-extension-server", func() {
 				resp2[4].TotalIops = 4.6
 				resp2[4].CommonMetricsFields.Timestamp = freshTime
 				resp2[5].TotalIops = 0.0
-				clientMock.On("PerformanceMetricsByVolume", context.Background(), mock.Anything, mock.Anything).
+				clientMock.On("PerformanceMetricsByVolume", mock.Anything, mock.Anything, mock.Anything).
 					Return(resp2, nil)
-				volID2 := []string{validBaseVolID}
+				volID2 := []string{validLegacyVolID}
 				req2 := &podmon.ValidateVolumeHostConnectivityRequest{
 					VolumeIds: volID2,
 					NodeId:    "csi-node-003c684ccb0c4ca0a9c99423563dfd2c-127.0.0.1",
 				}
 
 				response, err := ctrlSvc.ValidateVolumeHostConnectivity(context.Background(), req2)
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(response.IosInProgress).To(gomega.BeTrue())
+			})
+		})
+
+		ginkgo.When("the preferred array of a metro volume is disconnected, but the non-preferred is connected", func() {
+			ginkgo.It("should report IO is in-progress", func() {
+				// preferred side will have no IO in-progress
+				metroMetricsPreferred := getInactiveIOVolumeMetrics()
+				metroMetricsNonPreferred := getActiveIOVolumeMetrics()
+
+				clientMock.On("PerformanceMetricsByVolume", mock.Anything, validBaseVolID, mock.Anything).Times(1).
+					Return(metroMetricsPreferred, nil)
+				clientMock.On("PerformanceMetricsByVolume", mock.Anything, validRemoteVolID, mock.Anything).Times(1).
+					Return(metroMetricsNonPreferred, nil)
+
+				req := &podmon.ValidateVolumeHostConnectivityRequest{
+					VolumeIds: []string{validMetroBlockVolumeID},
+					NodeId:    validNodeID,
+				}
+
+				response, err := ctrlSvc.ValidateVolumeHostConnectivity(context.Background(), req)
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(response.IosInProgress).To(gomega.BeTrue())
+			})
+		})
+
+		ginkgo.When("the both arrays of a metro volume are disconnected", func() {
+			ginkgo.It("should report IO is not in-progress", func() {
+				// preferred side will have no IO in-progress
+				metroMetricsPreferred := getInactiveIOVolumeMetrics()
+				metroMetricsNonPreferred := getInactiveIOVolumeMetrics()
+
+				clientMock.On("PerformanceMetricsByVolume", mock.Anything, validBaseVolID, mock.Anything).Times(1).
+					Return(metroMetricsPreferred, nil)
+				clientMock.On("PerformanceMetricsByVolume", mock.Anything, validRemoteVolID, mock.Anything).Times(1).
+					Return(metroMetricsNonPreferred, nil)
+
+				req := &podmon.ValidateVolumeHostConnectivityRequest{
+					VolumeIds: []string{validMetroBlockVolumeID},
+					NodeId:    validNodeID,
+				}
+
+				response, err := ctrlSvc.ValidateVolumeHostConnectivity(context.Background(), req)
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(response.IosInProgress).To(gomega.BeFalse())
+			})
+		})
+
+		ginkgo.When("context times out for both arrays of a metro volume", func() {
+			ginkgo.It("should report IO is not in-progress", func() {
+				clientMock.On("PerformanceMetricsByVolume", mock.Anything, validBaseVolID, mock.Anything).After(time.Second*11).Times(1).
+					Return(nil, errors.New("a long delay occurred"))
+				clientMock.On("PerformanceMetricsByVolume", mock.Anything, validRemoteVolID, mock.Anything).Times(1).
+					Return(nil, errors.New("a long delay occurred"))
+
+				req := &podmon.ValidateVolumeHostConnectivityRequest{
+					VolumeIds: []string{validMetroBlockVolumeID},
+					NodeId:    validNodeID,
+				}
+
+				// create a context with a deadline that's already expired
+				ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(time.Second*4))
+				defer cancel()
+
+				response, err := ctrlSvc.ValidateVolumeHostConnectivity(ctx, req)
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(response.IosInProgress).To(gomega.BeFalse())
+			})
+		})
+
+		ginkgo.When("at least one volume has IO in-progress", func() {
+			ginkgo.It("should report IO is in-progress", func() {
+				activeVolumeMetrics := getActiveIOVolumeMetrics()
+				inactiveVolumeMetrics := getInactiveIOVolumeMetrics()
+
+				// Return at least one volume with IO in-progress
+				clientMock.On("PerformanceMetricsByVolume", mock.Anything, validBaseVolID, mock.Anything).Times(1).
+					Return(activeVolumeMetrics, nil)
+				clientMock.On("PerformanceMetricsByVolume", mock.Anything, validRemoteVolID, mock.Anything).Times(1).
+					Return(inactiveVolumeMetrics, nil)
+
+				testVolUUID := uuid.New()
+				testVolID := filepath.Join(testVolUUID.String(), firstValidID, "scsi")
+				clientMock.On("PerformanceMetricsByVolume", mock.Anything, testVolUUID.String(), mock.Anything).Times(1).
+					Return(inactiveVolumeMetrics, nil)
+
+				req := &podmon.ValidateVolumeHostConnectivityRequest{
+					// create a request that checks more than one volume
+					VolumeIds: []string{testVolID, validMetroBlockVolumeID},
+					NodeId:    validNodeID,
+				}
+
+				response, err := ctrlSvc.ValidateVolumeHostConnectivity(context.Background(), req)
 				gomega.Expect(err).To(gomega.BeNil())
 				gomega.Expect(response.IosInProgress).To(gomega.BeTrue())
 			})
@@ -180,7 +355,7 @@ var _ = ginkgo.Describe("csi-extension-server", func() {
 							StatusCode: http.StatusInternalServerError,
 						},
 					})
-				err := ctrlSvc.IsIOInProgress(context.Background(), validBlockVolumeID, ctrlSvc.DefaultArray(), "scsi")
+				err := getIOInProgress(context.Background(), validBlockVolumeID, *ctrlSvc.DefaultArray(), "scsi")
 				gomega.Expect(err).ToNot(gomega.BeNil())
 			})
 		})
@@ -194,7 +369,7 @@ var _ = ginkgo.Describe("csi-extension-server", func() {
 							StatusCode: http.StatusInternalServerError,
 						},
 					})
-				err := ctrlSvc.IsIOInProgress(context.Background(), validBlockVolumeID, ctrlSvc.DefaultArray(), "nfs")
+				err := getIOInProgress(context.Background(), validBlockVolumeID, *ctrlSvc.DefaultArray(), "nfs")
 				gomega.Expect(err).ToNot(gomega.BeNil())
 			})
 		})
@@ -210,7 +385,7 @@ var _ = ginkgo.Describe("csi-extension-server", func() {
 				resp[5].TotalIops = 0.0
 				clientMock.On("PerformanceMetricsByVolume", context.Background(), mock.Anything, mock.Anything).
 					Return(resp, nil)
-				err := ctrlSvc.IsIOInProgress(context.Background(), validBlockVolumeID, ctrlSvc.DefaultArray(), "scsi")
+				err := getIOInProgress(context.Background(), validBlockVolumeID, *ctrlSvc.DefaultArray(), "scsi")
 				gomega.Expect(err).ToNot(gomega.BeNil())
 			})
 		})
@@ -229,7 +404,7 @@ var _ = ginkgo.Describe("csi-extension-server", func() {
 				resp[5].TotalIops = 0.0
 				clientMock.On("PerformanceMetricsByVolume", context.Background(), mock.Anything, mock.Anything).
 					Return(resp, nil)
-				err := ctrlSvc.IsIOInProgress(context.Background(), validBlockVolumeID, ctrlSvc.DefaultArray(), "scsi")
+				err := getIOInProgress(context.Background(), validBlockVolumeID, *ctrlSvc.DefaultArray(), "scsi")
 				gomega.Expect(err).To(gomega.BeNil())
 			})
 		})
@@ -249,7 +424,7 @@ var _ = ginkgo.Describe("csi-extension-server", func() {
 				resp[5].TotalIops = 0.0
 				clientMock.On("PerformanceMetricsByVolume", context.Background(), mock.Anything, mock.Anything).
 					Return(resp, nil)
-				err := ctrlSvc.IsIOInProgress(context.Background(), validBlockVolumeID, ctrlSvc.DefaultArray(), "scsi")
+				err := getIOInProgress(context.Background(), validBlockVolumeID, *ctrlSvc.DefaultArray(), "scsi")
 				gomega.Expect(err).ToNot(gomega.BeNil())
 			})
 		})
@@ -265,7 +440,7 @@ var _ = ginkgo.Describe("csi-extension-server", func() {
 				resp[5].TotalIops = 0.0
 				clientMock.On("PerformanceMetricsByFileSystem", context.Background(), mock.Anything, mock.Anything).
 					Return(resp, nil)
-				err := ctrlSvc.IsIOInProgress(context.Background(), validBlockVolumeID, ctrlSvc.DefaultArray(), "nfs")
+				err := getIOInProgress(context.Background(), validBlockVolumeID, *ctrlSvc.DefaultArray(), "nfs")
 				gomega.Expect(err).ToNot(gomega.BeNil())
 			})
 		})
@@ -284,7 +459,7 @@ var _ = ginkgo.Describe("csi-extension-server", func() {
 				resp[5].TotalIops = 0.0
 				clientMock.On("PerformanceMetricsByFileSystem", context.Background(), mock.Anything, mock.Anything).
 					Return(resp, nil)
-				err := ctrlSvc.IsIOInProgress(context.Background(), validBlockVolumeID, ctrlSvc.DefaultArray(), "nfs")
+				err := getIOInProgress(context.Background(), validBlockVolumeID, *ctrlSvc.DefaultArray(), "nfs")
 				gomega.Expect(err).To(gomega.BeNil())
 			})
 		})
@@ -616,3 +791,188 @@ var _ = ginkgo.Describe("csi-extension-server", func() {
 		})
 	})
 })
+
+func Test_waitAndClose(t *testing.T) {
+	type args struct {
+		wg *sync.WaitGroup
+		ch chan error
+	}
+	tests := []struct {
+		name string
+		args args
+	}{
+		{
+			name: "success",
+			args: args{
+				wg: &sync.WaitGroup{},
+				ch: make(chan error),
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			waitAndClose(tt.args.wg, tt.args.ch)
+
+			assert.Panics(t, func() { close(tt.args.ch) })
+		})
+	}
+}
+
+func Test_isIOInProgress(t *testing.T) {
+	type args struct {
+		ctx context.Context
+		chs []<-chan error
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		{
+			name: "remaining goroutines are canceled after receiving a non-nil error",
+			args: args{
+				ctx: context.Background(),
+				chs: func() []<-chan error {
+					var chs []<-chan error
+
+					// provide a channel that will immediately write a non-nil error
+					// as soon as the receiver is ready to receive.
+					nilErrCh := func() <-chan error {
+						ch := make(chan error)
+						go func() {
+							defer close(ch)
+							ch <- nil
+						}()
+						return ch
+					}()
+					chs = append(chs, nilErrCh)
+
+					// add a channel on which nothing will ever be written
+					// causing one of the goroutines to block until the context
+					// is cancelled
+					canceledCh := make(chan error)
+					chs = append(chs, canceledCh)
+
+					return chs
+				}(),
+			},
+			want: true,
+		},
+		{
+			name: "channels are closed after sending two non-nil errors",
+			args: args{
+				ctx: context.Background(),
+				chs: func() []<-chan error {
+					var chs []<-chan error
+					// provide a channel that immediately writes a non-nil error
+					// and closes the channel, signaling to the goroutine to exit.
+					nonNilErrors := func() <-chan error {
+						ch := make(chan error)
+						go func() {
+							defer close(ch)
+							ch <- errors.New("an error occurred")
+						}()
+						return ch
+					}
+					chs = append(chs, nonNilErrors())
+					chs = append(chs, nonNilErrors())
+					return chs
+				}(),
+			},
+			want: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isIOInProgress(tt.args.ctx, tt.args.chs...); got != tt.want {
+				t.Errorf("isIOInProgress() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_asyncGetIOInProgress(t *testing.T) {
+	ctxTimeout := time.Millisecond * 100
+	responseDelay := ctxTimeout * 2
+
+	type args struct {
+		ctx      func() context.Context
+		volID    string
+		array    array.PowerStoreArray
+		protocol string
+	}
+	tests := []struct {
+		name     string
+		args     args
+		wantResp bool
+		wantErr  bool
+	}{
+		{
+			name: "context times out while waiting for a response",
+			args: args{
+				ctx: func() context.Context {
+					ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
+					t.Cleanup(func() { cancel() })
+					return ctx
+				},
+				volID: validBlockVolumeID,
+				array: func() array.PowerStoreArray {
+					clientMock = new(gopowerstoremock.Client)
+					// delay the response until after the ctx timeout
+					clientMock.On("PerformanceMetricsByVolume", mock.Anything, validBlockVolumeID, mock.Anything).After(responseDelay).
+						Return([]gopowerstore.PerformanceMetricsByVolumeResponse{}, nil).Times(1)
+
+					return array.PowerStoreArray{Client: clientMock, IP: "192.168.0.1", GlobalID: firstValidID}
+				}(),
+				protocol: "scsi",
+			},
+			wantResp: false,
+		},
+		{
+			name: "returns the error",
+			args: args{
+				ctx: func() context.Context {
+					ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
+					t.Cleanup(func() { cancel() })
+					return ctx
+				},
+				volID: validBlockVolumeID,
+				array: func() array.PowerStoreArray {
+					clientMock = new(gopowerstoremock.Client)
+					clientMock.On("PerformanceMetricsByVolume", mock.Anything, validBlockVolumeID, mock.Anything).
+						Return(nil, errors.New("an error occurred")).Times(1)
+
+					return array.PowerStoreArray{Client: clientMock, IP: "192.168.0.1", GlobalID: firstValidID}
+				}(),
+				protocol: "scsi",
+			},
+			wantResp: true,
+			wantErr:  true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			now := time.Now()
+
+			ctx := tt.args.ctx()
+			errCh := asyncGetIOInProgress(ctx, tt.args.volID, tt.args.array, tt.args.protocol)
+
+			gotResp := false
+			select {
+			case err := <-errCh:
+				gotResp = true
+				if (err != nil) != tt.wantErr {
+					t.Errorf("asyncGetIOInProgress() = %v, wanted error to be %v", err, tt.wantErr)
+				}
+			case <-ctx.Done(): // if ctx times out, we do not want to be listening anymore
+				// give time for the mock function to return so the select statement can be
+				// evaluated in asyncGetIOInProgress
+				time.Sleep(responseDelay - time.Since(now))
+			}
+
+			if tt.wantResp != gotResp {
+				t.Errorf("asyncGetIOInProgress() wrote a response on the channel and was not expecting a response")
+			}
+		})
+	}
+}
