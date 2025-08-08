@@ -8,17 +8,17 @@ require (
 	github.com/akutz/gosync v0.1.0
 	github.com/apparentlymart/go-cidr v1.1.0
 	github.com/container-storage-interface/spec v1.6.0
-	github.com/dell/csi-metadata-retriever v1.11.1-0.20250719075353-a093d9aeb9eb
+	github.com/dell/csi-metadata-retriever v1.11.1-0.20250728054709-02998bccd1ba
 	github.com/dell/csm-sharednfs v1.0.0
 	github.com/dell/dell-csi-extensions/common v1.8.1-0.20250717054012-23ceaf9c9606
 	github.com/dell/dell-csi-extensions/podmon v1.8.1-0.20250717054012-23ceaf9c9606
 	github.com/dell/dell-csi-extensions/replication v1.11.1-0.20250717054012-23ceaf9c9606
 	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.8.1
-	github.com/dell/gobrick v1.14.1
+	github.com/dell/gobrick v1.14.0
 	github.com/dell/gocsi v1.14.1-0.20250718150756-9e598eb9e012
 	github.com/dell/gofsutil v1.19.1-0.20250715050132-d6bd228cbcb0
 	github.com/dell/goiscsi v1.12.0
-	github.com/dell/gonvme v1.11.1
+	github.com/dell/gonvme v1.11.1-0.20250701150147-3adc18df98ba
 	github.com/dell/gopowerstore v1.19.1-0.20250630074043-2a862d3b0e6f
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/go-openapi/strfmt v0.23.0
@@ -37,7 +37,7 @@ require (
 	github.com/uber/jaeger-lib v2.4.1+incompatible
 	go.uber.org/mock v0.5.0
 	golang.org/x/net v0.42.0
-	google.golang.org/grpc v1.74.0
+	google.golang.org/grpc v1.74.2
 	google.golang.org/protobuf v1.36.6
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.33.0
