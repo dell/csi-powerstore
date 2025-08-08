@@ -2295,21 +2295,9 @@ func ExtractPort(urlString string) (string, error) {
 	return port, nil
 }
 
+// Removes the tenant prefix (Auth v2) from the volume name,
+// if it exists, to prevent mount failures.
 func removeVolumePrefixFromName(volumeName string) string {
-	// Remove the tenant-prefix (Auth v2) from the volume name if exists so that the mount will not fail
-	volPrefix := os.Getenv("X_CSI_VOL_PREFIX") // We will read the volume-prefix set by the user from the env variable
-
-	log.Infof("vol prefix is: %s", volPrefix)	
-
-	lastIndex := strings.LastIndex(volumeName, volPrefix)
-
-	log.Infof("lastIndex is: %d", lastIndex)
-
-	if lastIndex != -1 {
-		log.Infof("Returning: %s from removeVolumePrefixFromName", volumeName[lastIndex:])
-		return volumeName[lastIndex:]
-	}
-
-	log.Info("returning an empty string from removeVolumePrefixFromName")
-	return ""
+	volPrefix := os.Getenv("X_CSI_VOL_PREFIX")
+	return strings.TrimPrefix(volumeName, volPrefix)
 }
