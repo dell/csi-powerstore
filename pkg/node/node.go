@@ -38,6 +38,7 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-powerstore/v2/pkg/array"
 	"github.com/dell/csi-powerstore/v2/pkg/controller"
+	"github.com/dell/csi-powerstore/v2/pkg/helpers"
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers"
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers/fs"
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers/k8sutils"
@@ -1442,6 +1443,18 @@ func (s *Service) updateNodeID() error {
 		// we will chop off port from the host if present.
 		port, err := ExtractPort(defaultArray.Endpoint)
 		ip, err := getOutboundIP(defaultArray.GetIP(), port, s.Fs)
+		log.Debug("Outbound IP address: ", ip.String())
+
+		// When Authorization v2 is enabled the host IP address will be localhost. We should get the actual IP else volume will not mount
+		if ip.String() == "127.0.0.1" || ip.String() == "localhost" {
+			log.Debug("Detected localhost IP address, trying to get node IP address")
+			ip, err = helpers.GetNodeIP()
+			if err != nil {
+				return status.Errorf(codes.FailedPrecondition, "Could not get node IP address: %s", err.Error())
+			}
+		}
+
+		log.Debug("Outbound IP address after check: ", ip.String())
 		if err != nil {
 			log.WithFields(log.Fields{
 				"endpoint": s.DefaultArray().GetIP(),
