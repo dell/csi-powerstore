@@ -85,17 +85,41 @@ const (
 )
 
 var (
-	validBlockVolumeID           = filepath.Join(validBaseVolID, firstValidID, "scsi")
-	validMetroBlockVolumeID      = filepath.Join(validBaseVolID, firstValidID, "scsi:"+validRemoteVolID, secondValidID)
-	validNfsVolumeID             = filepath.Join(validBaseVolID, secondValidID, "nfs")
-	invalidBlockVolumeID         = filepath.Join(validBaseVolID, "globalvolid3", "scsi")
-	validNodeID                  = strings.Join([]string{validHostName, "127.0.0.1"}, "-")
-	validGroupName               = strings.Join([]string{"csi", validRemoteSystemName, validRPO}, "-")
-	validPolicyName              = "pp-" + validGroupName
-	validRuleName                = "rr-" + validGroupName
-	validGroupNameSync           = strings.Join([]string{"csi", validRemoteSystemName, zeroRPO}, "-")
-	validPolicyNameSync          = "pp-" + validGroupNameSync
-	validNamespacedGroupName     = strings.Join([]string{"csi", validNamespaceName, validRemoteSystemName, validRPO}, "-")
+	// format: <uuid>/<gobalID>/scsi
+	validBlockVolumeID = filepath.Join(validBaseVolID, firstValidID, "scsi")
+
+	// format: <uuid1>/<gobalID1>/scsi:<uuid2>/<globalID2>
+	validMetroBlockVolumeID = filepath.Join(validBaseVolID, firstValidID, "scsi:"+validRemoteVolID, secondValidID)
+
+	// format: <uuid>/<gobalID>/nfs
+	validNfsVolumeID = filepath.Join(validBaseVolID, secondValidID, "nfs")
+	// format: <uuid>/<invalid-gobalID>/scsi.
+	//
+	// should expect not to find this global ID in the list of arrays
+	invalidBlockVolumeID = filepath.Join(validBaseVolID, "globalvolid3", "scsi")
+
+	// format: csi-node-<uuid>-127.0.0.1
+	validNodeID = strings.Join([]string{validHostName, "127.0.0.1"}, "-")
+
+	// format: csi-<powerstore-name>-<rpo>
+	validGroupName = strings.Join([]string{"csi", validRemoteSystemName, validRPO}, "-")
+
+	// format: pp-csi-<powerstore-name>-<rpo>
+	validPolicyName = "pp-" + validGroupName
+
+	// format: rr-csi-<powerstore-name>-<rpo>
+	validRuleName = "rr-" + validGroupName
+
+	// format: csi-<powerstore-name>-Zero
+	validGroupNameSync = strings.Join([]string{"csi", validRemoteSystemName, zeroRPO}, "-")
+
+	// format: pp-csi-<powerstore-name>-Zero
+	validPolicyNameSync = "pp-" + validGroupNameSync
+
+	// format: csi-<namespace>-<powerstore-name>-<rpo>
+	validNamespacedGroupName = strings.Join([]string{"csi", validNamespaceName, validRemoteSystemName, validRPO}, "-")
+
+	// format: csi-<namespace>-<powerstore-name>-Zero
 	validNamespacedGroupNameSync = strings.Join([]string{"csi", validNamespaceName, validRemoteSystemName, zeroRPO}, "-")
 )
 
