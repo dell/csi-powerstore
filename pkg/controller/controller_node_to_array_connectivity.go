@@ -42,6 +42,7 @@ func (s *Service) QueryArrayStatus(ctx context.Context, url string) (bool, error
 	client := http.Client{
 		Timeout: identifiers.Timeout,
 	}
+
 	resp, err := client.Get(url)
 
 	log.Debugf("Received response %+v for url %s", resp, url)
