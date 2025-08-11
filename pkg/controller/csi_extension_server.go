@@ -323,8 +323,8 @@ func isIOInProgress(ctx context.Context, chs ...<-chan error) bool {
 				errCh <- ctx.Err()
 				return
 			// read the channel until it is closed
-			case err, ok := <-repCh:
-				if !ok {
+			case err, isOpen := <-repCh:
+				if !isOpen {
 					return
 				}
 				errCh <- err
@@ -348,7 +348,6 @@ func isIOInProgress(ctx context.Context, chs ...<-chan error) bool {
 	// Read results as they're ready.
 	// If the errCh channel is closed before a nil error is
 	// received, assume there is no IO in-progress.
-	ioInProgress := false
 	for err := range errCh {
 		if err != nil {
 			log.Debugf("error received while validating volume connectivity: %s", err.Error())
@@ -356,13 +355,14 @@ func isIOInProgress(ctx context.Context, chs ...<-chan error) bool {
 		}
 
 		// cancel any remaining goroutines so we can report IO in-progress ASAP
+		// and we don't leave any goroutines blocking, trying to write to the channel.
 		cancel()
 		log.Info("IO in-progress detected while validating volume connectivity")
-		ioInProgress = true
+		return true
 	}
 
 	log.Info("no IO in-progress was detected while validating volume connectivity")
-	return ioInProgress
+	return false
 }
 
 // asyncGetIOInProgress starts an async request to getIOInProgress and returns a channel
