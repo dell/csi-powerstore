@@ -7307,3 +7307,53 @@ func elementsMatch(a, b []string) bool {
 	}
 	return true
 }
+
+func TestRemoveVolumePrefixFromName(t *testing.T) {
+	tests := []struct {
+		name           string
+		volumeName     string
+		prefix         string
+		expectedResult string
+	}{
+		{
+			name:           "prefix exists",
+			volumeName:     "prefix-volume-name",
+			prefix:         "prefix-",
+			expectedResult: "volume-name",
+		},
+		{
+			name:           "prefix does not exist",
+			volumeName:     "volume-name",
+			prefix:         "prefix-",
+			expectedResult: "volume-name",
+		},
+		{
+			name:           "empty volume name",
+			volumeName:     "",
+			prefix:         "prefix-",
+			expectedResult: "",
+		},
+		{
+			name:           "empty prefix",
+			volumeName:     "volume-name",
+			prefix:         "",
+			expectedResult: "volume-name",
+		},
+		{
+			name:           "multiple occurrences of prefix",
+			volumeName:     "testtesttestvolume-name",
+			prefix:         "test",
+			expectedResult: "testtestvolume-name",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			os.Setenv("X_CSI_VOL_PREFIX", tt.prefix)
+			result := removeVolumePrefixFromName(tt.volumeName)
+			if result != tt.expectedResult {
+				t.Errorf("removeVolumePrefixFromName() got = %v, want %v", result, tt.expectedResult)
+			}
+		})
+	}
+}
