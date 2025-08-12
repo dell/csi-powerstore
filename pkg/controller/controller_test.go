@@ -93,6 +93,7 @@ var (
 
 	// format: <uuid>/<gobalID>/nfs
 	validNfsVolumeID = filepath.Join(validBaseVolID, secondValidID, "nfs")
+
 	// format: <uuid>/<invalid-gobalID>/scsi.
 	//
 	// should expect not to find this global ID in the list of arrays
