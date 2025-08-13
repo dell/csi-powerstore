@@ -91,6 +91,9 @@ var (
 	// format: <uuid1>/<gobalID1>/scsi:<uuid2>/<globalID2>
 	validMetroBlockVolumeID = filepath.Join(validBaseVolID, firstValidID, "scsi:"+validRemoteVolID, secondValidID)
 
+	// format: <uuid1>/<gobalID1>/scsi:<uuid2>/<globalID2>
+	invalidMetroBlockVolumeID = filepath.Join(validBaseVolID, firstValidID, "scsi:"+validRemoteVolID, "globalvolid3")
+
 	// format: <uuid>/<gobalID>/nfs
 	validNfsVolumeID = filepath.Join(validBaseVolID, secondValidID, "nfs")
 

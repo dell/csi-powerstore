@@ -224,72 +224,68 @@ func (s *Service) ValidateVolumeHostConnectivity(ctx context.Context, req *podmo
 		if err != nil {
 			return rep, err
 		}
+	}
 
-		// Check for IOinProgress only when volumes IDs are present in the request as the field is required only in the latter case also to reduce number of calls to the API making it efficient
-		if len(req.GetVolumeIds()) > 0 {
-			// Get array config
-			for _, volID := range req.GetVolumeIds() {
-				volume, err := array.ParseVolumeID(ctx, volID, s.DefaultArray(), nil)
-				if err != nil {
-					log.Errorf("failed to parse volumeID, %s, for querying IO metrics. err: %s", volID, err.Error())
-					return nil, err
-				}
-
-				if volume.LocalArrayGlobalID != globalID {
-					log.Errorf("Recived globalId from podman is %s and retrieved from array is %s ", globalID, volume.LocalArrayGlobalID)
-					return nil, fmt.Errorf("invalid globalId %s is provided", globalID)
-				}
-
-				localArray, err := s.GetOneArray(volume.LocalArrayGlobalID)
-				if err != nil || localArray == nil {
-					log.Errorf("failed to get local array configuration for array \"%s\" for volume activity validation: %s",
-						volume.LocalArrayGlobalID, err.Error())
-					return nil, err
-				}
-
-				// set to nil to avoid unnecessary API calls by subsequent iterations
-				var remoteArray *array.PowerStoreArray
-				if volume.RemoteArrayGlobalID != "" {
-					remoteArray, err = s.GetOneArray(volume.RemoteArrayGlobalID)
-					if err != nil {
-						log.Errorf("failed to get remote array configuration for array \"%s\" for volume activity validation: %s",
-							volume.RemoteArrayGlobalID, err.Error())
-					}
-				}
-
-				// This context is for the set of requests for the current volume.
-				// Used to cancel any pending requests before checking for IO on any
-				// subsequent volumes.
-				ioCtx, ioCtxCancel := context.WithCancel(ctx)
-
-				// channels for receiving responses from async requests
-				reqChs := make([]<-chan error, 0)
-				// check if any IO is inProgress for the current local globalID/array
-				reqLocalCh := asyncGetIOInProgress(ioCtx, volume.LocalUUID, *localArray, volume.Protocol)
-				reqChs = append(reqChs, reqLocalCh)
-
-				if remoteArray != nil {
-					// check if any IO is inProgress for the current remote globalID/array
-					reqRemoteCh := asyncGetIOInProgress(ioCtx, volume.RemoteUUID, *remoteArray, volume.Protocol)
-					reqChs = append(reqChs, reqRemoteCh)
-				}
-
-				if isIOInProgress(ioCtx, reqChs...) {
-					ioCtxCancel()
-					// so long as at least one volume has IO in-progress
-					// we should report it.
-					// This status is effectively a logical OR of all the volumes
-					rep.IosInProgress = true
-					log.Infof("IO detected for volume %s", volID)
-					return rep, nil
-				}
-
-				// make sure to cancel any pending requests from this iteration
-				// so no goroutines are left running.
-				ioCtxCancel()
+	// Check for IOinProgress only when volumes IDs are present in the request as the field is required only in the latter case also to reduce number of calls to the API making it efficient
+	if len(req.GetVolumeIds()) > 0 {
+		// Get array config
+		for _, volID := range req.GetVolumeIds() {
+			volume, err := array.ParseVolumeID(ctx, volID, s.DefaultArray(), nil)
+			if err != nil {
+				log.Errorf("failed to parse volumeID, %s, for querying IO metrics. err: %s", volID, err.Error())
+				return nil, err
 			}
+
+			localArray, err := s.GetOneArray(volume.LocalArrayGlobalID)
+			if err != nil || localArray == nil {
+				log.Errorf("failed to get local array configuration for array %s for volume activity validation: %s",
+					volume.LocalArrayGlobalID, err.Error())
+				return nil, err
+			}
+
+			// set to nil to avoid unnecessary API calls by subsequent iterations
+			var remoteArray *array.PowerStoreArray
+			if volume.RemoteArrayGlobalID != "" {
+				remoteArray, err = s.GetOneArray(volume.RemoteArrayGlobalID)
+				if err != nil {
+					log.Errorf("failed to get remote array configuration for array %s for volume activity validation: %s",
+						volume.RemoteArrayGlobalID, err.Error())
+					return nil, err
+				}
+			}
+
+			// This context is for the set of requests for the current volume.
+			// Used to cancel any pending requests before checking for IO on any
+			// subsequent volumes.
+			ioCtx, ioCtxCancel := context.WithCancel(ctx)
+
+			// channels for receiving responses from async requests
+			reqChs := make([]<-chan error, 0)
+			// check if any IO is inProgress for the current local globalID/array
+			reqLocalCh := asyncGetIOInProgress(ioCtx, volume.LocalUUID, *localArray, volume.Protocol)
+			reqChs = append(reqChs, reqLocalCh)
+
+			if remoteArray != nil {
+				// check if any IO is inProgress for the current remote globalID/array
+				reqRemoteCh := asyncGetIOInProgress(ioCtx, volume.RemoteUUID, *remoteArray, volume.Protocol)
+				reqChs = append(reqChs, reqRemoteCh)
+			}
+
+			if rep.IosInProgress = isIOInProgress(ioCtx, reqChs...); rep.IosInProgress {
+				// so long as at least one volume has IO in-progress
+				// we should report it.
+				// This status is effectively a logical OR of all the volumes
+				ioCtxCancel()
+				log.Infof("IO detected for volume %s", volID)
+				break
+			}
+
+			// make sure to cancel any pending requests from this iteration
+			// so no goroutines are left running.
+			ioCtxCancel()
 		}
 	}
+
 	log.Infof("ValidateVolumeHostConnectivity reply %+v", rep)
 	return rep, nil
 }

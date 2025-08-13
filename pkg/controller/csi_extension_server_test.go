@@ -145,6 +145,50 @@ var _ = ginkgo.Describe("csi-extension-server", func() {
 			})
 		})
 
+		ginkgo.When("the request contains a bad volumeID", func() {
+			ginkgo.It("should return an error", func() {
+				req := &podmon.ValidateVolumeHostConnectivityRequest{
+					ArrayId:   "default",
+					VolumeIds: []string{"SOMETHING-WRONG"},
+					NodeId:    validNodeID,
+				}
+				clientMock.On("GetVolume", mock.Anything, mock.Anything).Return(gopowerstore.Volume{}, errors.New("error: bad volume name"))
+				clientMock.On("GetFS", mock.Anything, mock.Anything).Return(gopowerstore.FileSystem{}, errors.New("error: bad volume name"))
+
+				res, err := ctrlSvc.ValidateVolumeHostConnectivity(context.Background(), req)
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err).ToNot(gomega.BeNil())
+			})
+		})
+
+		ginkgo.When("the request contains a volumeID with an invalid local arrayID", func() {
+			ginkgo.It("should return an error", func() {
+				req := &podmon.ValidateVolumeHostConnectivityRequest{
+					ArrayId:   "default",
+					VolumeIds: []string{invalidBlockVolumeID},
+					NodeId:    validNodeID,
+				}
+
+				res, err := ctrlSvc.ValidateVolumeHostConnectivity(context.Background(), req)
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err).ToNot(gomega.BeNil())
+			})
+		})
+
+		ginkgo.When("the request contains a metro volumeID with an invalid remote arrayID", func() {
+			ginkgo.It("should return an error", func() {
+				req := &podmon.ValidateVolumeHostConnectivityRequest{
+					ArrayId:   "default",
+					VolumeIds: []string{invalidMetroBlockVolumeID},
+					NodeId:    validNodeID,
+				}
+
+				res, err := ctrlSvc.ValidateVolumeHostConnectivity(context.Background(), req)
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err).ToNot(gomega.BeNil())
+			})
+		})
+
 		ginkgo.When("nodeId is not provided ", func() {
 			ginkgo.It("should return error", func() {
 				volID := []string{validLegacyVolID}
@@ -153,20 +197,6 @@ var _ = ginkgo.Describe("csi-extension-server", func() {
 					VolumeIds: volID,
 					NodeId:    "",
 				}
-				_, err := ctrlSvc.ValidateVolumeHostConnectivity(context.Background(), req)
-				gomega.Expect(err).ToNot(gomega.BeNil())
-			})
-		})
-
-		ginkgo.When("array ID provided in the request and arrayID in the volumeID do not match", func() {
-			ginkgo.It("should return error", func() {
-				volID := []string{validLegacyVolID}
-				req := &podmon.ValidateVolumeHostConnectivityRequest{
-					ArrayId:   "default",
-					VolumeIds: volID,
-					NodeId:    "csi-node-003c684ccb0c4ca0a9c99423563dfd2c-127.0.0.1",
-				}
-				clientMock.On("GetVolume", context.Background(), mock.Anything).Return(gopowerstore.Volume{ApplianceID: validApplianceID}, nil)
 				_, err := ctrlSvc.ValidateVolumeHostConnectivity(context.Background(), req)
 				gomega.Expect(err).ToNot(gomega.BeNil())
 			})
@@ -194,8 +224,8 @@ var _ = ginkgo.Describe("csi-extension-server", func() {
 			})
 		})
 
-		ginkgo.When("not sending arrayId in request body ", func() {
-			ginkgo.It("should not return error but IO in response should be false", func() {
+		ginkgo.When("the request has a volume ID but no array ID and no IO is in progress", func() {
+			ginkgo.It("should return IO in-progress as false", func() {
 				clientMock.On("GetVolume", context.Background(), mock.Anything).Return(gopowerstore.Volume{ApplianceID: validApplianceID}, nil)
 				var resp []gopowerstore.PerformanceMetricsByVolumeResponse
 				clientMock.On("PerformanceMetricsByVolume", mock.Anything, mock.Anything, mock.Anything).
@@ -217,7 +247,7 @@ var _ = ginkgo.Describe("csi-extension-server", func() {
 		})
 
 		ginkgo.When("not sending arrayId in request body and default array is connected well and IO operation is also there ", func() {
-			ginkgo.It("should not return error", func() {
+			ginkgo.It("should return IO in-progress", func() {
 				clientMock.On("GetVolume", context.Background(), mock.Anything).Return(gopowerstore.Volume{ApplianceID: validApplianceID}, nil)
 				resp2 := make([]gopowerstore.PerformanceMetricsByVolumeResponse, 6)
 				freshTime, _ := strfmt.ParseDateTime(fmt.Sprint(time.Now().UTC().Format("2006-01-02T15:04:05Z")))
