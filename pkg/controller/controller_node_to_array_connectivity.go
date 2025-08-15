@@ -40,7 +40,7 @@ func (s *Service) QueryArrayStatus(ctx context.Context, url string) (bool, error
 		}
 	}()
 	client := http.Client{
-		Timeout: identifiers.Timeout,
+		Timeout: identifiers.PodmonArrayConnectivityTimeout,
 	}
 
 	resp, err := client.Get(url)

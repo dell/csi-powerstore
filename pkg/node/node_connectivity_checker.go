@@ -66,8 +66,8 @@ func (s *Service) apiRouter(_ context.Context) {
 	server := &http.Server{
 		Addr:         identifiers.APIPort,
 		Handler:      router,
-		ReadTimeout:  identifiers.Timeout,
-		WriteTimeout: identifiers.Timeout,
+		ReadTimeout:  identifiers.PodmonArrayConnectivityTimeout,
+		WriteTimeout: identifiers.PodmonArrayConnectivityTimeout,
 	}
 	err := server.ListenAndServe()
 	if err != nil {
@@ -164,7 +164,7 @@ func (s *Service) startNodeToArrayConnectivityCheck(ctx context.Context) {
 	for _, array := range powerStoreArray {
 		// start one goroutine for each array, so each array's nodeProbe run concurrently
 		// should we really store the status of all array instead of default one, currently podman query only default array?
-		go s.testConnectivityAndUpdateStatus(ctx, array, identifiers.Timeout)
+		go s.testConnectivityAndUpdateStatus(ctx, array, identifiers.PodmonArrayConnectivityTimeout)
 	}
 	log.Infof("startNodeToArrayConnectivityCheck is running probes at pollingFrequency %d ", pollingFrequencyInSeconds/2)
 }

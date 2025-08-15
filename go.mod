@@ -19,7 +19,7 @@ require (
 	github.com/dell/gofsutil v1.19.1-0.20250715050132-d6bd228cbcb0
 	github.com/dell/goiscsi v1.12.0
 	github.com/dell/gonvme v1.11.1
-	github.com/dell/gopowerstore v1.19.1-0.20250630074043-2a862d3b0e6f
+	github.com/dell/gopowerstore v1.19.1-0.20250815171024-bda52ef684a2
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/go-openapi/strfmt v0.23.0
 	github.com/golang/mock v1.6.0

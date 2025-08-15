@@ -50,6 +50,7 @@ var (
 	ipToArrayMux             sync.Mutex
 	defaultMultiNasThreshold = 5
 	defaultMultiNasCooldown  = 5 * time.Minute
+	PowerStoreRESTApiTimeout = identifiers.GetTimeoutFromEnv(identifiers.EnvPowerstoreAPITimeout)
 )
 
 // Consumer provides methods for safe management of arrays
@@ -320,6 +321,8 @@ func GetPowerStoreArrays(fs fs.Interface, filePath string) (map[string]*PowerSto
 			return nil, nil, nil, errors.New("no GlobalID field found in config.yaml - update config.yaml according to the documentation")
 		}
 		clientOptions := gopowerstore.NewClientOptions()
+		log.Debugf("PowerStore REST API timeout set to %s", PowerStoreRESTApiTimeout)
+		clientOptions.SetDefaultTimeout(PowerStoreRESTApiTimeout)
 		clientOptions.SetInsecure(array.Insecure)
 
 		if throttlingRateLimit, ok := csictx.LookupEnv(context.Background(), identifiers.EnvThrottlingRateLimit); ok {
