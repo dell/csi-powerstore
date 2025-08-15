@@ -200,7 +200,7 @@ const (
 )
 
 // PodmonArrayConnectivityTimeout specifies timeout for making http requests to node services by podmon
-var PodmonArrayConnectivityTimeout = GetTimeoutFromEnv(EnvPodmonArrayConnectivityTimeout)
+var PodmonArrayConnectivityTimeout = GetPodmonArrayConnectivityTimeout()
 
 // TransportType differentiates different SCSI transport protocols (FC, iSCSI, Auto, None)
 type TransportType string
@@ -550,21 +550,37 @@ func IsNFSServiceEnabled(ctx context.Context, client gopowerstore.Client) (bool,
 }
 
 // GetTimeoutFromEnv retrieves a timeout value from the specified environment variable or returns default value.
-func GetTimeoutFromEnv(envvar string) time.Duration {
+func GetTimeoutFromEnv(envvar string) (time.Duration, error) {
 	var timeout time.Duration
 	var err error
-
 	if duration, ok := csictx.LookupEnv(context.Background(), envvar); ok {
 		timeout, err = time.ParseDuration(duration)
 		if err != nil {
-			log.Infof("Setting default timeout for %s", envvar)
-			if envvar == EnvPodmonArrayConnectivityTimeout {
-				timeout = time.Duration(10 * time.Second)
-			} else {
-				timeout = time.Duration(120 * time.Second)
-			}
+			return -1, err
 		}
+	} else {
+		return -1, errors.New("failed to get timeout from env")
 	}
 	log.Infof("%s set to: %v", envvar, timeout)
+	return timeout, nil
+}
+
+// GetPodmonArrayConnectivityPollRate retrieves a timeout value for podmon node array connectivity check from env var or returns default value.
+func GetPodmonArrayConnectivityTimeout() time.Duration {
+	timeout, err := GetTimeoutFromEnv(EnvPodmonArrayConnectivityTimeout)
+	if err != nil {
+		log.Debugf("failed to get timeout from env %s, using default value %d", EnvPodmonArrayConnectivityTimeout, 120)
+		timeout = 10 * time.Second
+	}
+	return timeout
+}
+
+// GetPowerStoreRESTApiTimeout retrieves a timeout value for PowerStore REST API requests from env var or returns default value..
+func GetPowerStoreRESTApiTimeout() time.Duration {
+	timeout, err := GetTimeoutFromEnv(EnvPowerstoreAPITimeout)
+	if err != nil {
+		log.Debugf("failed to get timeout from env %s, using default value %d", EnvPowerstoreAPITimeout, 120)
+		timeout = 120 * time.Second
+	}
 	return timeout
 }
