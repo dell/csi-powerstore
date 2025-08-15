@@ -199,8 +199,8 @@ const (
 	ArrayStatus = "/array-status"
 )
 
-// Timeout for making http requests
-var Timeout = GetArrayConnectivityTimeout()
+// PodmonArrayConnectivityTimeout specifies timeout for making http requests to node services by podmon
+var PodmonArrayConnectivityTimeout = GetTimeoutFromEnv(EnvPodmonArrayConnectivityTimeout)
 
 // TransportType differentiates different SCSI transport protocols (FC, iSCSI, Auto, None)
 type TransportType string
@@ -347,7 +347,7 @@ func GetISCSITargetsInfoFromStorage(client gopowerstore.Client, volumeApplianceI
 
 // GetNVMETCPTargetsInfoFromStorage returns list of gobrick compatible NVME TCP targets by querying PowerStore array
 func GetNVMETCPTargetsInfoFromStorage(client gopowerstore.Client, volumeApplianceID string) ([]gobrick.NVMeTargetInfo, error) {
-	clusterInfo, err := client.GetCluster(context.Background())
+	clusterInfo, _ := client.GetCluster(context.Background())
 	nvmeNQN := clusterInfo.NVMeNQN
 
 	addrInfo, err := client.GetStorageNVMETCPTargetAddresses(context.Background())
@@ -520,10 +520,7 @@ func SetAPIPort(ctx context.Context) {
 func ReachableEndPoint(endpoint string) bool {
 	// this endpoint has IP:PORT
 	_, err := net.DialTimeout("tcp", endpoint, 2*time.Second)
-	if err != nil {
-		return false
-	}
-	return true
+	return err == nil
 }
 
 func GetMountFlags(vc *csi.VolumeCapability) []string {
@@ -552,17 +549,22 @@ func IsNFSServiceEnabled(ctx context.Context, client gopowerstore.Client) (bool,
 	return false, nil
 }
 
-// GetArrayConnectivityTimeout get array connectivity timeout from environment variable or sets default value
-func GetArrayConnectivityTimeout() time.Duration {
-	var timeout time.Duration = time.Second * 5
-	if duration, ok := csictx.LookupEnv(context.Background(), EnvDriverAPITimeout); ok {
-		duration, err := strconv.Atoi(duration)
+// GetTimeoutFromEnv retrieves a timeout value from the specified environment variable or returns default value.
+func GetTimeoutFromEnv(envvar string) time.Duration {
+	var timeout time.Duration
+	var err error
+
+	if duration, ok := csictx.LookupEnv(context.Background(), envvar); ok {
+		timeout, err = time.ParseDuration(duration)
 		if err != nil {
-			log.Infof("Setting default timeout for API request")
-		} else {
-			timeout = time.Second * time.Duration(duration)
+			log.Infof("Setting default timeout for %s", envvar)
+			if envvar == EnvPodmonArrayConnectivityTimeout {
+				timeout = time.Duration(10 * time.Second)
+			} else {
+				timeout = time.Duration(120 * time.Second)
+			}
 		}
 	}
-	log.Infof("API request timeout: %s", timeout.String())
+	log.Infof("%s set to: %v", envvar, timeout)
 	return timeout
 }
