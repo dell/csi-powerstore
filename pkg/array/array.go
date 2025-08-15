@@ -50,7 +50,7 @@ var (
 	ipToArrayMux             sync.Mutex
 	defaultMultiNasThreshold = 5
 	defaultMultiNasCooldown  = 5 * time.Minute
-	PowerStoreRESTApiTimeout = identifiers.GetTimeoutFromEnv(identifiers.EnvPowerstoreAPITimeout)
+	PowerStoreRESTApiTimeout = identifiers.GetPowerStoreRESTApiTimeout()
 )
 
 // Consumer provides methods for safe management of arrays
