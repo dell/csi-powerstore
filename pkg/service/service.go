@@ -89,6 +89,9 @@ func (s *service) BeforeServe(ctx context.Context, _ *gocsi.StoragePlugin, _ net
 		return err
 	}
 
+	identifiers.PodmonArrayConnectivityTimeout = identifiers.GetPodmonArrayConnectivityTimeout()
+	identifiers.PowerstoreRESTApiTimeout = identifiers.GetPowerStoreRESTApiTimeout()
+
 	// The block is commented out for performance issue caused by sharednfs even when it's disabled.
 	// Remove the comment when enabling sharednfs feature.
 	/*
