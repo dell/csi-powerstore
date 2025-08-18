@@ -356,7 +356,11 @@ func GetISCSITargetsInfoFromStorage(client gopowerstore.Client, volumeApplianceI
 
 // GetNVMETCPTargetsInfoFromStorage returns list of gobrick compatible NVME TCP targets by querying PowerStore array
 func GetNVMETCPTargetsInfoFromStorage(client gopowerstore.Client, volumeApplianceID string) ([]gobrick.NVMeTargetInfo, error) {
-	clusterInfo, _ := client.GetCluster(context.Background())
+	clusterInfo, err := client.GetCluster(context.Background())
+	if err != nil {
+		log.Error(err.Error())
+		return []gobrick.NVMeTargetInfo{}, err
+	}
 	nvmeNQN := clusterInfo.NVMeNQN
 
 	addrInfo, err := client.GetStorageNVMETCPTargetAddresses(context.Background())
