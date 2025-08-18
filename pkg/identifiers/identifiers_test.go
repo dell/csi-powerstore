@@ -589,7 +589,6 @@ func TestIsNFSServiceEnabled(t *testing.T) {
 }
 
 func TestGetPowerStoreAPITimeout(t *testing.T) {
-	var EnvVar = "X_CSI_POWERSTORE_API_TIMEOUT"
 	tests := []struct {
 		name         string
 		expected     time.Duration
@@ -603,14 +602,14 @@ func TestGetPowerStoreAPITimeout(t *testing.T) {
 		{
 			name:         "env variable is set to valid value",
 			expected:     10 * time.Second,
-			setupFunc:    func() { os.Setenv(EnvVar, "10s") },
-			teardownFunc: func() { os.Unsetenv(EnvVar) },
+			setupFunc:    func() { os.Setenv("X_CSI_POWERSTORE_API_TIMEOUT", "10s") },
+			teardownFunc: func() { os.Unsetenv("X_CSI_POWERSTORE_API_TIMEOUT") },
 		},
 		{
 			name:         "env variable is set to invalid value",
 			expected:     120 * time.Second,
-			setupFunc:    func() { os.Setenv(EnvVar, "abc") },
-			teardownFunc: func() { os.Unsetenv(EnvVar) },
+			setupFunc:    func() { os.Setenv("X_CSI_POWERSTORE_API_TIMEOUT", "abc") },
+			teardownFunc: func() { os.Unsetenv("X_CSI_POWERSTORE_API_TIMEOUT") },
 		},
 	}
 
@@ -629,7 +628,6 @@ func TestGetPowerStoreAPITimeout(t *testing.T) {
 }
 
 func TestGetPodmonArrayConnectivityTimeout(t *testing.T) {
-	var EnvVar = "X_CSI_PODMON_ARRAY_CONNECTIVITY_TIMEOUT"
 	tests := []struct {
 		name         string
 		expected     time.Duration
@@ -643,14 +641,14 @@ func TestGetPodmonArrayConnectivityTimeout(t *testing.T) {
 		{
 			name:         "env variable is set to valid value",
 			expected:     25 * time.Second,
-			setupFunc:    func() { os.Setenv(EnvVar, "25s") },
-			teardownFunc: func() { os.Unsetenv(EnvVar) },
+			setupFunc:    func() { os.Setenv("X_CSI_PODMON_ARRAY_CONNECTIVITY_TIMEOUT", "25s") },
+			teardownFunc: func() { os.Unsetenv("X_CSI_PODMON_ARRAY_CONNECTIVITY_TIMEOUT") },
 		},
 		{
 			name:         "env variable is set to invalid value",
 			expected:     10 * time.Second,
-			setupFunc:    func() { os.Setenv(EnvVar, "abc") },
-			teardownFunc: func() { os.Unsetenv(EnvVar) },
+			setupFunc:    func() { os.Setenv("X_CSI_PODMON_ARRAY_CONNECTIVITY_TIMEOUT", "abc") },
+			teardownFunc: func() { os.Unsetenv("X_CSI_PODMON_ARRAY_CONNECTIVITY_TIMEOUT") },
 		},
 	}
 
