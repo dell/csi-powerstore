@@ -201,10 +201,14 @@ const (
 
 // PodmonArrayConnectivityTimeout specifies timeout for making http requests to node services by podmon
 var PodmonArrayConnectivityTimeout = GetPodmonArrayConnectivityTimeout()
+
+// DefaultPodmonArrayConnectivityTimeout specifies default timeout for making http requests to node services by podmon
 var DefaultPodmonArrayConnectivityTimeout = 10 * time.Second
 
 // PowerstoreRESTApiTimeout specifies timeout for making http requests by Powerstore client
 var PowerstoreRESTApiTimeout = GetPowerStoreRESTApiTimeout()
+
+// DefaultPowerstoreRESTApiTimeout specifies default timeout for making http requests by Powerstore client
 var DefaultPowerstoreRESTApiTimeout = 120 * time.Second
 
 // TransportType differentiates different SCSI transport protocols (FC, iSCSI, Auto, None)
@@ -586,7 +590,6 @@ func GetPowerStoreRESTApiTimeout() time.Duration {
 	if err != nil {
 		log.Debugf("failed to get timeout from env %s, using default value %d", EnvPowerstoreAPITimeout, DefaultPowerstoreRESTApiTimeout)
 		return DefaultPowerstoreRESTApiTimeout
-
 	}
 	return timeout
 }
