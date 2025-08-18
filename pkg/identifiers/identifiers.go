@@ -201,9 +201,11 @@ const (
 
 // PodmonArrayConnectivityTimeout specifies timeout for making http requests to node services by podmon
 var PodmonArrayConnectivityTimeout = GetPodmonArrayConnectivityTimeout()
+var DefaultPodmonArrayConnectivityTimeout = 10 * time.Second
 
 // PowerstoreRESTApiTimeout specifies timeout for making http requests by Powerstore client
 var PowerstoreRESTApiTimeout = GetPowerStoreRESTApiTimeout()
+var DefaultPowerstoreRESTApiTimeout = 120 * time.Second
 
 // TransportType differentiates different SCSI transport protocols (FC, iSCSI, Auto, None)
 type TransportType string
@@ -572,9 +574,8 @@ func GetTimeoutFromEnv(envvar string) (time.Duration, error) {
 func GetPodmonArrayConnectivityTimeout() time.Duration {
 	timeout, err := GetTimeoutFromEnv(EnvPodmonArrayConnectivityTimeout)
 	if err != nil {
-
-		timeout = 10 * time.Second
-		log.Debugf("failed to get timeout from env %s, using default value %d", EnvPodmonArrayConnectivityTimeout, timeout)
+		log.Debugf("failed to get timeout from env %s, using default value %d", EnvPodmonArrayConnectivityTimeout, DefaultPodmonArrayConnectivityTimeout)
+		return DefaultPodmonArrayConnectivityTimeout
 	}
 	return timeout
 }
@@ -583,8 +584,8 @@ func GetPodmonArrayConnectivityTimeout() time.Duration {
 func GetPowerStoreRESTApiTimeout() time.Duration {
 	timeout, err := GetTimeoutFromEnv(EnvPowerstoreAPITimeout)
 	if err != nil {
-		timeout = 120 * time.Second
-		log.Debugf("failed to get timeout from env %s, using default value %d", EnvPowerstoreAPITimeout, timeout)
+		log.Debugf("failed to get timeout from env %s, using default value %d", EnvPowerstoreAPITimeout, DefaultPowerstoreRESTApiTimeout)
+		return DefaultPowerstoreRESTApiTimeout
 
 	}
 	return timeout
