@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"net/http"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -46,49 +47,84 @@ import (
 )
 
 const (
-	validBaseVolID               = "39bb1b5f-5624-490d-9ece-18f7b28a904e"
-	validBlockVolumeID           = "39bb1b5f-5624-490d-9ece-18f7b28a904e/globalvolid1/scsi"
-	validMetroBlockVolumeID      = "39bb1b5f-5624-490d-9ece-18f7b28a904e/globalvolid1/scsi:9f840c56-96e6-4de9-b5a3-27e7c20eaa77/globalvolid2"
-	validNfsVolumeID             = "39bb1b5f-5624-490d-9ece-18f7b28a904e/globalvolid2/nfs"
-	invalidBlockVolumeID         = "39bb1b5f-5624-490d-9ece-18f7b28a904e/globalvolid3/scsi"
-	validNasID                   = "24aefac2-a796-47dc-886a-c73ff8c1a671"
-	validVolSize                 = 16 * 1024 * 1024 * 1024
-	firstValidID                 = "globalvolid1"
-	secondValidID                = "globalvolid2"
-	validNasName                 = "my-nas-name"
-	validSnapName                = "my-snap"
-	validNodeID                  = "csi-node-1a47a1b91c444a8a90193d8066669603-127.0.0.1"
-	validHostName                = "csi-node-1a47a1b91c444a8a90193d8066669603"
-	validHostID                  = "24aefac2-a796-47dc-886a-c73ff8c1a671"
-	validClusterName             = "localSystemName"
-	validRemoteVolID             = "9f840c56-96e6-4de9-b5a3-27e7c20eaa77"
-	validRemoteSystemName        = "remoteName"
-	validRemoteSystemID          = "df7f804c-6373-4659-b197-36654d17979c"
-	validSessionID               = "9abd0198-2733-4e46-b5fa-456e9c367184"
-	validRPO                     = "Five_Minutes"
-	zeroRPO                      = "Zero"
-	replicationModeSync          = "SYNC"
-	replicationModeAsync         = "ASYNC"
-	validGroupID                 = "610adaef-4f0a-4dff-9812-29ffa5daf185"
-	validRemoteGroupID           = "62ed932b-329b-4ba6-b0e0-3f51c34c4701"
-	validNamespaceName           = "default"
-	validGroupName               = "csi-" + validRemoteSystemName + "-" + validRPO
-	validGroupNameSync           = "csi-" + validRemoteSystemName + "-" + zeroRPO
-	validNamespacedGroupName     = "csi-" + validNamespaceName + "-" + validRemoteSystemName + "-" + validRPO
-	validNamespacedGroupNameSync = "csi-" + validNamespaceName + "-" + validRemoteSystemName + "-" + zeroRPO
-	validPolicyID                = "e74f6cfd-ae2a-4cde-ad6b-529b40edee5e"
-	validPolicyName              = "pp-" + validGroupName
-	validPolicyNameSync          = "pp-" + validGroupNameSync
-	validRuleID                  = "c721f30b-0b37-4aaf-a3a2-ef99caba2100"
-	validRuleName                = "rr-" + validGroupName
-	validReplicationPrefix       = "/" + KeyReplicationEnabled
-	validVolumeGroupName         = "VGName"
-	validRemoteSystemGlobalID    = "PS111111111111"
-	validNfsAcls                 = "A::OWNER@:RWX"
-	validNfsServerID             = "24aefac2-a796-47dc-886a-c73ff8c1a671"
-	validApplianceID             = "my-appliance"
-	validRemoteApplianceID       = "my-appliance2"
-	validServiceTag              = "service-tag"
+	validBaseVolID            = "39bb1b5f-5624-490d-9ece-18f7b28a904e"
+	validLegacyVolID          = validBaseVolID
+	validNasID                = "24aefac2-a796-47dc-886a-c73ff8c1a671"
+	KiB                       = 1024
+	MiB                       = 1024 * KiB
+	GiB                       = 1024 * MiB
+	validVolSize              = 16 * GiB
+	firstValidID              = "globalvolid1"
+	secondValidID             = "globalvolid2"
+	validNasName              = "my-nas-name"
+	validSnapName             = "my-snap"
+	validHostName             = "csi-node-1a47a1b91c444a8a90193d8066669603"
+	validHostID               = "24aefac2-a796-47dc-886a-c73ff8c1a671"
+	validClusterName          = "localSystemName"
+	validRemoteVolID          = "9f840c56-96e6-4de9-b5a3-27e7c20eaa77"
+	validRemoteSystemName     = "remoteName"
+	validRemoteSystemID       = "df7f804c-6373-4659-b197-36654d17979c"
+	validSessionID            = "9abd0198-2733-4e46-b5fa-456e9c367184"
+	validRPO                  = "Five_Minutes"
+	zeroRPO                   = "Zero"
+	replicationModeSync       = "SYNC"
+	replicationModeAsync      = "ASYNC"
+	validGroupID              = "610adaef-4f0a-4dff-9812-29ffa5daf185"
+	validRemoteGroupID        = "62ed932b-329b-4ba6-b0e0-3f51c34c4701"
+	validNamespaceName        = "default"
+	validPolicyID             = "e74f6cfd-ae2a-4cde-ad6b-529b40edee5e"
+	validRuleID               = "c721f30b-0b37-4aaf-a3a2-ef99caba2100"
+	validReplicationPrefix    = "/" + KeyReplicationEnabled
+	validVolumeGroupName      = "VGName"
+	validRemoteSystemGlobalID = "PS111111111111"
+	validNfsAcls              = "A::OWNER@:RWX"
+	validNfsServerID          = "24aefac2-a796-47dc-886a-c73ff8c1a671"
+	validApplianceID          = "my-appliance"
+	validRemoteApplianceID    = "my-appliance2"
+	validServiceTag           = "service-tag"
+)
+
+var (
+	// format: <uuid>/<gobalID>/scsi
+	validBlockVolumeID = filepath.Join(validBaseVolID, firstValidID, "scsi")
+
+	// format: <uuid1>/<gobalID1>/scsi:<uuid2>/<globalID2>
+	validMetroBlockVolumeID = filepath.Join(validBaseVolID, firstValidID, "scsi:"+validRemoteVolID, secondValidID)
+
+	// format: <uuid1>/<gobalID1>/scsi:<uuid2>/<globalID2>
+	invalidMetroBlockVolumeID = filepath.Join(validBaseVolID, firstValidID, "scsi:"+validRemoteVolID, "globalvolid3")
+
+	// format: <uuid>/<gobalID>/nfs
+	validNfsVolumeID = filepath.Join(validBaseVolID, secondValidID, "nfs")
+
+	// format: <uuid>/<invalid-gobalID>/scsi.
+	//
+	// should expect not to find this global ID in the list of arrays
+	invalidBlockVolumeID = filepath.Join(validBaseVolID, "globalvolid3", "scsi")
+
+	// format: csi-node-<uuid>-127.0.0.1
+	validNodeID = strings.Join([]string{validHostName, "127.0.0.1"}, "-")
+
+	// format: csi-<powerstore-name>-<rpo>
+	validGroupName = strings.Join([]string{"csi", validRemoteSystemName, validRPO}, "-")
+
+	// format: pp-csi-<powerstore-name>-<rpo>
+	validPolicyName = "pp-" + validGroupName
+
+	// format: rr-csi-<powerstore-name>-<rpo>
+	validRuleName = "rr-" + validGroupName
+
+	// format: csi-<powerstore-name>-Zero
+	validGroupNameSync = strings.Join([]string{"csi", validRemoteSystemName, zeroRPO}, "-")
+
+	// format: pp-csi-<powerstore-name>-Zero
+	validPolicyNameSync = "pp-" + validGroupNameSync
+
+	// format: csi-<namespace>-<powerstore-name>-<rpo>
+	validNamespacedGroupName = strings.Join([]string{"csi", validNamespaceName, validRemoteSystemName, validRPO}, "-")
+
+	// format: csi-<namespace>-<powerstore-name>-Zero
+	validNamespacedGroupNameSync = strings.Join([]string{"csi", validNamespaceName, validRemoteSystemName, zeroRPO}, "-")
 )
 
 var (
