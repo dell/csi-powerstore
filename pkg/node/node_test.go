@@ -5020,6 +5020,41 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 			})
 		})
 
+		ginkgo.When("NFS export found as expected [NFS]", func() {
+			ginkgo.It("should return stats as abnormal with ReadDir() error", func() {
+				clientMock.On("GetFS", mock.Anything, validBaseVolumeID).
+					Return(gopowerstore.FileSystem{ID: validBaseVolumeID}, nil)
+				clientMock.On("GetNFSExportByFileSystemID", mock.Anything, validBaseVolumeID).
+					Return(gopowerstore.NFSExport{
+						ID:      "some-export-id",
+						ROHosts: []string{"127.0.0.1/255.255.255.0"},
+					}, nil)
+				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil)
+				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{
+					{
+						Device: validDevName,
+						Path:   validTargetPath,
+					},
+				}, nil)
+
+				req := &csi.NodeGetVolumeStatsRequest{
+					VolumeId:          validNfsVolumeID,
+					VolumePath:        validTargetPath,
+					StagingTargetPath: "",
+				}
+				res, err := nodeSvc.NodeGetVolumeStats(context.Background(), req)
+
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.NodeGetVolumeStatsResponse{
+					Usage: usage,
+					VolumeCondition: &csi.VolumeCondition{
+						Abnormal: true,
+						Message:  fmt.Sprintf("volume path %s not accessible for volume %s", validTargetPath, validBaseVolumeID),
+					},
+				}))
+			})
+		})
+
 		ginkgo.When("there are issues with mount paths", func() {
 			ginkgo.BeforeEach(func() {
 				clientMock.On("GetVolume", mock.Anything, validBaseVolumeID).
