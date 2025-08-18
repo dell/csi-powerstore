@@ -589,7 +589,7 @@ func TestIsNFSServiceEnabled(t *testing.T) {
 }
 
 func TestGetPowerStoreAPITimeout(t *testing.T) {
-	var ENV_VAR string = "X_CSI_POWERSTORE_API_TIMEOUT"
+	var ENV_VAR = "X_CSI_POWERSTORE_API_TIMEOUT"
 	tests := []struct {
 		name         string
 		expected     time.Duration
@@ -629,7 +629,7 @@ func TestGetPowerStoreAPITimeout(t *testing.T) {
 }
 
 func TestGetPodmonArrayConnectivityTimeout(t *testing.T) {
-	var ENV_VAR string = "X_CSI_PODMON_ARRAY_CONNECTIVITY_TIMEOUT"
+	var ENV_VAR = "X_CSI_PODMON_ARRAY_CONNECTIVITY_TIMEOUT"
 	tests := []struct {
 		name         string
 		expected     time.Duration
