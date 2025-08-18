@@ -589,7 +589,7 @@ func TestIsNFSServiceEnabled(t *testing.T) {
 }
 
 func TestGetPowerStoreAPITimeout(t *testing.T) {
-	var ENV_VAR = "X_CSI_POWERSTORE_API_TIMEOUT"
+	var EnvVar = "X_CSI_POWERSTORE_API_TIMEOUT"
 	tests := []struct {
 		name         string
 		expected     time.Duration
@@ -603,14 +603,14 @@ func TestGetPowerStoreAPITimeout(t *testing.T) {
 		{
 			name:         "env variable is set to valid value",
 			expected:     10 * time.Second,
-			setupFunc:    func() { os.Setenv(ENV_VAR, "10s") },
-			teardownFunc: func() { os.Unsetenv(ENV_VAR) },
+			setupFunc:    func() { os.Setenv(EnvVar, "10s") },
+			teardownFunc: func() { os.Unsetenv(EnvVar) },
 		},
 		{
 			name:         "env variable is set to invalid value",
 			expected:     120 * time.Second,
-			setupFunc:    func() { os.Setenv(ENV_VAR, "abc") },
-			teardownFunc: func() { os.Unsetenv(ENV_VAR) },
+			setupFunc:    func() { os.Setenv(EnvVar, "abc") },
+			teardownFunc: func() { os.Unsetenv(EnvVar) },
 		},
 	}
 
@@ -629,7 +629,7 @@ func TestGetPowerStoreAPITimeout(t *testing.T) {
 }
 
 func TestGetPodmonArrayConnectivityTimeout(t *testing.T) {
-	var ENV_VAR = "X_CSI_PODMON_ARRAY_CONNECTIVITY_TIMEOUT"
+	var EnvVar = "X_CSI_PODMON_ARRAY_CONNECTIVITY_TIMEOUT"
 	tests := []struct {
 		name         string
 		expected     time.Duration
@@ -643,14 +643,14 @@ func TestGetPodmonArrayConnectivityTimeout(t *testing.T) {
 		{
 			name:         "env variable is set to valid value",
 			expected:     25 * time.Second,
-			setupFunc:    func() { os.Setenv(ENV_VAR, "25s") },
-			teardownFunc: func() { os.Unsetenv(ENV_VAR) },
+			setupFunc:    func() { os.Setenv(EnvVar, "25s") },
+			teardownFunc: func() { os.Unsetenv(EnvVar) },
 		},
 		{
 			name:         "env variable is set to invalid value",
 			expected:     10 * time.Second,
-			setupFunc:    func() { os.Setenv(ENV_VAR, "abc") },
-			teardownFunc: func() { os.Unsetenv(ENV_VAR) },
+			setupFunc:    func() { os.Setenv(EnvVar, "abc") },
+			teardownFunc: func() { os.Unsetenv(EnvVar) },
 		},
 	}
 
