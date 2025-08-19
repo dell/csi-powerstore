@@ -732,7 +732,7 @@ func (s *Service) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolume
 		attached := false
 		// Extract the IP address from the node ID
 		ipList := identifiers.GetIPListFromString(s.nodeID)
-		if ipList == nil {
+		if len(ipList) == 0 {
 			return nil, status.Errorf(codes.NotFound, "failed to find IP in nodeID %s", s.nodeID)
 		}
 		nodeIP := ipList[0]
