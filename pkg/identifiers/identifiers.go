@@ -195,12 +195,21 @@ const (
 	// DefaultPodmonPollRate is the default polling frequency to check for array connectivity
 	DefaultPodmonPollRate = 60
 
-	// Timeout for making http requests
-	Timeout = time.Second * 5
-
 	// ArrayStatus is the endPoint for polling to check array status
 	ArrayStatus = "/array-status"
 )
+
+// PodmonArrayConnectivityTimeout specifies timeout for making http requests to node services by podmon
+var PodmonArrayConnectivityTimeout = GetPodmonArrayConnectivityTimeout()
+
+// DefaultPodmonArrayConnectivityTimeout specifies default timeout for making http requests to node services by podmon
+var DefaultPodmonArrayConnectivityTimeout = 10 * time.Second
+
+// PowerstoreRESTApiTimeout specifies timeout for making http requests by Powerstore client
+var PowerstoreRESTApiTimeout = GetPowerStoreRESTApiTimeout()
+
+// DefaultPowerstoreRESTApiTimeout specifies default timeout for making http requests by Powerstore client
+var DefaultPowerstoreRESTApiTimeout = 120 * time.Second
 
 // TransportType differentiates different SCSI transport protocols (FC, iSCSI, Auto, None)
 type TransportType string
@@ -348,6 +357,10 @@ func GetISCSITargetsInfoFromStorage(client gopowerstore.Client, volumeApplianceI
 // GetNVMETCPTargetsInfoFromStorage returns list of gobrick compatible NVME TCP targets by querying PowerStore array
 func GetNVMETCPTargetsInfoFromStorage(client gopowerstore.Client, volumeApplianceID string) ([]gobrick.NVMeTargetInfo, error) {
 	clusterInfo, err := client.GetCluster(context.Background())
+	if err != nil {
+		log.Error(err.Error())
+		return []gobrick.NVMeTargetInfo{}, err
+	}
 	nvmeNQN := clusterInfo.NVMeNQN
 
 	addrInfo, err := client.GetStorageNVMETCPTargetAddresses(context.Background())
@@ -520,10 +533,7 @@ func SetAPIPort(ctx context.Context) {
 func ReachableEndPoint(endpoint string) bool {
 	// this endpoint has IP:PORT
 	_, err := net.DialTimeout("tcp", endpoint, 2*time.Second)
-	if err != nil {
-		return false
-	}
-	return true
+	return err == nil
 }
 
 func GetMountFlags(vc *csi.VolumeCapability) []string {
@@ -550,4 +560,40 @@ func IsNFSServiceEnabled(ctx context.Context, client gopowerstore.Client) (bool,
 		}
 	}
 	return false, nil
+}
+
+// GetTimeoutFromEnv retrieves a timeout value from the specified environment variable or returns default value.
+func GetTimeoutFromEnv(envvar string) (time.Duration, error) {
+	var timeout time.Duration
+	var err error
+	if duration, ok := csictx.LookupEnv(context.Background(), envvar); ok {
+		timeout, err = time.ParseDuration(duration)
+		if err != nil {
+			return -1, err
+		}
+	} else {
+		return -1, errors.New("failed to get timeout from env")
+	}
+	log.Infof("%s set to: %v", envvar, timeout)
+	return timeout, nil
+}
+
+// GetPodmonArrayConnectivityPollRate retrieves a timeout value for podmon node array connectivity check from env var or returns default value.
+func GetPodmonArrayConnectivityTimeout() time.Duration {
+	timeout, err := GetTimeoutFromEnv(EnvPodmonArrayConnectivityTimeout)
+	if err != nil {
+		log.Debugf("failed to get timeout from env %s, using default value %d", EnvPodmonArrayConnectivityTimeout, DefaultPodmonArrayConnectivityTimeout)
+		return DefaultPodmonArrayConnectivityTimeout
+	}
+	return timeout
+}
+
+// GetPowerStoreRESTApiTimeout retrieves a timeout value for PowerStore REST API requests from env var or returns default value..
+func GetPowerStoreRESTApiTimeout() time.Duration {
+	timeout, err := GetTimeoutFromEnv(EnvPowerstoreAPITimeout)
+	if err != nil {
+		log.Debugf("failed to get timeout from env %s, using default value %d", EnvPowerstoreAPITimeout, DefaultPowerstoreRESTApiTimeout)
+		return DefaultPowerstoreRESTApiTimeout
+	}
+	return timeout
 }
