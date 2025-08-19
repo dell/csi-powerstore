@@ -25,10 +25,11 @@ import (
 	"os"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-powerstore/v2/mocks"
-	"github.com/dell/csi-powerstore/v2/pkg/identifiers"
+	identifiers "github.com/dell/csi-powerstore/v2/pkg/identifiers"
 	csictx "github.com/dell/gocsi/context"
 	csiutils "github.com/dell/gocsi/utils/csi"
 	"github.com/dell/gopowerstore"
@@ -585,4 +586,83 @@ func TestIsNFSServiceEnabled(t *testing.T) {
 		assert.NoError(t, err)
 		assert.False(t, result, "Expected result to be false")
 	})
+}
+
+func TestGetPowerStoreAPITimeout(t *testing.T) {
+	tests := []struct {
+		name         string
+		expected     time.Duration
+		setupFunc    func()
+		teardownFunc func()
+	}{
+		{
+			name:     "env variable is not set",
+			expected: 120 * time.Second,
+		},
+		{
+			name:         "env variable is set to valid value",
+			expected:     10 * time.Second,
+			setupFunc:    func() { os.Setenv("X_CSI_POWERSTORE_API_TIMEOUT", "10s") },
+			teardownFunc: func() { os.Unsetenv("X_CSI_POWERSTORE_API_TIMEOUT") },
+		},
+		{
+			name:         "env variable is set to invalid value",
+			expected:     120 * time.Second,
+			setupFunc:    func() { os.Setenv("X_CSI_POWERSTORE_API_TIMEOUT", "abc") },
+			teardownFunc: func() { os.Unsetenv("X_CSI_POWERSTORE_API_TIMEOUT") },
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.setupFunc != nil {
+				tt.setupFunc()
+				defer tt.teardownFunc()
+			}
+			actual := identifiers.GetPowerStoreRESTApiTimeout()
+			if actual != tt.expected {
+				t.Errorf("GetTimeout() = %v, want %v", actual, tt.expected)
+			}
+		})
+	}
+}
+
+func TestGetPodmonArrayConnectivityTimeout(t *testing.T) {
+	tests := []struct {
+		name         string
+		expected     time.Duration
+		setupFunc    func()
+		teardownFunc func()
+	}{
+		{
+			name:     "env variable is not set",
+			expected: 10 * time.Second,
+		},
+		{
+			name:         "env variable is set to valid value",
+			expected:     25 * time.Second,
+			setupFunc:    func() { os.Setenv("X_CSI_PODMON_ARRAY_CONNECTIVITY_TIMEOUT", "25s") },
+			teardownFunc: func() { os.Unsetenv("X_CSI_PODMON_ARRAY_CONNECTIVITY_TIMEOUT") },
+		},
+		{
+			name:         "env variable is set to invalid value",
+			expected:     10 * time.Second,
+			setupFunc:    func() { os.Setenv("X_CSI_PODMON_ARRAY_CONNECTIVITY_TIMEOUT", "abc") },
+			teardownFunc: func() { os.Unsetenv("X_CSI_PODMON_ARRAY_CONNECTIVITY_TIMEOUT") },
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.setupFunc != nil {
+				tt.setupFunc()
+				defer tt.teardownFunc()
+			}
+
+			actual := identifiers.GetPodmonArrayConnectivityTimeout()
+			if actual != tt.expected {
+				t.Errorf("GetTimeout() = %v, want %v", actual, tt.expected)
+			}
+		})
+	}
 }
