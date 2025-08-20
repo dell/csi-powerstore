@@ -730,9 +730,18 @@ func (s *Service) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolume
 		hosts = append(hosts, nfsExport.RWHosts...)
 		hosts = append(hosts, nfsExport.RWRootHosts...)
 		attached := false
+		// Extract the IP address from the node ID
+		ipList := identifiers.GetIPListFromString(s.nodeID)
+		if len(ipList) == 0 {
+			return nil, status.Errorf(codes.NotFound, "failed to find IP in nodeID %s", s.nodeID)
+		}
+		nodeIP := ipList[0]
 		for _, host := range hosts {
-			if s.nodeID == host {
+			// Extract the IP address from the host (IP/netmask)
+			hostIP := strings.Split(host, "/")[0]
+			if nodeIP == hostIP {
 				attached = true
+				break
 			}
 		}
 		if !attached {
