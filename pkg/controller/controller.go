@@ -69,6 +69,9 @@ type Service struct {
 	replicationPrefix           string
 	isHealthMonitorEnabled      bool
 	isAutoRoundOffFsSizeEnabled bool
+
+	csi.UnimplementedControllerServer
+	repAddonsServer
 }
 
 // maxVolumesSizeForArray -  store the maxVolumesSizeForArray
@@ -1807,4 +1810,9 @@ func (s *Service) listPowerStoreSnapshots(ctx context.Context, startToken, maxEn
 	}
 
 	return generalSnapshots[startToken : startToken+maxEntries], nextTokenStr, nil
+}
+
+// func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
+func (s *Service) ControllerModifyVolume(ctx context.Context, req *csi.ControllerModifyVolumeRequest) (*csi.ControllerModifyVolumeResponse, error) {
+	return nil, nil
 }

@@ -98,6 +98,9 @@ type Service struct {
 	isPodmonEnabled        bool
 
 	array.Locker
+	csi.UnimplementedControllerServer
+	csi.UnimplementedNodeServer
+	csi.UnimplementedIdentityServer
 }
 
 const (
@@ -238,7 +241,9 @@ func (s *Service) initConnectors() {
 	}
 
 	if s.ctrlSvc == nil {
-		svc := &controller.Service{Fs: s.Fs}
+		svc := &controller.Service{
+			Fs: s.Fs,
+		}
 		svc.SetArrays(s.Arrays())
 		svc.SetDefaultArray(s.DefaultArray())
 		s.ctrlSvc = svc

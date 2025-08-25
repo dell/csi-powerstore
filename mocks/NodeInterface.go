@@ -40,6 +40,9 @@ type MockInterface struct {
 	ctrl     *gomock.Controller
 	recorder *MockInterfaceMockRecorder
 	isgomock struct{}
+	csi.UnimplementedControllerServer
+	csi.UnimplementedNodeServer
+	csi.UnimplementedIdentityServer
 }
 
 // MockInterfaceMockRecorder is the mock recorder for MockInterface.

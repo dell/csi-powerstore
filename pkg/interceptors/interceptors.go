@@ -149,7 +149,8 @@ func (i *interceptor) createMetadataRetrieverClient(ctx context.Context) {
 		metrics.WithProcessStartTime(false),
 		metrics.WithSubsystem(metrics.SubsystemSidecar))
 	if retrieverAddress, ok := csictx.LookupEnv(ctx, identifiers.EnvMetadataRetrieverEndpoint); ok {
-		rpcConn, err := connection.Connect(retrieverAddress, metricsManager, connection.OnConnectionLoss(connection.ExitOnConnectionLoss()))
+		//rpcConn, err := connection.Connect(retrieverAddress, metricsManager, connection.OnConnectionLoss(connection.ExitOnConnectionLoss()))
+		rpcConn, err := connection.Connect(context.Background(), retrieverAddress, metricsManager, connection.OnConnectionLoss(connection.ExitOnConnectionLoss()))
 		if err != nil {
 			log.Error(err.Error())
 		}

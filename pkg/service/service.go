@@ -22,6 +22,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-powerstore/v2/pkg/controller"
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers"
 	"github.com/dell/csi-powerstore/v2/pkg/node"
@@ -53,6 +54,9 @@ var (
 
 type service struct {
 	mode string
+	csi.UnimplementedControllerServer
+	csi.UnimplementedIdentityServer
+	csi.UnimplementedNodeServer
 }
 
 func New() nfs.Service {

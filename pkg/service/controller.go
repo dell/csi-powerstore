@@ -208,6 +208,13 @@ func (s *service) ProbeController(ctx context.Context, req *commonext.ProbeContr
 	return controllerSvc.ProbeController(ctx, req)
 }
 
+func (s *service) ControllerModifyVolume(ctx context.Context, req *csi.ControllerModifyVolumeRequest) (*csi.ControllerModifyVolumeResponse, error) {
+	if nfs.IsNFSVolumeID(req.GetVolumeId()) {
+		req.VolumeId = nfs.ToArrayVolumeID(req.VolumeId)
+	}
+	return controllerSvc.ControllerModifyVolume(ctx, req)
+}
+
 func getLogger(ctx context.Context) *logrus.Entry {
 	fields := logrus.Fields{}
 	headers, ok := metadata.FromIncomingContext(ctx)

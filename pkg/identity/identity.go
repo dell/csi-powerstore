@@ -42,6 +42,7 @@ type Service struct {
 	version  string
 	manifest map[string]string
 	ready    bool
+	csi.UnimplementedIdentityServer
 }
 
 // GetPluginInfo returns general information about plugin (driver) such as name, version and manifest
