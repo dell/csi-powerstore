@@ -977,10 +977,17 @@ func (s *Service) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolum
 			return nil, status.Errorf(codes.Internal,
 				"cannot expand volume %q: missing metro replication session ID", vol.Name)
 		}
-		if controller.IsPausedMetroSession(ctx, vol.MetroReplicationSessionID, arr) {
+
+		state, err := controller.GetMetroSessionState(ctx, vol.MetroReplicationSessionID, arr)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal,
+				"cannot expand volume %q: failed to get metro session state: %v", vol.Name, err)
+		}
+
+		if state != gopowerstore.RsStateOk {
 			return nil, status.Errorf(codes.Aborted,
-				"cannot expand volume %q: metro session %s is paused; resume it manually",
-				vol.Name, vol.MetroReplicationSessionID)
+				"cannot expand volume %q: metro session %s is in state %q; expected 'OK'",
+				vol.Name, vol.MetroReplicationSessionID, state)
 		}
 	}
 
