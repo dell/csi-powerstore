@@ -969,30 +969,30 @@ func (s *Service) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolum
 		devMnt, err = s.Fs.GetUtil().GetMountInfoFromDevice(ctx, vol.Name)
 	}
 
+	// Stop block volume expansion if metro session is paused
+	// User needs to require resume first.
+	remoteVolumeID := volumeHandle.RemoteUUID // metro indicator
+	if remoteVolumeID != "" {
+		if vol.MetroReplicationSessionID == "" {
+			return nil, status.Errorf(codes.FailedPrecondition,
+				"cannot expand volume %q: missing metro replication session ID", vol.Name)
+		}
+		paused, err := controller.IsPausedMetroSession(ctx, vol.MetroReplicationSessionID, arr)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal,
+				"cannot verify metro session for %q: %v", vol.Name, err) // unknown state → don't proceed
+		}
+		if paused {
+			return nil, status.Errorf(codes.FailedPrecondition,
+				"cannot expand volume %q: metro session %s is paused; resume and retry",
+				vol.Name, vol.MetroReplicationSessionID) // user need to manually resume the session
+		}
+	}
+
 	if err != nil {
 		if isBlock {
-			// Stop block volume expansion if metro session is paused
-			// User needs to require resume first.
-			remoteVolumeID := volumeHandle.RemoteUUID // metro indicator
-			if remoteVolumeID != "" {
-				if vol.MetroReplicationSessionID == "" {
-					return nil, status.Errorf(codes.FailedPrecondition,
-						"cannot expand volume %q: missing metro replication session ID", vol.Name)
-				}
-				paused, err := controller.IsPausedMetroSession(ctx, vol.MetroReplicationSessionID, arr)
-				if err != nil {
-					return nil, status.Errorf(codes.Internal,
-						"cannot verify metro session for %q: %v", vol.Name, err) // unknown state → don't proceed
-				}
-				if paused {
-					return nil, status.Errorf(codes.FailedPrecondition,
-						"cannot expand volume %q: metro session %s is paused; resume and retry",
-						vol.Name, vol.MetroReplicationSessionID) // user need to manually resume the session
-				}
-			}
 			return s.nodeExpandRawBlockVolume(ctx, volumeWWN)
 		}
-
 		log.Infof("Failed to find mount info for (%s) with error (%s)", vol.Name, err.Error())
 		log.Info("Probably offline volume expansion. Will try to perform a temporary mount.")
 		var disklocation string
