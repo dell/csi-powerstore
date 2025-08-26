@@ -953,9 +953,13 @@ func (s *Service) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolum
 		return nil, status.Error(codes.NotFound, "Volume not found")
 	}
 
-	// If the volume is created from Auth v2 using a prefix then we need to remove that while publishing, otherwise mount will fail
-	finalVolName := removeVolumePrefixFromName(vol.Name)
-	vol.Name = finalVolName
+	isAuthEnabled := os.Getenv("X_CSM_AUTH_ENABLED")
+	if isAuthEnabled == "true" {
+		// If the volume is created from Auth v2 which has tenant prefix then we need to remove that while publishing, otherwise mount will fail - THIS IS A TEMPORARY FIX
+		vol.Name = vol.Name[4:] // we will just discard first 4 characters which is tenant prefix along with - Ex:tn1-
+		log.Infof("Volume name %s has tenant prefix, Removed the prefix for node expand", vol.Name)
+	}
+
 	log.Debug("Volume name after trimming: ", vol.Name)
 
 	volumeWWN := vol.Wwn
@@ -2300,14 +2304,4 @@ func ExtractPort(urlString string) (string, error) {
 	}
 
 	return port, nil
-}
-
-func removeVolumePrefixFromName(volumeName string) string {
-	// Remove the tenant-prefix (Auth v2) from the volume name if exists so that the mount will not fail
-	volPrefix := os.Getenv("X_CSI_VOL_PREFIX") // We will read the volume-prefix set by the user from the env variable
-	// if it's empty string or undefined, don't remove anything
-	if volPrefix == "" {
-		return volumeName
-	}
-	return strings.TrimPrefix(volumeName, volPrefix)
 }
