@@ -1428,7 +1428,7 @@ func (s *Service) ListSnapshots(ctx context.Context, req *csi.ListSnapshotsReque
 	}, nil
 }
 
-func isPausedMetroSession(ctx context.Context, metroSessionID string, arr *array.PowerStoreArray) (paused bool, err error) {
+func IsPausedMetroSession(ctx context.Context, metroSessionID string, arr *array.PowerStoreArray) (paused bool, err error) {
 	metroSession, err := arr.Client.GetReplicationSessionByID(ctx, metroSessionID)
 	if err != nil {
 		return false, fmt.Errorf("could not get metro replication session %s", metroSessionID)
@@ -1483,7 +1483,7 @@ func (s *Service) ControllerExpandVolume(ctx context.Context, req *csi.Controlle
 		if vol.Size < requiredBytes {
 			if isMetro {
 				// must pause metro session before modifying the volume
-				_, err = isPausedMetroSession(ctx, vol.MetroReplicationSessionID, array)
+				_, err = IsPausedMetroSession(ctx, vol.MetroReplicationSessionID, array)
 				if err != nil {
 					return nil, status.Errorf(codes.Internal,
 						"failed to expand the volume, %s, because the metro replication session is not paused. please pause the metro replication session: %s",
