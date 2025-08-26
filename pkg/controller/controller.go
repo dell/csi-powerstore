@@ -1428,21 +1428,22 @@ func (s *Service) ListSnapshots(ctx context.Context, req *csi.ListSnapshotsReque
 	}, nil
 }
 
-func IsPausedMetroSession(ctx context.Context, metroSessionID string, arr *array.PowerStoreArray) (paused bool, err error) {
+func IsPausedMetroSession(ctx context.Context, metroSessionID string, arr *array.PowerStoreArray) bool {
 	metroSession, err := arr.Client.GetReplicationSessionByID(ctx, metroSessionID)
 	if err != nil {
-		return false, fmt.Errorf("could not get metro replication session %s", metroSessionID)
+		log.Errorf("could not get metro replication session %s: %v", metroSessionID, err)
+		return false
 	}
 
 	log.Debugf("checking if metro replication session, %s, is paused", metroSession.ID)
 
 	if metroSession.State != gopowerstore.RsStatePaused {
-		return false, errors.New("metro replication session not in 'paused' state")
+		log.Infof("metro replication session %s is not in 'paused' state", metroSession.ID)
+		return false
 	}
 
 	log.Debugf("metro replication session, %s, is paused", metroSession.ID)
-
-	return true, nil
+	return true
 }
 
 // ControllerExpandVolume resizes Volume or FileSystem by increasing available volume capacity in the storage array.
@@ -1483,11 +1484,10 @@ func (s *Service) ControllerExpandVolume(ctx context.Context, req *csi.Controlle
 		if vol.Size < requiredBytes {
 			if isMetro {
 				// must pause metro session before modifying the volume
-				_, err = IsPausedMetroSession(ctx, vol.MetroReplicationSessionID, array)
-				if err != nil {
-					return nil, status.Errorf(codes.Internal,
-						"failed to expand the volume, %s, because the metro replication session is not paused. please pause the metro replication session: %s",
-						vol.Name, err.Error())
+				if !IsPausedMetroSession(ctx, vol.MetroReplicationSessionID, array) {
+					return nil, status.Errorf(codes.Aborted,
+						"failed to expand the volume %q because the metro replication session is not paused. Please pause the metro replication session and retry.",
+						vol.Name)
 				}
 			}
 
