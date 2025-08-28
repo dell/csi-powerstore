@@ -956,11 +956,14 @@ func (s *Service) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolum
 	isAuthEnabled := os.Getenv("X_CSM_AUTH_ENABLED")
 	if isAuthEnabled == "true" {
 		// If the volume is created from Auth v2 which has tenant prefix then we need to remove that while publishing, otherwise mount will fail - THIS IS A TEMPORARY FIX
-		vol.Name = vol.Name[4:] // we will just discard first 4 characters which is tenant prefix along with - Ex:tn1-
-		log.Infof("Volume name %s has tenant prefix, Removed the prefix for node expand", vol.Name)
+		splittedVolName := strings.Split(vol.Name, "-")
+		if len(splittedVolName) > 2 {
+			vol.Name = splittedVolName[1] + "-" + splittedVolName[2] // we will just discard first part which is tenant prefix - Ex: tn1-csivol-12345
+			log.Infof("Volume name %s has tenant prefix, Removed the prefix for node expand", vol.Name)
+		}
 	}
 
-	log.Debug("Volume name after trimming: ", vol.Name)
+	log.Debug("Volume name: ", vol.Name)
 
 	volumeWWN := vol.Wwn
 
