@@ -91,15 +91,16 @@ const (
 		"volumes/kubernetes.io~csi/csi-d91431aba3/mount"
 	validStagingPath = "/var/lib/kubelet/plugins/kubernetes.io/csi/volumeDevices/" +
 		"staging/csi-44b46e98ae/c875b4f0-172e-4238-aec7-95b379eb55db"
-	firstValidIP       = "gid1"
-	secondValidIP      = "gid2"
-	firstGlobalID      = "unique1"
-	secondGlobalID     = "unique2"
-	validNasName       = "my-nas-name"
-	validNasID         = "e8f4c5f8-c2fc-4df4-bd99-c292c12b55be"
-	validNfsServerID   = "e8f4c5f8-c2fc-4dd2-bd99-c292c12b55be"
-	validEphemeralName = "ephemeral-39bb1b5f-5624-490d-9ece-18f7b28a904e/gid1/scsi"
-	ephemerallockfile  = "/var/lib/kubelet/plugins/kubernetes.io/csi/pv/ephemeral/39bb1b5f-5624-490d-9ece-18f7b28a904e/gid1/scsi/id"
+	firstValidIP        = "gid1"
+	secondValidIP       = "gid2"
+	firstGlobalID       = "unique1"
+	secondGlobalID      = "unique2"
+	validNasName        = "my-nas-name"
+	validNasID          = "e8f4c5f8-c2fc-4df4-bd99-c292c12b55be"
+	validNfsServerID    = "e8f4c5f8-c2fc-4dd2-bd99-c292c12b55be"
+	validEphemeralName  = "ephemeral-39bb1b5f-5624-490d-9ece-18f7b28a904e/gid1/scsi"
+	ephemerallockfile   = "/var/lib/kubelet/plugins/kubernetes.io/csi/pv/ephemeral/39bb1b5f-5624-490d-9ece-18f7b28a904e/gid1/scsi/id"
+	validMetroSessionID = "9abd0198-2733-4e46-b5fa-456e9c367184"
 )
 
 var (
@@ -2739,6 +2740,33 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				fsMock.On("ExecCommandOutput", mock.Anything, mock.Anything, mock.Anything).Return([]byte("version 5.0.0"), nil)
 				utilMock.On("ResizeFS", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 				res, err := nodeSvc.NodeExpandVolume(context.Background(), getNodeVolumeExpandValidRequest(validBlockVolumeID, false))
+				gomega.Ω(err).To(gomega.BeNil())
+				gomega.Ω(res).To(gomega.Equal(&csi.NodeExpandVolumeResponse{}))
+			})
+			ginkgo.It("should succeed [metro-volumes]", func() {
+				fsMock.On("GetUtil").Return(utilMock)
+				metroVolumeID := fmt.Sprintf("%s:%s/%s", validBlockVolumeID, validRemoteVolID, secondValidIP)
+				clientMock.On("GetVolume", mock.Anything, mock.Anything).Return(gopowerstore.Volume{
+					Description:               "",
+					ID:                        metroVolumeID,
+					Name:                      "name",
+					Size:                      controller.MaxVolumeSizeBytes / 200,
+					MetroReplicationSessionID: validMetroSessionID,
+				}, nil)
+				clientMock.On("GetReplicationSessionByID", mock.Anything, validMetroSessionID).Return(gopowerstore.ReplicationSession{
+					ID:    validMetroSessionID,
+					State: gopowerstore.RsStateOk,
+				}, nil).Times(1)
+				utilMock.On("GetMountInfoFromDevice", mock.Anything, mock.Anything).Return(&gofsutil.DeviceMountInfo{
+					DeviceNames: []string{validDevName},
+					MPathName:   "",
+					MountPoint:  stagingPath,
+				}, nil)
+				utilMock.On("DeviceRescan", mock.Anything, mock.Anything).Return(nil)
+				utilMock.On("FindFSType", mock.Anything, mock.Anything).Return("ext4", nil)
+				fsMock.On("ExecCommandOutput", mock.Anything, mock.Anything, mock.Anything).Return([]byte("version 5.0.0"), nil)
+				utilMock.On("ResizeFS", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+				res, err := nodeSvc.NodeExpandVolume(context.Background(), getNodeVolumeExpandValidRequest(metroVolumeID, false))
 				gomega.Ω(err).To(gomega.BeNil())
 				gomega.Ω(res).To(gomega.Equal(&csi.NodeExpandVolumeResponse{}))
 			})
