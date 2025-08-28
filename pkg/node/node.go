@@ -959,7 +959,6 @@ func (s *Service) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolum
 		splittedVolName := strings.Split(vol.Name, "-")
 		if len(splittedVolName) > 2 {
 			vol.Name = splittedVolName[1] + "-" + splittedVolName[2] // we will just discard first part which is tenant prefix - Ex: tn1-csivol-12345
-			log.Infof("Volume name %s has tenant prefix, Removed the prefix for node expand", vol.Name)
 		}
 	}
 
