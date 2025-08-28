@@ -975,18 +975,18 @@ func (s *Service) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolum
 	if remoteVolumeID != "" {
 		if vol.MetroReplicationSessionID == "" {
 			return nil, status.Errorf(codes.Internal,
-				"cannot expand volume %q: missing metro replication session ID", vol.Name)
+				"cannot expand volume %s: missing metro replication session ID", vol.Name)
 		}
 
 		state, err := controller.GetMetroSessionState(ctx, vol.MetroReplicationSessionID, arr)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal,
-				"cannot expand volume %q: failed to get metro session state: %v", vol.Name, err)
+				"cannot expand volume %s: failed to get metro session state: %v", vol.Name, err)
 		}
 
 		if state != gopowerstore.RsStateOk {
 			return nil, status.Errorf(codes.Aborted,
-				"cannot expand volume %q: metro session %s is in state %q; expected 'OK'",
+				"cannot expand volume %s: metro session %s is not active, its in %s state",
 				vol.Name, vol.MetroReplicationSessionID, state)
 		}
 	}
