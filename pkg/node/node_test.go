@@ -2721,6 +2721,29 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				gomega.Ω(err).To(gomega.BeNil())
 				gomega.Ω(res).To(gomega.Equal(&csi.NodeExpandVolumeResponse{}))
 			})
+			ginkgo.It("should succeed when Auth is enabled and volume has tenant prefix in it[ext4]", func() {
+				fsMock.On("GetUtil").Return(utilMock)
+				clientMock.On("GetVolume", mock.Anything, mock.Anything).Return(gopowerstore.Volume{
+					Description: "",
+					ID:          validBlockVolumeID,
+					Name:        "tn1-csivol-123456",
+					Size:        controller.MaxVolumeSizeBytes / 200,
+				}, nil)
+				utilMock.On("GetMountInfoFromDevice", mock.Anything, mock.Anything).Return(&gofsutil.DeviceMountInfo{
+					DeviceNames: []string{validDevName},
+					MPathName:   "",
+					MountPoint:  stagingPath,
+				}, nil)
+				utilMock.On("DeviceRescan", mock.Anything, mock.Anything).Return(nil)
+				utilMock.On("FindFSType", mock.Anything, mock.Anything).Return("ext4", nil)
+				fsMock.On("ExecCommandOutput", mock.Anything, mock.Anything, mock.Anything).Return([]byte("version 5.0.0"), nil)
+				utilMock.On("ResizeFS", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+				os.Setenv("X_CSM_AUTH_ENABLED", "true")
+				res, err := nodeSvc.NodeExpandVolume(context.Background(), getNodeVolumeExpandValidRequest(validBlockVolumeID, false))
+				gomega.Ω(err).To(gomega.BeNil())
+				gomega.Ω(res).To(gomega.Equal(&csi.NodeExpandVolumeResponse{}))
+			})
+
 			ginkgo.It("should succeed [xfs]", func() {
 				fsMock.On("GetUtil").Return(utilMock)
 				clientMock.On("GetVolume", mock.Anything, mock.Anything).Return(gopowerstore.Volume{
