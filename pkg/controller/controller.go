@@ -27,6 +27,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-powerstore/v2/core"
@@ -112,6 +113,9 @@ func (s *Service) Init() error {
 
 // CreateVolume creates either FileSystem or Volume on storage array.
 func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
+	timeout, _ := ctx.Deadline()
+	log.Infof("Bharath - Debug CreateVolume context details : timeout = %v --  timeUntil = %d", timeout, time.Until(timeout))
+
 	params := req.GetParameters()
 
 	// Get array from map
@@ -219,6 +223,8 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 	if req.AccessibilityRequirements != nil {
 		topology = req.AccessibilityRequirements.Preferred
 	}
+
+	log.Infof("Bharath Debug : CreateVolume Topology = %v", topology)
 
 	if err := creator.CheckName(ctx, req.GetName()); err != nil {
 		return nil, err
@@ -430,6 +436,7 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 			if err != nil {
 				return nil, status.Errorf(codes.Internal, "can't query remote system by name: %s", err.Error())
 			}
+			log.Infof("Bharath - Debug : Remote system = %v", remoteSystem)
 
 			isMetroVolume = true // set to true
 		default:
@@ -497,6 +504,36 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 		}
 		// Build the metro volume handle suffix
 		metroVolumeIDSuffix = ":" + replicationSession.RemoteResourceID + "/" + remoteSystem.SerialNumber
+		log.Infof("Bharath Debug : Remote System details %v= %v", remoteSystem.ID, remoteSystem.SerialNumber)
+		log.Infof("Bharath Debug : Remote system info %v", s.Arrays()[remoteSystem.SerialNumber])
+		remoteTopology := csi.Topology{
+			Segments: map[string]string{
+				"topology.kubernetes.io/zone": s.Arrays()[remoteSystem.SerialNumber].Labels["topology.kubernetes.io/zone"],
+			},
+		}
+		topology = append(topology, &remoteTopology)
+
+		remoteTopology = csi.Topology{
+			Segments: map[string]string{
+				identifiers.Name + "/" + s.Arrays()[remoteSystem.SerialNumber].GetIP() + "-" + s.Arrays()[remoteSystem.SerialNumber].Labels["topology.kubernetes.io/zone"]: "true",
+			},
+		}
+
+		topology = append(topology, &remoteTopology)
+		localTopology := csi.Topology{
+			Segments: map[string]string{
+				"topology.kubernetes.io/zone": s.Arrays()[arrayID].Labels["topology.kubernetes.io/zone"],
+			},
+		}
+		topology = append(topology, &localTopology)
+
+		localTopology = csi.Topology{
+			Segments: map[string]string{
+				identifiers.Name + "/" + arr.GetIP() + "-" + s.Arrays()[arrayID].Labels["topology.kubernetes.io/zone"]: "true",
+			},
+		}
+
+		log.Infof("Bharath Debug : Added topology = %v", topology)
 	}
 
 	// Fetch the service tag
@@ -706,6 +743,10 @@ func (s *Service) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest
 func (s *Service) ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
 	id := req.GetVolumeId()
 	kubeNodeID := req.GetNodeId()
+	nodeIDInfo := strings.Split(kubeNodeID, "-")
+	log.Infof("Bharath - Debug : Node id info = %v", nodeIDInfo)
+	zone := nodeIDInfo[len(nodeIDInfo)-1]
+	log.Infof("Bharath - Debug : zone = %s", zone)
 
 	if id == "" {
 		return nil, status.Error(codes.InvalidArgument, "volume ID is required")
@@ -721,6 +762,8 @@ func (s *Service) ControllerPublishVolume(ctx context.Context, req *csi.Controll
 		return nil, err
 	}
 
+	log.Infof("Node id to array mappings = %v", array.NodeIDToArrayMappings)
+
 	id = volumeHandle.LocalUUID
 	arrayID := volumeHandle.LocalArrayGlobalID
 	protocol := volumeHandle.Protocol
@@ -731,6 +774,18 @@ func (s *Service) ControllerPublishVolume(ctx context.Context, req *csi.Controll
 	if !ok {
 		return nil, status.Errorf(codes.InvalidArgument, "failed to find array with ID %s", arrayID)
 	}
+	log.Infof("Bharath - Debug : array details  %s = %v", arr.GlobalID, arr)
+	isMetro := false
+	isMetroUniform := false
+	if arr.MetroTopology != "" {
+		isMetro = true
+		if arr.MetroTopology == "Uniform" {
+			isMetroUniform = true
+		}
+	}
+
+	log.Infof("Bharath - Debug : isMetro %t, isMetroUniform %t", isMetro, isMetroUniform)
+
 	var remoteArray *array.PowerStoreArray
 	if remoteArrayID != "" {
 		remoteArray, ok = s.Arrays()[remoteArrayID]
@@ -766,13 +821,26 @@ func (s *Service) ControllerPublishVolume(ctx context.Context, req *csi.Controll
 	}
 
 	publishContext := make(map[string]string)
-	publishVolumeResponse, err := publisher.Publish(ctx, publishContext, req, arr.GetClient(), kubeNodeID, id, false)
-	if err != nil {
-		return nil, err
+	var publishVolumeResponse *csi.ControllerPublishVolumeResponse
+
+	if arr.Labels["topology.kubernetes.io/zone"] == zone {
+		log.Infof("Bharath - Debug: publishing one side of metro on %s using NodeID %s", arr.GlobalID, kubeNodeID)
+		publishVolumeResponse, err = publisher.Publish(ctx, publishContext, req, arr.GetClient(), kubeNodeID, id, false)
+		if err != nil {
+			log.Infof("Publish on %s failed, maybe this is intended - %v", arr.GlobalID, err)
+			err = nil
+		}
+
 	}
 
-	if remoteArrayID != "" && remoteVolumeID != "" { // For Remote Metro volume
+	log.Infof("Bharath - Debug: publishing remote side of metro on %s:%s using NodeID %s", remoteArrayID, remoteArray.GlobalID, kubeNodeID)
+	if remoteArrayID != "" && remoteArray.Labels["topology.kubernetes.io/zone"] == zone && remoteVolumeID != "" { // For Remote Metro volume
 		publishVolumeResponse, err = publisher.Publish(ctx, publishContext, req, remoteArray.GetClient(), kubeNodeID, remoteVolumeID, true)
+		if err != nil {
+			log.Infof("Publish on %s failed, maybe this is intended - %v", remoteArray.GlobalID, err)
+			err = nil
+
+		}
 	}
 
 	return publishVolumeResponse, err
@@ -789,6 +857,11 @@ func (s *Service) ControllerUnpublishVolume(ctx context.Context, req *csi.Contro
 	if kubeNodeID == "" {
 		return nil, status.Error(codes.InvalidArgument, "node ID is required")
 	}
+
+	nodeIDInfo := strings.Split(kubeNodeID, "-")
+	log.Infof("Bharath - Debug : Node id info = %v", nodeIDInfo)
+	zone := nodeIDInfo[len(nodeIDInfo)-1]
+	log.Infof("Bharath - Debug : zone = %s", zone)
 
 	volumeHandle, err := array.ParseVolumeID(ctx, id, s.DefaultArray(), nil)
 	if err != nil {
@@ -840,12 +913,14 @@ func (s *Service) ControllerUnpublishVolume(ctx context.Context, req *csi.Contro
 			}
 		}
 
-		err = detachVolumeFromHost(ctx, node.ID, id, arr.GetClient())
-		if err != nil {
-			return nil, err
+		if arr.Labels["topology.kubernetes.io/zone"] == zone {
+			err = detachVolumeFromHost(ctx, node.ID, id, arr.GetClient())
+			if err != nil {
+				return nil, err
+			}
 		}
 
-		if remoteArrayID != "" && remoteVolumeID != "" { // For Remote Metro volume
+		if remoteArrayID != "" && remoteVolumeID != "" && remoteArray.Labels["topology.kubernetes.io/zone"] == zone { // For Remote Metro volume
 			node, err := remoteArray.GetClient().GetHostByName(ctx, kubeNodeID)
 			if err != nil {
 				return nil, status.Errorf(codes.Internal,

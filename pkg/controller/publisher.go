@@ -94,7 +94,7 @@ func (s *SCSIPublisher) Publish(ctx context.Context, publishContext map[string]s
 	// Check if the volume is already attached to some host
 	for _, m := range mapping {
 		if m.HostID == node.ID {
-			log.Debug("Volume already mapped")
+			log.Info("Volume already mapped")
 			s.addLUNIDToPublishContext(publishContext, m, volume, isRemote)
 			return &csi.ControllerPublishVolumeResponse{
 				PublishContext: publishContext,
@@ -118,7 +118,7 @@ func (s *SCSIPublisher) Publish(ctx context.Context, publishContext map[string]s
 		}
 	}
 	// Attach volume to host
-	log.Debugf("Attach volume %s to host %s", volume.ID, node.ID)
+	log.Infof("Attach volume %s to host %s", volume.ID, node.ID)
 	params := gopowerstore.HostVolumeAttach{VolumeID: &volume.ID}
 	_, err = client.AttachVolumeToHost(ctx, node.ID, &params)
 	if err != nil {

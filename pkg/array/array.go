@@ -59,6 +59,7 @@ type Consumer interface {
 	DefaultArray() *PowerStoreArray
 	SetDefaultArray(*PowerStoreArray)
 	UpdateArrays(string, fs.Interface) error
+	SetOneArray(string, *PowerStoreArray)
 }
 
 // Locker provides implementation for safe management of arrays
@@ -73,10 +74,6 @@ type Locker struct {
 func (s *Locker) Arrays() map[string]*PowerStoreArray {
 	s.arraysLock.Lock()
 	defer s.arraysLock.Unlock()
-
-	for key, array := range s.arrays {
-		log.Infof("[Bharath] ----> Key : %s, GlobalID: %s, EndPoint: %s", key, array.GlobalID, array.Endpoint)
-	}
 	return s.arrays
 }
 
@@ -96,6 +93,13 @@ func (s *Locker) SetArrays(arrays map[string]*PowerStoreArray) {
 	s.arraysLock.Lock()
 	defer s.arraysLock.Unlock()
 	s.arrays = arrays
+}
+
+// SetArrays adds an array
+func (s *Locker) SetOneArray(arrayID string, array *PowerStoreArray) {
+	s.arraysLock.Lock()
+	defer s.arraysLock.Unlock()
+	s.arrays[arrayID] = array
 }
 
 // DefaultArray is a getter for default array
@@ -259,7 +263,10 @@ type PowerStoreArray struct {
 	Client             gopowerstore.Client
 	IP                 string
 	NASCooldownTracker NASCooldownTracker
+	NodeIDMappings     []string
 }
+
+var NodeIDToArrayMappings map[string]string = make(map[string]string)
 
 // GetNasName is a getter that returns name of configured NAS
 func (psa *PowerStoreArray) GetNasName() string {
@@ -324,7 +331,7 @@ func GetPowerStoreArrays(fs fs.Interface, filePath string) (map[string]*PowerSto
 			return nil, nil, nil, errors.New("no GlobalID field found in config.yaml - update config.yaml according to the documentation")
 		}
 		clientOptions := gopowerstore.NewClientOptions()
-		log.Debugf("PowerStore REST API timeout set to %s", identifiers.PowerstoreRESTApiTimeout)
+		log.Infof("PowerStore REST API timeout set to %s", identifiers.PowerstoreRESTApiTimeout)
 		clientOptions.SetDefaultTimeout(identifiers.PowerstoreRESTApiTimeout)
 		clientOptions.SetInsecure(array.Insecure)
 
@@ -338,6 +345,8 @@ func GetPowerStoreArrays(fs fs.Interface, filePath string) (map[string]*PowerSto
 				clientOptions.SetRateLimit(rateLimit)
 			}
 		}
+
+		log.Infof("Create PowerstoreClient for %s, with timeout set to %f", array.GlobalID, clientOptions.DefaultTimeout().Seconds())
 
 		c, err := gopowerstore.NewClientWithArgs(
 			array.Endpoint, array.Username, array.Password, clientOptions)

@@ -483,6 +483,11 @@ func (_m *ControllerInterface) SetDefaultArray(_a0 *array.PowerStoreArray) {
 	_m.Called(_a0)
 }
 
+// SetDefaultArray provides a mock function with given fields: _a0
+func (_m *ControllerInterface) SetOneArray(_a0 string, _a1 *array.PowerStoreArray) {
+	_m.Called(_a0)
+}
+
 // UpdateArrays provides a mock function with given fields: _a0, _a1
 func (_m *ControllerInterface) UpdateArrays(_a0 string, _a1 fs.Interface) error {
 	ret := _m.Called(_a0, _a1)

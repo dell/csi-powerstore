@@ -96,12 +96,14 @@ type Service struct {
 	reusedHost             bool
 	isHealthMonitorEnabled bool
 	isPodmonEnabled        bool
+	nodeIDMappings         map[string]string
 
 	array.Locker
 }
 
 const (
 	maxPowerstoreVolumesPerNodeLabel = "max-powerstore-volumes-per-node"
+	zoneLabel                        = "topology.kubernetes.io/zone"
 )
 
 // Init initializes node service by parsing environmental variables, connecting it as a host.
@@ -241,7 +243,6 @@ func (s *Service) initConnectors() {
 		svc := &controller.Service{Fs: s.Fs}
 		svc.SetArrays(s.Arrays())
 		svc.SetDefaultArray(s.DefaultArray())
-		s.ctrlSvc = svc
 	}
 
 	if s.iscsiLib == nil {
@@ -307,6 +308,7 @@ func (s *Service) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeR
 	arrayID := volumeHandle.LocalArrayGlobalID
 	protocol := volumeHandle.Protocol
 	remoteVolumeID := volumeHandle.RemoteUUID
+	remoteArrayID := volumeHandle.RemoteArrayGlobalID
 
 	arr, ok := s.Arrays()[arrayID]
 	if !ok {
@@ -328,12 +330,25 @@ func (s *Service) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeR
 		}
 	}
 
-	response, err := stager.Stage(ctx, req, logFields, s.Fs, id, false)
+	nodeLabels, err := k8sutils.GetNodeLabels(ctx, s.opts.KubeConfigPath, s.opts.KubeNodeName)
 	if err != nil {
+		log.Errorf("failed to fetch node labels")
 		return nil, err
 	}
 
-	if remoteVolumeID != "" { // For Remote Metro volume
+	var response *csi.NodeStageVolumeResponse
+	if nodeLabels[zoneLabel] == arr.Labels[zoneLabel] {
+		log.Infof("Staging volume on zone %s on array ID %s", nodeLabels[zoneLabel], arrayID)
+		response, err = stager.Stage(ctx, req, logFields, s.Fs, id, false)
+		if err != nil {
+			log.Infof("Node stage on local array failed, ignoring for now: %v", err)
+			//return nil, nil
+		}
+	}
+
+	remoteArr, _ := s.Arrays()[remoteArrayID]
+
+	if remoteArr.Labels[zoneLabel] == nodeLabels[zoneLabel] { // For Remote Metro volume
 		log.Info("Staging remote metro volume")
 		// need to change the staging path for nfs
 		if nfs.IsNFSVolumeID(req.VolumeId) {
@@ -551,6 +566,17 @@ func (s *Service) NodePublishVolume(ctx context.Context, req *csi.NodePublishVol
 	protocol := volumeHandle.Protocol
 
 	stagingPath := req.GetStagingTargetPath()
+
+	nodeLabels, err := k8sutils.GetNodeLabels(ctx, s.opts.KubeConfigPath, s.opts.KubeNodeName)
+	if err != nil {
+		log.Errorf("failed to fetch node labels")
+		return nil, err
+	}
+
+	remoteID := volumeHandle.RemoteArrayGlobalID
+	if nodeLabels["topology.kubernetes.io/zone"] == s.Arrays()[remoteID].Labels["topology.kubernetes.io/zone"] {
+		id = volumeHandle.RemoteUUID
+	}
 
 	if !isHBN {
 		// append additional path to be able to do bind mounts
@@ -1437,11 +1463,11 @@ func (s *Service) NodeGetInfo(ctx context.Context, _ *csi.NodeGetInfoRequest) (*
 	}
 
 	// Check for node label 'max-powerstore-volumes-per-node'. If present set 'maxVolumesPerNode' to this value.
-	labels, err := k8sutils.GetNodeLabels(ctx, s.opts.KubeConfigPath, s.opts.KubeNodeName)
+	nodeLabels, err := k8sutils.GetNodeLabels(ctx, s.opts.KubeConfigPath, s.opts.KubeNodeName)
 	if err != nil {
 		log.Warnf("failed to get Node Labels with error: %s", err.Error())
-	} else if labels != nil {
-		if val, ok := labels[maxPowerstoreVolumesPerNodeLabel]; ok {
+	} else if nodeLabels != nil {
+		if val, ok := nodeLabels[maxPowerstoreVolumesPerNodeLabel]; ok {
 			maxVols, err := strconv.ParseInt(val, 10, 64)
 			if err != nil {
 				log.Warnf("invalid value '%s' specified for 'max-powerstore-volumes-per-node' node label", val)
@@ -1456,6 +1482,21 @@ func (s *Service) NodeGetInfo(ctx context.Context, _ *csi.NodeGetInfoRequest) (*
 	if maxVolumesPerNode >= 0 {
 		resp.MaxVolumesPerNode = maxVolumesPerNode
 		log.Infof("Setting MaxVolumesPerNode to '%d'", maxVolumesPerNode)
+	}
+
+	log.Infof("Bharath - NODE labels are : %v", nodeLabels)
+
+	for _, arr := range s.Arrays() {
+		log.Infof("Bharath - Checking array : %s", arr.GlobalID)
+		log.Infof("Bharath - Array labels from secret %v", arr.Labels)
+		if nodeLabels[zoneLabel] != "" {
+			log.Infof("Bharath - Zone label %s exists Node labels : %s", zoneLabel, nodeLabels[zoneLabel])
+			if arr.Labels[zoneLabel] == nodeLabels[zoneLabel] {
+				log.Infof("Bharath - Updating csinode with topology key for zone")
+				resp.AccessibleTopology.Segments[identifiers.Name+"/"+arr.GetIP()+"-"+nodeLabels[zoneLabel]] = "true"
+				log.Infof("Bharath - %s -> %s", identifiers.Name+"/"+arr.GetIP()+"-"+nodeLabels[zoneLabel], nodeLabels[zoneLabel])
+			}
+		}
 	}
 
 	return resp, nil
@@ -1504,6 +1545,20 @@ func (s *Service) updateNodeID() error {
 			"%s-%s-%s", s.opts.NodeNamePrefix, strings.TrimSpace(string(hostID)), ip.String(),
 		)
 
+		nodeLabels, err := k8sutils.GetNodeLabels(context.Background(), s.opts.KubeConfigPath, s.opts.KubeNodeName)
+		if err != nil {
+			log.Warnf("failed to get Node Labels with error: %s", err.Error())
+		} else if nodeLabels != nil {
+			if zone, ok := nodeLabels[zoneLabel]; ok {
+				log.Infof("Bharath Debug : zone label exists in node labels : %s", zone)
+				nodeID = fmt.Sprintf(
+					"%s-%s", nodeID, zone,
+				)
+				log.Infof("Bharath Debug : updated nodeID with zone label: %s", nodeID)
+
+			}
+		}
+
 		if len(nodeID) > powerStoreMaxNodeNameLength {
 			err := errors.New("node name prefix is too long")
 			log.WithFields(log.Fields{
@@ -1513,6 +1568,7 @@ func (s *Service) updateNodeID() error {
 			return err
 		}
 		s.nodeID = nodeID
+		log.Infof("Bharath Debug : nodeID = %s", s.nodeID)
 	}
 	return nil
 }
@@ -1639,6 +1695,19 @@ func (s *Service) setupHost(initiators []string, client gopowerstore.Client, arr
 	if s.nodeID == "" {
 		return fmt.Errorf("nodeID not set")
 	}
+
+	// log.Infof("Bharath - Setting host - setting NodeMappings[%s]=%s", arrayID, s.nodeID)
+	// for i := range s.Arrays() {
+	// 	log.Infof("s.Arrays = %v", s.Arrays()[i])
+	// }
+	// if _, ok := s.Arrays()[arrayID]; ok {
+	// 	if s.Arrays()[arrayID].NodeIDMappings == nil {
+	// 		s.Arrays()[arrayID].NodeIDMappings = make(map[string]string)
+	// 	}
+	// 	s.Arrays()[arrayID].NodeIDMappings[arrayID] = s.nodeID
+	// } else {
+	// 	log.Infof("Could not find %s in s.Arrays", arrayID)
+	// }
 
 	if s.useNVME[arrayID] {
 		s.checkForDuplicateUUIDs()
@@ -1811,6 +1880,15 @@ func (s *Service) createHost(
 			if primaryArrayID == "" {
 				primaryArrayID = arr.GlobalID
 			}
+
+			log.Infof("Bharath-Debug : Processing node with nodeID : %s", s.nodeID)
+			s.Arrays()[arr.GlobalID].NodeIDMappings = append(s.Arrays()[arr.GlobalID].NodeIDMappings, s.nodeID)
+			array.NodeIDToArrayMappings[s.nodeID] = arr.GlobalID
+			log.Infof("Bharath - Debug: NodeIDToArrayMappings - %v", array.NodeIDToArrayMappings)
+			array, _ := s.GetOneArray(arr.GlobalID)
+			s.ctrlSvc.SetOneArray(arr.GlobalID, array)
+			log.Infof("[Bharath-Debug: MAP UPDATED with NodeID Mappings id = %v - %s", s.Arrays()[arr.GlobalID].NodeIDMappings, s.nodeID)
+
 			continue
 		}
 
