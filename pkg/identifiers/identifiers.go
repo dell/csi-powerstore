@@ -126,6 +126,9 @@ const (
 	KeyFlrMaxRetention = "csi.dell.com/flr_attributes.flr_create.maximum_retention"
 	// KeyServiceTag has the service tag associated to an Appliance
 	KeyServiceTag = "serviceTag"
+
+	KeyZone = "zone"
+
 	// VerboseName longer description of the driver
 	VerboseName = "CSI Driver for Dell EMC PowerStore"
 	// FcTransport indicates that FC is chosen as a SCSI transport protocol

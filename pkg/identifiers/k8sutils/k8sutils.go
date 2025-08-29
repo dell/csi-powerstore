@@ -27,6 +27,10 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
+type CSINodeRetrieverInterface interface {
+	GetCSINodes(ctx context.Context) (map[string]string, error)
+}
+
 // NodeLabelsRetrieverInterface defines the methods for retrieving Kubernetes Node Labels
 type NodeLabelsRetrieverInterface interface {
 	BuildConfigFromFlags(masterURL, kubeconfig string) (*rest.Config, error)
@@ -201,4 +205,28 @@ func GetNVMeUUIDs(ctx context.Context, kubeConfigPath string) (map[string]string
 	}
 
 	return NodeLabelsRetriever.GetNVMeUUIDs(ctx)
+}
+
+// GetNodeLabels returns labels present in the k8s node
+func GetCSINodes(ctx context.Context, kubeConfigPath string) (map[string][]string, error) {
+	nodes := make(map[string][]string)
+	err := CreateKubeClientSet(kubeConfigPath)
+	if err != nil {
+		return nil, err
+	}
+
+	// Retrieve the list of nodes
+	csiNodes, err := Clientset.StorageV1().CSINodes().List(ctx, v1.ListOptions{})
+	if err != nil {
+		return nodes, fmt.Errorf("failed to get node list: %v", err.Error())
+	}
+
+	// Iterate over all nodes to check their labels
+	for _, node := range csiNodes.Items {
+		nodeID := node.Spec.Drivers[0].NodeID
+		topo := node.Spec.Drivers[0].TopologyKeys
+		nodes[nodeID] = topo
+	}
+
+	return nodes, nil
 }

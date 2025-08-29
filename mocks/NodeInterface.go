@@ -81,6 +81,13 @@ func (m *MockInterface) DefaultArray() *array.PowerStoreArray {
 	return ret0
 }
 
+// DefaultArray mocks base method.
+func (m *MockInterface) SetOneArray(id string, array *array.PowerStoreArray) {
+	m.ctrl.T.Helper()
+	_ = m.ctrl.Call(m, "SetOneArray")
+	//ret0, _ := ret[0].(*array.PowerStoreArray)
+}
+
 // DefaultArray indicates an expected call of DefaultArray.
 func (mr *MockInterfaceMockRecorder) DefaultArray() *gomock.Call {
 	mr.mock.ctrl.T.Helper()

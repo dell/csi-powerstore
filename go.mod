@@ -14,12 +14,12 @@ require (
 	github.com/dell/dell-csi-extensions/podmon v1.8.1-0.20250819061805-75a74ddc3cba
 	github.com/dell/dell-csi-extensions/replication v1.11.1-0.20250819061805-75a74ddc3cba
 	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.8.1
-	github.com/dell/gobrick v1.14.0
-	github.com/dell/gocsi v1.14.1-0.20250819131305-b1e701f09007
-	github.com/dell/gofsutil v1.19.1-0.20250819055627-f3c46eb76ffe
-	github.com/dell/goiscsi v1.12.1-0.20250819061735-a01d8763f641
-	github.com/dell/gonvme v1.11.1-0.20250819061410-1c006e069862
-	github.com/dell/gopowerstore v1.19.1-0.20250818152456-835f4538e4ee
+	github.com/dell/gobrick v1.14.1
+	github.com/dell/gocsi v1.14.1-0.20250718150756-9e598eb9e012
+	github.com/dell/gofsutil v1.19.1-0.20250715050132-d6bd228cbcb0
+	github.com/dell/goiscsi v1.12.0
+	github.com/dell/gonvme v1.11.1
+	github.com/dell/gopowerstore v1.19.1-0.20250826143846-a53d6fdd07a2
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/go-openapi/strfmt v0.23.0
 	github.com/golang/mock v1.6.0
