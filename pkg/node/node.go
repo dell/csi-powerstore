@@ -958,7 +958,7 @@ func (s *Service) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolum
 		// If the volume is created from Auth v2 which has tenant prefix then we need to remove that while publishing, otherwise mount will fail - THIS IS A TEMPORARY FIX
 		splittedVolName := strings.Split(vol.Name, "-")
 		if len(splittedVolName) > 2 {
-			vol.Name = splittedVolName[1] + "-" + splittedVolName[2] // we will just discard first part which is tenant prefix - Ex: tn1-csivol-12345
+			vol.Name = strings.Join(splittedVolName[1:], "-") // we will just discard first part which is tenant prefix - Ex: tn1-csivol-12345
 		}
 	}
 
