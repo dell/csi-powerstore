@@ -1428,21 +1428,12 @@ func (s *Service) ListSnapshots(ctx context.Context, req *csi.ListSnapshotsReque
 	}, nil
 }
 
-func isPausedMetroSession(ctx context.Context, metroSessionID string, arr *array.PowerStoreArray) (paused bool, err error) {
+func GetMetroSessionState(ctx context.Context, metroSessionID string, arr *array.PowerStoreArray) (gopowerstore.RSStateEnum, error) {
 	metroSession, err := arr.Client.GetReplicationSessionByID(ctx, metroSessionID)
 	if err != nil {
-		return false, fmt.Errorf("could not get metro replication session %s", metroSessionID)
+		return "", fmt.Errorf("could not get metro replication session %s: %w", metroSessionID, err)
 	}
-
-	log.Debugf("checking if metro replication session, %s, is paused", metroSession.ID)
-
-	if metroSession.State != gopowerstore.RsStatePaused {
-		return false, errors.New("metro replication session not in 'paused' state")
-	}
-
-	log.Debugf("metro replication session, %s, is paused", metroSession.ID)
-
-	return true, nil
+	return metroSession.State, nil
 }
 
 // ControllerExpandVolume resizes Volume or FileSystem by increasing available volume capacity in the storage array.
@@ -1483,11 +1474,16 @@ func (s *Service) ControllerExpandVolume(ctx context.Context, req *csi.Controlle
 		if vol.Size < requiredBytes {
 			if isMetro {
 				// must pause metro session before modifying the volume
-				_, err = isPausedMetroSession(ctx, vol.MetroReplicationSessionID, array)
+				state, err := GetMetroSessionState(ctx, vol.MetroReplicationSessionID, array)
 				if err != nil {
 					return nil, status.Errorf(codes.Internal,
-						"failed to expand the volume, %s, because the metro replication session is not paused. please pause the metro replication session: %s",
-						vol.Name, err.Error())
+						"failed to expand the volume %q: could not retrieve metro session state: %v", vol.Name, err)
+				}
+
+				if state != gopowerstore.RsStatePaused {
+					return nil, status.Errorf(codes.Aborted,
+						"failed to expand the volume %q because the metro replication session is in state %q. Please pause the metro replication session manually.",
+						vol.Name, state)
 				}
 			}
 

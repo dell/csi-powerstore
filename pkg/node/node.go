@@ -975,6 +975,28 @@ func (s *Service) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolum
 		devMnt, err = s.Fs.GetUtil().GetMountInfoFromDevice(ctx, vol.Name)
 	}
 
+	// Stop block volume expansion if metro session is paused
+	// User needs to resume it first.
+	remoteVolumeID := volumeHandle.RemoteUUID // metro indicator
+	if remoteVolumeID != "" {
+		if vol.MetroReplicationSessionID == "" {
+			return nil, status.Errorf(codes.Internal,
+				"cannot expand volume %s: missing metro replication session ID", vol.Name)
+		}
+
+		state, err := controller.GetMetroSessionState(ctx, vol.MetroReplicationSessionID, arr)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal,
+				"cannot expand volume %s: failed to get metro session state: %v", vol.Name, err)
+		}
+
+		if state != gopowerstore.RsStateOk {
+			return nil, status.Errorf(codes.Aborted,
+				"cannot expand volume %s: metro session %s is not active, its in %s state",
+				vol.Name, vol.MetroReplicationSessionID, state)
+		}
+	}
+
 	if err != nil {
 		if isBlock {
 			return s.nodeExpandRawBlockVolume(ctx, volumeWWN)
