@@ -8,18 +8,18 @@ require (
 	github.com/akutz/gosync v0.1.0
 	github.com/apparentlymart/go-cidr v1.1.0
 	github.com/container-storage-interface/spec v1.6.0
-	github.com/dell/csi-metadata-retriever v1.11.1-0.20250818122924-619ef61f48a2
+	github.com/dell/csi-metadata-retriever v1.11.1-0.20250825144336-5c293c436c99
 	github.com/dell/csm-sharednfs v1.0.0
-	github.com/dell/dell-csi-extensions/common v1.8.1-0.20250819061805-75a74ddc3cba
-	github.com/dell/dell-csi-extensions/podmon v1.8.1-0.20250819061805-75a74ddc3cba
-	github.com/dell/dell-csi-extensions/replication v1.11.1-0.20250819061805-75a74ddc3cba
+	github.com/dell/dell-csi-extensions/common v1.8.1-0.20250825155821-05e7f81ae500
+	github.com/dell/dell-csi-extensions/podmon v1.8.1-0.20250825155821-05e7f81ae500
+	github.com/dell/dell-csi-extensions/replication v1.11.1-0.20250825155821-05e7f81ae500
 	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.8.1
 	github.com/dell/gobrick v1.14.0
-	github.com/dell/gocsi v1.14.1-0.20250819131305-b1e701f09007
-	github.com/dell/gofsutil v1.19.1-0.20250819055627-f3c46eb76ffe
-	github.com/dell/goiscsi v1.12.1-0.20250819061735-a01d8763f641
-	github.com/dell/gonvme v1.11.1-0.20250819061410-1c006e069862
-	github.com/dell/gopowerstore v1.19.1-0.20250818152456-835f4538e4ee
+	github.com/dell/gocsi v1.14.1-0.20250828071850-fe2891b95da5
+	github.com/dell/gofsutil v1.19.1-0.20250828071543-d6f6a5a812e3
+	github.com/dell/goiscsi v1.12.1-0.20250828071455-fd1c391bd920
+	github.com/dell/gonvme v1.11.1-0.20250828071511-e8cac5e362ec
+	github.com/dell/gopowerstore v1.19.1-0.20250828071553-729e69f22fc3
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/go-openapi/strfmt v0.23.0
 	github.com/golang/mock v1.6.0
