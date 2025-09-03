@@ -241,7 +241,7 @@ func RmSockFile(f fs.Interface) {
 // GetIPListFromString returns list of ips in string form found in input string
 // A return value of nil indicates no match
 func GetIPListFromString(input string) []string {
-	re := regexp.MustCompile(`(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)){3}`)
+	re := regexp.MustCompile(`\b((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)){3}|localhost|([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,})\b`)
 	return re.FindAllString(input, -1)
 }
 
