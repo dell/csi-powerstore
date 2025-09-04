@@ -481,6 +481,7 @@ func TestGetIPListFromString(t *testing.T) {
 		{"Valid Localhost", args{input: "https://localhost:9400"}, []string{"localhost"}},
 		{"Valid Domain", args{input: "https://example.com:9443"}, []string{"example.com"}},
 		{"Invalid Domain", args{input: "http://mydomain."}, x},
+		{"Valid Multi-Segment Domain", args{input: "https://abc.example.com/page"}, []string{"abc.example.com"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
