@@ -2952,7 +2952,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				_, err := ctrlSvc.ControllerExpandVolume(context.Background(), req)
 
 				gomega.Expect(err).ToNot(gomega.BeNil())
-				gomega.Expect(err.Error()).To(gomega.ContainSubstring("metro replication session not in 'paused' state"))
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("Please pause the metro replication session manually"))
 			})
 		})
 

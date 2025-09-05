@@ -91,15 +91,16 @@ const (
 		"volumes/kubernetes.io~csi/csi-d91431aba3/mount"
 	validStagingPath = "/var/lib/kubelet/plugins/kubernetes.io/csi/volumeDevices/" +
 		"staging/csi-44b46e98ae/c875b4f0-172e-4238-aec7-95b379eb55db"
-	firstValidIP       = "gid1"
-	secondValidIP      = "gid2"
-	firstGlobalID      = "unique1"
-	secondGlobalID     = "unique2"
-	validNasName       = "my-nas-name"
-	validNasID         = "e8f4c5f8-c2fc-4df4-bd99-c292c12b55be"
-	validNfsServerID   = "e8f4c5f8-c2fc-4dd2-bd99-c292c12b55be"
-	validEphemeralName = "ephemeral-39bb1b5f-5624-490d-9ece-18f7b28a904e/gid1/scsi"
-	ephemerallockfile  = "/var/lib/kubelet/plugins/kubernetes.io/csi/pv/ephemeral/39bb1b5f-5624-490d-9ece-18f7b28a904e/gid1/scsi/id"
+	firstValidIP        = "gid1"
+	secondValidIP       = "gid2"
+	firstGlobalID       = "unique1"
+	secondGlobalID      = "unique2"
+	validNasName        = "my-nas-name"
+	validNasID          = "e8f4c5f8-c2fc-4df4-bd99-c292c12b55be"
+	validNfsServerID    = "e8f4c5f8-c2fc-4dd2-bd99-c292c12b55be"
+	validEphemeralName  = "ephemeral-39bb1b5f-5624-490d-9ece-18f7b28a904e/gid1/scsi"
+	ephemerallockfile   = "/var/lib/kubelet/plugins/kubernetes.io/csi/pv/ephemeral/39bb1b5f-5624-490d-9ece-18f7b28a904e/gid1/scsi/id"
+	validMetroSessionID = "9abd0198-2733-4e46-b5fa-456e9c367184"
 )
 
 var (
@@ -2721,6 +2722,29 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				gomega.Ω(err).To(gomega.BeNil())
 				gomega.Ω(res).To(gomega.Equal(&csi.NodeExpandVolumeResponse{}))
 			})
+			ginkgo.It("should succeed when Auth is enabled and volume has tenant prefix in it[ext4]", func() {
+				fsMock.On("GetUtil").Return(utilMock)
+				clientMock.On("GetVolume", mock.Anything, mock.Anything).Return(gopowerstore.Volume{
+					Description: "",
+					ID:          validBlockVolumeID,
+					Name:        "tn1-csivol-123456",
+					Size:        controller.MaxVolumeSizeBytes / 200,
+				}, nil)
+				utilMock.On("GetMountInfoFromDevice", mock.Anything, mock.Anything).Return(&gofsutil.DeviceMountInfo{
+					DeviceNames: []string{validDevName},
+					MPathName:   "",
+					MountPoint:  stagingPath,
+				}, nil)
+				utilMock.On("DeviceRescan", mock.Anything, mock.Anything).Return(nil)
+				utilMock.On("FindFSType", mock.Anything, mock.Anything).Return("ext4", nil)
+				fsMock.On("ExecCommandOutput", mock.Anything, mock.Anything, mock.Anything).Return([]byte("version 5.0.0"), nil)
+				utilMock.On("ResizeFS", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+				os.Setenv("X_CSM_AUTH_ENABLED", "true")
+				res, err := nodeSvc.NodeExpandVolume(context.Background(), getNodeVolumeExpandValidRequest(validBlockVolumeID, false))
+				gomega.Ω(err).To(gomega.BeNil())
+				gomega.Ω(res).To(gomega.Equal(&csi.NodeExpandVolumeResponse{}))
+			})
+
 			ginkgo.It("should succeed [xfs]", func() {
 				fsMock.On("GetUtil").Return(utilMock)
 				clientMock.On("GetVolume", mock.Anything, mock.Anything).Return(gopowerstore.Volume{
@@ -2739,6 +2763,33 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				fsMock.On("ExecCommandOutput", mock.Anything, mock.Anything, mock.Anything).Return([]byte("version 5.0.0"), nil)
 				utilMock.On("ResizeFS", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 				res, err := nodeSvc.NodeExpandVolume(context.Background(), getNodeVolumeExpandValidRequest(validBlockVolumeID, false))
+				gomega.Ω(err).To(gomega.BeNil())
+				gomega.Ω(res).To(gomega.Equal(&csi.NodeExpandVolumeResponse{}))
+			})
+			ginkgo.It("should succeed [metro-volumes]", func() {
+				fsMock.On("GetUtil").Return(utilMock)
+				metroVolumeID := fmt.Sprintf("%s:%s/%s", validBlockVolumeID, validRemoteVolID, secondValidIP)
+				clientMock.On("GetVolume", mock.Anything, mock.Anything).Return(gopowerstore.Volume{
+					Description:               "",
+					ID:                        metroVolumeID,
+					Name:                      "name",
+					Size:                      controller.MaxVolumeSizeBytes / 200,
+					MetroReplicationSessionID: validMetroSessionID,
+				}, nil)
+				clientMock.On("GetReplicationSessionByID", mock.Anything, validMetroSessionID).Return(gopowerstore.ReplicationSession{
+					ID:    validMetroSessionID,
+					State: gopowerstore.RsStateOk,
+				}, nil).Times(1)
+				utilMock.On("GetMountInfoFromDevice", mock.Anything, mock.Anything).Return(&gofsutil.DeviceMountInfo{
+					DeviceNames: []string{validDevName},
+					MPathName:   "",
+					MountPoint:  stagingPath,
+				}, nil)
+				utilMock.On("DeviceRescan", mock.Anything, mock.Anything).Return(nil)
+				utilMock.On("FindFSType", mock.Anything, mock.Anything).Return("ext4", nil)
+				fsMock.On("ExecCommandOutput", mock.Anything, mock.Anything, mock.Anything).Return([]byte("version 5.0.0"), nil)
+				utilMock.On("ResizeFS", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+				res, err := nodeSvc.NodeExpandVolume(context.Background(), getNodeVolumeExpandValidRequest(metroVolumeID, false))
 				gomega.Ω(err).To(gomega.BeNil())
 				gomega.Ω(res).To(gomega.Equal(&csi.NodeExpandVolumeResponse{}))
 			})
@@ -5015,6 +5066,41 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					VolumeCondition: &csi.VolumeCondition{
 						Abnormal: true,
 						Message:  fmt.Sprintf("host %s is not attached to NFS export for filesystem %s", validNodeID, validBaseVolumeID),
+					},
+				}))
+			})
+		})
+
+		ginkgo.When("NFS export found as expected [NFS]", func() {
+			ginkgo.It("should return stats as abnormal with ReadDir() error", func() {
+				clientMock.On("GetFS", mock.Anything, validBaseVolumeID).
+					Return(gopowerstore.FileSystem{ID: validBaseVolumeID}, nil)
+				clientMock.On("GetNFSExportByFileSystemID", mock.Anything, validBaseVolumeID).
+					Return(gopowerstore.NFSExport{
+						ID:      "some-export-id",
+						ROHosts: []string{"127.0.0.1/255.255.255.0"},
+					}, nil)
+				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil)
+				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{
+					{
+						Device: validDevName,
+						Path:   validTargetPath,
+					},
+				}, nil)
+
+				req := &csi.NodeGetVolumeStatsRequest{
+					VolumeId:          validNfsVolumeID,
+					VolumePath:        validTargetPath,
+					StagingTargetPath: "",
+				}
+				res, err := nodeSvc.NodeGetVolumeStats(context.Background(), req)
+
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.NodeGetVolumeStatsResponse{
+					Usage: usage,
+					VolumeCondition: &csi.VolumeCondition{
+						Abnormal: true,
+						Message:  fmt.Sprintf("volume path %s not accessible for volume %s", validTargetPath, validBaseVolumeID),
 					},
 				}))
 			})
@@ -7306,54 +7392,4 @@ func elementsMatch(a, b []string) bool {
 		m[v]--
 	}
 	return true
-}
-
-func TestRemoveVolumePrefixFromName(t *testing.T) {
-	tests := []struct {
-		name           string
-		volumeName     string
-		prefix         string
-		expectedResult string
-	}{
-		{
-			name:           "prefix exists",
-			volumeName:     "prefix-volume-name",
-			prefix:         "prefix-",
-			expectedResult: "volume-name",
-		},
-		{
-			name:           "prefix does not exist",
-			volumeName:     "volume-name",
-			prefix:         "prefix-",
-			expectedResult: "volume-name",
-		},
-		{
-			name:           "empty volume name",
-			volumeName:     "",
-			prefix:         "prefix-",
-			expectedResult: "",
-		},
-		{
-			name:           "empty prefix",
-			volumeName:     "volume-name",
-			prefix:         "",
-			expectedResult: "volume-name",
-		},
-		{
-			name:           "multiple occurrences of prefix",
-			volumeName:     "testtesttestvolume-name",
-			prefix:         "test",
-			expectedResult: "testtestvolume-name",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			os.Setenv("X_CSI_VOL_PREFIX", tt.prefix)
-			result := removeVolumePrefixFromName(tt.volumeName)
-			if result != tt.expectedResult {
-				t.Errorf("removeVolumePrefixFromName() got = %v, want %v", result, tt.expectedResult)
-			}
-		})
-	}
 }

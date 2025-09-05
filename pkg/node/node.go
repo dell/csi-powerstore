@@ -730,9 +730,18 @@ func (s *Service) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolume
 		hosts = append(hosts, nfsExport.RWHosts...)
 		hosts = append(hosts, nfsExport.RWRootHosts...)
 		attached := false
+		// Extract the IP address from the node ID
+		ipList := identifiers.GetIPListFromString(s.nodeID)
+		if len(ipList) == 0 {
+			return nil, status.Errorf(codes.NotFound, "failed to find IP in nodeID %s", s.nodeID)
+		}
+		nodeIP := ipList[0]
 		for _, host := range hosts {
-			if s.nodeID == host {
+			// Extract the IP address from the host (IP/netmask)
+			hostIP := strings.Split(host, "/")[0]
+			if nodeIP == hostIP {
 				attached = true
+				break
 			}
 		}
 		if !attached {
@@ -944,10 +953,16 @@ func (s *Service) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolum
 		return nil, status.Error(codes.NotFound, "Volume not found")
 	}
 
-	// If the volume is created from Auth v2 using a prefix then we need to remove that while publishing, otherwise mount will fail
-	finalVolName := removeVolumePrefixFromName(vol.Name)
-	vol.Name = finalVolName
-	log.Debug("Volume name after trimming: ", vol.Name)
+	isAuthEnabled := os.Getenv("X_CSM_AUTH_ENABLED")
+	if isAuthEnabled == "true" {
+		// If the volume is created from Auth v2 which has tenant prefix then we need to remove that while publishing, otherwise mount will fail - THIS IS A TEMPORARY FIX
+		splittedVolName := strings.Split(vol.Name, "-")
+		if len(splittedVolName) > 2 {
+			vol.Name = strings.Join(splittedVolName[1:], "-") // we will just discard first part which is tenant prefix - Ex: tn1-csivol-12345
+		}
+	}
+
+	log.Debug("Volume name: ", vol.Name)
 
 	volumeWWN := vol.Wwn
 
@@ -958,6 +973,28 @@ func (s *Service) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolum
 		devMnt, err = s.Fs.GetUtil().GetMountInfoFromDevice(ctx, id)
 	} else {
 		devMnt, err = s.Fs.GetUtil().GetMountInfoFromDevice(ctx, vol.Name)
+	}
+
+	// Stop block volume expansion if metro session is paused
+	// User needs to resume it first.
+	remoteVolumeID := volumeHandle.RemoteUUID // metro indicator
+	if remoteVolumeID != "" {
+		if vol.MetroReplicationSessionID == "" {
+			return nil, status.Errorf(codes.Internal,
+				"cannot expand volume %s: missing metro replication session ID", vol.Name)
+		}
+
+		state, err := controller.GetMetroSessionState(ctx, vol.MetroReplicationSessionID, arr)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal,
+				"cannot expand volume %s: failed to get metro session state: %v", vol.Name, err)
+		}
+
+		if state != gopowerstore.RsStateOk {
+			return nil, status.Errorf(codes.Aborted,
+				"cannot expand volume %s: metro session %s is not active, its in %s state",
+				vol.Name, vol.MetroReplicationSessionID, state)
+		}
 	}
 
 	if err != nil {
@@ -2291,14 +2328,4 @@ func ExtractPort(urlString string) (string, error) {
 	}
 
 	return port, nil
-}
-
-func removeVolumePrefixFromName(volumeName string) string {
-	// Remove the tenant-prefix (Auth v2) from the volume name if exists so that the mount will not fail
-	volPrefix := os.Getenv("X_CSI_VOL_PREFIX") // We will read the volume-prefix set by the user from the env variable
-	// if it's empty string or undefined, don't remove anything
-	if volPrefix == "" {
-		return volumeName
-	}
-	return strings.TrimPrefix(volumeName, volPrefix)
 }
