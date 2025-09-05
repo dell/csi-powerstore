@@ -12,7 +12,7 @@ require (
 	github.com/dell/dell-csi-extensions/podmon v1.8.1-0.20250905054742-ad01c425487b
 	github.com/dell/dell-csi-extensions/replication v1.11.1-0.20250905054742-ad01c425487b
 	github.com/dell/dell-csi-extensions/volumeGroupSnapshot v1.8.1
-	github.com/dell/gobrick v1.14.0
+	github.com/dell/gobrick v1.14.1-0.20250905070950-cfc6233bb65d
 	github.com/dell/gocsi v1.14.1-0.20250905061753-91bcfb5340eb
 	github.com/dell/gofsutil v1.19.1-0.20250905055737-9760342d7345
 	github.com/dell/goiscsi v1.12.1-0.20250905060008-55acbdc24de2
