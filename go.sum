@@ -99,8 +99,8 @@ github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSs
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc h1:U9qPSI2PIWSS1VwoXQT9A3Wy9MM3WgvqSxFWenqJduM=
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/dell/csi-metadata-retriever v1.11.1-0.20250905061324-168bd1d6dac2 h1:+VSwm6e7npfG5FK2GoNPIiLaXuBPSY9z3RnPJh2K8Zo=
-github.com/dell/csi-metadata-retriever v1.11.1-0.20250905061324-168bd1d6dac2/go.mod h1:3K7oUlamgg2LJQa09ZIexNe22/0WHfjIsCfXwl3Qgqo=
+github.com/dell/csi-metadata-retriever v1.11.1-0.20250905071610-d02a4c8ac65a h1:VlBmeJr3Ld3U4moGOvzAlwW0inLVgw2Ts2SyBHhCsKY=
+github.com/dell/csi-metadata-retriever v1.11.1-0.20250905071610-d02a4c8ac65a/go.mod h1:3K7oUlamgg2LJQa09ZIexNe22/0WHfjIsCfXwl3Qgqo=
 github.com/dell/csm-sharednfs v1.0.0 h1:+sVJSU1q8i9lfHuSxJUYjQeofsWPcLfyY05m3x2CeWE=
 github.com/dell/csm-sharednfs v1.0.0/go.mod h1:+flf+ETu0LkNUDVFEybV7fJtO6MEHedg816CILTrXhs=
 github.com/dell/dell-csi-extensions/common v1.8.1-0.20250905054742-ad01c425487b h1:m/SLgY3M7IV/N/bBzcpOrFk73UrhJSLjs67KWPgsIG8=

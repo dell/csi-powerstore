@@ -6,7 +6,7 @@ require (
 	github.com/akutz/gosync v0.1.0
 	github.com/apparentlymart/go-cidr v1.1.0
 	github.com/container-storage-interface/spec v1.6.0
-	github.com/dell/csi-metadata-retriever v1.11.1-0.20250905061324-168bd1d6dac2
+	github.com/dell/csi-metadata-retriever v1.11.1-0.20250905071610-d02a4c8ac65a
 	github.com/dell/csm-sharednfs v1.0.0
 	github.com/dell/dell-csi-extensions/common v1.8.1-0.20250905054742-ad01c425487b
 	github.com/dell/dell-csi-extensions/podmon v1.8.1-0.20250905054742-ad01c425487b
