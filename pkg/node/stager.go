@@ -67,10 +67,19 @@ func (s *SCSIStager) Stage(ctx context.Context, req *csi.NodeStageVolumeRequest,
 	logFields log.Fields, fs fs.Interface, id string, isRemote bool, client gopowerstore.Client,
 ) (*csi.NodeStageVolumeResponse, error) {
 	stagingPath := req.GetStagingTargetPath()
+	orginalContext := req.PublishContext
 	id, stagingPath = getStagingPath(ctx, stagingPath, id)
 	volume, err := client.GetVolume(ctx, id)
 	targetMap := make(map[string]string)
 	err = s.AddTargetsInfoToPublishContext(targetMap, volume.ApplianceID, client, isRemote)
+
+	if !isRemote {
+		targetMap[identifiers.PublishContextDeviceWWN] = orginalContext[identifiers.PublishContextDeviceWWN]
+		targetMap[identifiers.PublishContextLUNAddress] = orginalContext[identifiers.PublishContextLUNAddress]
+	} else {
+		targetMap[identifiers.PublishContextRemoteDeviceWWN] = orginalContext[identifiers.PublishContextRemoteDeviceWWN]
+		targetMap[identifiers.PublishContextRemoteLUNAddress] = orginalContext[identifiers.PublishContextRemoteDeviceWWN]
+	}
 
 	publishContext, err := readSCSIInfoFromPublishContext(targetMap, s.useFC, s.useNVME, isRemote)
 	if err != nil {
