@@ -545,6 +545,7 @@ func isReadyToPublishNFS(ctx context.Context, stagingPath string, fs fs.Interfac
 
 	return found, nil
 }
+
 func (s *SCSIStager) AddTargetsInfoToPublishContext(
 	publishContext map[string]string, volumeApplianceID string, client gopowerstore.Client, isRemote bool,
 ) error {
