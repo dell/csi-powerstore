@@ -31,8 +31,8 @@ LABEL vendor="Dell Technologies" \
       name="csi-powerstore" \
       summary="CSI Driver for Dell EMC PowerStore" \
       description="CSI Driver for provisioning persistent storage from Dell EMC PowerStore" \
-      release="1.14.0" \
-      version="2.14.0" \
+      release="1.15.0" \
+      version="2.15.0" \
       license="Apache-2.0"
 COPY licenses /licenses
 
