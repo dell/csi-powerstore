@@ -20,6 +20,7 @@ package node
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -46,7 +47,7 @@ const (
 
 // VolumeStager allows to node stage a volume
 type VolumeStager interface {
-	Stage(ctx context.Context, req *csi.NodeStageVolumeRequest, logFields log.Fields, fs fs.Interface, id string, isRemote bool) (*csi.NodeStageVolumeResponse, error)
+	Stage(ctx context.Context, req *csi.NodeStageVolumeRequest, logFields log.Fields, fs fs.Interface, id string, isRemote bool, client gopowerstore.Client) (*csi.NodeStageVolumeResponse, error)
 }
 
 // ReachableEndPoint checks if the endpoint is reachable or not
@@ -63,12 +64,15 @@ type SCSIStager struct {
 
 // Stage stages volume by connecting it through either FC or iSCSI and creating bind mount to staging path
 func (s *SCSIStager) Stage(ctx context.Context, req *csi.NodeStageVolumeRequest,
-	logFields log.Fields, fs fs.Interface, id string, isRemote bool,
+	logFields log.Fields, fs fs.Interface, id string, isRemote bool, client gopowerstore.Client,
 ) (*csi.NodeStageVolumeResponse, error) {
 	stagingPath := req.GetStagingTargetPath()
 	id, stagingPath = getStagingPath(ctx, stagingPath, id)
+	volume, err := client.GetVolume(ctx, id)
+	targetMap := make(map[string]string)
+	err = s.AddTargetsInfoToPublishContext(targetMap, volume.ApplianceID, client, isRemote)
 
-	publishContext, err := readSCSIInfoFromPublishContext(req.PublishContext, s.useFC, s.useNVME, isRemote)
+	publishContext, err := readSCSIInfoFromPublishContext(targetMap, s.useFC, s.useNVME, isRemote)
 	if err != nil {
 		return nil, err
 	}
@@ -135,7 +139,7 @@ type NFSStager struct {
 
 // Stage stages volume by mounting volumes as nfs to the staging path
 func (n *NFSStager) Stage(ctx context.Context, req *csi.NodeStageVolumeRequest,
-	logFields log.Fields, fs fs.Interface, id string, _ bool,
+	logFields log.Fields, fs fs.Interface, id string, _ bool, client gopowerstore.Client,
 ) (*csi.NodeStageVolumeResponse, error) {
 	stagingPath := req.GetStagingTargetPath()
 
@@ -531,4 +535,64 @@ func isReadyToPublishNFS(ctx context.Context, stagingPath string, fs fs.Interfac
 	}
 
 	return found, nil
+}
+func (s *SCSIStager) AddTargetsInfoToPublishContext(
+	publishContext map[string]string, volumeApplianceID string, client gopowerstore.Client, isRemote bool,
+) error {
+	iscsiPortalsKey := identifiers.PublishContextISCSIPortalsPrefix
+	iscsiTargetsKey := identifiers.PublishContextISCSITargetsPrefix
+	fcWwpnKey := identifiers.PublishContextFCWWPNPrefix
+	nvmeFcPortalsKey := identifiers.PublishContextNVMEFCPortalsPrefix
+	nvmeFcTargetsKey := identifiers.PublishContextNVMEFCTargetsPrefix
+	nvmeTCPPortalsKey := identifiers.PublishContextNVMETCPPortalsPrefix
+	nvmeTCPTargetsKey := identifiers.PublishContextNVMETCPTargetsPrefix
+	if isRemote {
+		iscsiPortalsKey = identifiers.PublishContextRemoteISCSIPortalsPrefix
+		iscsiTargetsKey = identifiers.PublishContextRemoteISCSITargetsPrefix
+		fcWwpnKey = identifiers.PublishContextRemoteFCWWPNPrefix
+		nvmeFcPortalsKey = identifiers.PublishContextRemoteNVMEFCPortalsPrefix
+		nvmeFcTargetsKey = identifiers.PublishContextRemoteNVMEFCTargetsPrefix
+		nvmeTCPPortalsKey = identifiers.PublishContextRemoteNVMETCPPortalsPrefix
+		nvmeTCPTargetsKey = identifiers.PublishContextRemoteNVMETCPTargetsPrefix
+	}
+
+	iscsiTargetsInfo, err := identifiers.GetISCSITargetsInfoFromStorage(client, volumeApplianceID)
+	if err != nil {
+		log.Error("error unable to get iSCSI targets from array", err)
+	}
+	for i, t := range iscsiTargetsInfo {
+		publishContext[fmt.Sprintf("%s%d", iscsiPortalsKey, i)] = t.Portal
+		publishContext[fmt.Sprintf("%s%d", iscsiTargetsKey, i)] = t.Target
+	}
+	fcTargetsInfo, err := identifiers.GetFCTargetsInfoFromStorage(client, volumeApplianceID)
+	if err != nil {
+		log.Error("error unable to get FC targets from array", err)
+	}
+	for i, t := range fcTargetsInfo {
+		publishContext[fmt.Sprintf("%s%d", fcWwpnKey, i)] = t.WWPN
+	}
+
+	nvmefcTargetInfo, err := identifiers.GetNVMEFCTargetInfoFromStorage(client, volumeApplianceID)
+	if err != nil {
+		log.Error("error unable to get NVMeFC targets from array", err)
+	}
+	for i, t := range nvmefcTargetInfo {
+		publishContext[fmt.Sprintf("%s%d", nvmeFcPortalsKey, i)] = t.Portal
+		publishContext[fmt.Sprintf("%s%d", nvmeFcTargetsKey, i)] = t.Target
+	}
+
+	nvmetcpTargetInfo, err := identifiers.GetNVMETCPTargetsInfoFromStorage(client, volumeApplianceID)
+	if err != nil {
+		log.Error("error unable to get NVMeTCP targets from array", err)
+	}
+	for i, t := range nvmetcpTargetInfo {
+		publishContext[fmt.Sprintf("%s%d", nvmeTCPPortalsKey, i)] = t.Portal
+		publishContext[fmt.Sprintf("%s%d", nvmeTCPTargetsKey, i)] = t.Target
+	}
+
+	// If the system is not capable of any protocol, then we will through the error
+	if len(iscsiTargetsInfo) == 0 && len(fcTargetsInfo) == 0 && len(nvmefcTargetInfo) == 0 && len(nvmetcpTargetInfo) == 0 {
+		return errors.New("unable to get targets for any protocol")
+	}
+	return nil
 }

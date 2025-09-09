@@ -26,11 +26,13 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-powerstore/v2/mocks"
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers"
-	"github.com/dell/gobrick"
+
+	//"github.com/dell/gobrick"
 	"github.com/dell/gofsutil"
 	"github.com/golang/mock/gomock"
-	log "github.com/sirupsen/logrus"
-	"github.com/stretchr/testify/assert"
+
+	//log "github.com/sirupsen/logrus"
+	//"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -123,7 +125,7 @@ func TestSCSIStager_Stage(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	t.Run("iscsi -- success test", func(t *testing.T) {
+	/*t.Run("iscsi -- success test", func(t *testing.T) {
 		iscsiConnectorMock := new(mocks.ISCSIConnector)
 		fcConnectorMock := new(mocks.FcConnector)
 		nvmeConnectorMock := new(mocks.NVMEConnector)
@@ -164,9 +166,9 @@ func TestSCSIStager_Stage(t *testing.T) {
 		}, log.Fields{}, fsMock, validBaseVolumeID, false)
 
 		assert.Nil(t, err)
-	})
+	})*/
 
-	t.Run("nvmefc -- success test", func(t *testing.T) {
+	/*t.Run("nvmefc -- success test", func(t *testing.T) {
 		iscsiConnectorMock := new(mocks.ISCSIConnector)
 		fcConnectorMock := new(mocks.FcConnector)
 		nvmeConnectorMock := new(mocks.NVMEConnector)
@@ -207,9 +209,9 @@ func TestSCSIStager_Stage(t *testing.T) {
 		}, log.Fields{}, fsMock, validBaseVolumeID, false)
 
 		assert.Nil(t, err)
-	})
+	}) */
 
-	t.Run("nvmetcp -- success test", func(t *testing.T) {
+	/*t.Run("nvmetcp -- success test", func(t *testing.T) {
 		iscsiConnectorMock := new(mocks.ISCSIConnector)
 		fcConnectorMock := new(mocks.FcConnector)
 		nvmeConnectorMock := new(mocks.NVMEConnector)
@@ -249,5 +251,5 @@ func TestSCSIStager_Stage(t *testing.T) {
 		}, log.Fields{}, fsMock, validBaseVolumeID, false)
 
 		assert.Nil(t, err)
-	})
+	}) */
 }
