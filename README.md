@@ -10,7 +10,7 @@ For existing customers using Dell’s Container Storage Modules, you will contin
 * **Continued Access to Current Open Source Version**<br>
        The current open-source version will remain available under its existing license for those who rely on it.
 
-Moving to a Enterprise model allows Dell’s development team to accelerate feature delivery and enhance integration across our Enterprise Kubernetes Storage solutions ultimately providing a more seamless and robust experience.<br>
+Moving to a closed source model allows Dell’s development team to accelerate feature delivery and enhance integration across our Enterprise Kubernetes Storage solutions ultimately providing a more seamless and robust experience.<br>
 We deeply appreciate the contributions of the open source community and remain committed to supporting our customers through this transition.<br>
 
 For questions or access requests, please contact the maintainers via [Dell Support](https://www.dell.com/support/kbdoc/en-in/000188046/container-storage-interface-csi-drivers-and-container-storage-modules-csm-how-to-get-support).
@@ -71,3 +71,4 @@ If you want to use NVMe/FC be sure that the NVMeFC zoning of the Host Bus Adapte
 
 ## Documentation
 For more detailed information on the driver, please refer to [Container Storage Modules documentation](https://dell.github.io/csm-docs/).
+
