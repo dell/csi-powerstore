@@ -159,11 +159,11 @@ func (s *SCSIPublisher) addLUNIDToPublishContext(
 	isRemote bool,
 ) {
 	if !isRemote {
-		publishContext[identifiers.PublishContextDeviceWWN] = strings.TrimPrefix(volume.Wwn, identifiers.WWNPrefix)
-		publishContext[identifiers.PublishContextLUNAddress] = strconv.FormatInt(mapping.LogicalUnitNumber, 10)
+		publishContext[identifiers.TargetMapDeviceWWN] = strings.TrimPrefix(volume.Wwn, identifiers.WWNPrefix)
+		publishContext[identifiers.TargetMapLUNAddress] = strconv.FormatInt(mapping.LogicalUnitNumber, 10)
 	} else {
-		publishContext[identifiers.PublishContextRemoteDeviceWWN] = strings.TrimPrefix(volume.Wwn, identifiers.WWNPrefix)
-		publishContext[identifiers.PublishContextRemoteLUNAddress] = strconv.FormatInt(mapping.LogicalUnitNumber, 10)
+		publishContext[identifiers.TargetMapRemoteDeviceWWN] = strings.TrimPrefix(volume.Wwn, identifiers.WWNPrefix)
+		publishContext[identifiers.TargetMapRemoteLUNAddress] = strconv.FormatInt(mapping.LogicalUnitNumber, 10)
 	}
 }
 

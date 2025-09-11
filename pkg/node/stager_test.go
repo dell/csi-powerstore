@@ -43,35 +43,35 @@ var validBaseVolID = "39bb1b5f-5624-490d-9ece-18f7b28a904e"
 
 func getValidPublishContext() map[string]string {
 	return map[string]string{
-		identifiers.PublishContextLUNAddress:                 validLUNID,
-		identifiers.PublishContextDeviceWWN:                  validDeviceWWN,
-		identifiers.PublishContextISCSIPortalsPrefix + "0":   validISCSIPortals[0],
-		identifiers.PublishContextISCSIPortalsPrefix + "1":   validISCSIPortals[1],
-		identifiers.PublishContextISCSITargetsPrefix + "0":   validISCSITargets[0],
-		identifiers.PublishContextISCSITargetsPrefix + "1":   validISCSITargets[1],
-		identifiers.PublishContextNVMEFCPortalsPrefix + "0":  validNVMEFCPortals[0],
-		identifiers.PublishContextNVMEFCPortalsPrefix + "1":  validNVMEFCPortals[1],
-		identifiers.PublishContextNVMEFCTargetsPrefix + "0":  validNVMEFCTargets[0],
-		identifiers.PublishContextNVMEFCTargetsPrefix + "1":  validNVMEFCTargets[1],
-		identifiers.PublishContextNVMETCPPortalsPrefix + "0": validNVMETCPPortals[0],
-		identifiers.PublishContextNVMETCPPortalsPrefix + "1": validNVMETCPPortals[1],
-		identifiers.PublishContextNVMETCPTargetsPrefix + "0": validNVMETCPTargets[0],
-		identifiers.PublishContextNVMETCPTargetsPrefix + "1": validNVMETCPTargets[1],
-		identifiers.PublishContextFCWWPNPrefix + "0":         validFCTargetsWWPN[0],
-		identifiers.PublishContextFCWWPNPrefix + "1":         validFCTargetsWWPN[1],
+		identifiers.TargetMapLUNAddress:                             validLUNID,
+		identifiers.TargetMapDeviceWWN:                              validDeviceWWN,
+		identifiers.TargetMapContextISCSIPortalsPrefix + "0":        validISCSIPortals[0],
+		identifiers.TargetMapContextISCSIPortalsPrefix + "1":        validISCSIPortals[1],
+		identifiers.TargetMapISCSITargetsPrefix + "0":               validISCSITargets[0],
+		identifiers.TargetMapISCSITargetsPrefix + "1":               validISCSITargets[1],
+		identifiers.TargetMapublishContextNVMEFCPortalsPrefix + "0": validNVMEFCPortals[0],
+		identifiers.TargetMapublishContextNVMEFCPortalsPrefix + "1": validNVMEFCPortals[1],
+		identifiers.TargetMapNVMEFCTargetsPrefix + "0":              validNVMEFCTargets[0],
+		identifiers.TargetMapNVMEFCTargetsPrefix + "1":              validNVMEFCTargets[1],
+		identifiers.TargetMapNVMETCPPortalsPrefix + "0":             validNVMETCPPortals[0],
+		identifiers.TargetMapNVMETCPPortalsPrefix + "1":             validNVMETCPPortals[1],
+		identifiers.TargetMapNVMETCPTargetsPrefix + "0":             validNVMETCPTargets[0],
+		identifiers.TargetMapNVMETCPTargetsPrefix + "1":             validNVMETCPTargets[1],
+		identifiers.TargetMapFCWWPNPrefix + "0":                     validFCTargetsWWPN[0],
+		identifiers.TargetMapFCWWPNPrefix + "1":                     validFCTargetsWWPN[1],
 	}
 }
 
 func getValidRemoteMetroPublishContext() map[string]string {
 	publishContext := getValidPublishContext()
-	publishContext[identifiers.PublishContextRemoteLUNAddress] = validLUNID
-	publishContext[identifiers.PublishContextRemoteDeviceWWN] = validDeviceWWN
-	publishContext[identifiers.PublishContextRemoteISCSIPortalsPrefix+"0"] = validRemoteISCSIPortals[0]
-	publishContext[identifiers.PublishContextRemoteISCSIPortalsPrefix+"1"] = validRemoteISCSIPortals[1]
-	publishContext[identifiers.PublishContextRemoteISCSITargetsPrefix+"0"] = validRemoteISCSITargets[0]
-	publishContext[identifiers.PublishContextRemoteISCSITargetsPrefix+"1"] = validRemoteISCSITargets[1]
-	publishContext[identifiers.PublishContextRemoteFCWWPNPrefix+"0"] = validRemoteFCTargetsWWPN[0]
-	publishContext[identifiers.PublishContextRemoteFCWWPNPrefix+"1"] = validRemoteFCTargetsWWPN[1]
+	publishContext[identifiers.TargetMapRemoteLUNAddress] = validLUNID
+	publishContext[identifiers.TargetMapRemoteDeviceWWN] = validDeviceWWN
+	publishContext[identifiers.TargetMapRemoteISCSIPortalsPrefix+"0"] = validRemoteISCSIPortals[0]
+	publishContext[identifiers.TargetMapRemoteISCSIPortalsPrefix+"1"] = validRemoteISCSIPortals[1]
+	publishContext[identifiers.TargetMapRemoteISCSITargetsPrefix+"0"] = validRemoteISCSITargets[0]
+	publishContext[identifiers.TargetMapRemoteISCSITargetsPrefix+"1"] = validRemoteISCSITargets[1]
+	publishContext[identifiers.TargetMapRemoteFCWWPNPrefix+"0"] = validRemoteFCTargetsWWPN[0]
+	publishContext[identifiers.TargetMapRemoteFCWWPNPrefix+"1"] = validRemoteFCTargetsWWPN[1]
 
 	return publishContext
 }

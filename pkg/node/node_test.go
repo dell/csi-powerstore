@@ -1578,7 +1578,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				res, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
 					VolumeId: validBlockVolumeID,
 					PublishContext: map[string]string{
-						identifiers.PublishContextLUNAddress: validLUNID,
+						identifiers.TargetMapLUNAddress: validLUNID,
 					},
 					StagingTargetPath: nodeStagePrivateDir,
 					VolumeCapability: getCapabilityWithVoltypeAccessFstype(
@@ -1596,7 +1596,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				res, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
 					VolumeId: validBlockVolumeID,
 					PublishContext: map[string]string{
-						identifiers.PublishContextDeviceWWN: validDeviceWWN,
+						identifiers.TargetMapDeviceWWN: validDeviceWWN,
 					},
 					StagingTargetPath: nodeStagePrivateDir,
 					VolumeCapability: getCapabilityWithVoltypeAccessFstype(
@@ -1614,8 +1614,8 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				_, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
 					VolumeId: validBlockVolumeID,
 					PublishContext: map[string]string{
-						identifiers.PublishContextDeviceWWN:  validDeviceWWN,
-						identifiers.PublishContextLUNAddress: validLUNID,
+						identifiers.TargetMapDeviceWWN:  validDeviceWWN,
+						identifiers.TargetMapLUNAddress: validLUNID,
 					},
 					StagingTargetPath: nodeStagePrivateDir,
 					VolumeCapability: getCapabilityWithVoltypeAccessFstype(
@@ -1633,8 +1633,8 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				_, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
 					VolumeId: validBlockVolumeID,
 					PublishContext: map[string]string{
-						identifiers.PublishContextDeviceWWN:  validDeviceWWN,
-						identifiers.PublishContextLUNAddress: validLUNID,
+						identifiers.TargetMapDeviceWWN:  validDeviceWWN,
+						identifiers.TargetMapLUNAddress: validLUNID,
 					},
 					StagingTargetPath: nodeStagePrivateDir,
 					VolumeCapability: getCapabilityWithVoltypeAccessFstype(
@@ -1652,8 +1652,8 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				_, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
 					VolumeId: validBlockVolumeID,
 					PublishContext: map[string]string{
-						identifiers.PublishContextDeviceWWN:  validDeviceWWN,
-						identifiers.PublishContextLUNAddress: validLUNID,
+						identifiers.TargetMapDeviceWWN:  validDeviceWWN,
+						identifiers.TargetMapLUNAddress: validLUNID,
 					},
 					StagingTargetPath: nodeStagePrivateDir,
 					VolumeCapability: getCapabilityWithVoltypeAccessFstype(
@@ -1670,8 +1670,8 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				_, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
 					VolumeId: validBlockVolumeID,
 					PublishContext: map[string]string{
-						identifiers.PublishContextDeviceWWN:  validDeviceWWN,
-						identifiers.PublishContextLUNAddress: validLUNID,
+						identifiers.TargetMapDeviceWWN:  validDeviceWWN,
+						identifiers.TargetMapLUNAddress: validLUNID,
 					},
 					StagingTargetPath: nodeStagePrivateDir,
 					VolumeCapability: getCapabilityWithVoltypeAccessFstype(

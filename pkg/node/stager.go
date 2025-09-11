@@ -71,17 +71,17 @@ func (s *SCSIStager) Stage(ctx context.Context, req *csi.NodeStageVolumeRequest,
 	id, stagingPath = getStagingPath(ctx, stagingPath, id)
 	volume, err := client.GetVolume(ctx, id)
 	targetMap := make(map[string]string)
-	err = s.AddTargetsInfoToPublishContext(targetMap, volume.ApplianceID, client, isRemote)
+	err = s.AddTargetsInfoToMap(targetMap, volume.ApplianceID, client, isRemote)
 	if err != nil {
 		return nil, err
 	}
 
 	if !isRemote {
-		targetMap[identifiers.PublishContextDeviceWWN] = orginalContext[identifiers.PublishContextDeviceWWN]
-		targetMap[identifiers.PublishContextLUNAddress] = orginalContext[identifiers.PublishContextLUNAddress]
+		targetMap[identifiers.TargetMapDeviceWWN] = orginalContext[identifiers.TargetMapDeviceWWN]
+		targetMap[identifiers.TargetMapLUNAddress] = orginalContext[identifiers.TargetMapLUNAddress]
 	} else {
-		targetMap[identifiers.PublishContextRemoteDeviceWWN] = orginalContext[identifiers.PublishContextRemoteDeviceWWN]
-		targetMap[identifiers.PublishContextRemoteLUNAddress] = orginalContext[identifiers.PublishContextRemoteDeviceWWN]
+		targetMap[identifiers.TargetMapRemoteDeviceWWN] = orginalContext[identifiers.TargetMapRemoteDeviceWWN]
+		targetMap[identifiers.TargetMapRemoteLUNAddress] = orginalContext[identifiers.TargetMapRemoteDeviceWWN]
 	}
 
 	publishContext, err := readSCSIInfoFromPublishContext(targetMap, s.useFC, s.useNVME, isRemote)
@@ -274,11 +274,11 @@ type scsiPublishContextData struct {
 func readSCSIInfoFromPublishContext(publishContext map[string]string, useFC bool, useNVMe bool, isRemote bool) (scsiPublishContextData, error) {
 	// Get publishContext
 	var data scsiPublishContextData
-	deviceWwnKey := identifiers.PublishContextDeviceWWN
-	lunAddressKey := identifiers.PublishContextLUNAddress
+	deviceWwnKey := identifiers.TargetMapDeviceWWN
+	lunAddressKey := identifiers.TargetMapLUNAddress
 	if isRemote {
-		deviceWwnKey = identifiers.PublishContextRemoteDeviceWWN
-		lunAddressKey = identifiers.PublishContextRemoteLUNAddress
+		deviceWwnKey = identifiers.TargetMapRemoteDeviceWWN
+		lunAddressKey = identifiers.TargetMapRemoteLUNAddress
 	}
 
 	deviceWWN, ok := publishContext[deviceWwnKey]
@@ -314,11 +314,11 @@ func readSCSIInfoFromPublishContext(publishContext map[string]string, useFC bool
 
 func readISCSITargetsFromPublishContext(pc map[string]string, isRemote bool) []gobrick.ISCSITargetInfo {
 	var targets []gobrick.ISCSITargetInfo
-	iscsiTargetsKey := identifiers.PublishContextISCSITargetsPrefix
-	iscsiPortalsKey := identifiers.PublishContextISCSIPortalsPrefix
+	iscsiTargetsKey := identifiers.TargetMapISCSITargetsPrefix
+	iscsiPortalsKey := identifiers.TargetMapContextISCSIPortalsPrefix
 	if isRemote {
-		iscsiTargetsKey = identifiers.PublishContextRemoteISCSITargetsPrefix
-		iscsiPortalsKey = identifiers.PublishContextRemoteISCSIPortalsPrefix
+		iscsiTargetsKey = identifiers.TargetMapRemoteISCSITargetsPrefix
+		iscsiPortalsKey = identifiers.TargetMapRemoteISCSIPortalsPrefix
 	}
 	for i := 0; ; i++ {
 		target := gobrick.ISCSITargetInfo{}
@@ -345,11 +345,11 @@ func readISCSITargetsFromPublishContext(pc map[string]string, isRemote bool) []g
 
 func readNVMETCPTargetsFromPublishContext(pc map[string]string, isRemote bool) []gobrick.NVMeTargetInfo {
 	var targets []gobrick.NVMeTargetInfo
-	nvmeTCPTargetsKey := identifiers.PublishContextNVMETCPTargetsPrefix
-	nvmeTCPPortalsKey := identifiers.PublishContextNVMETCPPortalsPrefix
+	nvmeTCPTargetsKey := identifiers.TargetMapNVMETCPTargetsPrefix
+	nvmeTCPPortalsKey := identifiers.TargetMapNVMETCPPortalsPrefix
 	if isRemote {
-		nvmeTCPTargetsKey = identifiers.PublishContextRemoteNVMETCPTargetsPrefix
-		nvmeTCPPortalsKey = identifiers.PublishContextRemoteNVMETCPPortalsPrefix
+		nvmeTCPTargetsKey = identifiers.TargetMapRemoteNVMETCPTargetsPrefix
+		nvmeTCPPortalsKey = identifiers.TargetMapRemoteNVMETCPPortalsPrefix
 	}
 	for i := 0; ; i++ {
 		target := gobrick.NVMeTargetInfo{}
@@ -372,11 +372,11 @@ func readNVMETCPTargetsFromPublishContext(pc map[string]string, isRemote bool) [
 
 func readNVMEFCTargetsFromPublishContext(pc map[string]string, isRemote bool) []gobrick.NVMeTargetInfo {
 	var targets []gobrick.NVMeTargetInfo
-	nvmeFcTargetsKey := identifiers.PublishContextNVMEFCTargetsPrefix
-	nvmeFcPortalsKey := identifiers.PublishContextNVMEFCPortalsPrefix
+	nvmeFcTargetsKey := identifiers.TargetMapNVMEFCTargetsPrefix
+	nvmeFcPortalsKey := identifiers.TargetMapublishContextNVMEFCPortalsPrefix
 	if isRemote {
-		nvmeFcTargetsKey = identifiers.PublishContextRemoteNVMEFCTargetsPrefix
-		nvmeFcPortalsKey = identifiers.PublishContextRemoteNVMEFCPortalsPrefix
+		nvmeFcTargetsKey = identifiers.TargetMapRemoteNVMEFCTargetsPrefix
+		nvmeFcPortalsKey = identifiers.TargetMapRemoteNVMEFCPortalsPrefix
 	}
 	for i := 0; ; i++ {
 		target := gobrick.NVMeTargetInfo{}
@@ -399,9 +399,9 @@ func readNVMEFCTargetsFromPublishContext(pc map[string]string, isRemote bool) []
 
 func readFCTargetsFromPublishContext(pc map[string]string, isRemote bool) []gobrick.FCTargetInfo {
 	var targets []gobrick.FCTargetInfo
-	fcWwpnKey := identifiers.PublishContextFCWWPNPrefix
+	fcWwpnKey := identifiers.TargetMapFCWWPNPrefix
 	if isRemote {
-		fcWwpnKey = identifiers.PublishContextRemoteFCWWPNPrefix
+		fcWwpnKey = identifiers.TargetMapRemoteFCWWPNPrefix
 	}
 	for i := 0; ; i++ {
 		wwpn, tfound := pc[fmt.Sprintf("%s%d", fcWwpnKey, i)]
@@ -549,24 +549,24 @@ func isReadyToPublishNFS(ctx context.Context, stagingPath string, fs fs.Interfac
 	return found, nil
 }
 
-func (s *SCSIStager) AddTargetsInfoToPublishContext(
-	publishContext map[string]string, volumeApplianceID string, client gopowerstore.Client, isRemote bool,
+func (s *SCSIStager) AddTargetsInfoToMap(
+	targetMap map[string]string, volumeApplianceID string, client gopowerstore.Client, isRemote bool,
 ) error {
-	iscsiPortalsKey := identifiers.PublishContextISCSIPortalsPrefix
-	iscsiTargetsKey := identifiers.PublishContextISCSITargetsPrefix
-	fcWwpnKey := identifiers.PublishContextFCWWPNPrefix
-	nvmeFcPortalsKey := identifiers.PublishContextNVMEFCPortalsPrefix
-	nvmeFcTargetsKey := identifiers.PublishContextNVMEFCTargetsPrefix
-	nvmeTCPPortalsKey := identifiers.PublishContextNVMETCPPortalsPrefix
-	nvmeTCPTargetsKey := identifiers.PublishContextNVMETCPTargetsPrefix
+	iscsiPortalsKey := identifiers.TargetMapContextISCSIPortalsPrefix
+	iscsiTargetsKey := identifiers.TargetMapISCSITargetsPrefix
+	fcWwpnKey := identifiers.TargetMapFCWWPNPrefix
+	nvmeFcPortalsKey := identifiers.TargetMapublishContextNVMEFCPortalsPrefix
+	nvmeFcTargetsKey := identifiers.TargetMapNVMEFCTargetsPrefix
+	nvmeTCPPortalsKey := identifiers.TargetMapNVMETCPPortalsPrefix
+	nvmeTCPTargetsKey := identifiers.TargetMapNVMETCPTargetsPrefix
 	if isRemote {
-		iscsiPortalsKey = identifiers.PublishContextRemoteISCSIPortalsPrefix
-		iscsiTargetsKey = identifiers.PublishContextRemoteISCSITargetsPrefix
-		fcWwpnKey = identifiers.PublishContextRemoteFCWWPNPrefix
-		nvmeFcPortalsKey = identifiers.PublishContextRemoteNVMEFCPortalsPrefix
-		nvmeFcTargetsKey = identifiers.PublishContextRemoteNVMEFCTargetsPrefix
-		nvmeTCPPortalsKey = identifiers.PublishContextRemoteNVMETCPPortalsPrefix
-		nvmeTCPTargetsKey = identifiers.PublishContextRemoteNVMETCPTargetsPrefix
+		iscsiPortalsKey = identifiers.TargetMapRemoteISCSIPortalsPrefix
+		iscsiTargetsKey = identifiers.TargetMapRemoteISCSITargetsPrefix
+		fcWwpnKey = identifiers.TargetMapRemoteFCWWPNPrefix
+		nvmeFcPortalsKey = identifiers.TargetMapRemoteNVMEFCPortalsPrefix
+		nvmeFcTargetsKey = identifiers.TargetMapRemoteNVMEFCTargetsPrefix
+		nvmeTCPPortalsKey = identifiers.TargetMapRemoteNVMETCPPortalsPrefix
+		nvmeTCPTargetsKey = identifiers.TargetMapRemoteNVMETCPTargetsPrefix
 	}
 
 	iscsiTargetsInfo, err := identifiers.GetISCSITargetsInfoFromStorage(client, volumeApplianceID)
@@ -574,15 +574,15 @@ func (s *SCSIStager) AddTargetsInfoToPublishContext(
 		log.Error("error unable to get iSCSI targets from array", err)
 	}
 	for i, t := range iscsiTargetsInfo {
-		publishContext[fmt.Sprintf("%s%d", iscsiPortalsKey, i)] = t.Portal
-		publishContext[fmt.Sprintf("%s%d", iscsiTargetsKey, i)] = t.Target
+		targetMap[fmt.Sprintf("%s%d", iscsiPortalsKey, i)] = t.Portal
+		targetMap[fmt.Sprintf("%s%d", iscsiTargetsKey, i)] = t.Target
 	}
 	fcTargetsInfo, err := identifiers.GetFCTargetsInfoFromStorage(client, volumeApplianceID)
 	if err != nil {
 		log.Error("error unable to get FC targets from array", err)
 	}
 	for i, t := range fcTargetsInfo {
-		publishContext[fmt.Sprintf("%s%d", fcWwpnKey, i)] = t.WWPN
+		targetMap[fmt.Sprintf("%s%d", fcWwpnKey, i)] = t.WWPN
 	}
 
 	nvmefcTargetInfo, err := identifiers.GetNVMEFCTargetInfoFromStorage(client, volumeApplianceID)
@@ -590,8 +590,8 @@ func (s *SCSIStager) AddTargetsInfoToPublishContext(
 		log.Error("error unable to get NVMeFC targets from array", err)
 	}
 	for i, t := range nvmefcTargetInfo {
-		publishContext[fmt.Sprintf("%s%d", nvmeFcPortalsKey, i)] = t.Portal
-		publishContext[fmt.Sprintf("%s%d", nvmeFcTargetsKey, i)] = t.Target
+		targetMap[fmt.Sprintf("%s%d", nvmeFcPortalsKey, i)] = t.Portal
+		targetMap[fmt.Sprintf("%s%d", nvmeFcTargetsKey, i)] = t.Target
 	}
 
 	nvmetcpTargetInfo, err := identifiers.GetNVMETCPTargetsInfoFromStorage(client, volumeApplianceID)
@@ -599,8 +599,8 @@ func (s *SCSIStager) AddTargetsInfoToPublishContext(
 		log.Error("error unable to get NVMeTCP targets from array", err)
 	}
 	for i, t := range nvmetcpTargetInfo {
-		publishContext[fmt.Sprintf("%s%d", nvmeTCPPortalsKey, i)] = t.Portal
-		publishContext[fmt.Sprintf("%s%d", nvmeTCPTargetsKey, i)] = t.Target
+		targetMap[fmt.Sprintf("%s%d", nvmeTCPPortalsKey, i)] = t.Portal
+		targetMap[fmt.Sprintf("%s%d", nvmeTCPTargetsKey, i)] = t.Target
 	}
 
 	// If the system is not capable of any protocol, then we will through the error
