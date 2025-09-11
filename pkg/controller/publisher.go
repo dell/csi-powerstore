@@ -83,7 +83,6 @@ func (s *SCSIPublisher) Publish(ctx context.Context, publishContext map[string]s
 			"failed to get mapping for volume with ID '%s': %s", volume.ID, err.Error())
 	}
 
-	// err = s.addTargetsInfoToPublishContext(publishContext, volume.ApplianceID, client, isRemote)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "could not get scsi Targets: %s", err.Error())
 	}

@@ -72,6 +72,9 @@ func (s *SCSIStager) Stage(ctx context.Context, req *csi.NodeStageVolumeRequest,
 	volume, err := client.GetVolume(ctx, id)
 	targetMap := make(map[string]string)
 	err = s.AddTargetsInfoToPublishContext(targetMap, volume.ApplianceID, client, isRemote)
+	if err != nil {
+		return nil, err
+	}
 
 	if !isRemote {
 		targetMap[identifiers.PublishContextDeviceWWN] = orginalContext[identifiers.PublishContextDeviceWWN]
@@ -279,11 +282,11 @@ func readSCSIInfoFromPublishContext(publishContext map[string]string, useFC bool
 	}
 
 	deviceWWN, ok := publishContext[deviceWwnKey]
-	if !ok {
+	if !ok || deviceWWN == "" {
 		return data, status.Error(codes.InvalidArgument, "deviceWWN must be in publish context")
 	}
 	volumeLUNAddress, ok := publishContext[lunAddressKey]
-	if !ok {
+	if !ok || volumeLUNAddress == "" {
 		return data, status.Error(codes.InvalidArgument, "volumeLUNAddress must be in publish context")
 	}
 
@@ -332,7 +335,7 @@ func readISCSITargetsFromPublishContext(pc map[string]string, isRemote bool) []g
 		}
 
 		if ReachableEndPoint(p) {
-			// if the portals from the context (set in ControllerPublishVolume) is not reachable from the nodes
+			// if the portals from the context (set in NodeStageVolume) is not reachable from the nodes
 			targets = append(targets, target)
 		}
 	}

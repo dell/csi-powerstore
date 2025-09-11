@@ -140,8 +140,8 @@ func TestVolumePublisher_Publish(t *testing.T) {
 				Return([]gopowerstore.HostVolumeMapping{{HostID: validHostID, LogicalUnitNumber: 1}}, nil).Once()
 
 			_, err := sp.Publish(context.Background(), make(map[string]string), nil, clientMock, validNodeID, validBaseVolID, false)
-			assert.Error(t, err)
-			assert.Contains(t, err.Error(), e.Error())
+			// as of 1.16, logic for finding targets is handled in the stager
+			assert.Nil(t, err)
 		})
 	})
 
