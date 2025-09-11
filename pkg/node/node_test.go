@@ -1607,7 +1607,6 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				gomega.Expect(err.Error()).To(gomega.ContainSubstring("volumeLUNAddress must be in publish context"))
 			})
 
-			// TODO:failing for missing targets  has been moved to stager, will need to write similiar tests over there expecting errors before a PR can be opened
 			ginkgo.It("should fail [iscsiTargets]", func() {
 				setClientMocks()
 				setFSmocks()
@@ -1622,9 +1621,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					VolumeCapability: getCapabilityWithVoltypeAccessFstype(
 						"mount", "single-writer", "ext4"),
 				})
-				// gomega.Expect(err).ToNot(gomega.BeNil())
 				gomega.Expect(err).To(gomega.BeNil())
-				// gomega.Expect(err.Error()).To(gomega.ContainSubstring("iscsiTargets data must be in publish context"))
 			})
 
 			ginkgo.It("should fail [nvmefcTargets]", func() {
@@ -1643,9 +1640,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					VolumeCapability: getCapabilityWithVoltypeAccessFstype(
 						"mount", "single-writer", "ext4"),
 				})
-				// gomega.Expect(err).ToNot(gomega.BeNil())
 				gomega.Expect(err).To(gomega.BeNil())
-				// gomega.Expect(err.Error()).To(gomega.ContainSubstring("NVMeFC Targets data must be in publish context"))
 			})
 
 			ginkgo.It("should fail [nvmetcpTargets]", func() {
@@ -1664,9 +1659,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					VolumeCapability: getCapabilityWithVoltypeAccessFstype(
 						"mount", "single-writer", "ext4"),
 				})
-				// gomega.Expect(err).ToNot(gomega.BeNil())
 				gomega.Expect(err).To(gomega.BeNil())
-				// gomega.Expect(err.Error()).To(gomega.ContainSubstring("NVMeTCP Targets data must be in publish context"))
 			})
 
 			ginkgo.It("should fail [fcTargets]", func() {
@@ -1684,9 +1677,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					VolumeCapability: getCapabilityWithVoltypeAccessFstype(
 						"mount", "single-writer", "ext4"),
 				})
-				// gomega.Expect(err).ToNot(gomega.BeNil())
 				gomega.Expect(err).To(gomega.BeNil())
-				// gomega.Expect(err.Error()).To(gomega.ContainSubstring("fcTargets data must be in publish context"))
 			})
 		})
 
