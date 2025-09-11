@@ -22,6 +22,7 @@ import (
 	"context"
 	"errors"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
@@ -496,4 +497,75 @@ func TestSCSIStager_Stage(t *testing.T) {
 		assert.NotNil(t, err)
 		assert.Contains(t, err.Error(), "fcTargets data must be in publish context")
 	})
+}
+
+func TestSCSIStager_AddTargetsInfoToMap(t *testing.T) {
+	tests := []struct {
+		name               string
+		isRemote           bool
+		volumeApplianceID  string
+		iscsiTargetsInfo   string
+		fcTargetsInfo      string
+		nvmeFcTargetsInfo  string
+		nvmeTcpTargetsInfo string
+		expectedTargetMap  map[string]string
+		runBefore          func()
+		expectErr          string
+	}{
+		{
+			name:               "local iSCSI targets",
+			isRemote:           false,
+			volumeApplianceID:  "applianceID",
+			iscsiTargetsInfo:   "test",
+			fcTargetsInfo:      "",
+			nvmeFcTargetsInfo:  "",
+			nvmeTcpTargetsInfo: "",
+			expectedTargetMap: map[string]string{
+				identifiers.TargetMapContextISCSIPortalsPrefix:        "test",
+				identifiers.TargetMapISCSITargetsPrefix:               "",
+				identifiers.TargetMapFCWWPNPrefix:                     "",
+				identifiers.TargetMapublishContextNVMEFCPortalsPrefix: "",
+				identifiers.TargetMapNVMEFCTargetsPrefix:              "",
+				identifiers.TargetMapNVMETCPPortalsPrefix:             "",
+				identifiers.TargetMapNVMETCPTargetsPrefix:             "",
+			},
+			runBefore: func() {
+
+			},
+			expectErr: "",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// reset the mocks after each run
+			setClientMocks()
+
+			// TODO: put test-specificvalues into the client mock
+
+			// TODO: Use this to inject errors
+			// (like removing values from the client mock to force a fail)
+			if test.runBefore != nil {
+				test.runBefore()
+			}
+			targetMap := make(map[string]string)
+			stager := &SCSIStager{}
+			err := stager.AddTargetsInfoToMap(targetMap, test.volumeApplianceID, clientMock, test.isRemote)
+
+			// if there was an error and we expected none, fail
+			if err != nil && test.expectErr == "" {
+				t.Errorf("AddTargetsInfoToMap returned unexpected error: %v", err)
+			}
+
+			// if there was no error and we expected one, fail
+			if err == nil && test.expectErr != "" {
+				t.Errorf("AddTargetsInfoToMap returned no error, but expected: %v", test.expectErr)
+			}
+
+			// if the returned map doesn't match what was expected, fail
+			if !reflect.DeepEqual(targetMap, test.expectedTargetMap) {
+				t.Errorf("AddTargetsInfoToMap returned unexpected target map. Expected: %+v, Actual: %+v", test.expectedTargetMap, targetMap)
+			}
+		})
+	}
 }
