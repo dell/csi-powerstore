@@ -570,6 +570,8 @@ func TestSCSIStager_AddTargetsInfoToMap(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			// set the variables before each run
+			setVariables()
 			// reset the mocks after each run
 			setDefaultClientMocks()
 
