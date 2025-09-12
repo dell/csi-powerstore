@@ -556,7 +556,7 @@ func TestSCSIStager_AddTargetsInfoToMap(t *testing.T) {
 		iscsiTargetsInfo   string
 		fcWwn              string
 		nvmeNqn            string
-		nvmeTcpTargetsInfo string
+		nvmeTCPTargetsInfo string
 		expectedTargetMap  map[string]string
 		expectErr          bool
 	}{
@@ -567,7 +567,7 @@ func TestSCSIStager_AddTargetsInfoToMap(t *testing.T) {
 			iscsiTargetsInfo:   "test",
 			fcWwn:              "testWwn",
 			nvmeNqn:            "testNqn",
-			nvmeTcpTargetsInfo: "test2", // only determines if NVME TCP will be added to mock/error out, value will be nvmeNqn
+			nvmeTCPTargetsInfo: "test2", // only determines if NVME TCP will be added to mock/error out, value will be nvmeNqn
 			expectedTargetMap: map[string]string{
 				identifiers.TargetMapISCSIPortalsPrefix + "0":   "192.168.1.1:3260",
 				identifiers.TargetMapISCSITargetsPrefix + "0":   "test",
@@ -610,7 +610,7 @@ func TestSCSIStager_AddTargetsInfoToMap(t *testing.T) {
 			setVariables()
 
 			// put test-specificvalues into the client mock
-			setCustomClientMocks(test.iscsiTargetsInfo, test.fcWwn, test.nvmeTcpTargetsInfo, test.nvmeNqn)
+			setCustomClientMocks(test.iscsiTargetsInfo, test.fcWwn, test.nvmeTCPTargetsInfo, test.nvmeNqn)
 
 			// fill any values that are not set by custom
 			// note: mock.On will not override previous values with mock.anything

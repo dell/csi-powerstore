@@ -151,7 +151,7 @@ type NFSStager struct {
 
 // Stage stages volume by mounting volumes as nfs to the staging path
 func (n *NFSStager) Stage(ctx context.Context, req *csi.NodeStageVolumeRequest,
-	logFields log.Fields, fs fs.Interface, id string, _ bool, client gopowerstore.Client,
+	logFields log.Fields, fs fs.Interface, id string, _ bool, _ gopowerstore.Client,
 ) (*csi.NodeStageVolumeResponse, error) {
 	stagingPath := req.GetStagingTargetPath()
 
