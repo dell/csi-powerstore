@@ -164,39 +164,52 @@ func setDefaultClientMocks() {
 		}, nil)
 }
 
-func setCustomClientMocks(iscsiTargets string, fcTargets string, nvmeFCTargets string, nvmeTCPTargets string) {
+func setCustomClientMocks(iscsiTargets string, wwn string, nvmeTCPTargets string, nvmeNqn string) {
 	// for any given item, return an error if the item is not set
 	if iscsiTargets == "" {
 		clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
-			Return("", errors.New("error"))
+			Return(nil, errors.New("error"))
 	} else {
 		clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
-			Return(iscsiTargets, nil)
+			Return([]gopowerstore.IPPoolAddress{
+				{
+					Address: "192.168.1.1",
+					IPPort:  gopowerstore.IPPortInstance{TargetIqn: iscsiTargets},
+				},
+			}, nil)
 	}
 
-	if fcTargets == "" {
-		clientMock.On("GetStorageFCPortAddresses", mock.Anything).
-			Return("", errors.New("error"))
+	if wwn == "" {
+		clientMock.On("GetFCPorts", mock.Anything).
+			Return(nil, errors.New("error"))
 	} else {
-		clientMock.On("GetStorageFCPortAddresses", mock.Anything).
-			Return(nvmeTCPTargets, nil)
-	}
-
-	if nvmeFCTargets == "" {
-		clientMock.On("GetStorageNVMETCPTargetAddresses", mock.Anything).
-			Return("", errors.New("error"))
-	} else {
-		clientMock.On("GetStorageFCPortAddresses", mock.Anything).
-			Return(fcTargets, nil)
+		clientMock.On("GetFCPorts", mock.Anything).
+			Return([]gopowerstore.FcPort{
+				{
+					IsLinkUp: true,
+					Wwn:      wwn,
+					WwnNVMe:  wwn,
+					WwnNode:  wwn,
+				},
+			}, nil)
 	}
 
 	if nvmeTCPTargets == "" {
 		clientMock.On("GetStorageNVMETCPTargetAddresses", mock.Anything).
-			Return("", errors.New("error"))
+			Return(nil, errors.New("error"))
 	} else {
 		clientMock.On("GetStorageNVMETCPTargetAddresses", mock.Anything).
-			Return(nvmeTCPTargets, nil)
+			Return([]gopowerstore.IPPoolAddress{
+				{
+					Address: "192.168.1.1",
+					IPPort:  gopowerstore.IPPortInstance{TargetIqn: nvmeTCPTargets},
+				},
+			}, nil)
 	}
+
+	// always set the cluster value
+	clientMock.On("GetCluster", mock.Anything).
+		Return(gopowerstore.Cluster{Name: validClusterName, NVMeNQN: nvmeNqn}, nil)
 }
 
 func TestSCSIStager_Stage(t *testing.T) {
@@ -541,30 +554,53 @@ func TestSCSIStager_AddTargetsInfoToMap(t *testing.T) {
 		isRemote           bool
 		volumeApplianceID  string
 		iscsiTargetsInfo   string
-		fcTargetsInfo      string
-		nvmeFcTargetsInfo  string
+		fcWwn              string
+		nvmeNqn            string
 		nvmeTcpTargetsInfo string
 		expectedTargetMap  map[string]string
-		expectErr          string
+		expectErr          bool
 	}{
 		{
-			name:               "local iSCSI targets",
+			name:               "local targets - all",
 			isRemote:           false,
-			volumeApplianceID:  "applianceID",
+			volumeApplianceID:  "", // should be empty in most cases
 			iscsiTargetsInfo:   "test",
-			fcTargetsInfo:      "test2",
-			nvmeFcTargetsInfo:  "test3",
-			nvmeTcpTargetsInfo: "test4",
+			fcWwn:              "testWwn",
+			nvmeNqn:            "testNqn",
+			nvmeTcpTargetsInfo: "test2", // only determines if NVME TCP will be added to mock/error out, value will be nvmeNqn
 			expectedTargetMap: map[string]string{
-				identifiers.TargetMapContextISCSIPortalsPrefix:        "test",
-				identifiers.TargetMapISCSITargetsPrefix:               "test",
-				identifiers.TargetMapFCWWPNPrefix:                     "test2",
-				identifiers.TargetMapublishContextNVMEFCPortalsPrefix: "",
-				identifiers.TargetMapNVMEFCTargetsPrefix:              "",
-				identifiers.TargetMapNVMETCPPortalsPrefix:             "",
-				identifiers.TargetMapNVMETCPTargetsPrefix:             "",
+				identifiers.TargetMapContextISCSIPortalsPrefix + "0":        "192.168.1.1:3260",
+				identifiers.TargetMapISCSITargetsPrefix + "0":               "test",
+				identifiers.TargetMapFCWWPNPrefix + "0":                     "testWwn",
+				identifiers.TargetMapublishContextNVMEFCPortalsPrefix + "0": "nn-0xtestWwn:pn-0xtestWwn",
+				identifiers.TargetMapNVMEFCTargetsPrefix + "0":              "testNqn",
+				identifiers.TargetMapNVMETCPPortalsPrefix + "0":             "192.168.1.1:4420",
+				identifiers.TargetMapNVMETCPTargetsPrefix + "0":             "testNqn",
 			},
-			expectErr: "",
+			expectErr: false,
+		},
+		{
+			name:              "fail to get NVME and FC targets but ISCSI succeeds",
+			isRemote:          false,
+			volumeApplianceID: "", // should be empty in most cases
+			iscsiTargetsInfo:  "test",
+			fcWwn:             "",
+			nvmeNqn:           "",
+			expectedTargetMap: map[string]string{
+				identifiers.TargetMapContextISCSIPortalsPrefix + "0": "192.168.1.1:3260",
+				identifiers.TargetMapISCSITargetsPrefix + "0":        "test",
+			},
+			expectErr: false,
+		},
+		{
+			name:              "fail to get all targets",
+			isRemote:          false,
+			volumeApplianceID: "", // should be empty in most cases
+			iscsiTargetsInfo:  "",
+			fcWwn:             "",
+			nvmeNqn:           "",
+			expectedTargetMap: map[string]string{},
+			expectErr:         true,
 		},
 	}
 
@@ -572,11 +608,13 @@ func TestSCSIStager_AddTargetsInfoToMap(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			// set the variables before each run
 			setVariables()
-			// reset the mocks after each run
-			setDefaultClientMocks()
 
 			// put test-specificvalues into the client mock
-			setCustomClientMocks(test.iscsiTargetsInfo, test.fcTargetsInfo, test.nvmeFcTargetsInfo, test.nvmeTcpTargetsInfo)
+			setCustomClientMocks(test.iscsiTargetsInfo, test.fcWwn, test.nvmeTcpTargetsInfo, test.nvmeNqn)
+
+			// fill any values that are not set by custom
+			// note: mock.On will not override previous values with mock.anything
+			setDefaultClientMocks()
 
 			targetMap := make(map[string]string)
 			stager := &SCSIStager{}
@@ -585,13 +623,13 @@ func TestSCSIStager_AddTargetsInfoToMap(t *testing.T) {
 			fmt.Println(targetMap)
 
 			// if there was an error and we expected none, fail
-			if err != nil && test.expectErr == "" {
+			if err != nil && test.expectErr == false {
 				t.Errorf("AddTargetsInfoToMap returned unexpected error: %v", err)
 			}
 
 			// if there was no error and we expected one, fail
-			if err == nil && test.expectErr != "" {
-				t.Errorf("AddTargetsInfoToMap returned no error, but expected: %v", test.expectErr)
+			if test.expectErr {
+				assert.NotNil(t, err)
 			}
 
 			// if the returned map doesn't match what was expected, fail
