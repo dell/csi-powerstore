@@ -81,7 +81,7 @@ func (s *SCSIStager) Stage(ctx context.Context, req *csi.NodeStageVolumeRequest,
 		targetMap[identifiers.TargetMapLUNAddress] = orginalContext[identifiers.TargetMapLUNAddress]
 	} else {
 		targetMap[identifiers.TargetMapRemoteDeviceWWN] = orginalContext[identifiers.TargetMapRemoteDeviceWWN]
-		targetMap[identifiers.TargetMapRemoteLUNAddress] = orginalContext[identifiers.TargetMapRemoteDeviceWWN]
+		targetMap[identifiers.TargetMapRemoteLUNAddress] = orginalContext[identifiers.TargetMapRemoteLUNAddress]
 	}
 
 	publishContext, err := readSCSIInfoFromPublishContext(targetMap, s.useFC, s.useNVME, isRemote)

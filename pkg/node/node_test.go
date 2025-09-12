@@ -83,12 +83,11 @@ const (
 	validHostID          = "e8f4c5f8-c2fc-4df4-bd99-c292c12b55be"
 	validHostName        = "csi-node-1a47a1b91c444a8a90193d8066669603"
 	testErrMsg           = "test err"
-	// validDeviceWWN       = "68ccf09800e23ab798312a05426acae0"
-	validDeviceWWN     = "123"
-	validDevPath       = "/dev/sdag"
-	validDevName       = "sdag"
-	validNfsExportPath = "/mnt/nfs"
-	validTargetPath    = "/var/lib/kubelet/pods/dac33335-a31d-11e9-b46e-005056917428/" +
+	validDeviceWWN       = "68ccf09800e23ab798312a05426acae0"
+	validDevPath         = "/dev/sdag"
+	validDevName         = "sdag"
+	validNfsExportPath   = "/mnt/nfs"
+	validTargetPath      = "/var/lib/kubelet/pods/dac33335-a31d-11e9-b46e-005056917428/" +
 		"volumes/kubernetes.io~csi/csi-d91431aba3/mount"
 	validStagingPath = "/var/lib/kubelet/plugins/kubernetes.io/csi/volumeDevices/" +
 		"staging/csi-44b46e98ae/c875b4f0-172e-4238-aec7-95b379eb55db"
