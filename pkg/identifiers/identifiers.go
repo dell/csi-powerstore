@@ -140,16 +140,16 @@ const (
 	TargetMapDeviceWWN = "DEVICE_WWN"
 	// TargetMapLUNAddress indicates publish context LUN address
 	TargetMapLUNAddress = "LUN_ADDRESS"
-	// TargetMapContextISCSIPortalsPrefix indicates target map iSCSI portals prefix
-	TargetMapContextISCSIPortalsPrefix = "PORTAL"
+	// TargetMapISCSIPortalsPrefix indicates target map iSCSI portals prefix
+	TargetMapISCSIPortalsPrefix = "PORTAL"
 	// TargetMapISCSITargetsPrefix indicates target map iSCSI targets prefix
 	TargetMapISCSITargetsPrefix = "TARGET"
 	// TargetMapNVMETCPPortalsPrefix indicates target map NVMeTCP portals prefix
 	TargetMapNVMETCPPortalsPrefix = "NVMETCPPORTAL"
 	// TargetMapNVMETCPTargetsPrefix indicates target mapNVMe targets prefix
 	TargetMapNVMETCPTargetsPrefix = "NVMETCPTARGET"
-	// TargetMapublishContextNVMEFCPortalsPrefix indicates publish context NVMe targets prefix
-	TargetMapublishContextNVMEFCPortalsPrefix = "NVMEFCPORTAL"
+	// TargetMapNVMEFCPortalsPrefix indicates publish context NVMe targets prefix
+	TargetMapNVMEFCPortalsPrefix = "NVMEFCPORTAL"
 	// TargetMapNVMEFCTargetsPrefix indicates target map NVMe targets prefix
 	TargetMapNVMEFCTargetsPrefix = "NVMEFCTARGET"
 	// NVMETCPTransport indicates that NVMe/TCP is chosen as the transport protocol
