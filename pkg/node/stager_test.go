@@ -21,7 +21,9 @@ package node
 import (
 	"context"
 	"errors"
+	"fmt"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
@@ -126,8 +128,8 @@ func scsiStageRemoteMetroVolumeOK(util *mocks.UtilInterface, fs *mocks.FsInterfa
 	fs.On("GetUtil").Return(util)
 }
 
-// setClientMocks sets mocks for gopowerstore client, no matter what protocol is used, the mocks needed are the same
-func setClientMocks() {
+// setDefaultClientMocks sets default mock values for gopowerstore client, no matter what protocol is used, the mocks needed are the same
+func setDefaultClientMocks() {
 	clientMock.On("GetVolume", mock.Anything, validBaseVolID).
 		Return(gopowerstore.Volume{ID: validBaseVolID, Wwn: "naa.68ccf098003ceb5e4577a20be6d11bf9"}, nil)
 
@@ -162,13 +164,48 @@ func setClientMocks() {
 		}, nil)
 }
 
+func setCustomClientMocks(iscsiTargets string, fcTargets string, nvmeFCTargets string, nvmeTCPTargets string) {
+	// for any given item, return an error if the item is not set
+	if iscsiTargets == "" {
+		clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
+			Return("", errors.New("error"))
+	} else {
+		clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
+			Return(iscsiTargets, nil)
+	}
+
+	if fcTargets == "" {
+		clientMock.On("GetStorageFCPortAddresses", mock.Anything).
+			Return("", errors.New("error"))
+	} else {
+		clientMock.On("GetStorageFCPortAddresses", mock.Anything).
+			Return(nvmeTCPTargets, nil)
+	}
+
+	if nvmeFCTargets == "" {
+		clientMock.On("GetStorageNVMETCPTargetAddresses", mock.Anything).
+			Return("", errors.New("error"))
+	} else {
+		clientMock.On("GetStorageFCPortAddresses", mock.Anything).
+			Return(fcTargets, nil)
+	}
+
+	if nvmeTCPTargets == "" {
+		clientMock.On("GetStorageNVMETCPTargetAddresses", mock.Anything).
+			Return("", errors.New("error"))
+	} else {
+		clientMock.On("GetStorageNVMETCPTargetAddresses", mock.Anything).
+			Return(nvmeTCPTargets, nil)
+	}
+}
+
 func TestSCSIStager_Stage(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	t.Run("iscsi -- success test", func(t *testing.T) {
 		setVariables()
-		setClientMocks()
+		setDefaultClientMocks()
 		iscsiConnectorMock := new(mocks.ISCSIConnector)
 		fcConnectorMock := new(mocks.FcConnector)
 		nvmeConnectorMock := new(mocks.NVMEConnector)
@@ -199,7 +236,7 @@ func TestSCSIStager_Stage(t *testing.T) {
 
 	t.Run("nvmefc -- success test", func(t *testing.T) {
 		setVariables()
-		setClientMocks()
+		setDefaultClientMocks()
 		iscsiConnectorMock := new(mocks.ISCSIConnector)
 		fcConnectorMock := new(mocks.FcConnector)
 		nvmeConnectorMock := new(mocks.NVMEConnector)
@@ -232,7 +269,7 @@ func TestSCSIStager_Stage(t *testing.T) {
 
 	t.Run("nvmetcp -- success test", func(t *testing.T) {
 		setVariables()
-		setClientMocks()
+		setDefaultClientMocks()
 		iscsiConnectorMock := new(mocks.ISCSIConnector)
 		fcConnectorMock := new(mocks.FcConnector)
 		nvmeConnectorMock := new(mocks.NVMEConnector)
@@ -498,7 +535,7 @@ func TestSCSIStager_Stage(t *testing.T) {
 	})
 }
 
-/*func TestSCSIStager_AddTargetsInfoToMap(t *testing.T) {
+func TestSCSIStager_AddTargetsInfoToMap(t *testing.T) {
 	tests := []struct {
 		name               string
 		isRemote           bool
@@ -508,7 +545,6 @@ func TestSCSIStager_Stage(t *testing.T) {
 		nvmeFcTargetsInfo  string
 		nvmeTcpTargetsInfo string
 		expectedTargetMap  map[string]string
-		runBefore          func()
 		expectErr          string
 	}{
 		{
@@ -516,20 +552,17 @@ func TestSCSIStager_Stage(t *testing.T) {
 			isRemote:           false,
 			volumeApplianceID:  "applianceID",
 			iscsiTargetsInfo:   "test",
-			fcTargetsInfo:      "",
-			nvmeFcTargetsInfo:  "",
-			nvmeTcpTargetsInfo: "",
+			fcTargetsInfo:      "test2",
+			nvmeFcTargetsInfo:  "test3",
+			nvmeTcpTargetsInfo: "test4",
 			expectedTargetMap: map[string]string{
 				identifiers.TargetMapContextISCSIPortalsPrefix:        "test",
-				identifiers.TargetMapISCSITargetsPrefix:               "",
-				identifiers.TargetMapFCWWPNPrefix:                     "",
+				identifiers.TargetMapISCSITargetsPrefix:               "test",
+				identifiers.TargetMapFCWWPNPrefix:                     "test2",
 				identifiers.TargetMapublishContextNVMEFCPortalsPrefix: "",
 				identifiers.TargetMapNVMEFCTargetsPrefix:              "",
 				identifiers.TargetMapNVMETCPPortalsPrefix:             "",
 				identifiers.TargetMapNVMETCPTargetsPrefix:             "",
-			},
-			runBefore: func() {
-
 			},
 			expectErr: "",
 		},
@@ -538,18 +571,16 @@ func TestSCSIStager_Stage(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			// reset the mocks after each run
-			setClientMocks()
+			setDefaultClientMocks()
 
-			// TODO: put test-specificvalues into the client mock
+			// put test-specificvalues into the client mock
+			setCustomClientMocks(test.iscsiTargetsInfo, test.fcTargetsInfo, test.nvmeFcTargetsInfo, test.nvmeTcpTargetsInfo)
 
-			// TODO: Use this to inject errors
-			// (like removing values from the client mock to force a fail)
-			if test.runBefore != nil {
-				test.runBefore()
-			}
 			targetMap := make(map[string]string)
 			stager := &SCSIStager{}
 			err := stager.AddTargetsInfoToMap(targetMap, test.volumeApplianceID, clientMock, test.isRemote)
+			fmt.Println("Actual map: ")
+			fmt.Println(targetMap)
 
 			// if there was an error and we expected none, fail
 			if err != nil && test.expectErr == "" {
@@ -567,4 +598,4 @@ func TestSCSIStager_Stage(t *testing.T) {
 			}
 		})
 	}
-}*/
+}

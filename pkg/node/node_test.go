@@ -1217,7 +1217,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 		stagingPath := filepath.Join(nodeStagePrivateDir, validBaseVolumeID)
 		ginkgo.When("using iSCSI", func() {
 			ginkgo.It("should successfully stage iSCSI volume", func() {
-				setClientMocks()
+				setDefaultClientMocks()
 				iscsiConnectorMock.On("ConnectVolume", mock.Anything, mock.Anything).Return(gobrick.Device{}, nil)
 				scsiStageVolumeOK(utilMock, fsMock)
 				res, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
@@ -1234,7 +1234,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 		ginkgo.When("using NVMeFC", func() {
 			ginkgo.It("should successfully stage NVMeFC volume", func() {
-				setClientMocks()
+				setDefaultClientMocks()
 				nodeSvc.useNVME[firstGlobalID] = true
 				nodeSvc.useFC[firstGlobalID] = true
 				nvmeConnectorMock.On("ConnectVolume", mock.Anything, mock.Anything, true).Return(gobrick.Device{}, nil)
@@ -1254,7 +1254,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 		ginkgo.When("using FC", func() {
 			ginkgo.It("should successfully stage FC volume", func() {
-				setClientMocks()
+				setDefaultClientMocks()
 				nodeSvc.useFC[firstGlobalID] = true
 				fcConnectorMock.On("ConnectVolume", mock.Anything, mock.Anything).Return(gobrick.Device{}, nil)
 
@@ -1380,7 +1380,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 		ginkgo.When("using iSCSI for Metro volume", func() {
 			ginkgo.It("should successfully stage Metro iSCSI volume", func() {
-				setClientMocks()
+				setDefaultClientMocks()
 				iscsiConnectorMock.On("ConnectVolume", mock.Anything, mock.Anything).Return(gobrick.Device{}, nil).Times(4)
 				scsiStageVolumeOK(utilMock, fsMock)
 				scsiStageRemoteMetroVolumeOK(utilMock, fsMock)
@@ -1399,7 +1399,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 		ginkgo.When("volume is already staged", func() {
 			ginkgo.It("should return that stage is successful [SCSI]", func() {
-				setClientMocks()
+				setDefaultClientMocks()
 				iscsiConnectorMock.On("ConnectVolume", mock.Anything, mock.Anything).Return(gobrick.Device{}, nil)
 				mountInfo := []gofsutil.Info{
 					{
@@ -1532,7 +1532,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 			})
 
 			ginkgo.It("should unstage and stage again", func() {
-				setClientMocks()
+				setDefaultClientMocks()
 				fsMock.On("Remove", stagingPath).Return(nil).Once()
 
 				res, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
@@ -1547,9 +1547,9 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 			})
 
 			ginkgo.When("unstaging fails", func() {
-				setClientMocks()
+				setDefaultClientMocks()
 				ginkgo.It("should fail", func() {
-					setClientMocks()
+					setDefaultClientMocks()
 					e := errors.New("os-error")
 					fsMock.On("Remove", stagingPath).Return(e).Once()
 					fsMock.On("IsNotExist", e).Return(false)
@@ -1571,7 +1571,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 		ginkgo.When("publish context is incorrect", func() {
 			ginkgo.It("should fail [deviceWWN]", func() {
-				setClientMocks()
+				setDefaultClientMocks()
 				setFSmocks()
 				iscsiConnectorMock.On("ConnectVolume", mock.Anything, mock.Anything).Return(gobrick.Device{}, nil)
 				res, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
@@ -1589,7 +1589,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 			})
 
 			ginkgo.It("should fail [volumeLUNAddress]", func() {
-				setClientMocks()
+				setDefaultClientMocks()
 				setFSmocks()
 				iscsiConnectorMock.On("ConnectVolume", mock.Anything, mock.Anything).Return(gobrick.Device{}, nil)
 				res, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
@@ -1607,7 +1607,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 			})
 
 			ginkgo.It("should fail [iscsiTargets]", func() {
-				setClientMocks()
+				setDefaultClientMocks()
 				setFSmocks()
 				iscsiConnectorMock.On("ConnectVolume", mock.Anything, mock.Anything).Return(gobrick.Device{}, nil)
 				_, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
@@ -1624,7 +1624,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 			})
 
 			ginkgo.It("should fail [nvmefcTargets]", func() {
-				setClientMocks()
+				setDefaultClientMocks()
 				setFSmocks()
 				nvmeConnectorMock.On("ConnectVolume", mock.Anything, mock.Anything, true).Return(gobrick.Device{}, nil)
 				nodeSvc.useNVME[firstGlobalID] = true
@@ -1643,7 +1643,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 			})
 
 			ginkgo.It("should fail [nvmetcpTargets]", func() {
-				setClientMocks()
+				setDefaultClientMocks()
 				setFSmocks()
 				nvmeConnectorMock.On("ConnectVolume", mock.Anything, mock.Anything, false).Return(gobrick.Device{}, nil)
 				nodeSvc.useNVME[firstGlobalID] = true
@@ -1662,7 +1662,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 			})
 
 			ginkgo.It("should fail [fcTargets]", func() {
-				setClientMocks()
+				setDefaultClientMocks()
 				setFSmocks()
 				fcConnectorMock.On("ConnectVolume", mock.Anything, mock.Anything).Return(gobrick.Device{}, nil)
 				nodeSvc.useFC[firstGlobalID] = true
@@ -1682,7 +1682,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 		ginkgo.When("can not connect device", func() {
 			ginkgo.It("should fail", func() {
-				setClientMocks()
+				setDefaultClientMocks()
 				e := errors.New("connection-error")
 				iscsiConnectorMock.On("ConnectVolume", mock.Anything, mock.Anything).Return(gobrick.Device{}, e)
 
@@ -1702,7 +1702,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 		ginkgo.When("mount fails", func() {
 			ginkgo.It("should fail", func() {
-				setClientMocks()
+				setDefaultClientMocks()
 				e := errors.New("mount-error")
 				iscsiConnectorMock.On("ConnectVolume", mock.Anything, mock.Anything).Return(gobrick.Device{}, nil)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
@@ -3169,7 +3169,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 	ginkgo.Describe("Calling EphemeralNodePublish()", func() {
 		ginkgo.When("everything's correct", func() {
 			ginkgo.It("should succeed", func() {
-				setClientMocks()
+				setDefaultClientMocks()
 				fsMock.On("Stat", mock.Anything).Return(&mocks.FileInfo{}, nil)
 				fsMock.On("MkdirAll", mock.Anything, mock.Anything).Return(nil).Times(2)
 				fsMock.On("Create", mock.Anything).Return(&os.File{}, nil)
@@ -3297,7 +3297,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 		})
 		ginkgo.When("Child NodeStage() is failing", func() {
 			ginkgo.It("should cleanup and call unpublish", func() {
-				setClientMocks()
+				setDefaultClientMocks()
 				fsMock.On("Stat", mock.Anything).Return(&mocks.FileInfo{}, nil)
 				fsMock.On("MkdirAll", mock.Anything, mock.Anything).Return(nil).Times(2)
 				fsMock.On("Create", mock.Anything).Return(&os.File{}, nil)
@@ -3491,7 +3491,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 	})
 	ginkgo.When("everything's correct", func() {
 		ginkgo.It("should succeed", func() {
-			setClientMocks()
+			setDefaultClientMocks()
 			fsMock.On("Stat", mock.Anything).Return(&mocks.FileInfo{}, nil)
 			fsMock.On("MkdirAll", mock.Anything, mock.Anything).Return(nil).Times(2)
 			fsMock.On("Create", mock.Anything).Return(&os.File{}, nil)
