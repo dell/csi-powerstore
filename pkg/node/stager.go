@@ -315,7 +315,7 @@ func readSCSIInfoFromPublishContext(publishContext map[string]string, useFC bool
 func readISCSITargetsFromPublishContext(pc map[string]string, isRemote bool) []gobrick.ISCSITargetInfo {
 	var targets []gobrick.ISCSITargetInfo
 	iscsiTargetsKey := identifiers.TargetMapISCSITargetsPrefix
-	iscsiPortalsKey := identifiers.TargetMapContextISCSIPortalsPrefix
+	iscsiPortalsKey := identifiers.TargetMapISCSIPortalsPrefix
 	if isRemote {
 		iscsiTargetsKey = identifiers.TargetMapRemoteISCSITargetsPrefix
 		iscsiPortalsKey = identifiers.TargetMapRemoteISCSIPortalsPrefix
@@ -373,7 +373,7 @@ func readNVMETCPTargetsFromPublishContext(pc map[string]string, isRemote bool) [
 func readNVMEFCTargetsFromPublishContext(pc map[string]string, isRemote bool) []gobrick.NVMeTargetInfo {
 	var targets []gobrick.NVMeTargetInfo
 	nvmeFcTargetsKey := identifiers.TargetMapNVMEFCTargetsPrefix
-	nvmeFcPortalsKey := identifiers.TargetMapublishContextNVMEFCPortalsPrefix
+	nvmeFcPortalsKey := identifiers.TargetMapNVMEFCPortalsPrefix
 	if isRemote {
 		nvmeFcTargetsKey = identifiers.TargetMapRemoteNVMEFCTargetsPrefix
 		nvmeFcPortalsKey = identifiers.TargetMapRemoteNVMEFCPortalsPrefix
@@ -552,10 +552,10 @@ func isReadyToPublishNFS(ctx context.Context, stagingPath string, fs fs.Interfac
 func (s *SCSIStager) AddTargetsInfoToMap(
 	targetMap map[string]string, volumeApplianceID string, client gopowerstore.Client, isRemote bool,
 ) error {
-	iscsiPortalsKey := identifiers.TargetMapContextISCSIPortalsPrefix
+	iscsiPortalsKey := identifiers.TargetMapISCSIPortalsPrefix
 	iscsiTargetsKey := identifiers.TargetMapISCSITargetsPrefix
 	fcWwpnKey := identifiers.TargetMapFCWWPNPrefix
-	nvmeFcPortalsKey := identifiers.TargetMapublishContextNVMEFCPortalsPrefix
+	nvmeFcPortalsKey := identifiers.TargetMapNVMEFCPortalsPrefix
 	nvmeFcTargetsKey := identifiers.TargetMapNVMEFCTargetsPrefix
 	nvmeTCPPortalsKey := identifiers.TargetMapNVMETCPPortalsPrefix
 	nvmeTCPTargetsKey := identifiers.TargetMapNVMETCPTargetsPrefix
