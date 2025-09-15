@@ -1137,8 +1137,8 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					}, nil)
 				arrays := getTestArrays()
 				nodeSvc.iscsiTargets[firstGlobalID] = []string{"iqn.2015-10.com.dell:dellemc-foobar-123-a-7ceb34a0"}
+				nodeSvc.iscsiTargets[secondGlobalID] = []string{"iqn.2015-10.com.dell:dellemc-foobar-123-a-abcd34a0"}
 				nodeSvc.startNodeToArrayConnectivityCheck(context.Background())
-
 				err := nodeSvc.nodeProbe(context.Background(), arrays["gid1"])
 				gomega.Expect(err).To(gomega.BeNil())
 			})
