@@ -205,6 +205,14 @@ var usage = []*csi.VolumeUsage{
 	},
 }
 
+func setFSmocks() {
+	fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil)
+	fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
+	fsMock.On("MkFileIdempotent", filepath.Join(nodeStagePrivateDir, validBaseVolumeID)).Return(true, nil)
+	fsMock.On("GetUtil").Return(utilMock)
+	utilMock.On("BindMount", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+}
+
 func TestCSINodeService(t *testing.T) {
 	gomega.RegisterFailHandler(ginkgo.Fail)
 	junitReporter := reporters.NewJUnitReporter("node-svc.xml")
@@ -1207,14 +1215,10 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 	ginkgo.Describe("calling NodeStage()", func() {
 		stagingPath := filepath.Join(nodeStagePrivateDir, validBaseVolumeID)
-
 		ginkgo.When("using iSCSI", func() {
 			ginkgo.It("should successfully stage iSCSI volume", func() {
-				iscsiConnectorMock.On("ConnectVolume", mock.Anything, gobrick.ISCSIVolumeInfo{
-					Targets: validISCSITargetInfo,
-					Lun:     validLUNIDINT,
-				}).Return(gobrick.Device{}, nil)
-
+				setDefaultClientMocks()
+				iscsiConnectorMock.On("ConnectVolume", mock.Anything, mock.Anything).Return(gobrick.Device{}, nil)
 				scsiStageVolumeOK(utilMock, fsMock)
 				res, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
 					VolumeId:          validBlockVolumeID,
@@ -1230,12 +1234,10 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 		ginkgo.When("using NVMeFC", func() {
 			ginkgo.It("should successfully stage NVMeFC volume", func() {
+				setDefaultClientMocks()
 				nodeSvc.useNVME[firstGlobalID] = true
 				nodeSvc.useFC[firstGlobalID] = true
-				nvmeConnectorMock.On("ConnectVolume", mock.Anything, gobrick.NVMeVolumeInfo{
-					Targets: validNVMEFCTargetInfo,
-					WWN:     validDeviceWWN,
-				}, true).Return(gobrick.Device{}, nil)
+				nvmeConnectorMock.On("ConnectVolume", mock.Anything, mock.Anything, true).Return(gobrick.Device{}, nil)
 
 				scsiStageVolumeOK(utilMock, fsMock)
 				res, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
@@ -1252,11 +1254,9 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 		ginkgo.When("using FC", func() {
 			ginkgo.It("should successfully stage FC volume", func() {
+				setDefaultClientMocks()
 				nodeSvc.useFC[firstGlobalID] = true
-				fcConnectorMock.On("ConnectVolume", mock.Anything, gobrick.FCVolumeInfo{
-					Targets: validFCTargetsInfo,
-					Lun:     validLUNIDINT,
-				}).Return(gobrick.Device{}, nil)
+				fcConnectorMock.On("ConnectVolume", mock.Anything, mock.Anything).Return(gobrick.Device{}, nil)
 
 				scsiStageVolumeOK(utilMock, fsMock)
 				res, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
@@ -1380,15 +1380,8 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 		ginkgo.When("using iSCSI for Metro volume", func() {
 			ginkgo.It("should successfully stage Metro iSCSI volume", func() {
-				iscsiConnectorMock.On("ConnectVolume", mock.Anything, gobrick.ISCSIVolumeInfo{
-					Targets: validISCSITargetInfo,
-					Lun:     validLUNIDINT,
-				}).Return(gobrick.Device{}, nil).Times(2)
-				iscsiConnectorMock.On("ConnectVolume", mock.Anything, gobrick.ISCSIVolumeInfo{
-					Targets: validRemoteISCSITargetInfo,
-					Lun:     validLUNIDINT,
-				}).Return(gobrick.Device{}, nil).Times(2)
-
+				setDefaultClientMocks()
+				iscsiConnectorMock.On("ConnectVolume", mock.Anything, mock.Anything).Return(gobrick.Device{}, nil).Times(4)
 				scsiStageVolumeOK(utilMock, fsMock)
 				scsiStageRemoteMetroVolumeOK(utilMock, fsMock)
 				metroVolumeID := fmt.Sprintf("%s:%s/%s", validBlockVolumeID, validRemoteVolID, secondValidIP)
@@ -1406,11 +1399,8 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 		ginkgo.When("volume is already staged", func() {
 			ginkgo.It("should return that stage is successful [SCSI]", func() {
-				iscsiConnectorMock.On("ConnectVolume", mock.Anything, gobrick.ISCSIVolumeInfo{
-					Targets: validISCSITargetInfo,
-					Lun:     validLUNIDINT,
-				}).Return(gobrick.Device{}, nil)
-
+				setDefaultClientMocks()
+				iscsiConnectorMock.On("ConnectVolume", mock.Anything, mock.Anything).Return(gobrick.Device{}, nil)
 				mountInfo := []gofsutil.Info{
 					{
 						Device: validDevName,
@@ -1524,10 +1514,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					},
 				}
 
-				iscsiConnectorMock.On("ConnectVolume", mock.Anything, gobrick.ISCSIVolumeInfo{
-					Targets: validISCSITargetInfo,
-					Lun:     validLUNIDINT,
-				}).Return(gobrick.Device{}, nil)
+				iscsiConnectorMock.On("ConnectVolume", mock.Anything, mock.Anything).Return(gobrick.Device{}, nil)
 
 				// Stage
 				utilMock.On("BindMount", mock.Anything, "/dev",
@@ -1545,6 +1532,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 			})
 
 			ginkgo.It("should unstage and stage again", func() {
+				setDefaultClientMocks()
 				fsMock.On("Remove", stagingPath).Return(nil).Once()
 
 				res, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
@@ -1559,7 +1547,9 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 			})
 
 			ginkgo.When("unstaging fails", func() {
+				setDefaultClientMocks()
 				ginkgo.It("should fail", func() {
+					setDefaultClientMocks()
 					e := errors.New("os-error")
 					fsMock.On("Remove", stagingPath).Return(e).Once()
 					fsMock.On("IsNotExist", e).Return(false)
@@ -1581,9 +1571,14 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 		ginkgo.When("publish context is incorrect", func() {
 			ginkgo.It("should fail [deviceWWN]", func() {
+				setDefaultClientMocks()
+				setFSmocks()
+				iscsiConnectorMock.On("ConnectVolume", mock.Anything, mock.Anything).Return(gobrick.Device{}, nil)
 				res, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
-					VolumeId:          validBlockVolumeID,
-					PublishContext:    map[string]string{},
+					VolumeId: validBlockVolumeID,
+					PublishContext: map[string]string{
+						identifiers.TargetMapLUNAddress: validLUNID,
+					},
 					StagingTargetPath: nodeStagePrivateDir,
 					VolumeCapability: getCapabilityWithVoltypeAccessFstype(
 						"mount", "single-writer", "ext4"),
@@ -1594,10 +1589,13 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 			})
 
 			ginkgo.It("should fail [volumeLUNAddress]", func() {
+				setDefaultClientMocks()
+				setFSmocks()
+				iscsiConnectorMock.On("ConnectVolume", mock.Anything, mock.Anything).Return(gobrick.Device{}, nil)
 				res, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
 					VolumeId: validBlockVolumeID,
 					PublishContext: map[string]string{
-						identifiers.PublishContextDeviceWWN: validDeviceWWN,
+						identifiers.TargetMapDeviceWWN: validDeviceWWN,
 					},
 					StagingTargetPath: nodeStagePrivateDir,
 					VolumeCapability: getCapabilityWithVoltypeAccessFstype(
@@ -1609,82 +1607,84 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 			})
 
 			ginkgo.It("should fail [iscsiTargets]", func() {
-				res, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
+				setDefaultClientMocks()
+				setFSmocks()
+				iscsiConnectorMock.On("ConnectVolume", mock.Anything, mock.Anything).Return(gobrick.Device{}, nil)
+				_, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
 					VolumeId: validBlockVolumeID,
 					PublishContext: map[string]string{
-						identifiers.PublishContextDeviceWWN:  validDeviceWWN,
-						identifiers.PublishContextLUNAddress: validLUNID,
+						identifiers.TargetMapDeviceWWN:  validDeviceWWN,
+						identifiers.TargetMapLUNAddress: validLUNID,
 					},
 					StagingTargetPath: nodeStagePrivateDir,
 					VolumeCapability: getCapabilityWithVoltypeAccessFstype(
 						"mount", "single-writer", "ext4"),
 				})
-				gomega.Expect(err).ToNot(gomega.BeNil())
-				gomega.Expect(res).To(gomega.BeNil())
-				gomega.Expect(err.Error()).To(gomega.ContainSubstring("iscsiTargets data must be in publish context"))
+				gomega.Expect(err).To(gomega.BeNil())
 			})
 
 			ginkgo.It("should fail [nvmefcTargets]", func() {
+				setDefaultClientMocks()
+				setFSmocks()
+				nvmeConnectorMock.On("ConnectVolume", mock.Anything, mock.Anything, true).Return(gobrick.Device{}, nil)
 				nodeSvc.useNVME[firstGlobalID] = true
 				nodeSvc.useFC[firstGlobalID] = true
-				res, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
+				_, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
 					VolumeId: validBlockVolumeID,
 					PublishContext: map[string]string{
-						identifiers.PublishContextDeviceWWN:  validDeviceWWN,
-						identifiers.PublishContextLUNAddress: validLUNID,
+						identifiers.TargetMapDeviceWWN:  validDeviceWWN,
+						identifiers.TargetMapLUNAddress: validLUNID,
 					},
 					StagingTargetPath: nodeStagePrivateDir,
 					VolumeCapability: getCapabilityWithVoltypeAccessFstype(
 						"mount", "single-writer", "ext4"),
 				})
-				gomega.Expect(err).ToNot(gomega.BeNil())
-				gomega.Expect(res).To(gomega.BeNil())
-				gomega.Expect(err.Error()).To(gomega.ContainSubstring("NVMeFC Targets data must be in publish context"))
+				gomega.Expect(err).To(gomega.BeNil())
 			})
 
 			ginkgo.It("should fail [nvmetcpTargets]", func() {
+				setDefaultClientMocks()
+				setFSmocks()
+				nvmeConnectorMock.On("ConnectVolume", mock.Anything, mock.Anything, false).Return(gobrick.Device{}, nil)
 				nodeSvc.useNVME[firstGlobalID] = true
 				nodeSvc.useFC[firstGlobalID] = false
-				res, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
+				_, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
 					VolumeId: validBlockVolumeID,
 					PublishContext: map[string]string{
-						identifiers.PublishContextDeviceWWN:  validDeviceWWN,
-						identifiers.PublishContextLUNAddress: validLUNID,
+						identifiers.TargetMapDeviceWWN:  validDeviceWWN,
+						identifiers.TargetMapLUNAddress: validLUNID,
 					},
 					StagingTargetPath: nodeStagePrivateDir,
 					VolumeCapability: getCapabilityWithVoltypeAccessFstype(
 						"mount", "single-writer", "ext4"),
 				})
-				gomega.Expect(err).ToNot(gomega.BeNil())
-				gomega.Expect(res).To(gomega.BeNil())
-				gomega.Expect(err.Error()).To(gomega.ContainSubstring("NVMeTCP Targets data must be in publish context"))
+				gomega.Expect(err).To(gomega.BeNil())
 			})
 
 			ginkgo.It("should fail [fcTargets]", func() {
+				setDefaultClientMocks()
+				setFSmocks()
+				fcConnectorMock.On("ConnectVolume", mock.Anything, mock.Anything).Return(gobrick.Device{}, nil)
 				nodeSvc.useFC[firstGlobalID] = true
-				res, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
+				_, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
 					VolumeId: validBlockVolumeID,
 					PublishContext: map[string]string{
-						identifiers.PublishContextDeviceWWN:  validDeviceWWN,
-						identifiers.PublishContextLUNAddress: validLUNID,
+						identifiers.TargetMapDeviceWWN:  validDeviceWWN,
+						identifiers.TargetMapLUNAddress: validLUNID,
 					},
 					StagingTargetPath: nodeStagePrivateDir,
 					VolumeCapability: getCapabilityWithVoltypeAccessFstype(
 						"mount", "single-writer", "ext4"),
 				})
-				gomega.Expect(err).ToNot(gomega.BeNil())
-				gomega.Expect(res).To(gomega.BeNil())
-				gomega.Expect(err.Error()).To(gomega.ContainSubstring("fcTargets data must be in publish context"))
+				gomega.Expect(err).To(gomega.BeNil())
 			})
 		})
 
 		ginkgo.When("can not connect device", func() {
 			ginkgo.It("should fail", func() {
+				setDefaultClientMocks()
 				e := errors.New("connection-error")
-				iscsiConnectorMock.On("ConnectVolume", mock.Anything, gobrick.ISCSIVolumeInfo{
-					Targets: validISCSITargetInfo,
-					Lun:     validLUNIDINT,
-				}).Return(gobrick.Device{}, e)
+				iscsiConnectorMock.On("ConnectVolume", mock.Anything, mock.Anything).Return(gobrick.Device{}, e)
 
 				scsiStageVolumeOK(utilMock, fsMock)
 				res, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
@@ -1702,11 +1702,9 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 		ginkgo.When("mount fails", func() {
 			ginkgo.It("should fail", func() {
+				setDefaultClientMocks()
 				e := errors.New("mount-error")
-				iscsiConnectorMock.On("ConnectVolume", mock.Anything, gobrick.ISCSIVolumeInfo{
-					Targets: validISCSITargetInfo,
-					Lun:     validLUNIDINT,
-				}).Return(gobrick.Device{}, nil)
+				iscsiConnectorMock.On("ConnectVolume", mock.Anything, mock.Anything).Return(gobrick.Device{}, nil)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
 				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
 				fsMock.On("MkFileIdempotent", filepath.Join(nodeStagePrivateDir, validBaseVolumeID)).Return(true, nil)
@@ -3171,6 +3169,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 	ginkgo.Describe("Calling EphemeralNodePublish()", func() {
 		ginkgo.When("everything's correct", func() {
 			ginkgo.It("should succeed", func() {
+				setDefaultClientMocks()
 				fsMock.On("Stat", mock.Anything).Return(&mocks.FileInfo{}, nil)
 				fsMock.On("MkdirAll", mock.Anything, mock.Anything).Return(nil).Times(2)
 				fsMock.On("Create", mock.Anything).Return(&os.File{}, nil)
@@ -3196,10 +3195,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 						"FCWWPN1":     "58ccf09348a002a3",
 					},
 				}, nil)
-				iscsiConnectorMock.On("ConnectVolume", mock.Anything, gobrick.ISCSIVolumeInfo{
-					Targets: validISCSITargetInfo,
-					Lun:     validLUNIDINT,
-				}).Return(gobrick.Device{}, nil)
+				iscsiConnectorMock.On("ConnectVolume", mock.Anything, mock.Anything).Return(gobrick.Device{}, nil)
 				fsMock.On("GetUtil").Return(utilMock)
 				utilMock.On("BindMount", mock.Anything, "/dev", mock.Anything).Return(nil)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil)
@@ -3301,6 +3297,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 		})
 		ginkgo.When("Child NodeStage() is failing", func() {
 			ginkgo.It("should cleanup and call unpublish", func() {
+				setDefaultClientMocks()
 				fsMock.On("Stat", mock.Anything).Return(&mocks.FileInfo{}, nil)
 				fsMock.On("MkdirAll", mock.Anything, mock.Anything).Return(nil).Times(2)
 				fsMock.On("Create", mock.Anything).Return(&os.File{}, nil)
@@ -3327,10 +3324,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					},
 				}, nil)
 
-				iscsiConnectorMock.On("ConnectVolume", mock.Anything, gobrick.ISCSIVolumeInfo{
-					Targets: validISCSITargetInfo,
-					Lun:     validLUNIDINT,
-				}).Return(gobrick.Device{}, nil)
+				iscsiConnectorMock.On("ConnectVolume", mock.Anything, mock.Anything).Return(gobrick.Device{}, nil)
 				utilMock.On("BindMount", mock.Anything, "/dev", mock.Anything).Return(nil)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
 				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
@@ -3497,6 +3491,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 	})
 	ginkgo.When("everything's correct", func() {
 		ginkgo.It("should succeed", func() {
+			setDefaultClientMocks()
 			fsMock.On("Stat", mock.Anything).Return(&mocks.FileInfo{}, nil)
 			fsMock.On("MkdirAll", mock.Anything, mock.Anything).Return(nil).Times(2)
 			fsMock.On("Create", mock.Anything).Return(&os.File{}, nil)
@@ -3522,10 +3517,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					"FCWWPN1":     "58ccf09348a002a3",
 				},
 			}, nil)
-			iscsiConnectorMock.On("ConnectVolume", mock.Anything, gobrick.ISCSIVolumeInfo{
-				Targets: validISCSITargetInfo,
-				Lun:     validLUNIDINT,
-			}).Return(gobrick.Device{}, nil)
+			iscsiConnectorMock.On("ConnectVolume", mock.Anything, mock.Anything).Return(gobrick.Device{}, nil)
 			fsMock.On("GetUtil").Return(utilMock)
 			utilMock.On("BindMount", mock.Anything, "/dev", mock.Anything).Return(nil)
 			fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil)

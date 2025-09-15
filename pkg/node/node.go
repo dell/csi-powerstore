@@ -313,6 +313,8 @@ func (s *Service) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeR
 		return nil, status.Errorf(codes.Internal, "can't find array with ID %s", arrayID)
 	}
 
+	client := arr.GetClient()
+
 	var stager VolumeStager
 	if protocol == "nfs" {
 		stager = &NFSStager{
@@ -328,7 +330,7 @@ func (s *Service) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeR
 		}
 	}
 
-	response, err := stager.Stage(ctx, req, logFields, s.Fs, id, false)
+	response, err := stager.Stage(ctx, req, logFields, s.Fs, id, false, client)
 	if err != nil {
 		return nil, err
 	}
@@ -339,7 +341,7 @@ func (s *Service) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeR
 		if nfs.IsNFSVolumeID(req.VolumeId) {
 			req.StagingTargetPath = nfs.NfsExportDirectory
 		}
-		response, err = stager.Stage(ctx, req, logFields, s.Fs, remoteVolumeID, true)
+		response, err = stager.Stage(ctx, req, logFields, s.Fs, remoteVolumeID, true, client)
 	}
 
 	return response, err

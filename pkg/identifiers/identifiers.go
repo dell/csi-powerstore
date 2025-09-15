@@ -136,46 +136,46 @@ const (
 	AutoDetectTransport TransportType = "AUTO"
 	// NoneTransport indicates that no SCSI transport protocol needed
 	NoneTransport TransportType = "NONE"
-	// PublishContextDeviceWWN indicates publish context device wwn
-	PublishContextDeviceWWN = "DEVICE_WWN"
-	// PublishContextLUNAddress indicates publish context LUN address
-	PublishContextLUNAddress = "LUN_ADDRESS"
-	// PublishContextISCSIPortalsPrefix indicates publish context iSCSI portals prefix
-	PublishContextISCSIPortalsPrefix = "PORTAL"
-	// PublishContextISCSITargetsPrefix indicates publish context iSCSI targets prefix
-	PublishContextISCSITargetsPrefix = "TARGET"
-	// PublishContextNVMETCPPortalsPrefix indicates publish context NVMeTCP portals prefix
-	PublishContextNVMETCPPortalsPrefix = "NVMETCPPORTAL"
-	// PublishContextNVMETCPTargetsPrefix indicates publish context NVMe targets prefix
-	PublishContextNVMETCPTargetsPrefix = "NVMETCPTARGET"
-	// PublishContextNVMEFCPortalsPrefix indicates publish context NVMe targets prefix
-	PublishContextNVMEFCPortalsPrefix = "NVMEFCPORTAL"
-	// PublishContextNVMEFCTargetsPrefix indicates publish context NVMe targets prefix
-	PublishContextNVMEFCTargetsPrefix = "NVMEFCTARGET"
+	// TargetMapDeviceWWN indicates target map device wwn
+	TargetMapDeviceWWN = "DEVICE_WWN"
+	// TargetMapLUNAddress indicates publish context LUN address
+	TargetMapLUNAddress = "LUN_ADDRESS"
+	// TargetMapISCSIPortalsPrefix indicates target map iSCSI portals prefix
+	TargetMapISCSIPortalsPrefix = "PORTAL"
+	// TargetMapISCSITargetsPrefix indicates target map iSCSI targets prefix
+	TargetMapISCSITargetsPrefix = "TARGET"
+	// TargetMapNVMETCPPortalsPrefix indicates target map NVMeTCP portals prefix
+	TargetMapNVMETCPPortalsPrefix = "NVMETCPPORTAL"
+	// TargetMapNVMETCPTargetsPrefix indicates target mapNVMe targets prefix
+	TargetMapNVMETCPTargetsPrefix = "NVMETCPTARGET"
+	// TargetMapNVMEFCPortalsPrefix indicates publish context NVMe targets prefix
+	TargetMapNVMEFCPortalsPrefix = "NVMEFCPORTAL"
+	// TargetMapNVMEFCTargetsPrefix indicates target map NVMe targets prefix
+	TargetMapNVMEFCTargetsPrefix = "NVMEFCTARGET"
 	// NVMETCPTransport indicates that NVMe/TCP is chosen as the transport protocol
 	NVMETCPTransport TransportType = "NVMETCP"
 	// NVMEFCTransport indicates that NVMe/FC is chosen as the transport protocol
 	NVMEFCTransport TransportType = "NVMEFC"
-	// PublishContextFCWWPNPrefix indicates publish context FC WWPN prefix
-	PublishContextFCWWPNPrefix = "FCWWPN"
-	// PublishContextRemoteDeviceWWN indicates publish context device wwn of remote device
-	PublishContextRemoteDeviceWWN = "REMOTE_DEVICE_WWN"
-	// PublishContextRemoteLUNAddress indicates publish context LUN address of remote device
-	PublishContextRemoteLUNAddress = "REMOTE_LUN_ADDRESS"
-	// PublishContextRemoteISCSIPortalsPrefix indicates publish context iSCSI portals prefix of remote array
-	PublishContextRemoteISCSIPortalsPrefix = "REMOTE_PORTAL"
-	// PublishContextRemoteISCSITargetsPrefix indicates publish context iSCSI targets prefix of remote array
-	PublishContextRemoteISCSITargetsPrefix = "REMOTE_TARGET"
-	// PublishContextRemoteNVMETCPPortalsPrefix indicates publish context NVMeTCP portals prefix of remote array
-	PublishContextRemoteNVMETCPPortalsPrefix = "REMOTE_NVMETCPPORTAL"
-	// PublishContextRemoteNVMETCPTargetsPrefix indicates publish context NVMe targets prefix of remote array
-	PublishContextRemoteNVMETCPTargetsPrefix = "REMOTE_NVMETCPTARGET"
-	// PublishContextRemoteNVMEFCPortalsPrefix indicates publish context NVMe targets prefix of remote array
-	PublishContextRemoteNVMEFCPortalsPrefix = "REMOTE_NVMEFCPORTAL"
-	// PublishContextRemoteNVMEFCTargetsPrefix indicates publish context NVMe targets prefix of remote array
-	PublishContextRemoteNVMEFCTargetsPrefix = "REMOTE_NVMEFCTARGET"
-	// PublishContextRemoteFCWWPNPrefix indicates publish context FC WWPN prefix of remote array
-	PublishContextRemoteFCWWPNPrefix = "REMOTE_FCWWPN"
+	// TargetMapFCWWPNPrefix indicates target map FC WWPN prefix
+	TargetMapFCWWPNPrefix = "FCWWPN"
+	// TargetMapRemoteDeviceWWN indicates target map device wwn of remote device
+	TargetMapRemoteDeviceWWN = "REMOTE_DEVICE_WWN"
+	// TargetMapRemoteLUNAddress indicates target map LUN address of remote device
+	TargetMapRemoteLUNAddress = "REMOTE_LUN_ADDRESS"
+	// TargetMapRemoteISCSIPortalsPrefix indicates target map iSCSI portals prefix of remote array
+	TargetMapRemoteISCSIPortalsPrefix = "REMOTE_PORTAL"
+	// TargetMapRemoteISCSITargetsPrefix indicates target map iSCSI targets prefix of remote array
+	TargetMapRemoteISCSITargetsPrefix = "REMOTE_TARGET"
+	// TargetMapRemoteNVMETCPPortalsPrefix indicates target map NVMeTCP portals prefix of remote array
+	TargetMapRemoteNVMETCPPortalsPrefix = "REMOTE_NVMETCPPORTAL"
+	// TargetMapRemoteNVMETCPTargetsPrefix indicates target map NVMe targets prefix of remote array
+	TargetMapRemoteNVMETCPTargetsPrefix = "REMOTE_NVMETCPTARGET"
+	// TargetMapRemoteNVMEFCPortalsPrefix indicates target map NVMe targets prefix of remote array
+	TargetMapRemoteNVMEFCPortalsPrefix = "REMOTE_NVMEFCPORTAL"
+	// TargetMapRemoteNVMEFCTargetsPrefix indicates target map NVMe targets prefix of remote array
+	TargetMapRemoteNVMEFCTargetsPrefix = "REMOTE_NVMEFCTARGET"
+	// TargetMapRemoteFCWWPNPrefix indicates target map FC WWPN prefix of remote array
+	TargetMapRemoteFCWWPNPrefix = "REMOTE_FCWWPN"
 	// WWNPrefix indicates WWN prefix
 	WWNPrefix = "naa."
 	// SyncMode indicates Synchronous Replication

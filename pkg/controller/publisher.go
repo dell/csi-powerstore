@@ -20,7 +20,6 @@ package controller
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -84,7 +83,6 @@ func (s *SCSIPublisher) Publish(ctx context.Context, publishContext map[string]s
 			"failed to get mapping for volume with ID '%s': %s", volume.ID, err.Error())
 	}
 
-	err = s.addTargetsInfoToPublishContext(publishContext, volume.ApplianceID, client, isRemote)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "could not get scsi Targets: %s", err.Error())
 	}
@@ -161,73 +159,12 @@ func (s *SCSIPublisher) addLUNIDToPublishContext(
 	isRemote bool,
 ) {
 	if !isRemote {
-		publishContext[identifiers.PublishContextDeviceWWN] = strings.TrimPrefix(volume.Wwn, identifiers.WWNPrefix)
-		publishContext[identifiers.PublishContextLUNAddress] = strconv.FormatInt(mapping.LogicalUnitNumber, 10)
+		publishContext[identifiers.TargetMapDeviceWWN] = strings.TrimPrefix(volume.Wwn, identifiers.WWNPrefix)
+		publishContext[identifiers.TargetMapLUNAddress] = strconv.FormatInt(mapping.LogicalUnitNumber, 10)
 	} else {
-		publishContext[identifiers.PublishContextRemoteDeviceWWN] = strings.TrimPrefix(volume.Wwn, identifiers.WWNPrefix)
-		publishContext[identifiers.PublishContextRemoteLUNAddress] = strconv.FormatInt(mapping.LogicalUnitNumber, 10)
+		publishContext[identifiers.TargetMapRemoteDeviceWWN] = strings.TrimPrefix(volume.Wwn, identifiers.WWNPrefix)
+		publishContext[identifiers.TargetMapRemoteLUNAddress] = strconv.FormatInt(mapping.LogicalUnitNumber, 10)
 	}
-}
-
-func (s *SCSIPublisher) addTargetsInfoToPublishContext(
-	publishContext map[string]string, volumeApplianceID string, client gopowerstore.Client, isRemote bool,
-) error {
-	iscsiPortalsKey := identifiers.PublishContextISCSIPortalsPrefix
-	iscsiTargetsKey := identifiers.PublishContextISCSITargetsPrefix
-	fcWwpnKey := identifiers.PublishContextFCWWPNPrefix
-	nvmeFcPortalsKey := identifiers.PublishContextNVMEFCPortalsPrefix
-	nvmeFcTargetsKey := identifiers.PublishContextNVMEFCTargetsPrefix
-	nvmeTCPPortalsKey := identifiers.PublishContextNVMETCPPortalsPrefix
-	nvmeTCPTargetsKey := identifiers.PublishContextNVMETCPTargetsPrefix
-	if isRemote {
-		iscsiPortalsKey = identifiers.PublishContextRemoteISCSIPortalsPrefix
-		iscsiTargetsKey = identifiers.PublishContextRemoteISCSITargetsPrefix
-		fcWwpnKey = identifiers.PublishContextRemoteFCWWPNPrefix
-		nvmeFcPortalsKey = identifiers.PublishContextRemoteNVMEFCPortalsPrefix
-		nvmeFcTargetsKey = identifiers.PublishContextRemoteNVMEFCTargetsPrefix
-		nvmeTCPPortalsKey = identifiers.PublishContextRemoteNVMETCPPortalsPrefix
-		nvmeTCPTargetsKey = identifiers.PublishContextRemoteNVMETCPTargetsPrefix
-	}
-
-	iscsiTargetsInfo, err := identifiers.GetISCSITargetsInfoFromStorage(client, volumeApplianceID)
-	if err != nil {
-		log.Error("error unable to get iSCSI targets from array", err)
-	}
-	for i, t := range iscsiTargetsInfo {
-		publishContext[fmt.Sprintf("%s%d", iscsiPortalsKey, i)] = t.Portal
-		publishContext[fmt.Sprintf("%s%d", iscsiTargetsKey, i)] = t.Target
-	}
-	fcTargetsInfo, err := identifiers.GetFCTargetsInfoFromStorage(client, volumeApplianceID)
-	if err != nil {
-		log.Error("error unable to get FC targets from array", err)
-	}
-	for i, t := range fcTargetsInfo {
-		publishContext[fmt.Sprintf("%s%d", fcWwpnKey, i)] = t.WWPN
-	}
-
-	nvmefcTargetInfo, err := identifiers.GetNVMEFCTargetInfoFromStorage(client, volumeApplianceID)
-	if err != nil {
-		log.Error("error unable to get NVMeFC targets from array", err)
-	}
-	for i, t := range nvmefcTargetInfo {
-		publishContext[fmt.Sprintf("%s%d", nvmeFcPortalsKey, i)] = t.Portal
-		publishContext[fmt.Sprintf("%s%d", nvmeFcTargetsKey, i)] = t.Target
-	}
-
-	nvmetcpTargetInfo, err := identifiers.GetNVMETCPTargetsInfoFromStorage(client, volumeApplianceID)
-	if err != nil {
-		log.Error("error unable to get NVMeTCP targets from array", err)
-	}
-	for i, t := range nvmetcpTargetInfo {
-		publishContext[fmt.Sprintf("%s%d", nvmeTCPPortalsKey, i)] = t.Portal
-		publishContext[fmt.Sprintf("%s%d", nvmeTCPTargetsKey, i)] = t.Target
-	}
-
-	// If the system is not capable of any protocol, then we will through the error
-	if len(iscsiTargetsInfo) == 0 && len(fcTargetsInfo) == 0 && len(nvmefcTargetInfo) == 0 && len(nvmetcpTargetInfo) == 0 {
-		return errors.New("unable to get targets for any protocol")
-	}
-	return nil
 }
 
 // NfsPublisher implementation of VolumePublisher for NFS volumes

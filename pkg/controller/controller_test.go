@@ -3082,15 +3082,8 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				gomega.Expect(err).To(gomega.BeNil())
 				gomega.Expect(res).To(gomega.Equal(&csi.ControllerPublishVolumeResponse{
 					PublishContext: map[string]string{
-						"PORTAL0":        "192.168.1.1:3260",
-						"TARGET0":        "iqn",
-						"NVMEFCPORTAL0":  "nn-0x58ccf090c9200c22:pn-0x58ccf091492b0c22",
-						"NVMEFCTARGET0":  "nqn",
-						"DEVICE_WWN":     "68ccf098003ceb5e4577a20be6d11bf9",
-						"LUN_ADDRESS":    "1",
-						"FCWWPN0":        "58ccf09348a003a3",
-						"NVMETCPTARGET0": "nqn",
-						"NVMETCPPORTAL0": "192.168.1.1:4420",
+						"DEVICE_WWN":  "68ccf098003ceb5e4577a20be6d11bf9",
+						"LUN_ADDRESS": "1",
 					},
 				}))
 			})
@@ -3280,12 +3273,8 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				gomega.Expect(err).To(gomega.BeNil())
 				gomega.Expect(res).To(gomega.Equal(&csi.ControllerPublishVolumeResponse{
 					PublishContext: map[string]string{
-						"PORTAL0":        "192.168.1.1:3260",
-						"TARGET0":        "iqn",
-						"DEVICE_WWN":     "68ccf098003ceb5e4577a20be6d11bf9",
-						"LUN_ADDRESS":    "1",
-						"NVMETCPPORTAL0": "192.168.1.1:4420",
-						"NVMETCPTARGET0": "",
+						"DEVICE_WWN":  "68ccf098003ceb5e4577a20be6d11bf9",
+						"LUN_ADDRESS": "1",
 					},
 				}))
 			})
@@ -3398,12 +3387,8 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 					gomega.Expect(err).To(gomega.BeNil())
 					gomega.Expect(res).To(gomega.Equal(&csi.ControllerPublishVolumeResponse{
 						PublishContext: map[string]string{
-							"PORTAL0":        "192.168.1.1:3260",
-							"TARGET0":        "iqn",
-							"DEVICE_WWN":     "68ccf098003ceb5e4577a20be6d11bf9",
-							"LUN_ADDRESS":    "1",
-							"NVMETCPPORTAL0": "192.168.1.1:4420",
-							"NVMETCPTARGET0": "",
+							"DEVICE_WWN":  "68ccf098003ceb5e4577a20be6d11bf9",
+							"LUN_ADDRESS": "1",
 						},
 					}))
 				})
@@ -3505,12 +3490,8 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 					gomega.Expect(err).To(gomega.BeNil())
 					gomega.Expect(res).To(gomega.Equal(&csi.ControllerPublishVolumeResponse{
 						PublishContext: map[string]string{
-							"PORTAL0":        "192.168.1.1:3260",
-							"TARGET0":        "iqn",
-							"DEVICE_WWN":     "68ccf098003ceb5e4577a20be6d11bf9",
-							"LUN_ADDRESS":    "2",
-							"NVMETCPPORTAL0": "192.168.1.1:4420",
-							"NVMETCPTARGET0": "",
+							"DEVICE_WWN":  "68ccf098003ceb5e4577a20be6d11bf9",
+							"LUN_ADDRESS": "2",
 						},
 					}))
 				})
@@ -3603,22 +3584,10 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				gomega.Expect(err).To(gomega.BeNil())
 				gomega.Expect(res).To(gomega.Equal(&csi.ControllerPublishVolumeResponse{
 					PublishContext: map[string]string{
-						"PORTAL0":              "192.168.1.1:3260",
-						"TARGET0":              "iqn",
-						"NVMEFCPORTAL0":        "nn-0x58ccf090c9200c22:pn-0x58ccf091492b0c22",
-						"NVMEFCTARGET0":        "nqn",
-						"DEVICE_WWN":           "68ccf098003ceb5e4577a20be6d11bf9",
-						"LUN_ADDRESS":          "1",
-						"FCWWPN0":              "58ccf09348a003a3",
-						"NVMETCPTARGET0":       "nqn",
-						"NVMETCPPORTAL0":       "192.168.1.1:4420",
-						"REMOTE_DEVICE_WWN":    "68ccf098003ceb5e4577a20be6d11bf9",
-						"REMOTE_LUN_ADDRESS":   "1",
-						"REMOTE_FCWWPN0":       "58ccf09348a00333",
-						"REMOTE_TARGET0":       "iqn.2015-10.com.dell:dellemc-powerstore-apm00223",
-						"REMOTE_NVMEFCTARGET0": "nqn.1988-11.com.dell:powerstore:00:303030303030ABCDEFGH",
-						"REMOTE_PORTAL0":       "192.168.1.2:3260",
-						"REMOTE_NVMEFCPORTAL0": "nn-0x58ccf090c9200c33:pn-0x58ccf091492b0c33",
+						"DEVICE_WWN":         "68ccf098003ceb5e4577a20be6d11bf9",
+						"LUN_ADDRESS":        "1",
+						"REMOTE_DEVICE_WWN":  "68ccf098003ceb5e4577a20be6d11bf9",
+						"REMOTE_LUN_ADDRESS": "1",
 					},
 				}))
 			})
