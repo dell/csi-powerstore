@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"strings"
 
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -34,6 +35,7 @@ type NodeLabelsRetrieverInterface interface {
 	NewForConfig(config *rest.Config) (*kubernetes.Clientset, error)
 	GetNodeLabels(ctx context.Context, kubeNodeName string) (map[string]string, error)
 	GetNVMeUUIDs(ctx context.Context) (map[string]string, error)
+	ListVolumes(ctx context.Context) (*corev1.PersistentVolumeList, error)
 }
 
 // NodeLabelsModifierInterface defines the methods for retrieving Kubernetes Node Labels
@@ -84,6 +86,19 @@ func (svc *NodeLabelsRetrieverImpl) GetNodeLabels(ctx context.Context, kubeNodeN
 		}
 
 		return node.Labels, nil
+	}
+
+	return nil, nil
+}
+
+func (svc *NodeLabelsRetrieverImpl) ListVolumes(ctx context.Context) (*corev1.PersistentVolumeList, error) {
+	if Clientset != nil {
+		volumes, err := Clientset.CoreV1().PersistentVolumes().List(ctx, v1.ListOptions{})
+		if err != nil {
+			return nil, err
+		}
+
+		return volumes, nil
 	}
 
 	return nil, nil
@@ -201,4 +216,13 @@ func GetNVMeUUIDs(ctx context.Context, kubeConfigPath string) (map[string]string
 	}
 
 	return NodeLabelsRetriever.GetNVMeUUIDs(ctx)
+}
+
+func ListVolumes(ctx context.Context, kubeConfigPath string) (*corev1.PersistentVolumeList, error) {
+	err := CreateKubeClientSet(kubeConfigPath)
+	if err != nil {
+		return nil, err
+	}
+
+	return NodeLabelsRetriever.ListVolumes(ctx)
 }

@@ -29,6 +29,7 @@ import (
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers/fs"
 	"github.com/dell/csi-powerstore/v2/pkg/identity"
 	"github.com/dell/csi-powerstore/v2/pkg/interceptors"
+	"github.com/dell/csi-powerstore/v2/pkg/monitor"
 	"github.com/dell/csi-powerstore/v2/pkg/node"
 	"github.com/dell/csi-powerstore/v2/pkg/provider"
 	"github.com/dell/csi-powerstore/v2/pkg/tracer"
@@ -144,6 +145,13 @@ func main() {
 		nodeService = ns
 	}
 
+	monitorService := monitor.NewService(5 * time.Second)
+	// Add init if needed.
+	err := monitorService.UpdateArrays(configPath, f)
+	if err != nil {
+		log.Fatalf("couldn't initialize arrays in monitory service: %s", err.Error())
+	}
+
 	viper.SetConfigFile(configPath)
 	viper.SetConfigType("yaml")
 	viper.WatchConfig()
@@ -160,6 +168,11 @@ func main() {
 			if err != nil {
 				log.Fatalf("couldn't initialize arrays in node service: %s", err.Error())
 			}
+		}
+
+		err := monitorService.UpdateArrays(configPath, f)
+		if err != nil {
+			log.Fatalf("couldn't initialize arrays in monitory service: %s", err.Error())
 		}
 	})
 
@@ -178,6 +191,12 @@ func main() {
 		defer closer.Close() // #nosec G307
 		opentracing.SetGlobalTracer(t)
 		InterceptorsList = append(InterceptorsList, grpc_opentracing.UnaryServerInterceptor(grpc_opentracing.WithTracer(t)))
+	}
+
+	log.Infoln("[Fernando] We are trying to monitor the arrays...")
+	err = monitorService.Monitor(context.Background())
+	if err != nil {
+		log.Fatalf("couldn't start monitoring: %s", err.Error())
 	}
 
 	storageProvider := provider.New(controllerService, identityService, nodeService, InterceptorsList)
