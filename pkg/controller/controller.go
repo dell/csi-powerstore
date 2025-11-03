@@ -441,8 +441,6 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 
 	var volumeResponse *csi.Volume
 
-	
-
 	// check if job is already in progress on array, if so, return error and let CO check again
 	if useNFS {
 		jobs, err := arr.Client.GetInProgressJobsByFsName(ctx, req.GetName())
