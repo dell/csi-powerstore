@@ -421,7 +421,6 @@ func (c *NfsCreator) CheckIfAlreadyExists(ctx context.Context, name string, size
 	}
 	log.Infof("filesystem '%s' already exists", name)
 
-
 	// update the nas server name for the volume to ensure CreateVolume adds the correct nas to volume context
 	nasServerID := alreadyExistVolume.NasServerID
 	nas, err := client.GetNAS(ctx, nasServerID)
