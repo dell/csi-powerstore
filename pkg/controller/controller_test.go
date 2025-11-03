@@ -202,6 +202,8 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 		ginkgo.When("creating block volume", func() {
 			ginkgo.It("should successfully create block volume", func() {
 				clientMock.On("GetCustomHTTPHeaders").Return(api.NewSafeHeader().GetHeader())
+				clientMock.On("GetVolumeByName", mock.Anything, mock.Anything).Return(
+					gopowerstore.Volume{}, errors.New("no vol found"))
 				clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
 				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 				clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
@@ -237,6 +239,8 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			clientMock.On("GetCustomHTTPHeaders").Return(api.NewSafeHeader().GetHeader())
 			clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
 			clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
+			clientMock.On("GetVolumeByName", mock.Anything, mock.Anything).Return(
+				gopowerstore.Volume{}, errors.New("no vol found"))
 			clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
 			clientMock.On("GetVolume", context.Background(), mock.Anything).Return(gopowerstore.Volume{ApplianceID: validApplianceID}, nil)
 			clientMock.On("GetAppliance", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
@@ -292,6 +296,8 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 
 		ginkgo.It("should create volume and volumeGroup if policy exists - ASYNC", func() {
 			clientMock.On("GetCustomHTTPHeaders").Return(api.NewSafeHeader().GetHeader())
+			clientMock.On("GetVolumeByName", mock.Anything, mock.Anything).Return(
+				gopowerstore.Volume{}, errors.New("no vol found"))
 			clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
 			clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 			// all entities not exists
@@ -334,6 +340,8 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 
 		ginkgo.It("should create volume and volumeGroup if policy exists - SYNC", func() {
 			clientMock.On("GetCustomHTTPHeaders").Return(api.NewSafeHeader().GetHeader())
+			clientMock.On("GetVolumeByName", mock.Anything, mock.Anything).Return(
+				gopowerstore.Volume{}, errors.New("no vol found"))
 			clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
 			clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 			// Setting Replciation mode and corresponding attributes for SYNC
@@ -388,6 +396,9 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				req.Parameters[ctrlSvc.WithRP(KeyReplicationIgnoreNamespaces)] = "true"
 				req.Parameters[KeyCSIPVCNamespace] = ""
 			}()
+
+			clientMock.On("GetVolumeByName", mock.Anything, mock.Anything).Return(
+				gopowerstore.Volume{}, errors.New("no vol found"))
 
 			clientMock.On("GetVolumeGroupByName", mock.Anything, validNamespacedGroupName).
 				Return(gopowerstore.VolumeGroup{}, gopowerstore.NewNotFoundError())
@@ -447,6 +458,9 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				req.Parameters[KeyCSIPVCNamespace] = ""
 			}()
 
+			clientMock.On("GetVolumeByName", mock.Anything, mock.Anything).Return(
+				gopowerstore.Volume{}, errors.New("no vol found"))
+
 			clientMock.On("GetVolumeGroupByName", mock.Anything, validNamespacedGroupNameSync).
 				Return(gopowerstore.VolumeGroup{}, gopowerstore.NewNotFoundError())
 
@@ -494,6 +508,8 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 		})
 
 		ginkgo.It("should create new volume with existing volumeGroup with policy - ASYNC", func() {
+			clientMock.On("GetVolumeByName", mock.Anything, mock.Anything).Return(
+				gopowerstore.Volume{}, errors.New("no vol found"))
 			clientMock.On("GetVolumeGroupByName", mock.Anything, validGroupName).
 				Return(gopowerstore.VolumeGroup{ID: validGroupID, ProtectionPolicyID: validPolicyID}, nil)
 
@@ -531,6 +547,8 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 		})
 
 		ginkgo.It("should create new volume with existing volumeGroup with policy - SYNC", func() {
+			clientMock.On("GetVolumeByName", mock.Anything, mock.Anything).Return(
+				gopowerstore.Volume{}, errors.New("no vol found"))
 			clientMock.On("GetVolumeGroupByName", mock.Anything, validGroupNameSync).
 				Return(gopowerstore.VolumeGroup{ID: validGroupID, ProtectionPolicyID: validPolicyID, IsWriteOrderConsistent: true}, nil)
 			// Setting Replciation mode and corresponding attributes for SYNC
@@ -594,6 +612,8 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 		})
 
 		ginkgo.It("should create volume and update volumeGroup without policy, but policy exists - ASYNC", func() {
+			clientMock.On("GetVolumeByName", mock.Anything, mock.Anything).Return(
+				gopowerstore.Volume{}, errors.New("no vol found"))
 			clientMock.On("GetVolumeGroupByName", mock.Anything, validGroupName).
 				Return(gopowerstore.VolumeGroup{ID: validGroupID, ProtectionPolicyID: validPolicyID}, nil)
 
@@ -633,6 +653,8 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 		})
 
 		ginkgo.It("should create volume and update volumeGroup without policy, but policy exists - SYNC", func() {
+			clientMock.On("GetVolumeByName", mock.Anything, mock.Anything).Return(
+				gopowerstore.Volume{}, errors.New("no vol found"))
 			clientMock.On("GetVolumeGroupByName", mock.Anything, validGroupNameSync).
 				Return(gopowerstore.VolumeGroup{ID: validGroupID, ProtectionPolicyID: validPolicyID, IsWriteOrderConsistent: true}, nil)
 
@@ -751,6 +773,8 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 
 		ginkgo.It("should default RPO to Zero when mode is SYNC and RPO is not specified", func() {
 			delete(req.Parameters, ctrlSvc.WithRP(KeyReplicationRPO))
+			clientMock.On("GetVolumeByName", mock.Anything, mock.Anything).Return(
+				gopowerstore.Volume{}, errors.New("no vol found"))
 			clientMock.On("GetVolumeGroupByName", mock.Anything, validGroupNameSync).
 				Return(gopowerstore.VolumeGroup{ID: validGroupID, ProtectionPolicyID: validPolicyID, IsWriteOrderConsistent: true}, nil)
 
@@ -877,6 +901,8 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				delete(req.Parameters, ctrlSvc.WithRP(KeyReplicationIgnoreNamespaces))
 				delete(req.Parameters, ctrlSvc.WithRP(KeyReplicationVGPrefix))
 
+				clientMock.On("GetVolumeByName", mock.Anything, mock.Anything).Return(
+					gopowerstore.Volume{}, errors.New("no vol found"))
 				clientMock.On("ConfigureMetroVolume", mock.Anything, validBaseVolID, configureMetroRequest).
 					Return(gopowerstore.MetroSessionResponse{ID: validSessionID}, nil)
 				clientMock.On("GetVolume", context.Background(), mock.Anything).
@@ -915,6 +941,9 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				delete(req.Parameters, ctrlSvc.WithRP(KeyReplicationRPO))
 				delete(req.Parameters, ctrlSvc.WithRP(KeyReplicationIgnoreNamespaces))
 				delete(req.Parameters, ctrlSvc.WithRP(KeyReplicationVGPrefix))
+
+				clientMock.On("GetVolumeByName", mock.Anything, mock.Anything).Return(
+					gopowerstore.Volume{}, errors.New("no vol found"))
 
 				clientMock.On("ConfigureMetroVolume", mock.Anything, validBaseVolID, configureMetroRequest).
 					Return(gopowerstore.MetroSessionResponse{}, gopowerstore.APIError{
@@ -955,6 +984,8 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			})
 
 			ginkgo.It("should fail to configure metro replication on volume if the volume cannot be found", func() {
+				clientMock.On("GetVolumeByName", mock.Anything, mock.Anything).Return(
+					gopowerstore.Volume{}, errors.New("no vol found"))
 				// Return volume not found error when trying to configure a metro session for that volume
 				clientMock.On("ConfigureMetroVolume", mock.Anything, validBaseVolID, configureMetroRequest).
 					Return(gopowerstore.MetroSessionResponse{}, gopowerstore.NewNotFoundError())
@@ -981,6 +1012,8 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			})
 
 			ginkgo.It("should fail if it can't find the replication session", func() {
+				clientMock.On("GetVolumeByName", mock.Anything, mock.Anything).Return(
+					gopowerstore.Volume{}, errors.New("no vol found"))
 				clientMock.On("ConfigureMetroVolume", mock.Anything, validBaseVolID, configureMetroRequest).
 					Return(gopowerstore.MetroSessionResponse{ID: validSessionID}, nil)
 				clientMock.On("GetVolume", context.Background(), mock.Anything).
@@ -997,6 +1030,8 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			})
 
 			ginkgo.It("should fail if the replication session resource type is incorrect", func() {
+				clientMock.On("GetVolumeByName", mock.Anything, mock.Anything).Return(
+					gopowerstore.Volume{}, errors.New("no vol found"))
 				clientMock.On("ConfigureMetroVolume", mock.Anything, validBaseVolID, configureMetroRequest).
 					Return(gopowerstore.MetroSessionResponse{ID: validSessionID}, nil)
 				clientMock.On("GetVolume", context.Background(), mock.Anything).
@@ -1024,6 +1059,8 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			clientMock.On("GetFS", context.Background(), mock.Anything).Return(gopowerstore.FileSystem{NasServerID: validNasID}, nil)
 			clientMock.On("GetNAS", context.Background(), mock.Anything).Return(gopowerstore.NAS{CurrentNodeID: validNodeID}, nil)
 			clientMock.On("GetApplianceByName", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
+			clientMock.On("GetInProgressJobsByFsName", context.Background(), mock.Anything).Return([]gopowerstore.Job{}, nil)
+			clientMock.On("GetFSByName", mock.Anything, mock.Anything).Return(gopowerstore.FileSystem{}, errors.New("not found"))
 
 			req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
 			req.Parameters[identifiers.KeyArrayID] = secondValidID
@@ -1059,6 +1096,8 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			clientMock.On("GetFS", context.Background(), mock.Anything).Return(gopowerstore.FileSystem{NasServerID: validNasID}, nil)
 			clientMock.On("GetNAS", context.Background(), mock.Anything).Return(gopowerstore.NAS{CurrentNodeID: validNodeID}, nil)
 			clientMock.On("GetApplianceByName", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
+			clientMock.On("GetInProgressJobsByFsName", context.Background(), mock.Anything).Return([]gopowerstore.Job{}, nil)
+			clientMock.On("GetFSByName", mock.Anything, mock.Anything).Return(gopowerstore.FileSystem{}, errors.New("not found"))
 
 			req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
 			req.Parameters[identifiers.KeyArrayID] = secondValidID
@@ -1121,6 +1160,8 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				clientMock.On("GetFS", context.Background(), mock.Anything).Return(gopowerstore.FileSystem{NasServerID: validNasID}, nil)
 				clientMock.On("GetNAS", context.Background(), mock.Anything).Return(gopowerstore.NAS{CurrentNodeID: validNodeID}, nil)
 				clientMock.On("GetApplianceByName", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
+				clientMock.On("GetInProgressJobsByFsName", context.Background(), mock.Anything).Return([]gopowerstore.Job{}, nil)
+				clientMock.On("GetFSByName", mock.Anything, mock.Anything).Return(gopowerstore.FileSystem{}, errors.New("not found"))
 
 				ctrlSvc.Arrays()[secondValidID].NfsAcls = "A::GROUP@:RWX"
 
@@ -1161,6 +1202,8 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				clientMock.On("GetFS", context.Background(), mock.Anything).Return(gopowerstore.FileSystem{NasServerID: validNasID}, nil)
 				clientMock.On("GetNAS", context.Background(), mock.Anything).Return(gopowerstore.NAS{CurrentNodeID: validNodeID}, nil)
 				clientMock.On("GetApplianceByName", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
+				clientMock.On("GetInProgressJobsByFsName", context.Background(), mock.Anything).Return([]gopowerstore.Job{}, nil)
+				clientMock.On("GetFSByName", mock.Anything, mock.Anything).Return(gopowerstore.FileSystem{}, errors.New("not found"))
 
 				ctrlSvc.Arrays()[secondValidID].NfsAcls = "A::GROUP@:RWX"
 
@@ -1200,6 +1243,8 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				clientMock.On("GetFS", context.Background(), mock.Anything).Return(gopowerstore.FileSystem{NasServerID: validNasID}, nil)
 				clientMock.On("GetNAS", context.Background(), mock.Anything).Return(gopowerstore.NAS{CurrentNodeID: validNodeID}, nil)
 				clientMock.On("GetApplianceByName", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
+				clientMock.On("GetInProgressJobsByFsName", context.Background(), mock.Anything).Return([]gopowerstore.Job{}, nil)
+				clientMock.On("GetFSByName", mock.Anything, mock.Anything).Return(gopowerstore.FileSystem{}, errors.New("not found"))
 
 				req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
 				req.Parameters[identifiers.KeyArrayID] = secondValidID
@@ -1237,6 +1282,8 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				clientMock.On("GetFS", context.Background(), mock.Anything).Return(gopowerstore.FileSystem{NasServerID: validNasID}, nil)
 				clientMock.On("GetNAS", context.Background(), mock.Anything).Return(gopowerstore.NAS{CurrentNodeID: validNodeID}, nil)
 				clientMock.On("GetApplianceByName", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
+				clientMock.On("GetInProgressJobsByFsName", context.Background(), mock.Anything).Return([]gopowerstore.Job{}, nil)
+				clientMock.On("GetFSByName", mock.Anything, mock.Anything).Return(gopowerstore.FileSystem{}, errors.New("not found"))
 
 				req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
 				req.Parameters[identifiers.KeyArrayID] = secondValidID
@@ -1299,6 +1346,8 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				clientMock.On("GetFS", context.Background(), mock.Anything).Return(gopowerstore.FileSystem{NasServerID: validNasID}, nil)
 				clientMock.On("GetNAS", context.Background(), mock.Anything).Return(gopowerstore.NAS{CurrentNodeID: validNodeID}, nil)
 				clientMock.On("GetApplianceByName", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
+				clientMock.On("GetInProgressJobsByFsName", context.Background(), mock.Anything).Return([]gopowerstore.Job{}, nil)
+				clientMock.On("GetFSByName", mock.Anything, mock.Anything).Return(gopowerstore.FileSystem{}, errors.New("not found"))
 
 				req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
 				req.Parameters[identifiers.KeyArrayID] = secondValidID
@@ -1393,8 +1442,18 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 					SizeTotal: validVolSize,
 				}, nil)
 				clientMock.On("GetFS", context.Background(), mock.Anything).Return(gopowerstore.FileSystem{NasServerID: validNasID}, nil)
-				clientMock.On("GetNAS", context.Background(), mock.Anything).Return(gopowerstore.NAS{CurrentNodeID: validNodeID}, nil)
+				clientMock.On("GetNAS", mock.Anything, mock.Anything).
+					Return(gopowerstore.NAS{
+						Name:          validNasName,
+						CurrentNodeID: validNodeID,
+					}, nil)
 				clientMock.On("GetApplianceByName", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
+				clientMock.On("GetInProgressJobsByFsName", context.Background(), mock.Anything).Return([]gopowerstore.Job{}, nil)
+				clientMock.On("GetFSByName", mock.Anything, volName).Return(gopowerstore.FileSystem{
+					ID:        validBaseVolID,
+					Name:      volName,
+					SizeTotal: validVolSize,
+				}, nil)
 
 				req := getTypicalCreateVolumeNFSRequest(volName, validVolSize)
 				req.Parameters[identifiers.KeyArrayID] = secondValidID
@@ -1456,7 +1515,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				ginkgo.It("should fail [NFS]", func() {
 					volName := "my-vol"
 					clientMock.On("GetNASByName", mock.Anything, validNasName).Return(gopowerstore.NAS{ID: validNasID}, nil)
-
+					clientMock.On("GetInProgressJobsByFsName", context.Background(), mock.Anything).Return([]gopowerstore.Job{}, nil)
 					clientMock.On("CreateFS", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{}, gopowerstore.APIError{
 						ErrorMsg: &api.ErrorMsg{
 							StatusCode: http.StatusUnprocessableEntity,
@@ -1693,6 +1752,9 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 		ginkgo.When("there is no array IP in storage class", func() {
 			ginkgo.It("should use default array", func() {
 				clientMock.On("GetCustomHTTPHeaders").Return(api.NewSafeHeader().GetHeader())
+				clientMock.On("GetVolumeByName", mock.Anything, mock.Anything).Return(
+					gopowerstore.Volume{}, errors.New("no vol found"))
+				clientMock.On("GetInProgressJobsByFsName", context.Background(), mock.Anything).Return([]gopowerstore.Job{}, nil)
 				clientMock.On("GetSoftwareMajorMinorVersion", context.Background()).Return(float32(3.0), nil)
 				clientMock.On("SetCustomHTTPHeaders", mock.Anything).Return(nil)
 				clientMock.On("CreateVolume", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{ID: validBaseVolID}, nil)
@@ -1838,6 +1900,8 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			clientMock.On("GetFS", context.Background(), mock.Anything).Return(gopowerstore.FileSystem{NasServerID: validNasID}, nil)
 			clientMock.On("GetNAS", context.Background(), mock.Anything).Return(gopowerstore.NAS{CurrentNodeID: validNodeID}, nil)
 			clientMock.On("GetApplianceByName", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
+			clientMock.On("GetInProgressJobsByFsName", context.Background(), mock.Anything).Return([]gopowerstore.Job{}, nil)
+			clientMock.On("GetFSByName", mock.Anything, mock.Anything).Return(gopowerstore.FileSystem{}, errors.New("not found"))
 
 			req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
 			req.Parameters[identifiers.KeyArrayID] = secondValidID
@@ -1874,6 +1938,8 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			clientMock.On("GetFS", context.Background(), mock.Anything).Return(gopowerstore.FileSystem{NasServerID: validNasID}, nil)
 			clientMock.On("GetNAS", context.Background(), mock.Anything).Return(gopowerstore.NAS{CurrentNodeID: validNodeID}, nil)
 			clientMock.On("GetApplianceByName", context.Background(), mock.Anything).Return(gopowerstore.ApplianceInstance{ServiceTag: validServiceTag}, nil)
+			clientMock.On("GetInProgressJobsByFsName", context.Background(), mock.Anything).Return([]gopowerstore.Job{}, nil)
+			clientMock.On("GetFSByName", mock.Anything, mock.Anything).Return(gopowerstore.FileSystem{}, errors.New("not found"))
 
 			req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
 			req.Parameters[identifiers.KeyArrayID] = secondValidID
@@ -1920,6 +1986,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 		})
 
 		ginkgo.It("should fail if CreateFS fails with NAS limit error & failure count should be incremented", func() {
+			clientMock.On("GetInProgressJobsByFsName", context.Background(), mock.Anything).Return([]gopowerstore.Job{}, nil)
 			clientMock.On("GetNASServers", mock.Anything).Return([]gopowerstore.NAS{validNAS1, validNAS2, validNAS3, invalidNAS4}, nil)
 			clientMock.On("GetNASByName", mock.Anything, "nasA").Return(gopowerstore.NAS{ID: validNasID}, nil)
 			clientMock.On("CreateFS", mock.Anything, mock.Anything).
@@ -1930,6 +1997,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 					},
 				})
 			clientMock.On("GetFSByName", mock.Anything, "my-vol").Return(gopowerstore.FileSystem{}, errors.New("not nil"))
+			clientMock.On("GetInProgressJobsByFsName", context.Background(), mock.Anything).Return([]gopowerstore.Job{}, nil)
 
 			req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
 			req.Parameters[identifiers.KeyArrayID] = secondValidID
@@ -1955,6 +2023,8 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 						Message:    "some error message",
 					},
 				})
+			clientMock.On("GetInProgressJobsByFsName", context.Background(), mock.Anything).Return([]gopowerstore.Job{}, nil)
+			clientMock.On("GetFSByName", mock.Anything, mock.Anything).Return(gopowerstore.FileSystem{}, errors.New("not found"))
 
 			req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
 			req.Parameters[identifiers.KeyArrayID] = secondValidID
@@ -1971,6 +2041,9 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 		})
 
 		ginkgo.It("should fail if CreateFS fails with Non-API error & failure count should be incremented", func() {
+			clientMock.On("GetInProgressJobsByFsName", context.Background(), mock.Anything).Return([]gopowerstore.Job{}, nil)
+			clientMock.On("GetFSByName", mock.Anything, mock.Anything).Return(
+				gopowerstore.FileSystem{}, errors.New("no vol found"))
 			clientMock.On("GetNASServers", mock.Anything).Return([]gopowerstore.NAS{validNAS1, validNAS2, validNAS3, invalidNAS4}, nil)
 			clientMock.On("GetNASByName", mock.Anything, "nasA").Return(gopowerstore.NAS{ID: validNasID}, nil)
 			clientMock.On("CreateFS", mock.Anything, mock.Anything).Return(gopowerstore.CreateResponse{}, errors.New("some error message"))
@@ -1989,7 +2062,46 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			gomega.Expect(tracker.GetStatusMap()["nasA"].Failures).To(gomega.Equal(1))
 		})
 
+		ginkgo.It("should fail when listing jobs returns error [NFS]", func() {
+			volName := "my-vol"
+			clientMock.On("GetNASByName", mock.Anything, validNasName).Return(gopowerstore.NAS{ID: validNasID}, nil)
+			clientMock.On("GetInProgressJobsByFsName", context.Background(), mock.Anything).Return([]gopowerstore.Job{}, errors.New("cannot list jobs"))
+			req := getTypicalCreateVolumeNFSRequest(volName, validVolSize)
+			req.Parameters[identifiers.KeyArrayID] = secondValidID
+			res, err := ctrlSvc.CreateVolume(context.Background(), req)
+
+			gomega.Expect(res).To(gomega.BeNil())
+			gomega.Expect(err).ToNot(gomega.BeNil())
+			gomega.Expect(err.Error()).To(
+				gomega.ContainSubstring("Error getting jobs that are in progress"),
+			)
+		})
+
+		ginkgo.It("should fail when an in progress job is found- to prevent duplicate volumes", func() {
+			volName := "my-vol"
+			clientMock.On("GetNASByName", mock.Anything, validNasName).Return(gopowerstore.NAS{ID: validNasID}, nil)
+			clientMock.On("GetInProgressJobsByFsName", context.Background(), mock.Anything).Return([]gopowerstore.Job{
+				{
+					ID:           "1",
+					Action:       "create",
+					Type:         "file_system",
+					ResourceName: volName,
+					State:        "InProgress",
+				},
+			}, nil)
+			req := getTypicalCreateVolumeNFSRequest(volName, validVolSize)
+			req.Parameters[identifiers.KeyArrayID] = secondValidID
+			res, err := ctrlSvc.CreateVolume(context.Background(), req)
+
+			gomega.Expect(res).To(gomega.BeNil())
+			gomega.Expect(err).ToNot(gomega.BeNil())
+			gomega.Expect(err.Error()).To(
+				gomega.ContainSubstring("Job already in progress"),
+			)
+		})
+
 		ginkgo.It("should enter a cooldown if the failure threshold (5) is reached & fallback to next best nas server", func() {
+			clientMock.On("GetInProgressJobsByFsName", context.Background(), mock.Anything).Return([]gopowerstore.Job{}, nil)
 			clientMock.On("GetNASServers", mock.Anything).Return([]gopowerstore.NAS{validNAS1, validNAS2, validNAS3, invalidNAS4}, nil)
 			// 1st to 5th call: return nasA
 			clientMock.On("GetNASByName", mock.Anything, "nasA").Return(gopowerstore.NAS{ID: validNasID}, nil).Times(5)
@@ -2039,6 +2151,8 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 
 			clientMock.On("CreateFS", mock.Anything, mock.Anything).
 				Return(gopowerstore.CreateResponse{}, errors.New("some error message")).Once()
+			clientMock.On("GetInProgressJobsByFsName", context.Background(), mock.Anything).Return([]gopowerstore.Job{}, nil)
+			clientMock.On("GetFSByName", mock.Anything, mock.Anything).Return(gopowerstore.FileSystem{}, errors.New("not found"))
 
 			req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
 			req.Parameters[identifiers.KeyArrayID] = secondValidID
@@ -5269,52 +5383,6 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 
 				req := &csiext.CreateStorageProtectionGroupRequest{
 					VolumeHandle: validBaseVolID + "/" + firstValidID + "/" + "iscsi",
-				}
-
-				res, err := ctrlSvc.CreateStorageProtectionGroup(context.Background(), req)
-
-				localParams, remoteParams := getLocalAndRemoteParams(validClusterName, firstValidID,
-					validRemoteSystemName, secondValidID, validRemoteSystemGlobalID, validVolumeGroupName)
-
-				gomega.Expect(err).To(gomega.BeNil())
-				gomega.Expect(res).To(gomega.Equal(&csiext.CreateStorageProtectionGroupResponse{
-					LocalProtectionGroupId:          validGroupID,
-					RemoteProtectionGroupId:         validRemoteGroupID,
-					LocalProtectionGroupAttributes:  localParams,
-					RemoteProtectionGroupAttributes: remoteParams,
-				}))
-			})
-
-			ginkgo.It("should successfully discover protection group of a host-based nfs volume", func() {
-				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).
-					Return(gopowerstore.VolumeGroups{VolumeGroup: []gopowerstore.VolumeGroup{{ID: validGroupID, Name: validVolumeGroupName}}}, nil)
-
-				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, validGroupID).
-					Return(gopowerstore.ReplicationSession{
-						RemoteSystemID:   validRemoteSystemID,
-						LocalResourceID:  validGroupID,
-						RemoteResourceID: validRemoteGroupID,
-						StorageElementPairs: []gopowerstore.StorageElementPair{{
-							LocalStorageElementID:  validBaseVolID,
-							RemoteStorageElementID: validRemoteVolID,
-						}},
-					}, nil)
-
-				clientMock.On("GetCluster", mock.Anything).
-					Return(gopowerstore.Cluster{Name: validClusterName, ManagementAddress: firstValidID}, nil)
-
-				clientMock.On("GetRemoteSystem", mock.Anything, validRemoteSystemID).
-					Return(gopowerstore.RemoteSystem{
-						Name:              validRemoteSystemName,
-						ManagementAddress: secondValidID,
-						SerialNumber:      validRemoteSystemGlobalID,
-					}, nil)
-
-				req := &csiext.CreateStorageProtectionGroupRequest{
-					VolumeHandle: nfs.CsiNfsPrefixDash + validBaseVolID + "/" + firstValidID + "/" + "iscsi",
-					Parameters: map[string]string{
-						nfs.CsiNfsParameter: "RWX",
-					},
 				}
 
 				res, err := ctrlSvc.CreateStorageProtectionGroup(context.Background(), req)

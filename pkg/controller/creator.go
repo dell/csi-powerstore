@@ -213,7 +213,7 @@ func (*SCSICreator) CheckName(_ context.Context, name string) error {
 func (*SCSICreator) CheckIfAlreadyExists(ctx context.Context, name string, sizeInBytes int64, client gopowerstore.Client) (*csi.Volume, error) {
 	alreadyExistVolume, err := client.GetVolumeByName(ctx, name)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "can't find volume '%s': %s", name, err.Error())
+		return nil, status.Errorf(status.Code(err), "can't find volume '%s': %s", name, err.Error())
 	}
 
 	if alreadyExistVolume.Size < sizeInBytes {
@@ -408,10 +408,10 @@ func (*NfsCreator) CheckName(_ context.Context, name string) error {
 }
 
 // CheckIfAlreadyExists queries storage array if FileSystem with given name exists
-func (*NfsCreator) CheckIfAlreadyExists(ctx context.Context, name string, sizeInBytes int64, client gopowerstore.Client) (*csi.Volume, error) {
+func (c *NfsCreator) CheckIfAlreadyExists(ctx context.Context, name string, sizeInBytes int64, client gopowerstore.Client) (*csi.Volume, error) {
 	alreadyExistVolume, err := client.GetFSByName(ctx, name)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "can't find filesystem '%s': %s", name, err.Error())
+		return nil, status.Errorf(status.Code(err), "can't find filesystem '%s': %s", name, err.Error())
 	}
 
 	if alreadyExistVolume.SizeTotal < sizeInBytes {
@@ -420,6 +420,15 @@ func (*NfsCreator) CheckIfAlreadyExists(ctx context.Context, name string, sizeIn
 			name, alreadyExistVolume.SizeTotal, sizeInBytes)
 	}
 	log.Infof("filesystem '%s' already exists", name)
+
+
+	// update the nas server name for the volume to ensure CreateVolume adds the correct nas to volume context
+	nasServerID := alreadyExistVolume.NasServerID
+	nas, err := client.GetNAS(ctx, nasServerID)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "can't find nas server '%s': %s", nasServerID, err.Error())
+	}
+	c.nasName = nas.Name
 	volumeResponse := getCSIVolume(alreadyExistVolume.ID, sizeInBytes)
 	return volumeResponse, nil
 }
