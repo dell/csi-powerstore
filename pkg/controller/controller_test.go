@@ -28,7 +28,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dell/csm-sharednfs/nfs"
 	csiext "github.com/dell/dell-csi-extensions/replication"
 
 	"github.com/dell/csi-powerstore/v2/mocks"
