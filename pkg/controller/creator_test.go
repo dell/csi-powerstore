@@ -21,9 +21,8 @@ package controller
 import (
 	"context"
 	"errors"
-	"testing"
 	"strings"
-
+	"testing"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/gopowerstore"
