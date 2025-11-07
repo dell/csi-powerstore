@@ -440,26 +440,40 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 	params[identifiers.KeyVolumeDescription] = getDescription(req.GetParameters())
 
 	var volumeResponse *csi.Volume
-	resp, createError := creator.Create(ctx, req, sizeInBytes, arr.GetClient())
-	if createError != nil {
-		log.Warnf("create volume for %s failed: '%s'", req.GetName(), createError.Error())
-		if apiError, ok := createError.(gopowerstore.APIError); ok && (apiError.VolumeNameIsAlreadyUse() || apiError.FSNameIsAlreadyUse()) {
-			volumeResponse, err = creator.CheckIfAlreadyExists(ctx, req.GetName(), sizeInBytes, arr.GetClient())
-			if err != nil {
-				if useNFS && status.Code(err) != codes.AlreadyExists {
-					arr.NASCooldownTracker.MarkFailure(selectedNasName)
-					return nil, status.Error(codes.ResourceExhausted, createError.Error())
-				}
-				return nil, err
-			}
-		} else {
+
+	// check if job is already in progress on array, if so, return error and let CO check again
+	if useNFS {
+		jobs, err := arr.Client.GetInProgressJobsByFsName(ctx, req.GetName())
+		if err != nil {
+			log.Errorf("Error getting jobs that are in progress for FileSystem: %s error: %s", req.Name, err.Error())
+			return nil, status.Errorf(codes.Internal, "Error getting jobs that are in progress for FileSystem: %s error: %s", req.Name, err.Error())
+		}
+		if len(jobs) > 0 {
+			log.Infof("Job already in progress to create FileSystem %s", req.GetName())
+			return nil, status.Errorf(codes.AlreadyExists, "Job already in progress to create FileSystem %s", req.GetName())
+		}
+	}
+
+	// check if vol exists before creating it in the array
+	volumeResponse, err = creator.CheckIfAlreadyExists(ctx, req.GetName(), sizeInBytes, arr.GetClient())
+	if err != nil {
+		// internal means something went wrong trying to check the volume and request needs to be retried
+		if status.Code(err) == codes.Internal || status.Code(err) == codes.AlreadyExists {
+			log.Warnf("CheckIfAlreadyExists returned error: %s for vol: %s", err.Error(), req.GetName())
+			return nil, err
+		}
+	}
+
+	if volumeResponse == nil {
+		resp, createError := creator.Create(ctx, req, sizeInBytes, arr.GetClient())
+		if createError != nil {
+			log.Warnf("create volume for %s failed: '%s'", req.GetName(), createError.Error())
 			if useNFS {
 				arr.NASCooldownTracker.MarkFailure(selectedNasName)
 				return nil, status.Error(codes.ResourceExhausted, createError.Error())
 			}
-			return nil, status.Error(codes.Internal, createError.Error())
+			return nil, createError
 		}
-	} else {
 		if useNFS {
 			arr.NASCooldownTracker.ResetFailure(selectedNasName)
 		}
@@ -501,7 +515,6 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 
 	// Fetch the service tag
 	serviceTag := GetServiceTag(ctx, req, arr, volumeResponse.VolumeId, protocol)
-
 	volumeResponse.VolumeContext = req.Parameters
 	volumeResponse.VolumeContext[identifiers.KeyArrayID] = arr.GetGlobalID()
 	volumeResponse.VolumeContext[identifiers.KeyArrayVolumeName] = req.Name
@@ -510,7 +523,7 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 
 	if useNFS {
 		volumeResponse.VolumeContext[identifiers.KeyNfsACL] = nfsAcls
-		volumeResponse.VolumeContext[identifiers.KeyNasName] = selectedNasName
+		volumeResponse.VolumeContext[identifiers.KeyNasName] = creator.(*NfsCreator).nasName
 		topology = identifiers.GetNfsTopology(arr.GetIP())
 		log.Infof("Modified topology to nfs for %s", req.GetName())
 	}

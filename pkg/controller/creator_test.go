@@ -21,6 +21,7 @@ package controller
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
@@ -111,10 +112,12 @@ func TestVolumeCreator_CheckIfAlreadyExists(t *testing.T) {
 		nc := &NfsCreator{}
 		name := "test"
 		sizeInBytes := int64(1610612736)
+		validNodeID = strings.Join([]string{validHostName, "127.0.0.1"}, "-")
 		clientMock := new(mocks.Client)
 		clientMock.On("GetFSByName", context.Background(), name).
 			Return(gopowerstore.FileSystem{SizeTotal: 3221225472}, nil)
 
+		clientMock.On("GetNAS", context.Background(), mock.Anything).Return(gopowerstore.NAS{CurrentNodeID: validNodeID}, nil)
 		vol, err := nc.CheckIfAlreadyExists(context.Background(), name, sizeInBytes, clientMock)
 		assert.NoError(t, err)
 		assert.Equal(t, sizeInBytes, vol.CapacityBytes)
