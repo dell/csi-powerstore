@@ -2306,6 +2306,42 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			})
 		})
 
+		ginkgo.When("delete protection policy from volume when deleting volume", func() {
+			ginkgo.It("should successfully remove protection policy from volume", func() {
+				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).Return(gopowerstore.VolumeGroups{}, nil)
+				clientMock.On("GetSnapshotsByVolumeID", mock.Anything, validBaseVolID).Return([]gopowerstore.Volume{}, nil)
+				clientMock.On("GetVolume", mock.Anything, validBaseVolID).
+					Return(gopowerstore.Volume{ID: validBaseVolID, ProtectionPolicyID: validPolicyID}, nil)
+				clientMock.On("ModifyVolume", mock.Anything, mock.AnythingOfType("*gopowerstore.VolumeModify"), validBaseVolID).
+					Return(gopowerstore.EmptyResponse(""), nil)
+				clientMock.On("DeleteVolume", mock.Anything, mock.AnythingOfType("*gopowerstore.VolumeDelete"), validBaseVolID).
+					Return(gopowerstore.EmptyResponse(""), nil)
+
+				req := &csi.DeleteVolumeRequest{VolumeId: validBlockVolumeID}
+				res, err := ctrlSvc.DeleteVolume(context.Background(), req)
+				fmt.Print("is it running")
+
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.DeleteVolumeResponse{}))
+			})
+
+			ginkgo.It("should fail to remove protection policy from volume", func() {
+				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).Return(gopowerstore.VolumeGroups{}, nil)
+				clientMock.On("GetSnapshotsByVolumeID", mock.Anything, validBaseVolID).Return([]gopowerstore.Volume{}, nil)
+				clientMock.On("GetVolume", mock.Anything, validBaseVolID).
+					Return(gopowerstore.Volume{ID: validBaseVolID, ProtectionPolicyID: validPolicyID}, nil)
+				clientMock.On("ModifyVolume", mock.Anything, mock.AnythingOfType("*gopowerstore.VolumeModify"), validBaseVolID).
+					Return(gopowerstore.EmptyResponse(""), gopowerstore.NewNotFoundError())
+
+				req := &csi.DeleteVolumeRequest{VolumeId: validBlockVolumeID}
+				res, err := ctrlSvc.DeleteVolume(context.Background(), req)
+
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("failure removing protection policy on volume"))
+			})
+		})
+
 		ginkgo.When("deleting nfs volume", func() {
 			ginkgo.It("should successfully delete nfs volume", func() {
 				clientMock.On("GetFsSnapshotsByVolumeID", mock.Anything, validBaseVolID).Return([]gopowerstore.FileSystem{}, nil)
