@@ -695,6 +695,15 @@ func (s *Service) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest
 			log.Debugf("Expected metro session for volume %s, but it seems to have been already removed.", id)
 		}
 
+		if volume.ProtectionPolicyID != "" {
+			_, err = arr.GetClient().ModifyVolume(ctx, &gopowerstore.VolumeModify{
+				ProtectionPolicyID: "",
+			}, volume.ID)
+			if err != nil {
+				return nil, status.Errorf(codes.Internal, "failure removing protection policy on volume: %s", err.Error())
+			}
+		}
+
 		// Delete volume
 		_, err = arr.GetClient().DeleteVolume(ctx, nil, id)
 		if err == nil {
