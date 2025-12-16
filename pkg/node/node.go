@@ -23,6 +23,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/url"
 	"os"
 	"path"
@@ -1303,9 +1304,13 @@ func (s *Service) NodeGetInfo(ctx context.Context, _ *csi.NodeGetInfoRequest) (*
 					var nvmeTargets []gonvme.NVMeTarget
 					for _, address := range infoList {
 						// doesn't matter how many portals are present, discovering from any one will list out all targets
-						nvmeIP := strings.Split(address.Portal, ":")
-						log.Info("Trying to discover NVMe target from portal ", nvmeIP[0])
-						nvmeTargets, err = s.nvmeLib.DiscoverNVMeTCPTargets(nvmeIP[0], false)
+						nvmeHost, _, err := net.SplitHostPort(address.Portal)
+						if err != nil {
+							log.WithFields(log.Fields{"portal": address.Portal, "error": err}).Error("couldn't parse NVMe portal")
+							continue
+						}
+						log.Info("Trying to discover NVMe target from portal ", nvmeHost)
+						nvmeTargets, err = s.nvmeLib.DiscoverNVMeTCPTargets(nvmeHost, false)
 						if err != nil {
 							log.Error("couldn't discover targets")
 							continue
