@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2021-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,9 +32,12 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/dell/csmlog"
 	"github.com/dell/gofsutil"
-	log "github.com/sirupsen/logrus"
 )
+
+// Instantiate csmlog on a package level
+var log = csmlog.GetLogger()
 
 // A FileInfo describes a file and is returned by Stat and Lstat.
 type FileInfo interface {
@@ -214,13 +217,18 @@ func (fs *Fs) MkFileIdempotent(path string) (bool, error) {
 	if fs.IsNotExist(err) {
 		file, err := fs.OpenFile(path, os.O_CREATE, 0o600)
 		if err != nil {
-			log.WithField("path", path).WithError(err).Error("Unable to create file")
+			log.WithFields(csmlog.Fields{
+				"path": path,
+			}).Error("Unable to create file" + err.Error())
 			return false, err
 		}
 		if err = file.Close(); err != nil {
 			return false, fmt.Errorf("could not close file")
 		}
-		log.WithField("path", path).Debug("created file")
+		log.WithFields(csmlog.Fields{
+			"path": path,
+		}).Debug("created file")
+
 		return true, nil
 	}
 	if st.IsDir() {

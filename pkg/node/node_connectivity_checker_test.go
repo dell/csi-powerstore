@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2022-2024 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2022-2026 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -159,6 +159,78 @@ func TestPopulateTargetsInCache(t *testing.T) {
 
 		if len(nodeSvc.nvmeTargets[firstGlobalID]) != 1 {
 			t.Errorf("Expected nvmeTargets to be populated")
+		}
+	})
+
+	t.Run("PopulateTargetsInCache - nvmeTargets should be populated in multiple networks [NVMeTCP]", func(t *testing.T) {
+		setVariables(withMockNumberOfNVMeTCPTargets(2))
+		nodeSvc.useNVME[firstGlobalID] = true
+
+		clientMock.On("GetCluster", mock.Anything).
+			Return(gopowerstore.Cluster{Name: validClusterName}, nil)
+		clientMock.On("GetStorageNVMETCPTargetAddresses", mock.Anything).
+			Return([]gopowerstore.IPPoolAddress{
+				{
+					Address:   "192.168.1.1",
+					IPPort:    gopowerstore.IPPortInstance{TargetIqn: "nqn"},
+					NetworkID: "NW1",
+				},
+				{
+					Address:   "192.168.1.2",
+					IPPort:    gopowerstore.IPPortInstance{TargetIqn: "nqn"},
+					NetworkID: "NW1",
+				},
+				{
+					Address:   "192.168.2.1",
+					IPPort:    gopowerstore.IPPortInstance{TargetIqn: "nqn"},
+					NetworkID: "NW2",
+				},
+				{
+					Address:   "192.168.2.2",
+					IPPort:    gopowerstore.IPPortInstance{TargetIqn: "nqn"},
+					NetworkID: "NW2",
+				},
+			}, nil)
+
+		nodeSvc.populateTargetsInCache(nodeSvc.Arrays()[firstValidIP])
+		if len(nodeSvc.nvmeTargets[firstGlobalID]) != 4 {
+			t.Errorf("Expected nvmeTargets to be populated")
+		}
+	})
+
+	t.Run("PopulateTargetsInCache - iscsiTargets should be populated in multiple networks [iSCSI]", func(t *testing.T) {
+		setVariables(withMockNumberOfISCSITargets(4))
+		nodeSvc.useNVME[firstGlobalID] = false
+
+		clientMock.On("GetCluster", mock.Anything).
+			Return(gopowerstore.Cluster{Name: validClusterName}, nil)
+		clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
+			Return([]gopowerstore.IPPoolAddress{
+				{
+					Address:   "192.168.1.1",
+					IPPort:    gopowerstore.IPPortInstance{TargetIqn: "nqn"},
+					NetworkID: "NW1",
+				},
+				{
+					Address:   "192.168.1.2",
+					IPPort:    gopowerstore.IPPortInstance{TargetIqn: "nqn"},
+					NetworkID: "NW1",
+				},
+				{
+					Address:   "192.168.2.1",
+					IPPort:    gopowerstore.IPPortInstance{TargetIqn: "nqn"},
+					NetworkID: "NW2",
+				},
+				{
+					Address:   "192.168.2.2",
+					IPPort:    gopowerstore.IPPortInstance{TargetIqn: "nqn"},
+					NetworkID: "NW2",
+				},
+			}, nil)
+
+		nodeSvc.populateTargetsInCache(nodeSvc.Arrays()[firstValidIP])
+		if len(nodeSvc.iscsiTargets[firstGlobalID]) != 4 {
+			t.Errorf("Expected iscsiTargets to be populated")
 		}
 	})
 

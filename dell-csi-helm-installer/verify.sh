@@ -355,6 +355,27 @@ function verify_alpha_snap_resources() {
   check_error error
 }
 
+# verify that the requirements for disaster recover support exist
+function verify_dr_requirements() {
+  log step "Verifying disaster recover support"
+  decho
+  log arrow
+  log smart_step "Verifying that disaster recover CRDs are available" "small"
+
+  error=0
+  # check for the CRDs. These are required for installation
+  CRDS=("VolumeJournal")
+  for C in "${CRDS[@]}"; do
+    # Verify if DR related CRDs are there on the system.
+    run_command kubectl explain ${C} 2>&1 >/dev/null
+    if [ $? -ne 0 ]; then
+      error=1
+      found_error "The CRD for ${C} is not installed. These need to be installed by the Kubernetes administrator"
+    fi
+  done
+  check_error error
+}
+
 # verify that the requirements for snapshot support exist
 function verify_snap_requirements() {
   log step "Verifying snapshot support"

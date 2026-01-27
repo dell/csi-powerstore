@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2021-2024 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2021-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,23 +23,24 @@ import (
 	"errors"
 	"net/http"
 	"os"
-	"reflect"
 	"testing"
 	"time"
 
-	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-powerstore/v2/mocks"
 	"github.com/dell/csi-powerstore/v2/pkg/array"
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers"
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers/fs"
-	sharednfs "github.com/dell/csm-sharednfs/nfs"
+	"github.com/dell/csm-dr/pkg/storage"
 	"github.com/dell/gofsutil"
 	"github.com/dell/gopowerstore"
 	"github.com/dell/gopowerstore/api"
 	gopowerstoremock "github.com/dell/gopowerstore/mocks"
+	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
+	k8score "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -419,52 +420,6 @@ func TestParseVolumeID(t *testing.T) {
 		assert.Equal(t, validRemoteGlobalID, id.RemoteArrayGlobalID)
 		assert.Equal(t, scsi, id.Protocol)
 	})
-
-	localVolUUID := "aaaaaaaa-0000-bbbb-1111-cccccccccccc"
-	powerstoreLocalSystemID := "PS000000000001"
-	SharedNFSVolumeID := sharednfs.CsiNfsPrefixDash + localVolUUID + "/" + powerstoreLocalSystemID + "/" + scsi
-	type args struct {
-		ctx          context.Context
-		volumeHandle string
-		defaultArray *array.PowerStoreArray
-		vc           *csi.VolumeCapability
-	}
-	tests := []struct {
-		name    string
-		args    args
-		want    array.VolumeHandle
-		wantErr bool
-	}{
-		{
-			name: "parse volume handle for a host-based nfs volume",
-			args: args{
-				ctx:          context.Background(),
-				volumeHandle: SharedNFSVolumeID,
-				defaultArray: nil,
-				vc:           nil,
-			},
-			want: array.VolumeHandle{
-				LocalUUID:           sharednfs.CsiNfsPrefixDash + localVolUUID,
-				LocalArrayGlobalID:  powerstoreLocalSystemID,
-				RemoteUUID:          "",
-				RemoteArrayGlobalID: "",
-				Protocol:            scsi,
-			},
-			wantErr: false,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := array.ParseVolumeID(tt.args.ctx, tt.args.volumeHandle, tt.args.defaultArray, tt.args.vc)
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("ParseVolumeID() got = %v, want %v", got, tt.want)
-			}
-			if (err != nil) != tt.wantErr {
-				t.Errorf("ParseVolumeID() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-		})
-	}
 }
 
 func TestLocker_UpdateArrays(t *testing.T) {
@@ -799,13 +754,6 @@ func Test_getVolumeIDPrefix(t *testing.T) {
 			},
 			wantPrefix: "",
 		},
-		{
-			name: "volume UUID with host-based nfs prefix",
-			args: args{
-				ID: sharednfs.CsiNfsPrefixDash + validBlockVolumeUUID,
-			},
-			wantPrefix: sharednfs.CsiNfsPrefixDash,
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -815,4 +763,422 @@ func Test_getVolumeIDPrefix(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestLocker_Get(t *testing.T) {
+	tests := []struct {
+		name string // description of this test case
+		// Named input parameters for target function.
+		globalID string
+		locker   func(tt *testing.T) *array.Locker
+		want     storage.HealthChecker
+		wantErr  bool
+	}{
+		{
+			name:     "fail",
+			globalID: "bad-id",
+			locker: func(_ *testing.T) *array.Locker {
+				return &array.Locker{}
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name:     "success",
+			globalID: validGlobalID,
+			locker: func(_ *testing.T) *array.Locker {
+				locker := array.Locker{}
+				locker.SetArrays(map[string]*array.PowerStoreArray{
+					validGlobalID: {
+						GlobalID: validGlobalID,
+					},
+				})
+				return &locker
+			},
+			want:    &array.PowerStoreArray{},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := tt.locker(t)
+			got, gotErr := s.Get(tt.globalID)
+			if gotErr != nil {
+				if !tt.wantErr {
+					t.Errorf("Get() failed: %v", gotErr)
+				}
+				return
+			}
+			if tt.wantErr {
+				t.Fatal("Get() succeeded unexpectedly")
+			}
+
+			if !tt.wantErr && got == nil {
+				t.Errorf("Get() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestPowerStoreArray_IsOnline(t *testing.T) {
+	tests := []struct {
+		name  string // description of this test case
+		array func(tt *testing.T) *array.PowerStoreArray
+		want  bool
+	}{
+		{
+			name: "is online",
+			array: func(tt *testing.T) *array.PowerStoreArray {
+				mArray := gopowerstoremock.NewClient(tt)
+				mArray.On("GetCluster", mock.Anything).Return(gopowerstore.Cluster{}, nil)
+
+				return &array.PowerStoreArray{
+					Client: mArray,
+				}
+			},
+			want: true,
+		},
+		{
+			name: "is online",
+			array: func(tt *testing.T) *array.PowerStoreArray {
+				mArray := gopowerstoremock.NewClient(tt)
+				mArray.On("GetCluster", mock.Anything).Return(gopowerstore.Cluster{}, errors.New("failed to get cluster"))
+
+				return &array.PowerStoreArray{
+					Client: mArray,
+				}
+			},
+			want: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			psa := tt.array(t)
+
+			got := psa.IsOnline(context.Background())
+
+			if got != tt.want {
+				t.Errorf("IsOnline() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestVolumeHandle_IsMetro(t *testing.T) {
+	tests := []struct {
+		name         string
+		volumeHandle array.VolumeHandle
+		want         bool
+	}{
+		{
+			name: "is metro",
+			volumeHandle: array.VolumeHandle{
+				LocalUUID:           validBlockVolumeUUID,
+				LocalArrayGlobalID:  validGlobalID,
+				Protocol:            scsi,
+				RemoteUUID:          validRemoteBlockVolumeUUID,
+				RemoteArrayGlobalID: validRemoteGlobalID,
+			},
+			want: true,
+		},
+		{
+			name: "is not metro",
+			volumeHandle: array.VolumeHandle{
+				LocalUUID:           validBlockVolumeUUID,
+				LocalArrayGlobalID:  validGlobalID,
+				Protocol:            scsi,
+				RemoteUUID:          "",
+				RemoteArrayGlobalID: "",
+			},
+			want: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			v := tt.volumeHandle
+
+			got := v.IsMetro()
+
+			if got != tt.want {
+				t.Errorf("IsMetro() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDoesNodeMatchMetroSelectors(t *testing.T) {
+	t.Run("Node matches local node selector", func(t *testing.T) {
+		node := &k8score.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "nodeid",
+				Labels: map[string]string{
+					"zone1": "local", // does not match the node selector
+				},
+				Annotations: map[string]string{
+					"csi.volume.kubernetes.io/nodeid": `{"csi-powerstore.dellemc.com":"nodeid"}`,
+				},
+			},
+		}
+		metroArr := &array.PowerStoreArray{
+			HostConnectivity: &array.HostConnectivity{
+				Metro: array.MetroConnectivityOptions{
+					ColocatedLocal: k8score.NodeSelector{
+						NodeSelectorTerms: []k8score.NodeSelectorTerm{
+							{
+								MatchExpressions: []k8score.NodeSelectorRequirement{
+									{
+										Key:      "zone1",
+										Operator: k8score.NodeSelectorOpIn,
+										Values:   []string{"local"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			GlobalID: "APM0012345",
+			Endpoint: "https://192.168.0.3/api/rest",
+			Username: "admin",
+			Password: "pass",
+			Insecure: true,
+			IP:       "192.168.0.3",
+		}
+		result := metroArr.DoesNodeMatchMetroSelectors(node)
+		assert.True(t, result)
+	})
+
+	t.Run("Node matches colocated node selector", func(t *testing.T) {
+		node := &k8score.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "nodeid",
+				Labels: map[string]string{
+					"zone3": "both", // does not match the node selector
+				},
+				Annotations: map[string]string{
+					"csi.volume.kubernetes.io/nodeid": `{"csi-powerstore.dellemc.com":"nodeid"}`,
+				},
+			},
+		}
+		metroArr := &array.PowerStoreArray{
+			HostConnectivity: &array.HostConnectivity{
+				Metro: array.MetroConnectivityOptions{
+					ColocatedBoth: k8score.NodeSelector{
+						NodeSelectorTerms: []k8score.NodeSelectorTerm{
+							{
+								MatchExpressions: []k8score.NodeSelectorRequirement{
+									{
+										Key:      "zone3",
+										Operator: k8score.NodeSelectorOpIn,
+										Values:   []string{"both"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			GlobalID: "APM0012345",
+			Endpoint: "https://192.168.0.3/api/rest",
+			Username: "admin",
+			Password: "pass",
+			Insecure: true,
+			IP:       "192.168.0.3",
+		}
+		result := metroArr.DoesNodeMatchMetroSelectors(node)
+		assert.True(t, result)
+	})
+
+	t.Run("Node matches remote node selector", func(t *testing.T) {
+		node := &k8score.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "nodeid",
+				Labels: map[string]string{
+					"zone2": "remote", // does not match the node selector
+				},
+				Annotations: map[string]string{
+					"csi.volume.kubernetes.io/nodeid": `{"csi-powerstore.dellemc.com":"nodeid"}`,
+				},
+			},
+		}
+		metroArr := &array.PowerStoreArray{
+			HostConnectivity: &array.HostConnectivity{
+				Metro: array.MetroConnectivityOptions{
+					ColocatedRemote: k8score.NodeSelector{
+						NodeSelectorTerms: []k8score.NodeSelectorTerm{
+							{
+								MatchExpressions: []k8score.NodeSelectorRequirement{
+									{
+										Key:      "zone2",
+										Operator: k8score.NodeSelectorOpIn,
+										Values:   []string{"remote"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			GlobalID: "APM0012345",
+			Endpoint: "https://192.168.0.3/api/rest",
+			Username: "admin",
+			Password: "pass",
+			Insecure: true,
+			IP:       "192.168.0.3",
+		}
+		result := metroArr.DoesNodeMatchMetroSelectors(node)
+		assert.True(t, result)
+	})
+
+	t.Run("Node does not match any node selector", func(t *testing.T) {
+		node := &k8score.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "nodeid",
+				Labels: map[string]string{
+					"zone2": "local", // does not match the node selector
+				},
+				Annotations: map[string]string{
+					"csi.volume.kubernetes.io/nodeid": `{"csi-powerstore.dellemc.com":"nodeid"}`,
+				},
+			},
+		}
+		metroArr := &array.PowerStoreArray{
+			HostConnectivity: &array.HostConnectivity{
+				Metro: array.MetroConnectivityOptions{
+					ColocatedRemote: k8score.NodeSelector{
+						NodeSelectorTerms: []k8score.NodeSelectorTerm{
+							{
+								MatchExpressions: []k8score.NodeSelectorRequirement{
+									{
+										Key:      "zone2",
+										Operator: k8score.NodeSelectorOpIn,
+										Values:   []string{"remote"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			GlobalID: "APM0012345",
+			Endpoint: "https://192.168.0.3/api/rest",
+			Username: "admin",
+			Password: "pass",
+			Insecure: true,
+			IP:       "192.168.0.3",
+		}
+		result := metroArr.DoesNodeMatchMetroSelectors(node)
+		assert.False(t, result)
+	})
+
+	t.Run("Error creating local node selector", func(t *testing.T) {
+		node := &k8score.Node{}
+		arr := &array.PowerStoreArray{
+			HostConnectivity: &array.HostConnectivity{
+				Metro: array.MetroConnectivityOptions{
+					ColocatedLocal: k8score.NodeSelector{
+						NodeSelectorTerms: []k8score.NodeSelectorTerm{
+							{
+								MatchExpressions: []k8score.NodeSelectorRequirement{
+									{
+										Key:      "",
+										Operator: k8score.NodeSelectorOpIn,
+										Values:   []string{"value"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+		result := arr.DoesNodeMatchMetroSelectors(node)
+		assert.False(t, result)
+	})
+	t.Run("Error creating remote node selector", func(t *testing.T) {
+		node := &k8score.Node{}
+		arr := &array.PowerStoreArray{
+			HostConnectivity: &array.HostConnectivity{
+				Metro: array.MetroConnectivityOptions{
+					ColocatedRemote: k8score.NodeSelector{
+						NodeSelectorTerms: []k8score.NodeSelectorTerm{
+							{
+								MatchExpressions: []k8score.NodeSelectorRequirement{
+									{
+										Key:      "",
+										Operator: k8score.NodeSelectorOpIn,
+										Values:   []string{"value"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+		result := arr.DoesNodeMatchMetroSelectors(node)
+		assert.False(t, result)
+	})
+	t.Run("Error creating Both node selector", func(t *testing.T) {
+		node := &k8score.Node{}
+		arr := &array.PowerStoreArray{
+			HostConnectivity: &array.HostConnectivity{
+				Metro: array.MetroConnectivityOptions{
+					ColocatedBoth: k8score.NodeSelector{
+						NodeSelectorTerms: []k8score.NodeSelectorTerm{
+							{
+								MatchExpressions: []k8score.NodeSelectorRequirement{
+									{
+										Key:      "",
+										Operator: k8score.NodeSelectorOpIn,
+										Values:   []string{"value"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+		result := arr.DoesNodeMatchMetroSelectors(node)
+		assert.False(t, result)
+	})
+	t.Run("Node does not find any metronode selector", func(t *testing.T) {
+		node := &k8score.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "nodeid",
+				Labels: map[string]string{
+					"zone2": "local", // does not match the node selector
+				},
+				Annotations: map[string]string{
+					"csi.volume.kubernetes.io/nodeid": `{"csi-powerstore.dellemc.com":"nodeid"}`,
+				},
+			},
+		}
+		metroArr := &array.PowerStoreArray{
+			HostConnectivity: &array.HostConnectivity{
+				Local: k8score.NodeSelector{
+					NodeSelectorTerms: []k8score.NodeSelectorTerm{
+						{
+							MatchExpressions: []k8score.NodeSelectorRequirement{
+								{
+									Key:      "zone4",
+									Operator: k8score.NodeSelectorOpIn,
+									Values:   []string{"local"},
+								},
+							},
+						},
+					},
+				},
+			},
+			GlobalID: "APM0012345",
+			Endpoint: "https://192.168.0.3/api/rest",
+			Username: "admin",
+			Password: "pass",
+			Insecure: true,
+			IP:       "192.168.0.3",
+		}
+		result := metroArr.DoesNodeMatchMetroSelectors(node)
+		assert.False(t, result)
+	})
 }

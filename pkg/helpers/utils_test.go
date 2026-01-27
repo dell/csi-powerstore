@@ -183,10 +183,9 @@ func TestDefaultProvider_Addrs(t *testing.T) {
 	assert.NotEmpty(t, interfaces)
 
 	for _, iface := range interfaces {
-		addrs, err := provider.Addrs(iface)
+		_, err := provider.Addrs(iface)
 		// Some interfaces may not have addresses, but the call shouldn't fail
 		assert.NoError(t, err)
-		assert.NotNil(t, addrs)
 	}
 }
 

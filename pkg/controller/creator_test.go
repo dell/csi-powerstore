@@ -24,9 +24,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/gopowerstore"
 	"github.com/dell/gopowerstore/mocks"
+	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )

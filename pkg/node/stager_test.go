@@ -26,17 +26,17 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-powerstore/v2/mocks"
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers"
+	"github.com/dell/csmlog"
 	"github.com/dell/gopowerstore"
 	gopowerstoremock "github.com/dell/gopowerstore/mocks"
+	"github.com/container-storage-interface/spec/lib/go/csi"
 
 	"github.com/dell/gobrick"
 	"github.com/dell/gofsutil"
 	"github.com/golang/mock/gomock"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -64,8 +64,24 @@ func getValidPublishContext() map[string]string {
 	}
 }
 
-func getValidRemoteMetroPublishContext() map[string]string {
+func getValidUniformMetroPublishContext() map[string]string {
 	publishContext := getValidPublishContext()
+	publishContext[identifiers.TargetMapRemoteLUNAddress] = validLUNID
+	publishContext[identifiers.TargetMapRemoteDeviceWWN] = validDeviceWWN
+	publishContext[identifiers.TargetMapRemoteISCSIPortalsPrefix+"0"] = validRemoteISCSIPortals[0]
+	publishContext[identifiers.TargetMapRemoteISCSIPortalsPrefix+"1"] = validRemoteISCSIPortals[1]
+	publishContext[identifiers.TargetMapRemoteISCSITargetsPrefix+"0"] = validRemoteISCSITargets[0]
+	publishContext[identifiers.TargetMapRemoteISCSITargetsPrefix+"1"] = validRemoteISCSITargets[1]
+	publishContext[identifiers.TargetMapRemoteFCWWPNPrefix+"0"] = validRemoteFCTargetsWWPN[0]
+	publishContext[identifiers.TargetMapRemoteFCWWPNPrefix+"1"] = validRemoteFCTargetsWWPN[1]
+
+	return publishContext
+}
+
+// getValidRemoteMetroPublishContext contains an empty local publish context
+// and a populated remote publish context.
+func getValidRemoteMetroPublishContext() map[string]string {
+	publishContext := make(map[string]string)
 	publishContext[identifiers.TargetMapRemoteLUNAddress] = validLUNID
 	publishContext[identifiers.TargetMapRemoteDeviceWWN] = validDeviceWWN
 	publishContext[identifiers.TargetMapRemoteISCSIPortalsPrefix+"0"] = validRemoteISCSIPortals[0]
@@ -120,11 +136,16 @@ func scsiStageVolumeOK(util *mocks.UtilInterface, fs *mocks.FsInterface) {
 	fs.On("GetUtil").Return(util)
 }
 
+func scsiStageVolumeFail(util *mocks.UtilInterface, fs *mocks.FsInterface) {
+	util.On("BindMount", mock.Anything, "/dev", filepath.Join(nodeStagePrivateDir, validBaseVolumeID)).Return(nil)
+	fs.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, errors.New("mock staging failure")).Once()
+}
+
 func scsiStageRemoteMetroVolumeOK(util *mocks.UtilInterface, fs *mocks.FsInterface) {
-	util.On("BindMount", mock.Anything, "/dev", filepath.Join(nodeStagePrivateDir, validRemoteVolID)).Return(nil)
+	util.On("BindMount", mock.Anything, "/dev", filepath.Join(nodeStagePrivateDir, validBaseVolumeID)).Return(nil)
 	fs.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
 	fs.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
-	fs.On("MkFileIdempotent", filepath.Join(nodeStagePrivateDir, validRemoteVolID)).Return(true, nil)
+	fs.On("MkFileIdempotent", filepath.Join(nodeStagePrivateDir, validBaseVolumeID)).Return(true, nil)
 	fs.On("GetUtil").Return(util)
 }
 
@@ -238,12 +259,12 @@ func TestSCSIStager_Stage(t *testing.T) {
 
 		scsiStageVolumeOK(utilMock, fsMock)
 		_, err := stager.Stage(context.Background(), &csi.NodeStageVolumeRequest{
-			VolumeId:          validBlockVolumeID,
+			VolumeId:          validBlockVolumeHandle,
 			PublishContext:    getValidPublishContext(),
 			StagingTargetPath: nodeStagePrivateDir,
 			VolumeCapability: getCapabilityWithVoltypeAccessFstype(
 				"block", "single-writer", "none"),
-		}, log.Fields{}, fsMock, validBaseVolumeID, false, clientMock)
+		}, filepath.Join(nodeStagePrivateDir, validBaseVolumeID), "node-1", csmlog.Fields{}, fsMock, validBaseVolumeID, false, clientMock)
 		assert.Nil(t, err)
 	})
 
@@ -270,12 +291,12 @@ func TestSCSIStager_Stage(t *testing.T) {
 		scsiStageVolumeOK(utilMock, fsMock)
 
 		_, err := stager.Stage(context.Background(), &csi.NodeStageVolumeRequest{
-			VolumeId:          validBlockVolumeID,
+			VolumeId:          validBlockVolumeHandle,
 			PublishContext:    getValidPublishContext(),
 			StagingTargetPath: nodeStagePrivateDir,
 			VolumeCapability: getCapabilityWithVoltypeAccessFstype(
 				"block", "single-writer", "none"),
-		}, log.Fields{}, fsMock, validBaseVolumeID, false, clientMock)
+		}, filepath.Join(nodeStagePrivateDir, validBaseVolumeID), "node-1", csmlog.Fields{}, fsMock, validBaseVolumeID, false, clientMock)
 
 		assert.Nil(t, err)
 	})
@@ -302,12 +323,12 @@ func TestSCSIStager_Stage(t *testing.T) {
 
 		scsiStageVolumeOK(utilMock, fsMock)
 		_, err := stager.Stage(context.Background(), &csi.NodeStageVolumeRequest{
-			VolumeId:          validBlockVolumeID,
+			VolumeId:          validBlockVolumeHandle,
 			PublishContext:    getValidPublishContext(),
 			StagingTargetPath: nodeStagePrivateDir,
 			VolumeCapability: getCapabilityWithVoltypeAccessFstype(
 				"block", "single-writer", "none"),
-		}, log.Fields{}, fsMock, validBaseVolumeID, false, clientMock)
+		}, filepath.Join(nodeStagePrivateDir, validBaseVolumeID), "node-1", csmlog.Fields{}, fsMock, validBaseVolumeID, false, clientMock)
 
 		assert.Nil(t, err)
 	})
@@ -346,12 +367,12 @@ func TestSCSIStager_Stage(t *testing.T) {
 
 		scsiStageVolumeOK(utilMock, fsMock)
 		_, err := stager.Stage(context.Background(), &csi.NodeStageVolumeRequest{
-			VolumeId:          validBlockVolumeID,
+			VolumeId:          validBlockVolumeHandle,
 			PublishContext:    getValidPublishContext(),
 			StagingTargetPath: nodeStagePrivateDir,
 			VolumeCapability: getCapabilityWithVoltypeAccessFstype(
 				"block", "single-writer", "none"),
-		}, log.Fields{}, fsMock, validBaseVolumeID, false, client)
+		}, filepath.Join(nodeStagePrivateDir, validBaseVolumeID), "node-1", csmlog.Fields{}, fsMock, validBaseVolumeID, false, client)
 		assert.NotNil(t, err)
 		assert.Contains(t, err.Error(), "unable to get targets for any protocol")
 	})
@@ -393,12 +414,12 @@ func TestSCSIStager_Stage(t *testing.T) {
 
 		scsiStageVolumeOK(utilMock, fsMock)
 		_, err := stager.Stage(context.Background(), &csi.NodeStageVolumeRequest{
-			VolumeId:          validBlockVolumeID,
+			VolumeId:          validBlockVolumeHandle,
 			PublishContext:    getValidPublishContext(),
 			StagingTargetPath: nodeStagePrivateDir,
 			VolumeCapability: getCapabilityWithVoltypeAccessFstype(
 				"block", "single-writer", "none"),
-		}, log.Fields{}, fsMock, validBaseVolumeID, false, client)
+		}, filepath.Join(nodeStagePrivateDir, validBaseVolumeID), "node-1", csmlog.Fields{}, fsMock, validBaseVolumeID, false, client)
 		assert.NotNil(t, err)
 		assert.Contains(t, err.Error(), "NVMeFC Targets data must be in publish context")
 	})
@@ -441,12 +462,12 @@ func TestSCSIStager_Stage(t *testing.T) {
 
 		scsiStageVolumeOK(utilMock, fsMock)
 		_, err := stager.Stage(context.Background(), &csi.NodeStageVolumeRequest{
-			VolumeId:          validBlockVolumeID,
+			VolumeId:          validBlockVolumeHandle,
 			PublishContext:    getValidPublishContext(),
 			StagingTargetPath: nodeStagePrivateDir,
 			VolumeCapability: getCapabilityWithVoltypeAccessFstype(
 				"block", "single-writer", "none"),
-		}, log.Fields{}, fsMock, validBaseVolumeID, false, client)
+		}, filepath.Join(nodeStagePrivateDir, validBaseVolumeID), "node-1", csmlog.Fields{}, fsMock, validBaseVolumeID, false, client)
 		assert.NotNil(t, err)
 		assert.Contains(t, err.Error(), "NVMeTCP Targets data must be in publish context")
 	})
@@ -490,12 +511,12 @@ func TestSCSIStager_Stage(t *testing.T) {
 
 		scsiStageVolumeOK(utilMock, fsMock)
 		_, err := stager.Stage(context.Background(), &csi.NodeStageVolumeRequest{
-			VolumeId:          validBlockVolumeID,
+			VolumeId:          validBlockVolumeHandle,
 			PublishContext:    getValidPublishContext(),
 			StagingTargetPath: nodeStagePrivateDir,
 			VolumeCapability: getCapabilityWithVoltypeAccessFstype(
 				"block", "single-writer", "none"),
-		}, log.Fields{}, fsMock, validBaseVolumeID, false, client)
+		}, filepath.Join(nodeStagePrivateDir, validBaseVolumeID), "node-1", csmlog.Fields{}, fsMock, validBaseVolumeID, false, client)
 		assert.NotNil(t, err)
 		assert.Contains(t, err.Error(), "iscsiTargets data must be in publish context")
 	})
@@ -537,15 +558,119 @@ func TestSCSIStager_Stage(t *testing.T) {
 
 		scsiStageVolumeOK(utilMock, fsMock)
 		_, err := stager.Stage(context.Background(), &csi.NodeStageVolumeRequest{
-			VolumeId:          validBlockVolumeID,
+			VolumeId:          validBlockVolumeHandle,
 			PublishContext:    getValidPublishContext(),
 			StagingTargetPath: nodeStagePrivateDir,
 			VolumeCapability: getCapabilityWithVoltypeAccessFstype(
 				"block", "single-writer", "none"),
-		}, log.Fields{}, fsMock, validBaseVolumeID, false, client)
+		}, filepath.Join(nodeStagePrivateDir, validBaseVolumeID), "node-1", csmlog.Fields{}, fsMock, validBaseVolumeID, false, client)
 		assert.NotNil(t, err)
 		assert.Contains(t, err.Error(), "fcTargets data must be in publish context")
 	})
+}
+
+func TestSCSIStager_getLunAddressFromArray(t *testing.T) {
+	tests := []struct {
+		name                     string
+		getHostByNameFunc        func(ctx context.Context, name string) (gopowerstore.Host, error)
+		getHostVolumeMappingFunc func(ctx context.Context, volumeID string) ([]gopowerstore.HostVolumeMapping, error)
+		volumeID                 string
+		nodeID                   string
+		want                     string
+		wantErr                  bool
+	}{
+		{
+			name: "valid array and volume",
+			getHostByNameFunc: func(_ context.Context, _ string) (gopowerstore.Host, error) {
+				return gopowerstore.Host{
+					ID:         validHostID,
+					Initiators: []gopowerstore.InitiatorInstance{},
+					Name:       "host-name",
+				}, nil
+			},
+			getHostVolumeMappingFunc: func(_ context.Context, _ string) ([]gopowerstore.HostVolumeMapping, error) {
+				return []gopowerstore.HostVolumeMapping{
+					{HostID: validHostID, LogicalUnitNumber: validLUNIDINT},
+				}, nil
+			},
+			volumeID: "valid-volume-id",
+			nodeID:   validHostID,
+			want:     validLUNID,
+			wantErr:  false,
+		},
+		{
+			name: "invalid volume ID",
+			getHostByNameFunc: func(_ context.Context, _ string) (gopowerstore.Host, error) {
+				return gopowerstore.Host{
+					ID:         validHostID,
+					Initiators: []gopowerstore.InitiatorInstance{},
+					Name:       "host-name",
+				}, nil
+			},
+			getHostVolumeMappingFunc: func(_ context.Context, _ string) ([]gopowerstore.HostVolumeMapping, error) {
+				return nil, errors.New("invalid volume ID")
+			},
+			volumeID: "invalid-volume-id",
+			nodeID:   "valid-node-id",
+			want:     "",
+			wantErr:  true,
+		},
+		{
+			name: "host not found",
+			getHostByNameFunc: func(_ context.Context, _ string) (gopowerstore.Host, error) {
+				return gopowerstore.Host{}, errors.New("invalid host")
+			},
+			getHostVolumeMappingFunc: func(_ context.Context, _ string) ([]gopowerstore.HostVolumeMapping, error) {
+				return []gopowerstore.HostVolumeMapping{
+					{HostID: validHostID, LogicalUnitNumber: validLUNIDINT},
+				}, nil
+			},
+			volumeID: "valid-volume-id",
+			nodeID:   "valid-node-id",
+			want:     "",
+			wantErr:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			clientMock.ExpectedCalls = nil // reset previous expectations
+
+			// Mock GetHostByName using closures
+			clientMock.On("GetHostByName", mock.Anything, mock.AnythingOfType("string")).
+				Return(func(ctx context.Context, name string) gopowerstore.Host {
+					host, _ := tt.getHostByNameFunc(ctx, name)
+					return host
+				}, func(ctx context.Context, name string) error {
+					_, err := tt.getHostByNameFunc(ctx, name)
+					return err
+				})
+
+			// Mock GetHostVolumeMappingByVolumeID using closures
+			clientMock.On("GetHostVolumeMappingByVolumeID", mock.Anything, mock.AnythingOfType("string")).
+				Return(func(ctx context.Context, volumeID string) []gopowerstore.HostVolumeMapping {
+					mapping, _ := tt.getHostVolumeMappingFunc(ctx, volumeID)
+					return mapping
+				}, func(ctx context.Context, volumeID string) error {
+					_, err := tt.getHostVolumeMappingFunc(ctx, volumeID)
+					return err
+				})
+
+			// Call the method under test
+			got, err := getLunAddressFromArray(context.Background(), clientMock, tt.volumeID, tt.nodeID)
+
+			// Validate error expectation
+			if (err != nil) != tt.wantErr {
+				t.Errorf("getLunAddressFromArray() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			// Validate result
+			if got != tt.want {
+				t.Errorf("getLunAddressFromArray() = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }
 
 func TestSCSIStager_AddTargetsInfoToMap(t *testing.T) {

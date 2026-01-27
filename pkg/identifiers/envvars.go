@@ -68,6 +68,10 @@ const (
 	// Used to provide NFS volumes behind NAT
 	EnvExternalAccess = "X_CSI_POWERSTORE_EXTERNAL_ACCESS" // #nosec G101
 
+	// EnvExclusiveAccess indicates whether only externalAccess entries should be added to the NFS export.
+	// If true, node IP is excluded, and only IP/CIDR from externalAccess is used.
+	EnvExclusiveAccess = "X_CSI_POWERSTORE_EXCLUSIVE_ACCESS"
+
 	// EnvArrayConfigFilePath is filepath to powerstore arrays config file
 	EnvArrayConfigFilePath = "X_CSI_POWERSTORE_CONFIG_PATH"
 
@@ -113,9 +117,6 @@ const (
 	// EnvMultiNASCooldownPeriod specifies the cooldown period for multiple NAS devices.
 	EnvMultiNASCooldownPeriod = "X_CSI_MULTI_NAS_COOLDOWN_PERIOD"
 
-	// EnvNFSExportDirectory is the path to the folder where the nfs volumes are mounted
-	EnvNFSExportDirectory = "X_CSI_NFS_EXPORT_DIRECTORY"
-
 	// EnvDriverNamespace is the namespace where the powerstore driver is deployed
 	EnvDriverNamespace = "X_CSI_DRIVER_NAMESPACE"
 
@@ -124,4 +125,16 @@ const (
 
 	// EnvPodmonArrayConnectivityTimeout specifies the timeout for array connectivity for podmon
 	EnvPodmonArrayConnectivityTimeout = "X_CSI_PODMON_ARRAY_CONNECTIVITY_TIMEOUT"
+
+	// EnvVolumeDisconnectMaxRetries specifies the maximum number of retry attempts for volume disconnection
+	EnvVolumeDisconnectMaxRetries = "X_CSI_VOLUME_DISCONNECT_MAX_RETRIES"
+
+	// EnvVolumeDisconnectRetryInterval specifies the wait time (in seconds) between volume disconnection retries
+	EnvVolumeDisconnectRetryInterval = "X_CSI_VOLUME_DISCONNECT_RETRY_INTERVAL"
+
+	// EnvVolumeDisconnectTimeoutSeconds specifies the timeout duration (in seconds) for each volume disconnection attempt
+	EnvVolumeDisconnectTimeoutSeconds = "X_CSI_VOLUME_DISCONNECT_TIMEOUT_SECONDS"
+
+	// EnvCSMDREnabled indicates if CSM-DR is enabled
+	EnvCSMDREnabled = "X_CSM_DR_ENABLED"
 )

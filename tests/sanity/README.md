@@ -22,13 +22,18 @@ cd csi-powerstore/
 make build
 ```
 
-3. Fill in the following files in tests/sanity/; anything with a "REPLACE" prefix needs to be replaced with a real value:  
+3. Fill in the following files in tests/sanity/; anything with a "REPLACE" prefix needs to be replaced with a real value:
 
 - config.yaml, this file will be used by the binary built in step 2 (from now on, referred to as "the binary" for short) to connect to array
 - setup-driver-controller-sanity.sh, this file is used to start the driver's controller service from the binary
 - setup-driver-node-sanity.sh, this file is used to start the driver's node service from the binary
 - params.yaml, this file is used by the sanity test to pass in parameters that would be defined in the storageclass
 - [Optional] driver-config-params.yaml, this file controls how the binary's logger is configured
+
+4. Install Disaster Recovery (DR) CRD from operatorconfig/moduleconfig/common/disaster-recovery/dr-crds.yaml in csm-operator repository.
+```sh
+kubectl apply -f dr-crds.yaml
+```
 
 ## Running
 
@@ -53,7 +58,7 @@ make build
 3. In (another) new terminal window, run the shell script to run the sanity test
 
 ```sh
-./run-csi-sanity.sh 
+./run-csi-sanity.sh
 ```
 
 Tests should pass in 10-12 minutes

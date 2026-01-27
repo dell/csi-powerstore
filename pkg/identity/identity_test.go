@@ -22,8 +22,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers"
+	"github.com/container-storage-interface/spec/lib/go/csi"
 	ginkgo "github.com/onsi/ginkgo"
 	"github.com/onsi/ginkgo/reporters"
 	gomega "github.com/onsi/gomega"

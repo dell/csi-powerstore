@@ -27,26 +27,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-powerstore/v2/mocks"
 	identifiers "github.com/dell/csi-powerstore/v2/pkg/identifiers"
-	csictx "github.com/dell/gocsi/context"
 	csiutils "github.com/dell/gocsi/utils/csi"
 	"github.com/dell/gopowerstore"
 	gopowerstoremock "github.com/dell/gopowerstore/mocks"
-	log "github.com/sirupsen/logrus"
+	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
-
-func TestCustomLogger(_ *testing.T) {
-	log.SetLevel(log.DebugLevel)
-	lg := &identifiers.CustomLogger{}
-	ctx := context.Background()
-	lg.Info(ctx, "foo")
-	lg.Debug(ctx, "bar")
-	lg.Error(ctx, "spam")
-}
 
 func TestRmSockFile(t *testing.T) {
 	sockPath := "unix:///var/run/csi/csi.sock"
@@ -88,25 +77,6 @@ func TestRmSockFile(t *testing.T) {
 		_ = os.Setenv(csiutils.CSIEndpoint, "")
 
 		identifiers.RmSockFile(fsMock)
-	})
-}
-
-func TestSetLogFields(t *testing.T) {
-	t.Run("empty context", func(_ *testing.T) {
-		identifiers.SetLogFields(nil, log.Fields{})
-	})
-}
-
-func TestGetLogFields(t *testing.T) {
-	t.Run("empty context", func(t *testing.T) {
-		fields := identifiers.GetLogFields(nil)
-		assert.Equal(t, log.Fields{}, fields)
-	})
-
-	t.Run("req id", func(t *testing.T) {
-		ctx := context.WithValue(context.Background(), csictx.RequestIDKey, "1")
-		fields := identifiers.GetLogFields(ctx)
-		assert.Equal(t, log.Fields{"RequestID": "1"}, fields)
 	})
 }
 
@@ -480,7 +450,8 @@ func TestGetIPListFromString(t *testing.T) {
 		{"InValid IP, Test 2", args{input: "10.256.1.2"}, x},
 		{"Valid Localhost", args{input: "https://localhost:9400"}, []string{"localhost"}},
 		{"Valid Domain", args{input: "https://example.com:9443"}, []string{"example.com"}},
-		{"Invalid Domain", args{input: "http://mydomain."}, x},
+		{"Valid CSI NodeID", args{input: "csi-node-b61220be1acc441abdd8b00e34542e5d-1.1.1.1"}, []string{"1.1.1.1"}},
+		{"Valid CSI NodeID", args{input: "csi-node-tar2222.infralab.ptec-2.2.2.2"}, []string{"2.2.2.2"}},
 		{"Valid Multi-Segment Domain", args{input: "https://abc.example.com/page"}, []string{"abc.example.com"}},
 	}
 	for _, tt := range tests {
@@ -666,6 +637,193 @@ func TestGetPodmonArrayConnectivityTimeout(t *testing.T) {
 			actual := identifiers.GetPodmonArrayConnectivityTimeout()
 			if actual != tt.expected {
 				t.Errorf("GetTimeout() = %v, want %v", actual, tt.expected)
+			}
+		})
+	}
+}
+
+func TestGetVolumeDisconnectTimeout(t *testing.T) {
+	tests := []struct {
+		name         string
+		expected     time.Duration
+		setupFunc    func()
+		teardownFunc func()
+	}{
+		{
+			name:     "env variable is not set",
+			expected: 120 * time.Second, // DefaultVolumeDisconnectTimeout
+		},
+		{
+			name:         "env variable is set to valid value",
+			expected:     45 * time.Second,
+			setupFunc:    func() { os.Setenv("X_CSI_VOLUME_DISCONNECT_TIMEOUT_SECONDS", "45s") },
+			teardownFunc: func() { os.Unsetenv("X_CSI_VOLUME_DISCONNECT_TIMEOUT_SECONDS") },
+		},
+		{
+			name:         "env variable is set to invalid value",
+			expected:     120 * time.Second,
+			setupFunc:    func() { os.Setenv("X_CSI_VOLUME_DISCONNECT_TIMEOUT_SECONDS", "invalid") },
+			teardownFunc: func() { os.Unsetenv("X_CSI_VOLUME_DISCONNECT_TIMEOUT_SECONDS") },
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.setupFunc != nil {
+				tt.setupFunc()
+				defer tt.teardownFunc()
+			}
+
+			actual := identifiers.GetVolumeDisconnectTimeout()
+			if actual != tt.expected {
+				t.Errorf("GetVolumeDisconnectTimeout() = %v, want %v", actual, tt.expected)
+			}
+		})
+	}
+}
+
+func TestGetVolumeDisconnectRetryInterval(t *testing.T) {
+	tests := []struct {
+		name         string
+		expected     time.Duration
+		setupFunc    func()
+		teardownFunc func()
+	}{
+		{
+			name:     "env variable is not set",
+			expected: 5 * time.Second, // DefaultVolumeDisconnectRetryInterval
+		},
+		{
+			name:         "env variable is set to valid value",
+			expected:     15 * time.Second,
+			setupFunc:    func() { os.Setenv("X_CSI_VOLUME_DISCONNECT_RETRY_INTERVAL", "15s") },
+			teardownFunc: func() { os.Unsetenv("X_CSI_VOLUME_DISCONNECT_RETRY_INTERVAL") },
+		},
+		{
+			name:         "env variable is set to invalid value",
+			expected:     5 * time.Second,
+			setupFunc:    func() { os.Setenv("X_CSI_VOLUME_DISCONNECT_RETRY_INTERVAL", "invalid") },
+			teardownFunc: func() { os.Unsetenv("X_CSI_VOLUME_DISCONNECT_RETRY_INTERVAL") },
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.setupFunc != nil {
+				tt.setupFunc()
+				defer tt.teardownFunc()
+			}
+
+			actual := identifiers.GetVolumeDisconnectRetryInterval()
+			if actual != tt.expected {
+				t.Errorf("GetVolumeDisconnectRetryInterval() = %v, want %v", actual, tt.expected)
+			}
+		})
+	}
+}
+
+func TestGetVolumeDisconnectMaxRetries(t *testing.T) {
+	tests := []struct {
+		name         string
+		expected     int
+		setupFunc    func()
+		teardownFunc func()
+	}{
+		{
+			name:     "env variable is not set",
+			expected: 5, // DefaultVolumeDisconnectMaxRetries
+		},
+		{
+			name:         "env variable is set to valid value",
+			expected:     7,
+			setupFunc:    func() { os.Setenv("X_CSI_VOLUME_DISCONNECT_MAX_RETRIES", "7") },
+			teardownFunc: func() { os.Unsetenv("X_CSI_VOLUME_DISCONNECT_MAX_RETRIES") },
+		},
+		{
+			name:         "env variable is set to invalid value",
+			expected:     5,
+			setupFunc:    func() { os.Setenv("X_CSI_VOLUME_DISCONNECT_MAX_RETRIES", "invalid") },
+			teardownFunc: func() { os.Unsetenv("X_CSI_VOLUME_DISCONNECT_MAX_RETRIES") },
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.setupFunc != nil {
+				tt.setupFunc()
+				defer tt.teardownFunc()
+			}
+
+			actual := identifiers.GetVolumeDisconnectMaxRetries()
+			if actual != tt.expected {
+				t.Errorf("GetVolumeDisconnectMaxRetries() = %v, want %v", actual, tt.expected)
+			}
+		})
+	}
+}
+
+func TestHostAlreadyPresentInNFSExport(t *testing.T) {
+	tests := []struct {
+		name   string
+		export gopowerstore.NFSExport
+		ip     string
+		want   bool
+	}{
+		{
+			name:   "present_in_RWHosts",
+			export: gopowerstore.NFSExport{RWHosts: []string{"10.0.0.1/255.255.255.255"}},
+			ip:     "10.0.0.1",
+			want:   true,
+		},
+		{
+			name:   "present_in_RWRootHosts",
+			export: gopowerstore.NFSExport{RWRootHosts: []string{"192.168.0.5/255.255.255.255"}},
+			ip:     "192.168.0.5",
+			want:   true,
+		},
+		{
+			name:   "present_in_ROHosts",
+			export: gopowerstore.NFSExport{ROHosts: []string{"172.16.10.10/255.255.255.255"}},
+			ip:     "172.16.10.10",
+			want:   true,
+		},
+		{
+			name:   "present_in_RORootHosts",
+			export: gopowerstore.NFSExport{RORootHosts: []string{"10.10.10.10/255.255.255.255"}},
+			ip:     "10.10.10.10",
+			want:   true,
+		},
+		{
+			name:   "not_present_different_ip",
+			export: gopowerstore.NFSExport{RWHosts: []string{"10.0.0.2/255.255.255.255"}, ROHosts: []string{"10.0.0.3/255.255.255.255"}},
+			ip:     "10.0.0.1",
+			want:   false,
+		},
+		{
+			name:   "not_present_empty_lists",
+			export: gopowerstore.NFSExport{},
+			ip:     "10.0.0.1",
+			want:   false,
+		},
+		{
+			name:   "present_in_multiple_lists",
+			export: gopowerstore.NFSExport{RWHosts: []string{"1.2.3.4/255.255.255.255"}, RORootHosts: []string{"5.6.7.8/255.255.255.255"}},
+			ip:     "1.2.3.4",
+			want:   true,
+		},
+		{
+			name:   "ip_with_trailing_spaces_not_present",
+			export: gopowerstore.NFSExport{RWHosts: []string{"8.8.8.8/255.255.255.255"}},
+			ip:     "8.8.8.8 ",
+			want:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := identifiers.HostAlreadyPresentInNFSExport(tt.export, tt.ip)
+			if got != tt.want {
+				t.Errorf("HostAlreadyPresentInNFSExport() = %v, want %v", got, tt.want)
 			}
 		})
 	}

@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2021-2024 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2021-2026 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,16 +32,19 @@ import (
 	"sync"
 	"time"
 
-	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/dell/csi-powerstore/v2/core"
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers"
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers/fs"
+	"github.com/dell/csi-powerstore/v2/pkg/identifiers/k8sutils"
+	"github.com/dell/csm-dr/pkg/storage"
+	"github.com/dell/csmlog"
 	csictx "github.com/dell/gocsi/context"
 	"github.com/dell/gopowerstore"
-	log "github.com/sirupsen/logrus"
+	"github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"gopkg.in/yaml.v3"
+	k8score "k8s.io/api/core/v1"
+	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
+	"sigs.k8s.io/yaml"
 )
 
 var (
@@ -50,6 +53,7 @@ var (
 	ipToArrayMux             sync.Mutex
 	defaultMultiNasThreshold = 5
 	defaultMultiNasCooldown  = 5 * time.Minute
+	log                      = csmlog.GetLogger()
 )
 
 // Consumer provides methods for safe management of arrays
@@ -67,6 +71,30 @@ type Locker struct {
 	defaultArrayLock sync.Mutex
 	arrays           map[string]*PowerStoreArray
 	defaultArray     *PowerStoreArray
+}
+
+// Get returns a PowerStoreArray associated with the globalID
+// if one exists in the Locker.
+//
+// Satisfies the ArrayLister interface for csm-dr
+func (s *Locker) Get(globalID string) (storage.HealthChecker, error) {
+	log.Debugf("getting array for global ID %q", globalID)
+	return s.GetOneArray(globalID)
+}
+
+// IsOnline returns true if the PowerStoreArray is online; false otherwise.
+// Array status is determined by submitting a REST request for the array cluster
+// using the gopowerstore API.
+//
+// Satisfies the HealthChecker interface for csm-dr.
+func (psa *PowerStoreArray) IsOnline(ctx context.Context) bool {
+	log.Debugf("checking if array %q is online", psa.GlobalID)
+	_, err := psa.GetClient().GetCluster(ctx)
+	if err != nil {
+		log.Errorf("array %q is offline: %v", psa.GlobalID, err)
+	}
+
+	return err == nil
 }
 
 // Arrays is a getter for list of arrays
@@ -240,21 +268,63 @@ func (n *NASCooldown) FallbackRetry(nasList []string) string {
 // It stores gopowerstore client that can be directly used to invoke PowerStore API calls.
 // This structure is supposed to be parsed from config and mainly is created by GetPowerStoreArrays function.
 type PowerStoreArray struct {
-	Endpoint      string                    `yaml:"endpoint"`
-	GlobalID      string                    `yaml:"globalID"`
-	Username      string                    `yaml:"username"`
-	Password      string                    `yaml:"password"`
-	NasName       string                    `yaml:"nasName"`
-	BlockProtocol identifiers.TransportType `yaml:"blockProtocol"`
-	Insecure      bool                      `yaml:"skipCertificateValidation"`
-	IsDefault     bool                      `yaml:"isDefault"`
-	NfsAcls       string                    `yaml:"nfsAcls"`
-	MetroTopology string                    `yaml:"metroTopology"`
-	Labels        map[string]string         `yaml:"labels"`
+	Endpoint      string                    `yaml:"endpoint" json:"endpoint"`
+	GlobalID      string                    `yaml:"globalID" json:"globalID"`
+	Username      string                    `yaml:"username" json:"username"`
+	Password      string                    `yaml:"password" json:"password"`
+	NasName       string                    `yaml:"nasName" json:"nasName"`
+	BlockProtocol identifiers.TransportType `yaml:"blockProtocol" json:"blockProtocol"`
+	Insecure      bool                      `yaml:"skipCertificateValidation" json:"skipCertificateValidation"`
+	IsDefault     bool                      `yaml:"isDefault" json:"isDefault"`
+	NfsAcls       string                    `yaml:"nfsAcls" json:"nfsAcls"`
+
+	// MetroTopology describes the desired topology of the hosts configured for
+	// metro replication. Accepted values are "Uniform" and "Non-Uniform", with
+	// "Non-Uniform" not yet being implemented.
+	//
+	// Deprecated: MetroTopology is deprecated and remains only for purposes of
+	// backward compatibility. Use HostConnectivity instead.
+	MetroTopology string `yaml:"metroTopology" json:"metroTopology"`
+	// Labels is a set of labels, ANDed to build a node selector query. Used in
+	// conjunction with MetroTopology to identify nodes that should register
+	// metro hosts in this PowerStore system.
+	Labels map[string]string `yaml:"labels" json:"labels"`
+
+	// HostConnectivity describes how nodes should register their hosts
+	// for this PowerStore system.
+	HostConnectivity *HostConnectivity `yaml:"hostConnectivity" json:"hostConnectivity"`
 
 	Client             gopowerstore.Client
 	IP                 string
 	NASCooldownTracker NASCooldownTracker
+}
+
+// HostConnectivity provides two host connectivity options for nodes that will
+// register hosts in a PowerStore system -- Local and Metro.
+type HostConnectivity struct {
+	// Local contains a NodeSelector term used to identify nodes that are locally
+	// connected to the current PowerStore array and should register their hosts locally.
+	Local k8score.NodeSelector `yaml:"local" json:"local"`
+	// Metro contains more-specific options for how to register a host for
+	// use with uniform metro replication. For non-uniform metro replication,
+	// hosts should be registered as Local.
+	Metro MetroConnectivityOptions `yaml:"metro" json:"metro"`
+}
+
+// MetroConnectivityOptions provides options for how a host should be registered
+// to optimize the connection for uniform metro replication.
+type MetroConnectivityOptions struct {
+	// ColocatedLocal contains a NodeSelector term used to identify nodes that are
+	// colocated with the current PowerStore array and should register a host with the system.
+	ColocatedLocal k8score.NodeSelector `yaml:"colocatedLocal" json:"colocatedLocal"`
+	// ColocatedRemote contains a NodeSelector term used to identify nodes that are
+	// NOT colocated with the current PowerStore array, but are instead colocated with the
+	// metro replication target and should still register a host with this system as a secondary path.
+	ColocatedRemote k8score.NodeSelector `yaml:"colocatedRemote" json:"colocatedRemote"`
+	// ColocatedBoth contains a NodeSelector term used to identify nodes that are
+	// colocated with both the current PowerStore array and the metro replication target PowerStore
+	// array and should register a host with the current system.
+	ColocatedBoth k8score.NodeSelector `yaml:"colocatedBoth" json:"colocatedBoth"`
 }
 
 // GetNasName is a getter that returns name of configured NAS
@@ -342,7 +412,7 @@ func GetPowerStoreArrays(fs fs.Interface, filePath string) (map[string]*PowerSto
 				"unable to create PowerStore client: %s", err.Error())
 		}
 		c.SetCustomHTTPHeaders(http.Header{
-			"Application-Type": {fmt.Sprintf("%s/%s", identifiers.VerboseName, core.SemVer)},
+			"Application-Type": {fmt.Sprintf("%s/%s", identifiers.VerboseName, identifiers.ManifestSemver)},
 		})
 
 		c.SetLogger(&identifiers.CustomLogger{})
@@ -453,6 +523,7 @@ func ParseVolumeID(ctx context.Context, volumeHandleRaw string,
 	defaultArray *PowerStoreArray, /*legacy support*/
 	vc *csi.VolumeCapability, /*legacy support*/
 ) (volumeHandle VolumeHandle, err error) {
+	log = log.WithContext(ctx)
 	log.Debugf("ParseVolumeID: parsing volume handle %s", volumeHandleRaw)
 
 	if volumeHandleRaw == "" {
@@ -529,6 +600,12 @@ func ParseVolumeID(ctx context.Context, volumeHandleRaw string,
 	return volumeHandle, nil
 }
 
+// IsMetro determines if the volume handle belongs to a metro volume by checking
+// if the RemoteUUID field is non-empty.
+func (v *VolumeHandle) IsMetro() bool {
+	return v.RemoteUUID != "" && v.RemoteArrayGlobalID != ""
+}
+
 // GetVolumeUUIDPrefix extracts the prefix, if any exists, from a volume ID with a UUID format.
 // The prefix is assumed to be all characters preceding the volume UUID including separators/delimiters,
 // e.g. '-'. If no prefix is found, or the volume ID is not of the UUID format, the function returns an
@@ -553,6 +630,7 @@ func GetVolumeUUIDPrefix(volumeID string) (prefix string) {
 
 // GetLeastUsedActiveNAS finds the active NAS with the least FS count
 func GetLeastUsedActiveNAS(ctx context.Context, arr *PowerStoreArray, nasServers []string) (string, error) {
+	log := log.WithContext(ctx)
 	nasList, err := arr.Client.GetNASServers(ctx)
 	if err != nil {
 		log.Errorf("Failed to fetch NAS servers: %v", err)
@@ -632,4 +710,64 @@ func GetNASInCooldown(arr *PowerStoreArray, nasServers []string) []string {
 		}
 	}
 	return nasInCooldown
+}
+
+// checkConnectivity checks if kubeNode matches metro selector.
+func (psa *PowerStoreArray) CheckConnectivity(ctx context.Context, kubeNodeID string) bool {
+	var err error
+
+	// Check for backward compatibility
+	if psa.HostConnectivity == nil {
+		log.Warnf("HostConnectivity is not defined in secret for array %s", psa.Endpoint)
+		return true
+	}
+	node, err := k8sutils.GetNodeByCSINodeID(ctx, identifiers.Name, kubeNodeID, identifiers.KeyNodeID)
+	if err != nil {
+		log.Errorf("GetNodeByCSINodeID error %s kubeNodeID %s", err, kubeNodeID)
+		return false
+	}
+	log.Debugf("checking if kubeNode %s matches metro selector. volume for metro array %+v", kubeNodeID, *psa.HostConnectivity)
+	if psa.DoesNodeMatchMetroSelectors(node) {
+		log.Debugf("selector matched.volume for uniform array %s, on kubeNodeID %s", psa.Endpoint, kubeNodeID)
+		return true
+	}
+	localSelector, localErr := nodeaffinity.NewNodeSelector(&psa.HostConnectivity.Local)
+	if localErr == nil && localSelector.Match(node) { // Check if node matches any of the local  selectors in array(for non-unform array)
+		log.Debugf("Local selector matched for non-uniform array %s, on kubeNodeID %s", psa.Endpoint, kubeNodeID)
+		return true
+	}
+
+	return false
+}
+
+// DoesNodeMatchMetroSelectors checks if the given node matches any of the provided metro selectors in secret
+func (psa *PowerStoreArray) DoesNodeMatchMetroSelectors(node *k8score.Node) bool {
+	local, errLocal := nodeaffinity.NewNodeSelector(&psa.HostConnectivity.Metro.ColocatedLocal)
+	if errLocal != nil {
+		log.Debugf("Error creating local node selector: %v", errLocal)
+	}
+
+	if errLocal == nil && local != nil && local.Match(node) {
+		return true
+	}
+
+	remote, errRemote := nodeaffinity.NewNodeSelector(&psa.HostConnectivity.Metro.ColocatedRemote)
+	if errRemote != nil {
+		log.Debugf("Error creating remote node selector: %v", errRemote)
+	}
+
+	if errRemote == nil && remote != nil && remote.Match(node) {
+		return true
+	}
+
+	colocate, errColocate := nodeaffinity.NewNodeSelector(&psa.HostConnectivity.Metro.ColocatedBoth)
+	if errColocate != nil {
+		log.Debugf("Error creating colocated node selector: %v", errColocate)
+	}
+
+	if errColocate == nil && colocate != nil && colocate.Match(node) {
+		return true
+	}
+	log.Debug("Node does not match any metro selectors")
+	return false
 }

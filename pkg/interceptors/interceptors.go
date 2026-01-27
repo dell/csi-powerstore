@@ -26,25 +26,28 @@ import (
 	"sync"
 	"time"
 
-	"github.com/akutz/gosync"
-	"github.com/container-storage-interface/spec/lib/go/csi"
 	controller "github.com/dell/csi-powerstore/v2/pkg/controller"
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers"
 	"github.com/dell/gocsi/middleware/serialvolume"
+	"github.com/akutz/gosync"
+	"github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
+	"github.com/dell/csmlog"
 	csictx "github.com/dell/gocsi/context"
 	mwtypes "github.com/dell/gocsi/middleware/serialvolume/lockprovider"
-	log "github.com/sirupsen/logrus"
 	xctx "golang.org/x/net/context"
 
 	"github.com/dell/csi-metadata-retriever/retriever"
 	"github.com/kubernetes-csi/csi-lib-utils/connection"
 	"github.com/kubernetes-csi/csi-lib-utils/metrics"
 )
+
+// Instantial csmlog on a package level
+var log = csmlog.GetLogger()
 
 type rewriteRequestIDInterceptor struct{}
 
@@ -145,6 +148,7 @@ func NewCustomSerialLock(mode string) grpc.UnaryServerInterceptor {
 }
 
 func (i *interceptor) createMetadataRetrieverClient(ctx context.Context) {
+	log := log.WithContext(ctx)
 	metricsManager := metrics.NewCSIMetricsManagerWithOptions("csi-metadata-retriever",
 		metrics.WithProcessStartTime(false),
 		metrics.WithSubsystem(metrics.SubsystemSidecar))
@@ -161,7 +165,7 @@ func (i *interceptor) createMetadataRetrieverClient(ctx context.Context) {
 
 		i.opts.MetadataSidecarClient = retrieverClient
 	} else {
-		log.Warn("env var not found: ", identifiers.EnvMetadataRetrieverEndpoint)
+		log.Warnf("env var not found: %s", identifiers.EnvMetadataRetrieverEndpoint)
 	}
 }
 
@@ -208,6 +212,7 @@ func (i *interceptor) nodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 func (i *interceptor) createVolume(ctx context.Context, req *csi.CreateVolumeRequest,
 	_ *grpc.UnaryServerInfo, handler grpc.UnaryHandler,
 ) (res interface{}, resErr error) {
+	log := log.WithContext(ctx)
 	lock, err := i.opts.locker.GetLockWithID(ctx, req.Name)
 	if err != nil {
 		return nil, err

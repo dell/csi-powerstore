@@ -19,17 +19,11 @@ package controller
 import (
 	"context"
 	"net/http"
-	"reflect"
-	"testing"
 
 	"github.com/dell/csi-powerstore/v2/pkg/array"
-	"github.com/dell/csi-powerstore/v2/pkg/identifiers"
-	"github.com/dell/csi-powerstore/v2/pkg/identifiers/fs"
-	"github.com/dell/csm-sharednfs/nfs"
 	csiext "github.com/dell/dell-csi-extensions/replication"
 	"github.com/dell/gopowerstore"
 	"github.com/dell/gopowerstore/api"
-	gopowerstoreMock "github.com/dell/gopowerstore/mocks"
 	ginkgo "github.com/onsi/ginkgo"
 	gomega "github.com/onsi/gomega"
 	"github.com/stretchr/testify/mock"
@@ -669,7 +663,7 @@ var _ = ginkgo.Describe("Replication", func() {
 					gomega.Expect(res).To(gomega.BeNil())
 					gomega.Expect(err).ToNot(gomega.BeNil())
 					gomega.Expect(err.Error()).To(
-						gomega.ContainSubstring("Error: : Unable to delete Volume Group"))
+						gomega.ContainSubstring("Error: Unable to delete Volume Group"))
 				})
 			})
 			ginkgo.When("Can't get the protection policy", func() {
@@ -704,7 +698,7 @@ var _ = ginkgo.Describe("Replication", func() {
 					gomega.Expect(res).To(gomega.BeNil())
 					gomega.Expect(err).ToNot(gomega.BeNil())
 					gomega.Expect(err.Error()).To(
-						gomega.ContainSubstring("Error: Unable to get the PP"))
+						gomega.ContainSubstring("Error: Unable to get protection policy"))
 				})
 			})
 
@@ -742,7 +736,7 @@ var _ = ginkgo.Describe("Replication", func() {
 					gomega.Expect(res).To(gomega.BeNil())
 					gomega.Expect(err).ToNot(gomega.BeNil())
 					gomega.Expect(err.Error()).To(
-						gomega.ContainSubstring("Error: RR not found"))
+						gomega.ContainSubstring("Error: Unable to get replication rule"))
 				})
 			})
 			ginkgo.When("The replication rule can't be deleted", func() {
@@ -784,6 +778,18 @@ var _ = ginkgo.Describe("Replication", func() {
 					gomega.Expect(err).ToNot(gomega.BeNil())
 					gomega.Expect(err.Error()).To(
 						gomega.ContainSubstring("Error: Unable to delete replication rule"))
+				})
+			})
+			ginkgo.When("NFS context is detected via NasServerID", func() {
+				ginkgo.It("should skip deletion logic and return success", func() {
+					req := new(csiext.DeleteStorageProtectionGroupRequest)
+					params := make(map[string]string)
+					params["globalID"] = firstValidID
+					params["NasServerID"] = "nas-server-id"
+					req.ProtectionGroupAttributes = params
+					res, err := ctrlSvc.DeleteStorageProtectionGroup(context.Background(), req)
+					gomega.Expect(err).To(gomega.BeNil())
+					gomega.Expect(res).ToNot(gomega.BeNil())
 				})
 			})
 		})
@@ -1132,164 +1138,3 @@ var _ = ginkgo.Describe("Replication", func() {
 		})
 	})
 })
-
-func TestService_CreateRemoteVolume(t *testing.T) {
-	const GiB int64 = 1073741824
-
-	replicationContextPrefix := "powerstore/"
-
-	localVolUUID := "aaaaaaaa-0000-bbbb-1111-cccccccccccc"
-	remoteVolUUID := "00000000-aaaa-1111-bbbb-222222222222"
-
-	powerstoreLocalSystemID := "PS000000000001"
-	powerstoreRemoteSystemID := "PS000000000002"
-
-	localVolumeID := nfs.CsiNfsPrefixDash + localVolUUID + "/" + powerstoreLocalSystemID + "/scsi"
-	remoteVolumeID := nfs.CsiNfsPrefixDash + remoteVolUUID + "/" + powerstoreRemoteSystemID + "/scsi"
-
-	powerstoreLocalSystemName := "local-system"
-
-	powerstoreLocalEndpoint := "127.0.0.1"
-	powerstoreRemoteEndpoint := "127.0.0.2"
-
-	powerstoreDefaultGID := powerstoreLocalSystemID
-
-	sourceArray := array.PowerStoreArray{
-		Endpoint:      powerstoreLocalEndpoint,
-		GlobalID:      powerstoreDefaultGID,
-		Username:      "user",
-		Password:      "password",
-		BlockProtocol: identifiers.ISCSITransport,
-		Insecure:      true,
-		IsDefault:     true,
-		Client:        nil,
-	}
-
-	type fields struct {
-		Fs                          fs.Interface
-		externalAccess              string
-		nfsAcls                     string
-		replicationContextPrefix    string
-		replicationPrefix           string
-		isHealthMonitorEnabled      bool
-		isAutoRoundOffFsSizeEnabled bool
-	}
-	type args struct {
-		ctx context.Context
-		req *csiext.CreateRemoteVolumeRequest
-	}
-	type testcase struct {
-		name    string
-		fields  fields
-		args    args
-		before  func(s *Service)
-		want    *csiext.CreateRemoteVolumeResponse
-		wantErr bool
-	}
-	tests := []testcase{
-		{
-			name: "creates a remote host-based nfs volume",
-			fields: fields{
-				replicationContextPrefix: replicationContextPrefix,
-			},
-			args: args{
-				context.Background(),
-				&csiext.CreateRemoteVolumeRequest{
-					VolumeHandle: localVolumeID,
-					Parameters: map[string]string{
-						nfs.CsiNfsParameter: "RWX",
-					},
-				},
-			},
-			before: func(s *Service) {
-				// need to initialize the arrays and default array here,
-				// because we cannot copy the mutexs in array.Locker,
-				// and members of array.Locker are unexported, so we must
-				// use the provided setter funcs.
-
-				// make a copy so as not to modify the stub
-				defaultArray := sourceArray
-
-				// setup mock responses to gopowerstore queries
-				mockGopowerstoreClient := gopowerstoreMock.NewClient(t)
-				mockGopowerstoreClient.On("GetVolumeGroupsByVolumeID", mock.Anything, localVolUUID).Return(gopowerstore.VolumeGroups{
-					VolumeGroup: []gopowerstore.VolumeGroup{{ID: "vg-uuid"}},
-				}, nil)
-				mockGopowerstoreClient.On("GetReplicationSessionByLocalResourceID", mock.Anything, "vg-uuid").Return(
-					gopowerstore.ReplicationSession{
-						// return a replication session linking the volumes on local and remote systems
-						StorageElementPairs: []gopowerstore.StorageElementPair{
-							{
-								LocalStorageElementID:  localVolUUID,
-								RemoteStorageElementID: remoteVolUUID,
-							},
-						},
-						RemoteSystemID: powerstoreRemoteSystemID,
-					},
-					nil,
-				)
-				mockGopowerstoreClient.On("GetVolume", mock.Anything, localVolUUID).Return(
-					gopowerstore.Volume{
-						// only the size is required for this test. extra info is omitted.
-						Size: 5 * GiB,
-					}, nil,
-				)
-				mockGopowerstoreClient.On("GetCluster", mock.Anything).Return(gopowerstore.Cluster{Name: powerstoreLocalSystemName}, nil)
-				mockGopowerstoreClient.On("GetRemoteSystem", mock.Anything, powerstoreRemoteSystemID).Return(
-					gopowerstore.RemoteSystem{
-						SerialNumber:      powerstoreRemoteSystemID,
-						ManagementAddress: powerstoreRemoteEndpoint,
-					},
-					nil,
-				)
-
-				// assign the ephemeral mock client to the default array
-				defaultArray.Client = mockGopowerstoreClient
-				// add the default array to the list of arrays
-				arrays := map[string]*array.PowerStoreArray{
-					powerstoreDefaultGID: &defaultArray,
-				}
-
-				// initialize the Locker/arrays
-				s.Locker.SetArrays(arrays)
-				s.Locker.SetDefaultArray(&defaultArray)
-			},
-			want: &csiext.CreateRemoteVolumeResponse{
-				RemoteVolume: &csiext.Volume{
-					CapacityBytes: 5 * GiB,
-					VolumeId:      remoteVolumeID,
-					VolumeContext: map[string]string{
-						"remoteSystem":                                 powerstoreLocalSystemName,
-						replicationContextPrefix + "arrayID":           powerstoreRemoteSystemID,
-						replicationContextPrefix + "managementAddress": powerstoreRemoteEndpoint,
-					},
-				},
-			},
-			wantErr: false,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := &Service{
-				Fs:                          tt.fields.Fs,
-				externalAccess:              tt.fields.externalAccess,
-				nfsAcls:                     tt.fields.nfsAcls,
-				Locker:                      *new(array.Locker),
-				replicationContextPrefix:    tt.fields.replicationContextPrefix,
-				replicationPrefix:           tt.fields.replicationPrefix,
-				isHealthMonitorEnabled:      tt.fields.isHealthMonitorEnabled,
-				isAutoRoundOffFsSizeEnabled: tt.fields.isAutoRoundOffFsSizeEnabled,
-			}
-			tt.before(s)
-
-			got, err := s.CreateRemoteVolume(tt.args.ctx, tt.args.req)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Service.CreateRemoteVolume() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Service.CreateRemoteVolume() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}

@@ -60,6 +60,24 @@ func (_m *FcConnector) DisconnectVolumeByDeviceName(ctx context.Context, name st
 	return r0
 }
 
+// DisconnectVolumeByWWN provides a mock function with given fields: ctx, wwn
+func (_m *FcConnector) DisconnectVolumeByWWN(ctx context.Context, wwn string) error {
+	ret := _m.Called(ctx, wwn)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DisconnectVolumeByWWN")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) error); ok {
+		r0 = rf(ctx, wwn)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // GetInitiatorPorts provides a mock function with given fields: ctx
 func (_m *FcConnector) GetInitiatorPorts(ctx context.Context) ([]string, error) {
 	ret := _m.Called(ctx)

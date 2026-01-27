@@ -18,110 +18,119 @@ package k8sutils
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
+	"github.com/dell/csmlog"
+	k8score "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-// NodeLabelsRetrieverInterface defines the methods for retrieving Kubernetes Node Labels
-type NodeLabelsRetrieverInterface interface {
-	BuildConfigFromFlags(masterURL, kubeconfig string) (*rest.Config, error)
-	InClusterConfig() (*rest.Config, error)
-	NewForConfig(config *rest.Config) (*kubernetes.Clientset, error)
-	GetNodeLabels(ctx context.Context, kubeNodeName string) (map[string]string, error)
-	GetNVMeUUIDs(ctx context.Context) (map[string]string, error)
-}
-
-// NodeLabelsModifierInterface defines the methods for retrieving Kubernetes Node Labels
-type NodeLabelsModifierInterface interface {
-	AddNVMeLabels(ctx context.Context, kubeNodeName string, labelKey string, labelValue []string) error
-}
-
-// NodeLabelsRetrieverImpl provided the implementation for NodeLabelsRetrieverInterface
-type NodeLabelsRetrieverImpl struct{}
-
-// NodeLabelsModifierImpl provides the implementation for NodeLabelsModifierInterface
-type NodeLabelsModifierImpl struct{}
-
-var (
-	// NodeLabelsRetriever is the actual instance of NodeLabelsRetrieverInterface which is used to retrieve the node labels
-	NodeLabelsRetriever NodeLabelsRetrieverInterface
-	NodeLabelsModifier  NodeLabelsModifierInterface
-	// Kube Clientset
+type K8sClient struct {
 	Clientset kubernetes.Interface
-)
-
-func init() {
-	NodeLabelsRetriever = new(NodeLabelsRetrieverImpl)
-	NodeLabelsModifier = new(NodeLabelsModifierImpl)
 }
 
-// BuildConfigFromFlags is a method for building kubernetes client config
-func (svc *NodeLabelsRetrieverImpl) BuildConfigFromFlags(masterURL, kubeconfig string) (*rest.Config, error) {
-	return clientcmd.BuildConfigFromFlags(masterURL, kubeconfig)
-}
+// Instantiate csmlog on a package level
+var log = csmlog.GetLogger()
 
-// InClusterConfig returns a config object which uses the service account kubernetes gives to pods
-func (svc *NodeLabelsRetrieverImpl) InClusterConfig() (*rest.Config, error) {
+// Kube Kubeclient
+var Kubeclient *K8sClient
+
+// used for unit testing -
+// allows CreateKubeClientSet to be mocked
+var InClusterConfigFunc = func() (*rest.Config, error) {
 	return rest.InClusterConfig()
 }
 
-// NewForConfig creates a new Clientset for the given config
-func (svc *NodeLabelsRetrieverImpl) NewForConfig(config *rest.Config) (*kubernetes.Clientset, error) {
+var NewForConfigFunc = func(config *rest.Config) (kubernetes.Interface, error) {
 	return kubernetes.NewForConfig(config)
 }
 
-// GetNodeLabels retrieves the kubernetes node object and returns its labels
-func (svc *NodeLabelsRetrieverImpl) GetNodeLabels(ctx context.Context, kubeNodeName string) (map[string]string, error) {
-	if Clientset != nil {
-		node, err := Clientset.CoreV1().Nodes().Get(ctx, kubeNodeName, v1.GetOptions{})
-		if err != nil {
+// CreateKubeClientSet creates kubeclient set if not created already
+func CreateKubeClientSet(kubeconfig ...string) (*K8sClient, error) {
+	Kubeclient = &K8sClient{}
+
+	config, err := InClusterConfigFunc()
+	if err != nil {
+		if len(kubeconfig) == 0 {
 			return nil, err
 		}
 
-		return node.Labels, nil
+		config, err = clientcmd.BuildConfigFromFlags("", kubeconfig[0])
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	return nil, nil
+	Kubeclient.Clientset, err = NewForConfigFunc(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Kubernetes clientset: %s", err.Error())
+	}
+
+	return Kubeclient, nil
 }
 
-// CreateKubeClientSet creates kubeclient set if not created already
-func CreateKubeClientSet(kubeconfig string) error {
-	if Clientset == nil {
-		var config *rest.Config
-		var err error
-		if kubeconfig != "" {
-			config, err = NodeLabelsRetriever.BuildConfigFromFlags("", kubeconfig)
-			if err != nil {
-				return err
-			}
-		} else {
-			config, err = NodeLabelsRetriever.InClusterConfig()
-			if err != nil {
-				return err
-			}
-		}
-		// create the clientset
-		Clientset, err = NodeLabelsRetriever.NewForConfig(config)
-		if err != nil {
-			return err
-		}
+func (k8s *K8sClient) GetNode(ctx context.Context, kubeNodeName string) (*k8score.Node, error) {
+	if k8s.Clientset == nil {
+		return nil, fmt.Errorf("unable to get node %q, kubernetes client is uninitialized", kubeNodeName)
 	}
+
+	node, err := k8s.Clientset.CoreV1().Nodes().Get(ctx, kubeNodeName, v1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	return node, nil
+}
+
+// GetNodeLabels retrieves the kubernetes node object and returns its labels
+func (k8s *K8sClient) GetNodeLabels(ctx context.Context, kubeNodeName string) (map[string]string, error) {
+	if k8s.Clientset == nil {
+		return nil, fmt.Errorf("unable to get node labels for node %q, kubernetes client is uninitialized", kubeNodeName)
+	}
+
+	node, err := k8s.GetNode(ctx, kubeNodeName)
+	if err != nil {
+		return nil, err
+	}
+
+	return node.Labels, nil
+}
+
+// GetNodeLabels retrieves the kubernetes node object and returns its labels
+func (k8s *K8sClient) SetNodeLabel(ctx context.Context, kubeNodeName string, labelKey string, labelValue string) error {
+	if k8s.Clientset == nil {
+		return fmt.Errorf("unable to get node labels for node %q, kubernetes client is uninitialized", kubeNodeName)
+	}
+
+	node, err := k8s.GetNode(ctx, kubeNodeName)
+	if err != nil {
+		return err
+	}
+
+	// Update the node with the new labels
+	node.Labels[labelKey] = labelValue
+	_, err = k8s.Clientset.CoreV1().Nodes().Update(ctx, node, v1.UpdateOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to update node %s labels: %v", kubeNodeName, err.Error())
+	}
+
 	return nil
 }
 
 // AddNVMeLabels adds a hostnqn uuid label to the specified Kubernetes node
-func (svc *NodeLabelsModifierImpl) AddNVMeLabels(ctx context.Context, kubeNodeName string, labelKey string, labelValue []string) error {
-	if Clientset == nil {
-		return fmt.Errorf("k8sclientset is nil")
+func (k8s *K8sClient) AddNVMeLabels(ctx context.Context, kubeNodeName string, labelKey string, labelValue []string) error {
+	if k8s.Clientset == nil {
+		return fmt.Errorf("unable to add NVMe labels to node %q, kubernetes client is uninitialized", kubeNodeName)
 	}
 
 	// Get the current node
-	node, err := Clientset.CoreV1().Nodes().Get(ctx, kubeNodeName, v1.GetOptions{})
+	node, err := k8s.GetNode(ctx, kubeNodeName)
 	if err != nil {
 		return fmt.Errorf("failed to get node %s: %v", kubeNodeName, err.Error())
 	}
@@ -142,7 +151,7 @@ func (svc *NodeLabelsModifierImpl) AddNVMeLabels(ctx context.Context, kubeNodeNa
 
 	// Update the node with the new labels
 	node.Labels[labelKey] = strings.Join(uuids, ",")
-	_, err = Clientset.CoreV1().Nodes().Update(ctx, node, v1.UpdateOptions{})
+	_, err = k8s.Clientset.CoreV1().Nodes().Update(ctx, node, v1.UpdateOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to update node %s labels: %v", kubeNodeName, err.Error())
 	}
@@ -150,14 +159,14 @@ func (svc *NodeLabelsModifierImpl) AddNVMeLabels(ctx context.Context, kubeNodeNa
 }
 
 // GetNVMeUUIDs returns map of hosts with their hostnqn uuids
-func (svc *NodeLabelsRetrieverImpl) GetNVMeUUIDs(ctx context.Context) (map[string]string, error) {
+func (k8s *K8sClient) GetNVMeUUIDs(ctx context.Context) (map[string]string, error) {
 	nodeUUIDs := make(map[string]string)
-	if Clientset == nil {
-		return nodeUUIDs, fmt.Errorf("k8sclientset is nil")
+	if k8s.Clientset == nil {
+		return nodeUUIDs, errors.New("unable to get NVMe UUIDs, kubernetes client is uninitialized")
 	}
 
 	// Retrieve the list of nodes
-	nodes, err := Clientset.CoreV1().Nodes().List(ctx, v1.ListOptions{})
+	nodes, err := k8s.Clientset.CoreV1().Nodes().List(ctx, v1.ListOptions{})
 	if err != nil {
 		return nodeUUIDs, fmt.Errorf("failed to get node list: %v", err.Error())
 	}
@@ -173,32 +182,64 @@ func (svc *NodeLabelsRetrieverImpl) GetNVMeUUIDs(ctx context.Context) (map[strin
 	return nodeUUIDs, nil
 }
 
-// GetNodeLabels returns labels present in the k8s node
-func GetNodeLabels(ctx context.Context, kubeConfigPath string, kubeNodeName string) (map[string]string, error) {
-	err := CreateKubeClientSet(kubeConfigPath)
-	if err != nil {
-		return nil, err
+func (k8s *K8sClient) GetNodeByCSINodeID(ctx context.Context, driverKey string, csiNodeID string, keyNodeID string) (*k8score.Node, error) {
+	if k8s.Clientset == nil {
+		return nil, errors.New("unable to get node, kubernetes client is uninitialized")
 	}
 
-	return NodeLabelsRetriever.GetNodeLabels(ctx, kubeNodeName)
+	// Retrieve the list of nodes
+	nodes, err := k8s.Clientset.CoreV1().Nodes().List(ctx, v1.ListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get node list: %v", err.Error())
+	}
+
+	for _, node := range nodes.Items {
+		if annotation, exists := node.Annotations[keyNodeID]; exists {
+			var nodeIDMap map[string]string
+			if err := json.Unmarshal([]byte(annotation), &nodeIDMap); err != nil {
+				continue
+			}
+
+			if value, found := nodeIDMap[driverKey]; found && value == csiNodeID {
+				return &node, nil
+			}
+		}
+	}
+
+	return nil, fmt.Errorf("failed to find a Node matching csiNodeId %s", csiNodeID)
 }
 
-// AddNVMeLabels adds a hostnqn uuid label in the k8s node
-func AddNVMeLabels(ctx context.Context, kubeConfigPath string, kubeNodeName string, labelKey string, labelValue []string) error {
-	err := CreateKubeClientSet(kubeConfigPath)
-	if err != nil {
-		return err
+// ListVolumes lists all persistent volumes.
+func (k8s *K8sClient) ListPersistentVolumes(ctx context.Context) (*k8score.PersistentVolumeList, error) {
+	if k8s.Clientset == nil {
+		return nil, errors.New("unable to list volumes, kubernetes client is uninitialized")
 	}
 
-	return NodeLabelsModifier.AddNVMeLabels(ctx, kubeNodeName, labelKey, labelValue)
+	return k8s.Clientset.CoreV1().PersistentVolumes().List(ctx, v1.ListOptions{})
 }
 
-// GetNVMeUUIDs checks for duplicate hostnqn uuid labels in the k8s node
-func GetNVMeUUIDs(ctx context.Context, kubeConfigPath string) (map[string]string, error) {
-	err := CreateKubeClientSet(kubeConfigPath)
-	if err != nil {
-		return map[string]string{}, err
+// GetEvents gets events for the named resource of the given kind in the given namespace.
+// If name is empty, it gets all events for the given kind in the given namespace.
+func (k8s *K8sClient) GetEvents(ctx context.Context, kind, name, namespace string) (*k8score.EventList, error) {
+	if k8s.Clientset == nil {
+		return nil, errors.New("unable to get events, kubernetes client is uninitialized")
 	}
 
-	return NodeLabelsRetriever.GetNVMeUUIDs(ctx)
+	var fieldSelector string
+	if name != "" {
+		fieldSelector = fmt.Sprintf("involvedObject.name=%s", name)
+	}
+	if kind != "" {
+		fieldSelector = strings.Join([]string{fieldSelector, fmt.Sprintf("involvedObject.kind=%s", kind)}, ",")
+	}
+
+	log.Debugf("getting events for %q %q in namespace %q", kind, name, namespace)
+
+	return k8s.Clientset.CoreV1().Events(namespace).List(ctx, v1.ListOptions{
+		FieldSelector: fieldSelector,
+	})
+}
+
+var GetNodeByCSINodeID = func(ctx context.Context, driverKey string, csiNodeID string, keyNodeID string) (*k8score.Node, error) {
+	return Kubeclient.GetNodeByCSINodeID(ctx, driverKey, csiNodeID, keyNodeID)
 }

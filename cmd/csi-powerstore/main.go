@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2021-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2021-2026 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,29 +20,34 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
-	"github.com/dell/csi-powerstore/v2/core"
+	"github.com/dell/csi-powerstore/v2/pkg/array"
 	"github.com/dell/csi-powerstore/v2/pkg/controller"
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers"
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers/fs"
 	"github.com/dell/csi-powerstore/v2/pkg/identity"
 	"github.com/dell/csi-powerstore/v2/pkg/interceptors"
+	"github.com/dell/csi-powerstore/v2/pkg/monitor"
 	"github.com/dell/csi-powerstore/v2/pkg/node"
-	"github.com/dell/csi-powerstore/v2/pkg/provider"
 	"github.com/dell/csi-powerstore/v2/pkg/tracer"
+	drController "github.com/dell/csm-dr/pkg/controller"
+	"github.com/dell/csmlog"
 	"github.com/dell/gocsi"
 	csictx "github.com/dell/gocsi/context"
 	"github.com/dell/gofsutil"
 	"github.com/fsnotify/fsnotify"
 	grpc_opentracing "github.com/grpc-ecosystem/go-grpc-middleware/tracing/opentracing"
 	"github.com/opentracing/opentracing-go"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"github.com/uber/jaeger-client-go/config"
 	"google.golang.org/grpc"
 )
+
+var log = csmlog.GetLogger()
 
 //go:generate go generate ../../core
 
@@ -58,7 +63,7 @@ func init() {
 	initilizeDriverConfigParams()
 
 	// If we don't set this env gocsi will overwrite log level with default Info level
-	_ = os.Setenv(gocsi.EnvVarLogLevel, log.GetLevel().String())
+	_ = os.Setenv(gocsi.EnvVarLogLevel, csmlog.GetLevel().String())
 }
 
 func updateDriverName() {
@@ -68,9 +73,10 @@ func updateDriverName() {
 }
 
 func initilizeDriverConfigParams() {
+	log.SetLevel(csmlog.InfoLevel)
 	paramsPath, ok := csictx.LookupEnv(context.Background(), identifiers.EnvConfigParamsFilePath)
 	if !ok {
-		log.Warnf("config path X_CSI_POWERSTORE_CONFIG_PARAMS_PATH is not specified")
+		log.Warn("config path X_CSI_POWERSTORE_CONFIG_PARAMS_PATH is not specified")
 	}
 
 	paramsViper := viper.New()
@@ -80,7 +86,7 @@ func initilizeDriverConfigParams() {
 	err := paramsViper.ReadInConfig()
 	// if unable to read configuration file, default values will be used in updateDriverConfigParams
 	if err != nil {
-		log.WithError(err).Error("unable to read config file, using default values")
+		log.Warnf("unable to read config file, using default values %s ", err.Error())
 	}
 	paramsViper.WatchConfig()
 	paramsViper.OnConfigChange(func(e fsnotify.Event) {
@@ -91,12 +97,21 @@ func initilizeDriverConfigParams() {
 	updateDriverConfigParams(paramsViper)
 }
 
+var ManifestSemver string
+
 func main() {
+	log.SetLevel(csmlog.InfoLevel)
 	f := &fs.Fs{Util: &gofsutil.FS{}}
 
 	identifiers.RmSockFile(f)
 
-	identityService := identity.NewIdentityService(identifiers.Name, core.SemVer, identifiers.Manifest)
+	if ManifestSemver != "" {
+		log.Info("ManifestVersion isn't empty, setting it")
+		identifiers.ManifestSemver = ManifestSemver
+		identifiers.Manifest["semver"] = ManifestSemver
+	}
+
+	identityService := identity.NewIdentityService(identifiers.Name, ManifestSemver, identifiers.Manifest)
 	var controllerService *controller.Service
 	var nodeService *node.Service
 
@@ -111,44 +126,51 @@ func main() {
 		identifiers.Name = name
 	}
 	identifiers.SetAPIPort(context.Background())
+
+	var nodeName string
+	var arrayLocker *array.Locker
+
+	isCSMDREnabled, err := strconv.ParseBool(os.Getenv(identifiers.EnvCSMDREnabled))
+	if err != nil {
+		log.Infof("Error parsing %s: %s. Defaulting to true", identifiers.EnvCSMDREnabled, err.Error())
+		isCSMDREnabled = true
+	}
+
 	if strings.EqualFold(mode, "controller") {
-		cs := &controller.Service{
-			Fs: f,
-		}
 
-		err := cs.UpdateArrays(configPath, f)
+		var err error
+		controllerService, err = initControllerService(f, configPath)
 		if err != nil {
-			log.Fatalf("couldn't initialize arrays in controller service: %s", err.Error())
+			log.Fatalf("couldn't initialize controller service: %s", err.Error())
 		}
 
-		err = cs.Init()
-		if err != nil {
-			log.Fatalf("couldn't create controller service: %s", err.Error())
-		}
-
-		controllerService = cs
+		arrayLocker = &controllerService.Locker
+		controllerService.IsCSMDREnabled = isCSMDREnabled
 	} else if strings.EqualFold(mode, "node") {
-		ns := &node.Service{
-			Fs: f,
+		var err error
+		nodeService, err = initNodeService(f, configPath)
+		if err != nil {
+			log.Fatalf("couldn't initialize node service: %s", err.Error())
 		}
 
-		err := ns.UpdateArrays(configPath, f)
-		if err != nil {
-			log.Fatalf("couldn't initialize arrays in node service: %s", err.Error())
-		}
+		nodeName = os.Getenv(identifiers.EnvKubeNodeName)
+		arrayLocker = &nodeService.Locker
+	}
 
-		err = ns.Init()
+	if isCSMDREnabled {
+		// Initialize CSM DR volume journal reconciler.
+		log.Infof("Initializing CSM-DR controller ")
+		_, err := drController.Initialize(nodeService, controllerService, arrayLocker, mode, nodeName, ":8080", false, ":8081")
 		if err != nil {
-			log.Fatalf("couldn't create node service: %s", err.Error())
+			log.Errorf("[METRO] Unable to initialize volume journal reconciler: %s", err.Error())
 		}
-		nodeService = ns
 	}
 
 	viper.SetConfigFile(configPath)
 	viper.SetConfigType("yaml")
 	viper.WatchConfig()
 	viper.OnConfigChange(func(e fsnotify.Event) {
-		log.Println("Config file changed:", e.Name)
+		log.Infof("Config file changed: %s", e.Name)
 
 		if strings.EqualFold(mode, "controller") {
 			err := controllerService.UpdateArrays(configPath, f)
@@ -180,7 +202,21 @@ func main() {
 		InterceptorsList = append(InterceptorsList, grpc_opentracing.UnaryServerInterceptor(grpc_opentracing.WithTracer(t)))
 	}
 
-	storageProvider := provider.New(controllerService, identityService, nodeService, InterceptorsList)
+	storageProvider := &gocsi.StoragePlugin{
+		Controller:                controllerService,
+		Identity:                  identityService,
+		Node:                      nodeService,
+		Interceptors:              InterceptorsList,
+		RegisterAdditionalServers: controllerService.RegisterAdditionalServers,
+
+		EnvVars: []string{
+			// Enable request validation.
+			gocsi.EnvVarSpecReqValidation + "=true",
+			// Enable serial volume access.
+			gocsi.EnvVarSerialVolAccess + "=true",
+		},
+	}
+
 	runCSIPlugin(storageProvider)
 }
 
@@ -199,15 +235,13 @@ func updateDriverConfigParams(v *viper.Viper) {
 	fmt.Printf("Read CSI_LOG_FORMAT from log configuration file, format: %s\n", logFormat)
 
 	// Use JSON logger as default
-	if !strings.EqualFold(logFormat, "text") {
-		log.SetFormatter(&log.JSONFormatter{
-			TimestampFormat: time.RFC3339Nano,
+	if strings.EqualFold(logFormat, "JSON") {
+		log.SetFormatter(&logrus.JSONFormatter{
+			TimestampFormat: time.RFC3339,
 		})
-	} else {
-		log.SetFormatter(&log.TextFormatter{})
 	}
 
-	level := log.DebugLevel
+	level := csmlog.DebugLevel
 	if v.IsSet(logLevelParam) {
 		logLevel := v.GetString(logLevelParam)
 		if logLevel != "" {
@@ -215,15 +249,61 @@ func updateDriverConfigParams(v *viper.Viper) {
 			fmt.Printf("Read CSI_LOG_LEVEL from log configuration file, level: %s\n", logLevel)
 			var err error
 
-			l, err := log.ParseLevel(logLevel)
+			l, err := csmlog.ParseLevel(logLevel)
 			if err != nil {
-				log.WithError(err).Errorf("LOG_LEVEL %s value not recognized, setting to default error: %s ", logLevel, err.Error())
+				log.Errorf("LOG_LEVEL %s value not recognized, setting to default error: %s ", logLevel, err.Error())
 			} else {
 				level = l
 			}
 		}
 	}
-	log.SetLevel(level)
+	csmlog.SetLevel(level)
+}
+
+func initControllerService(f fs.Interface, configPath string) (*controller.Service, error) {
+	cs := &controller.Service{
+		Fs: f,
+	}
+
+	err := cs.UpdateArrays(configPath, f)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't initialize arrays in controller service: %v", err)
+	}
+
+	err = cs.Init()
+	if err != nil {
+		return nil, fmt.Errorf("couldn't create controller service: %v", err)
+	}
+
+	ms, err := monitor.NewMonitorService(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("could not start monitor service: %v", err)
+	}
+	err = ms.UpdateArrays(configPath, f)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize arrays in the monitor service: %v", err)
+	}
+
+	go ms.Start(context.Background(), 1*time.Minute)
+
+	return cs, nil
+}
+
+func initNodeService(f fs.Interface, configPath string) (*node.Service, error) {
+	ns := &node.Service{
+		Fs: f,
+	}
+
+	err := ns.UpdateArrays(configPath, f)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't initialize arrays in node service: %v", err)
+	}
+
+	err = ns.Init()
+	if err != nil {
+		return nil, fmt.Errorf("couldn't create node service: %v", err)
+	}
+	return ns, nil
 }
 
 const usage = `

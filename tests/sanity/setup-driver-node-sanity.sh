@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright © 2020-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
+# Copyright © 2020-2026 Dell Inc. or its subsidiaries. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@ export CSI_ENDPOINT=$(pwd)/node.sock
 export X_CSI_VOL_PREFIX=node
 export X_CSI_MAX_VOLUMES_PER_NODE=0
 export X_CSI_NODE_IP=REPLACE_IP
-export X_CSI_NODE_NAME=REPLACE_HOSTNAME
+export X_CSI_POWERSTORE_KUBE_NODE_NAME=REPLACE_NAME
 export X_CSI_POWERSTORE_NODE_ID_PATH=/etc/machine-id
 export X_CSI_POWERSTORE_NODE_CHROOT_PATH=/
 export X_CSI_HEALTH_MONITOR_ENABLED=true

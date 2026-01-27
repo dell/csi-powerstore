@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2021-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2021-2026 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@
 package main
 
 import (
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -24,13 +25,22 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dell/csi-powerstore/v2/mocks"
+	"github.com/dell/csi-powerstore/v2/pkg/controller"
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers"
+	"github.com/dell/csi-powerstore/v2/pkg/identifiers/fs"
+	"github.com/dell/csi-powerstore/v2/pkg/identifiers/k8sutils"
+	"github.com/dell/csi-powerstore/v2/pkg/node"
+	"github.com/dell/csmlog"
 	"github.com/dell/gocsi"
 	"github.com/fsnotify/fsnotify"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/rest"
 )
 
 func TestUpdateDriverName(t *testing.T) {
@@ -53,10 +63,7 @@ func TestUpdateDriverName(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			err := os.Setenv(identifiers.EnvDriverName, tc.envVar)
-			if err != nil {
-				t.Fatalf("Failed to set environment variable: %v", err)
-			}
+			t.Setenv(identifiers.EnvDriverName, tc.envVar)
 
 			updateDriverName()
 
@@ -70,25 +77,44 @@ func TestInitilizeDriverConfigParams(t *testing.T) {
 	content := `CSI_LOG_FORMAT: "JSON"`
 	driverConfigParams := filepath.Join(tmpDir, "driver-config-params.yaml")
 	writeToFile(t, driverConfigParams, content)
-	os.Setenv(identifiers.EnvConfigParamsFilePath, driverConfigParams)
+	t.Setenv(identifiers.EnvConfigParamsFilePath, driverConfigParams)
 	initilizeDriverConfigParams()
-	assert.Equal(t, log.DebugLevel, log.GetLevel())
+	assert.Equal(t, csmlog.DebugLevel, csmlog.GetLevel())
 	writeToFile(t, driverConfigParams, "CSI_LOG_LEVEL: \"info\"")
 	time.Sleep(time.Second)
-	assert.Equal(t, log.InfoLevel, log.GetLevel())
+	assert.Equal(t, csmlog.InfoLevel, csmlog.GetLevel())
 }
 
 func TestMainControllerMode(t *testing.T) {
 	tmpDir := t.TempDir()
 	config := copyConfigFileToTmpDir(t, "../../pkg/array/testdata/one-arr.yaml", tmpDir)
 
+	defaultK8sConfigFunc := k8sutils.InClusterConfigFunc
+	defaultK8sClientsetFunc := k8sutils.NewForConfigFunc
+
+	k8sutils.InClusterConfigFunc = func() (*rest.Config, error) {
+		return &rest.Config{}, nil
+	}
+	k8sutils.NewForConfigFunc = func(_ *rest.Config) (kubernetes.Interface, error) {
+		return fake.NewClientset(), nil
+	}
+
+	defer func() {
+		k8sutils.InClusterConfigFunc = defaultK8sConfigFunc
+		k8sutils.NewForConfigFunc = defaultK8sClientsetFunc
+	}()
+
+	// Set Manifest version similar to how the image would be built.
+	ManifestSemver = "1.0.0"
+
 	// Set required environment variables
-	os.Setenv(identifiers.EnvArrayConfigFilePath, config)
-	os.Setenv("CSI_ENDPOINT", "mock_endpoint")
-	os.Setenv(identifiers.EnvDriverName, "test")
-	os.Setenv(identifiers.EnvDebugEnableTracing, "true")
-	os.Setenv("JAEGER_SERVICE_NAME", "controller-test")
-	os.Setenv(string(gocsi.EnvVarMode), "controller")
+	t.Setenv(identifiers.EnvArrayConfigFilePath, config)
+	t.Setenv("CSI_ENDPOINT", "mock_endpoint")
+	t.Setenv(identifiers.EnvDriverName, "test")
+	t.Setenv(identifiers.EnvDebugEnableTracing, "true")
+	t.Setenv("JAEGER_SERVICE_NAME", "controller-test")
+	t.Setenv(string(gocsi.EnvVarMode), "controller")
+	t.Setenv(identifiers.EnvCSMDREnabled, "true")
 
 	array2 := `  - endpoint: "https://127.0.0.2/api/rest"
     username: "admin"
@@ -102,14 +128,15 @@ func TestMainControllerMode(t *testing.T) {
 		// Assertions
 		require.NotNil(t, test.Controller)
 		require.NotNil(t, test.Identity)
-		require.NotNil(t, test.Node)
+		require.Nil(t, test.Node)
+		require.EqualValues(t, 1, len(test.Controller.(*controller.Service).Arrays()))
 
 		// Update the config file
 		writeToFile(t, config, array2)
 		time.Sleep(time.Second)
 
 		// Assertions
-		require.NotNil(t, test.Controller)
+		require.EqualValues(t, 2, len(test.Controller.(*controller.Service).Arrays()))
 	}
 
 	defer func() {
@@ -125,14 +152,28 @@ func TestMainNodeMode(t *testing.T) {
 	tmpDir := t.TempDir()
 	config := copyConfigFileToTmpDir(t, "../../pkg/array/testdata/one-arr.yaml", tmpDir)
 
+	defaultK8sConfigFunc := k8sutils.InClusterConfigFunc
+	defaultK8sClientsetFunc := k8sutils.NewForConfigFunc
+
+	k8sutils.InClusterConfigFunc = func() (*rest.Config, error) {
+		return &rest.Config{}, nil
+	}
+	k8sutils.NewForConfigFunc = func(_ *rest.Config) (kubernetes.Interface, error) {
+		return fake.NewClientset(), nil
+	}
+
+	defer func() {
+		k8sutils.InClusterConfigFunc = defaultK8sConfigFunc
+		k8sutils.NewForConfigFunc = defaultK8sClientsetFunc
+	}()
+
 	// Set required environment variables
-	os.Setenv(identifiers.EnvArrayConfigFilePath, config)
-	os.Setenv(gocsi.EnvVarMode, "node")
-	os.Setenv(identifiers.EnvDebugEnableTracing, "")
-	tempNodeIDFile, err := os.CreateTemp("", "node-id")
+	t.Setenv(identifiers.EnvArrayConfigFilePath, config)
+	t.Setenv(gocsi.EnvVarMode, "node")
+	t.Setenv(identifiers.EnvDebugEnableTracing, "")
+	tempNodeIDFile, err := os.CreateTemp(tmpDir, "node-id")
 	require.NoError(t, err)
-	defer os.Remove(tempNodeIDFile.Name())
-	os.Setenv("X_CSI_POWERSTORE_NODE_ID_PATH", tempNodeIDFile.Name())
+	t.Setenv("X_CSI_POWERSTORE_NODE_ID_PATH", tempNodeIDFile.Name())
 
 	array2 := `  - endpoint: "https://127.0.0.2/api/rest"
     username: "admin"
@@ -144,16 +185,17 @@ func TestMainNodeMode(t *testing.T) {
 
 	runCSIPlugin = func(test *gocsi.StoragePlugin) {
 		// Assertions
-		require.NotNil(t, test.Controller)
+		require.Nil(t, test.Controller)
 		require.NotNil(t, test.Identity)
 		require.NotNil(t, test.Node)
+		require.EqualValues(t, 1, len(test.Node.(*node.Service).Arrays()))
 
 		// Update the config file
 		writeToFile(t, config, array2)
 		time.Sleep(time.Second)
 
 		// Assertions
-		require.NotNil(t, test.Node)
+		require.EqualValues(t, 2, len(test.Node.(*node.Service).Arrays()))
 	}
 
 	defer func() {
@@ -212,22 +254,142 @@ func TestUpdateDriverConfigParams(t *testing.T) {
 	assert.Equal(t, "text", logFormat)
 
 	updateDriverConfigParams(v)
-	level := log.GetLevel()
+	level := csmlog.GetLevel()
 
-	assert.Equal(t, log.DebugLevel, level)
+	assert.Equal(t, csmlog.DebugLevel, level)
 
 	v.Set("CSI_LOG_FORMAT", "json")
 	v.Set("CSI_LOG_LEVEL", "info")
 	updateDriverConfigParams(v)
-	level = log.GetLevel()
+	level = csmlog.GetLevel()
 
-	assert.Equal(t, log.InfoLevel, level)
-	logFormatter, ok := log.StandardLogger().Formatter.(*log.JSONFormatter)
-	assert.True(t, ok)
-	assert.Equal(t, time.RFC3339Nano, logFormatter.TimestampFormat)
+	assert.Equal(t, csmlog.InfoLevel, level)
+	logFormatter := &csmlog.MyTextFormatter{
+		Base: &logrus.TextFormatter{
+			TimestampFormat: time.RFC3339,
+		},
+	}
+	assert.Equal(t, time.RFC3339, logFormatter.Base.TimestampFormat)
 
 	v.Set("CSI_LOG_LEVEL", "notalevel")
 	updateDriverConfigParams(v)
-	level = log.GetLevel()
-	assert.Equal(t, log.DebugLevel, level)
+	level = csmlog.GetLevel()
+	assert.Equal(t, csmlog.DebugLevel, level)
+}
+
+func Test_initControllerService(t *testing.T) {
+	tests := []struct {
+		name string // description of this test case
+		// Named input parameters for target function.
+		init       func()
+		f          func() fs.Interface
+		configPath string
+		want       *controller.Service
+		wantErr    bool
+	}{
+		{
+			name: "fail to update arrays",
+			init: func() {},
+			f: func() fs.Interface {
+				fs := &mocks.FsInterface{}
+				fs.On("ReadFile", ".").Return([]byte{}, errors.New("read error"))
+				return fs
+			},
+			configPath: "",
+			want:       nil,
+			wantErr:    true,
+		},
+		{
+			name: "fail to initialize the controller service",
+			init: func() {
+				tempNewForConfigFunc := k8sutils.NewForConfigFunc
+				k8sutils.NewForConfigFunc = func(_ *rest.Config) (kubernetes.Interface, error) {
+					return nil, errors.New("new for config error")
+				}
+				t.Cleanup(func() {
+					k8sutils.NewForConfigFunc = tempNewForConfigFunc
+				})
+			},
+			f: func() fs.Interface {
+				fs := &mocks.FsInterface{}
+				fs.On("ReadFile", "/some/config.yaml").Return([]byte{}, nil)
+				return fs
+			},
+			configPath: "/some/config.yaml",
+			want:       nil,
+			wantErr:    true,
+		},
+		{
+			name: "fail to initialize the monitor service arrays",
+			init: func() {
+				tempNewForConfigFunc := k8sutils.NewForConfigFunc
+				k8sutils.NewForConfigFunc = func(_ *rest.Config) (kubernetes.Interface, error) {
+					return fake.NewClientset(), nil
+				}
+				tempInClusterConfigFunc := k8sutils.InClusterConfigFunc
+				k8sutils.InClusterConfigFunc = func() (*rest.Config, error) {
+					return nil, nil
+				}
+				t.Cleanup(func() {
+					k8sutils.NewForConfigFunc = tempNewForConfigFunc
+					k8sutils.InClusterConfigFunc = tempInClusterConfigFunc
+				})
+			},
+			f: func() fs.Interface {
+				fs := &mocks.FsInterface{}
+				fs.On("ReadFile", ".").Once().Return([]byte{}, nil)
+				fs.On("ReadFile", ".").Once().Return([]byte{}, errors.New("monitor read error"))
+				return fs
+			},
+			configPath: "",
+			want:       nil,
+			wantErr:    true,
+		},
+		{
+			name: "success",
+			init: func() {
+				tempNewForConfigFunc := k8sutils.NewForConfigFunc
+				k8sutils.NewForConfigFunc = func(_ *rest.Config) (kubernetes.Interface, error) {
+					return fake.NewClientset(), nil
+				}
+				tempInClusterConfigFunc := k8sutils.InClusterConfigFunc
+				k8sutils.InClusterConfigFunc = func() (*rest.Config, error) {
+					return nil, nil
+				}
+				t.Cleanup(func() {
+					k8sutils.NewForConfigFunc = tempNewForConfigFunc
+					k8sutils.InClusterConfigFunc = tempInClusterConfigFunc
+				})
+			},
+			f: func() fs.Interface {
+				fs := &mocks.FsInterface{}
+				fs.On("ReadFile", ".").Return([]byte{}, nil)
+				return fs
+			},
+			configPath: "",
+			want: &controller.Service{
+				Fs: &mocks.FsInterface{},
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.init()
+			got, gotErr := initControllerService(tt.f(), tt.configPath)
+			if gotErr != nil {
+				if !tt.wantErr {
+					t.Errorf("initControllerService() failed: %v", gotErr)
+				}
+				return
+			}
+			if tt.wantErr {
+				t.Fatal("initControllerService() succeeded unexpectedly")
+			}
+
+			if got == nil {
+				t.Error("initControllerService() expected a service struct but got nil")
+			}
+		})
+	}
 }

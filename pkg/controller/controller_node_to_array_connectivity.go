@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2022-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2022-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,16 +27,15 @@ import (
 	"net/http"
 	"time"
 
-	log "github.com/sirupsen/logrus"
-
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers"
 )
 
 // QueryArrayStatus make API call to the specified url to retrieve connection status
 func (s *Service) QueryArrayStatus(ctx context.Context, url string) (bool, error) {
+	log := log.WithContext(ctx)
 	defer func() {
 		if err := recover(); err != nil {
-			log.Println("panic occurred in queryStatus:", err)
+			log.Debugf("panic occurred in queryStatus: %v", err)
 		}
 	}()
 	client := http.Client{
