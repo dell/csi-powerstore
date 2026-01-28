@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2021-2024 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2021-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,10 +24,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers"
 	"github.com/dell/gopowerstore"
-	log "github.com/sirupsen/logrus"
+	"github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -48,6 +47,7 @@ type SCSIPublisher struct{}
 func (s *SCSIPublisher) Publish(ctx context.Context, publishContext map[string]string, req *csi.ControllerPublishVolumeRequest,
 	client gopowerstore.Client, kubeNodeID string, volumeID string, isRemote bool,
 ) (*csi.ControllerPublishVolumeResponse, error) {
+	log := log.WithContext(ctx)
 	volume, err := client.GetVolume(ctx, volumeID)
 	if err != nil {
 		if apiError, ok := err.(gopowerstore.APIError); ok && apiError.NotFound() {
@@ -171,12 +171,16 @@ func (s *SCSIPublisher) addLUNIDToPublishContext(
 type NfsPublisher struct {
 	// ExternalAccess used to set custom ip to be added to the NFS Export 'hosts' list
 	ExternalAccess string
+
+	// ExclusiveAccess indicates whether only externalAccess entries should be added to the NFS export
+	ExclusiveAccess bool
 }
 
 // Publish publishes FileSystem by adding host (node) to the NFS Export 'hosts' list
 func (n *NfsPublisher) Publish(ctx context.Context, publishContext map[string]string, req *csi.ControllerPublishVolumeRequest, client gopowerstore.Client,
 	kubeNodeID string, volumeID string, _ bool,
 ) (*csi.ControllerPublishVolumeResponse, error) {
+	log := log.WithContext(ctx)
 	fs, err := client.GetFS(ctx, volumeID)
 	if err != nil {
 		if apiError, ok := err.(gopowerstore.APIError); ok && apiError.NotFound() {
@@ -192,7 +196,6 @@ func (n *NfsPublisher) Publish(ctx context.Context, publishContext map[string]st
 	ip := ipList[0]
 
 	ipWithNat := make([]string, 0, 2)
-	ipWithNat = append(ipWithNat, ip)
 
 	// Create NFS export if it doesn't exist
 	_, err = client.GetNFSExportByFileSystemID(ctx, fs.ID)
@@ -217,12 +220,22 @@ func (n *NfsPublisher) Publish(ctx context.Context, publishContext map[string]st
 		return nil, status.Errorf(codes.Internal, "failure getting nfs export: %s", err.Error())
 	}
 
+	// Add host IP to nfs export if not already present
+	if !identifiers.HostAlreadyPresentInNFSExport(export, ip) {
+		log.Debug("IPs have not been added")
+
+		if !n.ExclusiveAccess {
+			log.Infof("Exclusive access is disabled, adding nodeIP %s to the nfs export", ip)
+			ipWithNat = append(ipWithNat, ip)
+		}
+	}
+
 	if n.ExternalAccess != "" && !identifiers.ExternalAccessAlreadyAdded(export, n.ExternalAccess) {
 		externalAccess, err := identifiers.GetIPListWithMaskFromString(n.ExternalAccess)
 		if err != nil {
 			return nil, status.Errorf(codes.InvalidArgument, "can't find IP in X_CSI_POWERSTORE_EXTERNAL_ACCESS variable")
 		}
-		log.Debug("externalAccess parsed IP:", externalAccess)
+		log.Debugf("externalAccess parsed IP: %s", externalAccess)
 		ipWithNat = append(ipWithNat, externalAccess)
 	}
 	// Add host IP to existing nfs export
@@ -230,7 +243,7 @@ func (n *NfsPublisher) Publish(ctx context.Context, publishContext map[string]st
 		AddRWRootHosts: ipWithNat,
 	}, export.ID)
 	if err != nil {
-		log.Debug("Error while PublishVolume: ", err.Error())
+		log.Debugf("Error while PublishVolume: %s ", err.Error())
 		if apiError, ok := err.(gopowerstore.APIError); !(ok && (apiError.NotFound() || apiError.HostAlreadyPresentInNFSExport())) {
 			return nil, status.Errorf(codes.Internal, "failure when adding new host to nfs export: %s", err.Error())
 		}
@@ -246,7 +259,16 @@ func (n *NfsPublisher) Publish(ctx context.Context, publishContext map[string]st
 	}
 	publishContext[KeyNasName] = nas.Name // we need to pass that to node part of the driver
 	publishContext[identifiers.KeyNfsExportPath] = fileInterface.IPAddress + ":/" + export.Name
-	publishContext[identifiers.KeyHostIP] = ipWithNat[0]
+
+	// Add node IP to publish context only if exclusive access is not set
+	if !n.ExclusiveAccess {
+		// Ensure we don't index an empty slice; fallback to the node IP when ipWithNat is empty.
+		if len(ipWithNat) > 0 {
+			publishContext[identifiers.KeyHostIP] = ipWithNat[0]
+		} else {
+			publishContext[identifiers.KeyHostIP] = ip
+		}
+	}
 	if n.ExternalAccess != "" {
 		parsedExternalAccess, _ := identifiers.GetIPListWithMaskFromString(n.ExternalAccess)
 		publishContext[identifiers.KeyNatIP] = parsedExternalAccess

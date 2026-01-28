@@ -141,11 +141,21 @@ function install_driver() {
   fi
 
   HELMOUTPUT="/tmp/csi-install.$$.out"
+  
+  # install all of the helm dependencies
+  log step "Installing helm dependencies"
+  run_command helm dependency build "${DRIVERDIR}/${DRIVER}" >>"${HELMOUTPUT}" 2>&1
+  if [ $? -ne 0 ]; then
+      cat "${HELMOUTPUT}"
+      log error "Failed to install ${DRIVER} helm dependencies"
+  fi
+
+  # install the driver
   run_command helm ${1} \
     --set openshift=${OPENSHIFT} \
     --values "${VALUES}" \
     --namespace ${NS} "${RELEASE}" \
-    "${DRIVERDIR}/${DRIVER}" >"${HELMOUTPUT}" 2>&1
+    "${DRIVERDIR}/${DRIVER}" >>"${HELMOUTPUT}" 2>&1
 
   if [ $? -ne 0 ]; then
     cat "${HELMOUTPUT}"

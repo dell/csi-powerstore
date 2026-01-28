@@ -42,6 +42,7 @@ import (
 	gomega "github.com/onsi/gomega"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	k8score "k8s.io/api/core/v1"
 )
 
 const (
@@ -372,6 +373,52 @@ var _ = ginkgo.Describe("csi-extension-server", func() {
 				gomega.Expect(err).To(gomega.BeNil())
 				gomega.Expect(response.IosInProgress).To(gomega.BeTrue())
 			})
+		})
+
+		ginkgo.It("unable to parse volume ID - defaults to array - volumeHandle is empty", func() {
+			req := &podmon.ValidateVolumeHostConnectivityRequest{
+				ArrayId:   "",
+				VolumeIds: []string{""},
+				NodeId:    validNodeID,
+			}
+
+			res, err := ctrlSvc.ValidateVolumeHostConnectivity(context.Background(), req)
+			gomega.Expect(res).To(gomega.BeNil())
+			gomega.Expect(err).ToNot(gomega.BeNil())
+		})
+
+		ginkgo.It("No matching host connectivity found and no volume ID in request - empty response", func() {
+			// Set the host connectivity for the first array when the node does not match for labels.
+			arr := ctrlSvc.Arrays()
+			gomega.Expect(arr).ToNot(gomega.BeNil())
+
+			arr[firstValidID].HostConnectivity = &array.HostConnectivity{
+				Metro: array.MetroConnectivityOptions{
+					ColocatedLocal: k8score.NodeSelector{
+						NodeSelectorTerms: []k8score.NodeSelectorTerm{
+							{
+								MatchExpressions: []k8score.NodeSelectorRequirement{
+									{
+										Key:      "zone1",
+										Operator: k8score.NodeSelectorOpIn,
+										Values:   []string{"local"},
+									},
+								},
+							},
+						},
+					},
+				},
+			}
+			ctrlSvc.SetArrays(arr)
+
+			req := &podmon.ValidateVolumeHostConnectivityRequest{
+				ArrayId: firstValidID,
+				NodeId:  validNodeID,
+			}
+
+			res, err := ctrlSvc.ValidateVolumeHostConnectivity(context.Background(), req)
+			gomega.Expect(res).ToNot(gomega.BeNil())
+			gomega.Expect(err).To(gomega.BeNil())
 		})
 	})
 

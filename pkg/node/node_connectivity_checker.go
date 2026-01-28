@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2022-2024 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2022-2026 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,7 +33,6 @@ import (
 	"github.com/dell/gonvme"
 	"github.com/dell/gopowerstore"
 	"github.com/gorilla/mux"
-	log "github.com/sirupsen/logrus"
 )
 
 // pollingFrequency in seconds
@@ -44,6 +43,7 @@ var probeStatus *sync.Map
 
 // startAPIService reads nodes to array status periodically
 func (s *Service) startAPIService(ctx context.Context) {
+	log := log.WithContext(ctx)
 	if !s.isPodmonEnabled {
 		log.Info("podmon is not enabled")
 		return
@@ -54,7 +54,8 @@ func (s *Service) startAPIService(ctx context.Context) {
 }
 
 // apiRouter serves http requests
-func (s *Service) apiRouter(_ context.Context) {
+func (s *Service) apiRouter(ctx context.Context) {
+	log := log.WithContext(ctx)
 	log.Infof("starting http server on port %s", identifiers.APIPort)
 	// create a new mux router
 	router := mux.NewRouter()
@@ -156,6 +157,7 @@ func getArrayConnectivityStatus(w http.ResponseWriter, r *http.Request) {
 
 // startNodeToArrayConnectivityCheck starts connectivityTest as one goroutine for each array
 func (s *Service) startNodeToArrayConnectivityCheck(ctx context.Context) {
+	log := log.WithContext(ctx)
 	log.Debug("startNodeToArrayConnectivityCheck called")
 	probeStatus = new(sync.Map)
 	// in case if we want to store the status of default array, uncomment below line
@@ -172,6 +174,7 @@ func (s *Service) startNodeToArrayConnectivityCheck(ctx context.Context) {
 // testConnectivityAndUpdateStatus runs probe to test connectivity from node to array
 // updates probeStatus map[array]ArrayConnectivityStatus
 func (s *Service) testConnectivityAndUpdateStatus(ctx context.Context, array *array.PowerStoreArray, timeout time.Duration) {
+	log := log.WithContext(ctx)
 	defer func() {
 		if err := recover(); err != nil {
 			log.Errorf("panic occurred in testConnectivityAndUpdateStatus: %s for array having %s", err, array.GlobalID)
@@ -211,7 +214,8 @@ func (s *Service) testConnectivityAndUpdateStatus(ctx context.Context, array *ar
 }
 
 // nodeProbe function used to store the status of array
-func (s *Service) nodeProbe(_ context.Context, array *array.PowerStoreArray) error {
+func (s *Service) nodeProbe(ctx context.Context, array *array.PowerStoreArray) error {
+	log := log.WithContext(ctx)
 	// try to get the host
 	host, err := array.Client.GetHostByName(context.Background(), s.nodeID)
 	// possibly NFS could be there.
@@ -313,19 +317,29 @@ func (s *Service) populateTargetsInCache(array *array.PowerStoreArray) {
 				return
 			}
 
+			networkIDs := map[string]struct{}{}
 			for _, address := range infoList {
-				nvmeIP := strings.Split(address.Portal, ":")
-				log.Info("Trying to discover NVMe target from portal ", nvmeIP[0])
-				nvmeTargets, err := s.nvmeLib.DiscoverNVMeTCPTargets(nvmeIP[0], false)
+				// discovering with one portal returns all targets in the network
+				// so if we already discovered an address with this network ID, continue
+				if _, ok := networkIDs[address.NetworkID]; ok {
+					continue
+				}
+
+				nvmeIP := strings.Split(address.Portal, ":")[0]
+				log.Infof("Trying to discover NVMe targets from portal %s on network %s", nvmeIP, address.NetworkID)
+				nvmeTargets, err := s.nvmeLib.DiscoverNVMeTCPTargets(nvmeIP, false)
 				if err != nil {
-					log.Error("couldn't discover targets")
+					log.Errorf("discovering portal: %s: %v", nvmeIP, err)
 					continue
 				}
 				for _, target := range nvmeTargets {
 					otherTargets := s.nvmeTargets[array.GlobalID]
 					s.nvmeTargets[array.GlobalID] = append(otherTargets, target.TargetNqn)
 				}
-				break
+
+				// mark this network ID as discovered so we don't discover another portal in the same network
+				// since it will return all the same target information already seen
+				networkIDs[address.NetworkID] = struct{}{}
 			}
 		}
 	} else if !s.useFC[array.GlobalID] && !s.useNFS {
@@ -340,13 +354,20 @@ func (s *Service) populateTargetsInCache(array *array.PowerStoreArray) {
 		}
 		var ipAddress string
 		var iscsiTargets []goiscsi.ISCSITarget
+		networkIDs := map[string]struct{}{}
 		for _, address := range infoList {
+			// discovering with one portal returns all targets in the network
+			// so if we already discovered an address with this network ID, continue
+			if _, ok := networkIDs[address.NetworkID]; ok {
+				continue
+			}
+
 			// first check if this portal is reachable from this machine or not
 			if ReachableEndPoint(address.Portal) {
 				ipAddressList := splitIPAddress(address.Portal)
 				ipAddress = ipAddressList[0]
 				// doesn't matter how many portals are present, discovering from any one will list out all targets
-				log.Info("Trying to discover iSCSI target from portal ", ipAddress)
+				log.Infof("Trying to discover iSCSI target from portal %s ", ipAddress)
 				ipInterface, err := s.iscsiLib.GetInterfaceForTargetIP(ipAddress)
 				if err != nil {
 					log.Errorf("couldn't get interface: %s", err.Error())
@@ -361,7 +382,10 @@ func (s *Service) populateTargetsInCache(array *array.PowerStoreArray) {
 					otherTargets := s.iscsiTargets[array.GlobalID]
 					s.iscsiTargets[array.GlobalID] = append(otherTargets, target.Target)
 				}
-				break
+
+				// mark this network ID as discovered so we don't discover another portal in the same network
+				// since it will return all the same target information already seen
+				networkIDs[address.NetworkID] = struct{}{}
 			}
 			log.Debugf("Portal is not rechable from the node")
 		}

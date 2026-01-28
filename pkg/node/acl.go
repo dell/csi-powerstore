@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2022 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2022-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,7 +26,6 @@ import (
 	"strings"
 
 	"github.com/dell/gopowerstore"
-	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -41,6 +40,7 @@ type NFSv4ACLsInterface interface {
 type NFSv4ACLs struct{}
 
 func validateAndSetACLs(ctx context.Context, s NFSv4ACLsInterface, nasName string, client gopowerstore.Client, acls string, dir string) (bool, error) {
+	log := log.WithContext(ctx)
 	aclsConfigured := false
 	if nfsv4ACLs(acls) {
 		if isNfsv4Enabled(ctx, client, nasName) {
@@ -89,6 +89,7 @@ func (n *NFSv4ACLs) SetNfsv4Acls(acls string, dir string) error {
 }
 
 func isNfsv4Enabled(ctx context.Context, client gopowerstore.Client, nasName string) bool {
+	log := log.WithContext(ctx)
 	nfsv4Enabled := false
 	nas, err := gopowerstore.Client.GetNASByName(client, ctx, nasName)
 	if err == nil {

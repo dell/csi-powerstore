@@ -21,7 +21,12 @@ package helpers
 import (
 	"errors"
 	"net"
+
+	"github.com/dell/csmlog"
 )
+
+// Instantiate csmlog at package level
+var log = csmlog.GetLogger()
 
 // InterfaceProvider allows mocking net.Interfaces
 type InterfaceProvider interface {

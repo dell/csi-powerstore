@@ -5,10 +5,9 @@ package mocks
 import (
 	context "context"
 
-	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	fs "github.com/dell/csi-powerstore/v2/pkg/identifiers/fs"
-
-	logrus "github.com/sirupsen/logrus"
+	"github.com/dell/csmlog"
+	csi "github.com/container-storage-interface/spec/lib/go/csi"
 
 	mock "github.com/stretchr/testify/mock"
 )
@@ -19,7 +18,7 @@ type VolumeStager struct {
 }
 
 // Stage provides a mock function with given fields: ctx, req, logFields, _a3, id, isRemote
-func (_m *VolumeStager) Stage(ctx context.Context, req *csi.NodeStageVolumeRequest, logFields logrus.Fields, _a3 fs.Interface, id string, isRemote bool) (*csi.NodeStageVolumeResponse, error) {
+func (_m *VolumeStager) Stage(ctx context.Context, req *csi.NodeStageVolumeRequest, logFields csmlog.Fields, _a3 fs.Interface, id string, isRemote bool) (*csi.NodeStageVolumeResponse, error) {
 	ret := _m.Called(ctx, req, logFields, _a3, id, isRemote)
 
 	if len(ret) == 0 {
@@ -28,10 +27,10 @@ func (_m *VolumeStager) Stage(ctx context.Context, req *csi.NodeStageVolumeReque
 
 	var r0 *csi.NodeStageVolumeResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *csi.NodeStageVolumeRequest, logrus.Fields, fs.Interface, string, bool) (*csi.NodeStageVolumeResponse, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *csi.NodeStageVolumeRequest, csmlog.Fields, fs.Interface, string, bool) (*csi.NodeStageVolumeResponse, error)); ok {
 		return rf(ctx, req, logFields, _a3, id, isRemote)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *csi.NodeStageVolumeRequest, logrus.Fields, fs.Interface, string, bool) *csi.NodeStageVolumeResponse); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *csi.NodeStageVolumeRequest, csmlog.Fields, fs.Interface, string, bool) *csi.NodeStageVolumeResponse); ok {
 		r0 = rf(ctx, req, logFields, _a3, id, isRemote)
 	} else {
 		if ret.Get(0) != nil {
@@ -39,7 +38,7 @@ func (_m *VolumeStager) Stage(ctx context.Context, req *csi.NodeStageVolumeReque
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *csi.NodeStageVolumeRequest, logrus.Fields, fs.Interface, string, bool) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *csi.NodeStageVolumeRequest, csmlog.Fields, fs.Interface, string, bool) error); ok {
 		r1 = rf(ctx, req, logFields, _a3, id, isRemote)
 	} else {
 		r1 = ret.Error(1)

@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2021-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,17 +21,17 @@ package node
 import (
 	"context"
 
-	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers"
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers/fs"
-	log "github.com/sirupsen/logrus"
+	"github.com/dell/csmlog"
+	"github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
 // VolumePublisher allows to node publish a volume
 type VolumePublisher interface {
-	Publish(ctx context.Context, logFields log.Fields, fs fs.Interface,
+	Publish(ctx context.Context, logFields csmlog.Fields, fs fs.Interface,
 		vc *csi.VolumeCapability, isRO bool, targetPath string, stagingPath string) (*csi.NodePublishVolumeResponse, error)
 }
 
@@ -41,7 +41,7 @@ type SCSIPublisher struct {
 }
 
 // Publish publishes volume as either raw block or mount by mounting it to the target path
-func (sp *SCSIPublisher) Publish(ctx context.Context, logFields log.Fields, fs fs.Interface, vc *csi.VolumeCapability, isRO bool, targetPath string, stagingPath string) (*csi.NodePublishVolumeResponse, error) {
+func (sp *SCSIPublisher) Publish(ctx context.Context, logFields csmlog.Fields, fs fs.Interface, vc *csi.VolumeCapability, isRO bool, targetPath string, stagingPath string) (*csi.NodePublishVolumeResponse, error) {
 	published, err := isAlreadyPublished(ctx, targetPath, getRWModeString(isRO), fs)
 	if err != nil {
 		return nil, err
@@ -57,8 +57,9 @@ func (sp *SCSIPublisher) Publish(ctx context.Context, logFields log.Fields, fs f
 	return sp.publishMount(ctx, logFields, fs, vc, isRO, targetPath, stagingPath)
 }
 
-func (sp *SCSIPublisher) publishBlock(ctx context.Context, logFields log.Fields, fs fs.Interface, _ *csi.VolumeCapability, isRO bool, targetPath string, stagingPath string) (*csi.NodePublishVolumeResponse, error) {
-	log.WithFields(logFields).Info("start publishing as block device")
+func (sp *SCSIPublisher) publishBlock(ctx context.Context, logFields csmlog.Fields, fs fs.Interface, _ *csi.VolumeCapability, isRO bool, targetPath string, stagingPath string) (*csi.NodePublishVolumeResponse, error) {
+	log := log.WithFields(logFields).WithContext(ctx)
+	log.Info("start publishing as block device")
 
 	if isRO {
 		return nil, status.Error(codes.InvalidArgument, "read only not supported for Block Volume")
@@ -68,26 +69,26 @@ func (sp *SCSIPublisher) publishBlock(ctx context.Context, logFields log.Fields,
 		return nil, status.Errorf(codes.Internal,
 			"can't create target file %s: %s", targetPath, err.Error())
 	}
-	log.WithFields(logFields).Info("target path successfully created")
+	log.Info("target path successfully created")
 
 	if err := fs.GetUtil().BindMount(ctx, stagingPath, targetPath); err != nil {
 		return nil, status.Errorf(codes.Internal,
 			"error bind disk %s to target path: %s", stagingPath, err.Error())
 	}
-	log.WithFields(logFields).Info("volume successfully binded")
+	log.Info("volume successfully binded")
 
 	return &csi.NodePublishVolumeResponse{}, nil
 }
 
-func (sp *SCSIPublisher) publishMount(ctx context.Context, logFields log.Fields, fs fs.Interface, vc *csi.VolumeCapability, isRO bool, targetPath string, stagingPath string) (*csi.NodePublishVolumeResponse, error) {
+func (sp *SCSIPublisher) publishMount(ctx context.Context, logFields csmlog.Fields, fs fs.Interface, vc *csi.VolumeCapability, isRO bool, targetPath string, stagingPath string) (*csi.NodePublishVolumeResponse, error) {
+	log := log.WithFields(logFields).WithContext(ctx)
 	if vc.GetAccessMode().GetMode() == csi.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER {
-		// MULTI_WRITER not supported for mount volumes
-		return nil, status.Error(codes.Unimplemented, "Mount volumes do not support AccessMode MULTI_NODE_MULTI_WRITER")
+		log.Infof(" Mount volume with the AccessMode ReadWriteMany")
 	}
 
 	if vc.GetAccessMode().GetMode() == csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY {
 		// Warning in case of MULTI_NODE_READER_ONLY for mount volumes
-		log.Warningf("Mount volume with the AccessMode ReadOnlyMany")
+		log.Warnf("Mount volume with the AccessMode ReadOnlyMany")
 	}
 
 	var opts []string
@@ -106,7 +107,7 @@ func (sp *SCSIPublisher) publishMount(ctx context.Context, logFields log.Fields,
 			"can't create target dir with Mkdirall %s: %s", targetPath, err.Error())
 	}
 
-	log.WithFields(logFields).Info("target dir successfully created")
+	log.Info("target dir successfully created")
 
 	curFS, err := fs.GetUtil().GetDiskFormat(ctx, stagingPath)
 	if err != nil {
@@ -121,7 +122,7 @@ func (sp *SCSIPublisher) publishMount(ctx context.Context, logFields log.Fields,
 	}
 
 	if curFS == "" {
-		log.WithFields(logFields).Infof("no filesystem found on staged disk %s", stagingPath)
+		log.Infof("no filesystem found on staged disk : %s", stagingPath)
 		if isRO {
 			return nil, status.Errorf(codes.FailedPrecondition,
 				"RO mount required but no fs detected on staged volume %s", stagingPath)
@@ -131,7 +132,7 @@ func (sp *SCSIPublisher) publishMount(ctx context.Context, logFields log.Fields,
 			return nil, status.Errorf(codes.Internal,
 				"can't format staged device %s: %s", stagingPath, err.Error())
 		}
-		log.WithFields(logFields).Infof("staged disk %s successfully formatted to %s", stagingPath, targetFS)
+		log.Infof("staged disk %s successfully formatted to %s", stagingPath, targetFS)
 	}
 	if isRO {
 		mntFlags = append(mntFlags, "ro")
@@ -141,7 +142,7 @@ func (sp *SCSIPublisher) publishMount(ctx context.Context, logFields log.Fields,
 		return nil, status.Errorf(codes.Internal,
 			"error performing mount for staging path %s: %s", stagingPath, err.Error())
 	}
-	log.WithFields(logFields).Info("volume successfully mounted")
+	log.Info("volume successfully mounted")
 
 	return &csi.NodePublishVolumeResponse{}, nil
 }
@@ -150,9 +151,10 @@ func (sp *SCSIPublisher) publishMount(ctx context.Context, logFields log.Fields,
 type NFSPublisher struct{}
 
 // Publish publishes nfs volume by mounting it to the target path
-func (np *NFSPublisher) Publish(ctx context.Context, logFields log.Fields, fs fs.Interface,
+func (np *NFSPublisher) Publish(ctx context.Context, logFields csmlog.Fields, fs fs.Interface,
 	vc *csi.VolumeCapability, isRO bool, targetPath string, stagingPath string,
 ) (*csi.NodePublishVolumeResponse, error) {
+	log := log.WithFields(logFields).WithContext(ctx)
 	published, err := isAlreadyPublished(ctx, targetPath, getRWModeString(isRO), fs)
 	if err != nil {
 		return nil, err
@@ -166,7 +168,7 @@ func (np *NFSPublisher) Publish(ctx context.Context, logFields log.Fields, fs fs
 		return nil, status.Errorf(codes.Internal,
 			"can't create target folder %s: %s", stagingPath, err.Error())
 	}
-	log.WithFields(logFields).Info("target path successfully created")
+	log.Info("target path successfully created")
 
 	mntFlags := identifiers.GetMountFlags(vc)
 
@@ -179,6 +181,6 @@ func (np *NFSPublisher) Publish(ctx context.Context, logFields log.Fields, fs fs
 			"error bind disk %s to target path: %s", stagingPath, err.Error())
 	}
 
-	log.WithFields(logFields).Info("volume successfully binded")
+	log.Info("volume successfully binded")
 	return &csi.NodePublishVolumeResponse{}, nil
 }

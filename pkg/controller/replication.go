@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2021-2024 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2021-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,10 +22,8 @@ import (
 	"strings"
 
 	"github.com/dell/csi-powerstore/v2/pkg/array"
-	"github.com/dell/csm-sharednfs/nfs"
 	csiext "github.com/dell/dell-csi-extensions/replication"
 	"github.com/dell/gopowerstore"
-	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -34,31 +32,24 @@ import (
 func (s *Service) CreateRemoteVolume(ctx context.Context,
 	req *csiext.CreateRemoteVolumeRequest,
 ) (*csiext.CreateRemoteVolumeResponse, error) {
+	log := log.WithContext(ctx)
 	volID := req.GetVolumeHandle()
+	log.Infof("CreateRemoteVolume: Full Volumerequest: %+v", req)
 	if volID == "" {
 		return nil, status.Error(codes.InvalidArgument, "volume ID is required")
 	}
-	params := req.GetParameters()
 
 	volumeHandle, err := array.ParseVolumeID(ctx, volID, s.DefaultArray(), nil)
 	if err != nil {
-		log.Error(err)
+		log.Error(err.Error())
 		return nil, err
 	}
 	id := volumeHandle.LocalUUID
 	arrayID := volumeHandle.LocalArrayGlobalID
-	protocol := volumeHandle.Protocol
+	protocol := strings.ToLower(volumeHandle.Protocol)
+	log.Infof("CreateRemoteVolume: Parsed volume ID: LocalUUID=%s, ArrayID=%s, Protocol=%s", id, arrayID, protocol)
 
 	volPrefix := ""
-	if accessMode, ok := params[nfs.CsiNfsParameter]; ok && accessMode != "" {
-		// host-based nfs volumes should have the "shared-nfs" parameter
-		// and an "nfs-" prefix in the volume ID that we need to remove
-		// for gopowerstore queries to succeed.
-		// Remove the prefix here and restore it when building the volume ID
-		// for the function response.
-		volPrefix = array.GetVolumeUUIDPrefix(id)
-		id = strings.TrimPrefix(id, volPrefix)
-	}
 
 	arr, ok := s.Arrays()[arrayID]
 	if !ok {
@@ -66,40 +57,106 @@ func (s *Service) CreateRemoteVolume(ctx context.Context,
 		return nil, status.Error(codes.InvalidArgument, "failed to find array with given IP")
 	}
 
-	vgs, err := arr.GetClient().GetVolumeGroupsByVolumeID(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-	if len(vgs.VolumeGroup) == 0 {
-		return nil, status.Error(codes.Unimplemented, "replication of volumes that aren't assigned to group is not implemented yet")
-	}
-	vg := vgs.VolumeGroup[0]
-
-	rs, err := arr.Client.GetReplicationSessionByLocalResourceID(ctx, vg.ID)
-	if err != nil {
-		return nil, err
-	}
-
 	var remoteVolumeID string
-	for _, sp := range rs.StorageElementPairs {
-		if sp.LocalStorageElementID == id {
-			remoteVolumeID = sp.RemoteStorageElementID
+	var volSize int64
+	var remoteSystemID string
+
+	if protocol == "nfs" {
+		log.Infof("CreateRemoteVolume: Checking NFS export for file system ID: %s", id)
+		export, err := arr.Client.GetNFSExportByFileSystemID(ctx, id)
+		if err != nil {
+			log.Warnf("CreateRemoteVolume: NFS export not found, attempting to create one for file system ID: %s", id)
+
+			fs, err := arr.Client.GetFS(ctx, id)
+			if err != nil {
+				log.Errorf("Failed to get file system by ID %s: %v", id, err)
+				return nil, status.Errorf(codes.NotFound, "file system not found")
+			}
+			prefix := "auto_export_"
+			var exportName string
+			if len(id) >= 8 {
+				exportName = prefix + id[:8]
+			} else {
+				exportName = prefix + id
+			}
+
+			createReq := gopowerstore.NFSExportCreate{
+				FileSystemID:     id,
+				Name:             exportName,
+				Path:             "/" + fs.Name,
+				DefaultAccess:    gopowerstore.NFSExportDefaultAccessEnum("No_Access"),
+				MinSecurity:      "Sys",
+				AnonymousUID:     -2,
+				AnonymousGID:     -2,
+				IsNoSUID:         false,
+				NFSOwnerUsername: "root",
+			}
+			exportID, createErr := arr.Client.CreateNFSExport(ctx, &createReq)
+			if createErr != nil {
+				log.Errorf("CreateRemoteVolume: Failed to create NFS export: %v", createErr)
+				return nil, status.Errorf(codes.Internal, "failed to create NFS export for file system ID %s", id)
+			}
+
+			log.Infof("CreateRemoteVolume: Successfully created NFS export with ID: %s", exportID)
+
+			// Retrieve the newly created export
+			export, err = arr.Client.GetNFSExportByFileSystemID(ctx, id)
+			if err != nil {
+				log.Errorf("CreateRemoteVolume: Failed to retrieve newly created NFS export: %v", err)
+				return nil, status.Errorf(codes.Internal, "unable to retrieve NFS export after creation for file system ID %s", id)
+			}
+		} else {
+			log.Infof("CreateRemoteVolume: Retrieved existing export: %+v", export)
 		}
+
+		rs, err := arr.Client.GetReplicationSessionByLocalResourceID(ctx, id)
+		if err != nil {
+			log.Errorf("CreateRemoteVolume: No replication session found for file system ID: %s, error: %v", id, err)
+			return nil, status.Error(codes.Internal, "no replication session found for file system")
+		}
+
+		remoteSystemID = rs.RemoteSystemID
+		remoteVolumeID = id
+		volSize = 0
+	} else {
+		// Block volume logic
+		vgs, err := arr.GetClient().GetVolumeGroupsByVolumeID(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		if len(vgs.VolumeGroup) == 0 {
+			return nil, status.Error(codes.Unimplemented, "replication of volumes that aren't assigned to group is not implemented yet")
+		}
+		vg := vgs.VolumeGroup[0]
+
+		rs, err := arr.Client.GetReplicationSessionByLocalResourceID(ctx, vg.ID)
+		if err != nil {
+			return nil, err
+		}
+		remoteSystemID = rs.RemoteSystemID
+
+		for _, sp := range rs.StorageElementPairs {
+			if sp.LocalStorageElementID == id {
+				remoteVolumeID = sp.RemoteStorageElementID
+			}
+		}
+		if remoteVolumeID == "" {
+			return nil, status.Errorf(codes.Internal, "couldn't find volume id %s in storage element pairs of replication session", id)
+		}
+
+		vol, err := arr.Client.GetVolume(ctx, id)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "can't query volume: %s", err.Error())
+		}
+		volSize = vol.Size
 	}
 
-	if remoteVolumeID == "" {
-		return nil, status.Errorf(codes.Internal, "couldn't find volume id %s in storage element pairs of replication session", id)
-	}
-
-	vol, err := arr.Client.GetVolume(ctx, id)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "can't query volume: %s", err.Error())
-	}
+	// Get local and remote system info
 	localSystem, err := arr.Client.GetCluster(ctx)
 	if err != nil {
 		return nil, err
 	}
-	remoteSystem, err := arr.Client.GetRemoteSystem(ctx, rs.RemoteSystemID)
+	remoteSystem, err := arr.Client.GetRemoteSystem(ctx, remoteSystemID)
 	if err != nil {
 		return nil, err
 	}
@@ -109,11 +166,13 @@ func (s *Service) CreateRemoteVolume(ctx context.Context,
 		s.replicationContextPrefix + "arrayID":           remoteSystem.SerialNumber,
 		s.replicationContextPrefix + "managementAddress": remoteSystem.ManagementAddress,
 	}
+
 	remoteVolume := getRemoteCSIVolume(
 		volPrefix+remoteVolumeID+"/"+remoteParams[s.replicationContextPrefix+"arrayID"]+"/"+protocol,
-		vol.Size,
+		volSize,
 	)
 	remoteVolume.VolumeContext = remoteParams
+
 	return &csiext.CreateRemoteVolumeResponse{
 		RemoteVolume: remoteVolume,
 	}, nil
@@ -123,29 +182,21 @@ func (s *Service) CreateRemoteVolume(ctx context.Context,
 func (s *Service) CreateStorageProtectionGroup(ctx context.Context,
 	req *csiext.CreateStorageProtectionGroupRequest,
 ) (*csiext.CreateStorageProtectionGroupResponse, error) {
+	log := log.WithContext(ctx)
 	volID := req.GetVolumeHandle()
 	if volID == "" {
 		return nil, status.Error(codes.InvalidArgument, "volume ID is required")
 	}
-	params := req.GetParameters()
 
 	volumeHandle, err := array.ParseVolumeID(ctx, volID, s.DefaultArray(), nil)
 	if err != nil {
-		log.Error(err)
+		log.Error(err.Error())
 		return nil, err
 	}
 
 	id := volumeHandle.LocalUUID
 	arrayID := volumeHandle.LocalArrayGlobalID
-	protocol := volumeHandle.Protocol
-
-	if accessMode, ok := params[nfs.CsiNfsParameter]; ok && accessMode != "" {
-		// host-based nfs volumes should have the "shared-nfs" parameter
-		// and a "nfs-" prefix in the volume ID that we need to remove
-		// for gopowerstore queries to succeed
-		volPrefix := array.GetVolumeUUIDPrefix(id)
-		id = strings.TrimPrefix(id, volPrefix)
-	}
+	protocol := strings.ToLower(volumeHandle.Protocol)
 
 	arr, ok := s.Arrays()[arrayID]
 	if !ok {
@@ -153,54 +204,100 @@ func (s *Service) CreateStorageProtectionGroup(ctx context.Context,
 		return nil, status.Error(codes.InvalidArgument, "failed to find array with given ID")
 	}
 
-	if protocol == "nfs" {
-		return nil, status.Error(codes.InvalidArgument, "replication is not supported for NFS volumes")
-	}
-
-	vgs, err := arr.GetClient().GetVolumeGroupsByVolumeID(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-	if len(vgs.VolumeGroup) == 0 {
-		return nil, status.Error(codes.Unimplemented, "replication of volumes that aren't assigned to group is not implemented yet")
-	}
-	vg := vgs.VolumeGroup[0]
-
-	rs, err := arr.Client.GetReplicationSessionByLocalResourceID(ctx, vg.ID)
-	if err != nil {
-		return nil, err
-	}
+	var localGroupID, remoteGroupID string
+	var localParams, remoteParams map[string]string
 
 	localSystem, err := arr.Client.GetCluster(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	remoteSystem, err := arr.Client.GetRemoteSystem(ctx, rs.RemoteSystemID)
-	if err != nil {
-		return nil, err
-	}
-	localParams := map[string]string{
-		s.replicationContextPrefix + "systemName":              localSystem.Name,
-		s.replicationContextPrefix + "managementAddress":       localSystem.ManagementAddress,
-		s.replicationContextPrefix + "remoteSystemName":        remoteSystem.Name,
-		s.replicationContextPrefix + "remoteManagementAddress": remoteSystem.ManagementAddress,
-		s.replicationContextPrefix + "globalID":                arrayID,
-		s.replicationContextPrefix + "remoteGlobalID":          remoteSystem.SerialNumber,
-		s.replicationContextPrefix + "VolumeGroupName":         vg.Name,
-	}
-	remoteParams := map[string]string{
-		s.replicationContextPrefix + "systemName":              remoteSystem.Name,
-		s.replicationContextPrefix + "managementAddress":       remoteSystem.ManagementAddress,
-		s.replicationContextPrefix + "remoteSystemName":        localSystem.Name,
-		s.replicationContextPrefix + "remoteManagementAddress": localSystem.ManagementAddress,
-		s.replicationContextPrefix + "globalID":                remoteSystem.SerialNumber,
-		s.replicationContextPrefix + "VolumeGroupName":         vg.Name,
+	if protocol == "nfs" {
+		log.Infof("CreateRemoteVolume: Checking NFS export for file system ID: %s", id)
+		export, err := arr.Client.GetNFSExportByFileSystemID(ctx, id)
+		if err != nil {
+			log.Errorf("CreateRemoteVolume: Error retrieving NFS export: %v", err)
+		} else {
+			log.Infof("CreateRemoteVolume: Retrieved export: %+v", export)
+		}
+		nasServerID := export.ID
+
+		rs, err := arr.Client.GetReplicationSessionByLocalResourceID(ctx, id)
+		if err != nil {
+			return nil, status.Error(codes.Internal, "no replication session found for NAS server")
+		}
+
+		remoteSystem, err := arr.Client.GetRemoteSystem(ctx, rs.RemoteSystemID)
+		if err != nil {
+			return nil, err
+		}
+
+		localGroupID = rs.LocalResourceID
+		remoteGroupID = rs.RemoteResourceID
+
+		localParams = map[string]string{
+			s.replicationContextPrefix + "systemName":              localSystem.Name,
+			s.replicationContextPrefix + "managementAddress":       localSystem.ManagementAddress,
+			s.replicationContextPrefix + "remoteSystemName":        remoteSystem.Name,
+			s.replicationContextPrefix + "remoteManagementAddress": remoteSystem.ManagementAddress,
+			s.replicationContextPrefix + "globalID":                arrayID,
+			s.replicationContextPrefix + "remoteGlobalID":          remoteSystem.SerialNumber,
+			s.replicationContextPrefix + "NasServerID":             nasServerID,
+		}
+		remoteParams = map[string]string{
+			s.replicationContextPrefix + "systemName":              remoteSystem.Name,
+			s.replicationContextPrefix + "managementAddress":       remoteSystem.ManagementAddress,
+			s.replicationContextPrefix + "remoteSystemName":        localSystem.Name,
+			s.replicationContextPrefix + "remoteManagementAddress": localSystem.ManagementAddress,
+			s.replicationContextPrefix + "globalID":                remoteSystem.SerialNumber,
+			s.replicationContextPrefix + "NasServerID":             rs.RemoteResourceID,
+		}
+	} else {
+		// Block volume logic
+		vgs, err := arr.GetClient().GetVolumeGroupsByVolumeID(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		if len(vgs.VolumeGroup) == 0 {
+			return nil, status.Error(codes.Unimplemented, "replication of volumes that aren't assigned to group is not implemented yet")
+		}
+		vg := vgs.VolumeGroup[0]
+
+		rs, err := arr.Client.GetReplicationSessionByLocalResourceID(ctx, vg.ID)
+		if err != nil {
+			return nil, err
+		}
+
+		remoteSystem, err := arr.Client.GetRemoteSystem(ctx, rs.RemoteSystemID)
+		if err != nil {
+			return nil, err
+		}
+
+		localGroupID = rs.LocalResourceID
+		remoteGroupID = rs.RemoteResourceID
+
+		localParams = map[string]string{
+			s.replicationContextPrefix + "systemName":              localSystem.Name,
+			s.replicationContextPrefix + "managementAddress":       localSystem.ManagementAddress,
+			s.replicationContextPrefix + "remoteSystemName":        remoteSystem.Name,
+			s.replicationContextPrefix + "remoteManagementAddress": remoteSystem.ManagementAddress,
+			s.replicationContextPrefix + "globalID":                arrayID,
+			s.replicationContextPrefix + "remoteGlobalID":          remoteSystem.SerialNumber,
+			s.replicationContextPrefix + "VolumeGroupName":         vg.Name,
+		}
+		remoteParams = map[string]string{
+			s.replicationContextPrefix + "systemName":              remoteSystem.Name,
+			s.replicationContextPrefix + "managementAddress":       remoteSystem.ManagementAddress,
+			s.replicationContextPrefix + "remoteSystemName":        localSystem.Name,
+			s.replicationContextPrefix + "remoteManagementAddress": localSystem.ManagementAddress,
+			s.replicationContextPrefix + "globalID":                remoteSystem.SerialNumber,
+			s.replicationContextPrefix + "VolumeGroupName":         vg.Name,
+		}
 	}
 
 	return &csiext.CreateStorageProtectionGroupResponse{
-		LocalProtectionGroupId:          rs.LocalResourceID,
-		RemoteProtectionGroupId:         rs.RemoteResourceID,
+		LocalProtectionGroupId:          localGroupID,
+		RemoteProtectionGroupId:         remoteGroupID,
 		LocalProtectionGroupAttributes:  localParams,
 		RemoteProtectionGroupAttributes: remoteParams,
 	}, nil
@@ -341,6 +438,7 @@ func (s *Service) GetReplicationCapabilities(_ context.Context, _ *csiext.GetRep
 func (s *Service) ExecuteAction(ctx context.Context,
 	req *csiext.ExecuteActionRequest,
 ) (*csiext.ExecuteActionResponse, error) {
+	log := log.WithContext(ctx)
 	var reqID string
 	localParams := req.GetProtectionGroupAttributes()
 	protectionGroupID := req.GetProtectionGroupId()
@@ -468,14 +566,13 @@ func validateRSState(session *gopowerstore.ReplicationSession, action gopowersto
 	return false, true, nil
 }
 
-// DeleteStorageProtectionGroup deletes storage protection group
-func (s *Service) DeleteStorageProtectionGroup(ctx context.Context,
+func (s *Service) DeleteStorageProtectionGroup(
+	ctx context.Context,
 	req *csiext.DeleteStorageProtectionGroupRequest,
 ) (*csiext.DeleteStorageProtectionGroupResponse, error) {
 	localParams := req.GetProtectionGroupAttributes()
 	groupID := req.GetProtectionGroupId()
 	globalID, ok := localParams[s.replicationContextPrefix+"globalID"]
-
 	if !ok {
 		return nil, status.Error(codes.InvalidArgument, "missing globalID in protection group attributes")
 	}
@@ -488,11 +585,24 @@ func (s *Service) DeleteStorageProtectionGroup(ctx context.Context,
 		"GlobalID":              globalID,
 		"ProtectedStorageGroup": groupID,
 	}
+	log := log.WithContext(ctx).WithFields(fields)
 
-	log.WithFields(fields).Info("Deleting storage protection group")
+	log.Info("Deleting storage protection group")
 
+	nasServerID, hasNas := localParams[s.replicationContextPrefix+"NasServerID"]
+
+	// Skip deletion logic for NFS replication sessions
+	// Storage Protection Group (i.e., Protection Policy) cannot be deleted from the PowerStore array
+	// if it is assigned to a NAS server. Modifying NAS to unassign the policy is currently unsupported,
+	// so deletion is effectively blocked for sync/async NAS contexts.
+	if hasNas && nasServerID != "" {
+		log.Info("NFS context detected — skipping deletion logic")
+		return &csiext.DeleteStorageProtectionGroupResponse{}, nil
+	}
+	// Block: Unassign PP and delete VolumeGroup
 	vg, err := arr.GetClient().GetVolumeGroup(ctx, groupID)
 	if apiErr, ok := err.(gopowerstore.APIError); ok && !apiErr.NotFound() {
+		log.Errorf("Failed to get Volume Group: %v", apiErr)
 		return nil, status.Errorf(codes.Internal, "Error: Unable to get Volume Group")
 	}
 	if vg.ID != "" {
@@ -501,41 +611,50 @@ func (s *Service) DeleteStorageProtectionGroup(ctx context.Context,
 				ProtectionPolicyID: "",
 			}, groupID)
 			if apiErr, ok := err.(gopowerstore.APIError); ok && !apiErr.NotFound() {
+				log.Errorf("Unable to un-assign PP from Volume Group: %v", apiErr)
 				return nil, status.Errorf(codes.Internal, "Error: Unable to un-assign PP from Volume Group")
 			}
 		}
 		_, err = arr.Client.DeleteVolumeGroup(ctx, groupID)
-		if apiError, ok := err.(gopowerstore.APIError); ok && !apiError.NotFound() {
-			return nil, status.Errorf(codes.Internal, "Error: %s: Unable to delete Volume Group", apiError.Error())
+		if apiErr, ok := err.(gopowerstore.APIError); ok && !apiErr.NotFound() {
+			log.Errorf("Unable to delete Volume Group: %v", apiErr)
+			return nil, status.Errorf(codes.Internal, "Error: Unable to delete Volume Group")
 		}
 	}
-
-	log.WithFields(fields).Info("Deleting protection policy")
 
 	vgName, ok := localParams[s.replicationContextPrefix+"VolumeGroupName"]
 	if !ok {
 		return nil, status.Errorf(codes.Internal, "Error: Unable to get volume group name")
 	}
+
+	// Delete Protection Policy
+	log.Info("Deleting protection policy")
 	pp, err := arr.GetClient().GetProtectionPolicyByName(ctx, "pp-"+vgName)
 	if apiErr, ok := err.(gopowerstore.APIError); ok && !apiErr.NotFound() {
-		return nil, status.Errorf(codes.Internal, "Error: Unable to get the PP")
+		log.Errorf("Error retrieving protection policy: %v", apiErr)
+		return nil, status.Errorf(codes.Internal, "Error: Unable to get protection policy")
 	}
-	if pp.ID != "" && len(pp.Volumes) == 0 && len(pp.VolumeGroups) == 0 {
+	if pp.ID != "" &&
+		len(pp.Volumes) == 0 &&
+		len(pp.VolumeGroups) == 0 {
 		_, err := arr.Client.DeleteProtectionPolicy(ctx, pp.ID)
 		if apiErr, ok := err.(gopowerstore.APIError); ok && !apiErr.NotFound() {
-			return nil, status.Errorf(codes.Internal, "Error: Unable to delete PP")
+			log.Errorf("Unable to delete protection policy: %v", apiErr)
+			return nil, status.Errorf(codes.Internal, "Error: Unable to delete protection policy")
 		}
 	}
 
-	log.WithFields(fields).Info("Deleting replication rule")
-
+	// Delete Replication Rule
+	log.Info("Deleting replication rule")
 	rr, err := arr.GetClient().GetReplicationRuleByName(ctx, "rr-"+vgName)
 	if apiErr, ok := err.(gopowerstore.APIError); ok && !apiErr.NotFound() {
-		return nil, status.Errorf(codes.Internal, "Error: RR not found")
+		log.Errorf("Error retrieving replication rule: %v", apiErr)
+		return nil, status.Errorf(codes.Internal, "Error: Unable to get replication rule")
 	}
 	if rr.ID != "" && len(rr.ProtectionPolicies) == 0 {
 		_, err = arr.GetClient().DeleteReplicationRule(ctx, rr.ID)
 		if apiErr, ok := err.(gopowerstore.APIError); ok && !apiErr.NotFound() {
+			log.Errorf("Unable to delete replication rule: %v", apiErr)
 			return nil, status.Errorf(codes.Internal, "Error: Unable to delete replication rule")
 		}
 	}
@@ -547,6 +666,7 @@ func (s *Service) DeleteStorageProtectionGroup(ctx context.Context,
 func (s *Service) DeleteLocalVolume(ctx context.Context,
 	req *csiext.DeleteLocalVolumeRequest,
 ) (*csiext.DeleteLocalVolumeResponse, error) {
+	log := log.WithContext(ctx)
 	log.Info("Deleting local volume " + req.VolumeHandle + " per request from remote replication controller")
 
 	// req.VolumeHandle is of format <volumeid>/<array ID>/<protocol>. We only need the IDs.
@@ -608,6 +728,7 @@ func (s *Service) DeleteLocalVolume(ctx context.Context,
 func (s *Service) GetStorageProtectionGroupStatus(ctx context.Context,
 	req *csiext.GetStorageProtectionGroupStatusRequest,
 ) (*csiext.GetStorageProtectionGroupStatusResponse, error) {
+	log := log.WithContext(ctx)
 	localParams := req.GetProtectionGroupAttributes()
 	groupID := req.GetProtectionGroupId()
 

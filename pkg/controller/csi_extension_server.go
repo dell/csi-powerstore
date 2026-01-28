@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2022-2024 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2022-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,7 +29,6 @@ import (
 	vgsext "github.com/dell/dell-csi-extensions/volumeGroupSnapshot"
 	"github.com/dell/gopowerstore"
 	"github.com/go-openapi/strfmt"
-	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -39,6 +38,7 @@ const StateReady = "Ready"
 
 // CreateVolumeGroupSnapshot creates volume group snapshot
 func (s *Service) CreateVolumeGroupSnapshot(ctx context.Context, request *vgsext.CreateVolumeGroupSnapshotRequest) (*vgsext.CreateVolumeGroupSnapshotResponse, error) {
+	log := log.WithContext(ctx)
 	log.Infof("CreateVolumeGroupSnapshot called with req: %v", request)
 
 	err := validateCreateVGSreq(request)
@@ -157,20 +157,17 @@ func (s *Service) CreateVolumeGroupSnapshot(ctx context.Context, request *vgsext
 func validateCreateVGSreq(request *vgsext.CreateVolumeGroupSnapshotRequest) error {
 	if request.Name == "" {
 		err := status.Error(codes.InvalidArgument, "CreateVolumeGroupSnapshotRequest needs Name to be set")
-		log.Errorf("Error from validateCreateVGSreq: %v ", err)
 		return err
 	}
 
 	// name must be less than 28 chars, because we name snapshots with -<index>, and index can at most be 3 chars
 	if len(request.Name) > 27 {
 		err := status.Errorf(codes.InvalidArgument, "Requested name %s longer than 27 character max", request.Name)
-		log.Errorf("Error from validateCreateVGSreq: %v ", err)
 		return err
 	}
 
 	if len(request.SourceVolumeIDs) == 0 {
 		err := status.Errorf(codes.InvalidArgument, "Source volumes are not present")
-		log.Errorf("Error from validateCreateVGSreq: %v ", err)
 		return err
 	}
 
@@ -179,7 +176,7 @@ func validateCreateVGSreq(request *vgsext.CreateVolumeGroupSnapshotRequest) erro
 
 // ValidateVolumeHostConnectivity menthod will be called by podmon sidecars to check host connectivity with array
 func (s *Service) ValidateVolumeHostConnectivity(ctx context.Context, req *podmon.ValidateVolumeHostConnectivityRequest) (*podmon.ValidateVolumeHostConnectivityResponse, error) {
-	// ctx, log, _ := GetRunIDLog(ctx)
+	log := log.WithContext(ctx)
 	log.Infof("ValidateVolumeHostConnectivity called %+v", req)
 	rep := &podmon.ValidateVolumeHostConnectivityResponse{
 		Messages: make([]string, 0),
@@ -200,17 +197,25 @@ func (s *Service) ValidateVolumeHostConnectivity(ctx context.Context, req *podmo
 	if globalID == "" {
 		if len(req.GetVolumeIds()) == 0 {
 			log.Info("neither globalId nor volumeID is present in request")
-			globalIDs[s.DefaultArray().GlobalID] = true
+			// need to put all arrays to check not only default array and not matched ID will be filtered later.
+			for _, array := range s.Arrays() {
+				globalIDs[array.GlobalID] = true
+			}
 		}
-		// for loop req.GetVolumeIds()
+
 		for _, volID := range req.GetVolumeIds() {
 			volumeHandle, err := array.ParseVolumeID(ctx, volID, s.DefaultArray(), nil)
-			globalID = volumeHandle.LocalArrayGlobalID
-			if err != nil || globalID == "" {
+			if err != nil || (volumeHandle.LocalArrayGlobalID == "" && volumeHandle.RemoteArrayGlobalID == "") {
 				log.Errorf("unable to retrieve array's globalID after parsing volumeID")
 				globalIDs[s.DefaultArray().GlobalID] = true
 			} else {
-				globalIDs[globalID] = true
+				if volumeHandle.LocalArrayGlobalID != "" {
+					globalIDs[volumeHandle.LocalArrayGlobalID] = true
+				}
+
+				if volumeHandle.RemoteArrayGlobalID != "" {
+					globalIDs[volumeHandle.RemoteArrayGlobalID] = true
+				}
 			}
 		}
 	} else {
@@ -219,13 +224,24 @@ func (s *Service) ValidateVolumeHostConnectivity(ctx context.Context, req *podmo
 
 	// Go through each of the globalIDs
 	for globalID := range globalIDs {
+		// Check if array is non-uniform and matches the node label
+		arr, err := s.GetOneArray(globalID)
+		if err != nil || arr == nil {
+			log.Errorf("failed to get array %s: %s", globalID, err.Error())
+			return nil, err
+		}
+
+		if !arr.CheckConnectivity(ctx, req.GetNodeId()) {
+			log.Warnf("Not a match for node %s on array %s, skipping connectivity check", req.GetNodeId(), globalID)
+			continue
+		}
+
 		// First - check if the array is visible from the node
-		err := s.checkIfNodeIsConnected(ctx, globalID, req.GetNodeId(), rep)
+		err = s.checkIfNodeIsConnected(ctx, globalID, req.GetNodeId(), rep)
 		if err != nil {
 			return rep, err
 		}
 	}
-
 	// Check for IOinProgress only when volumes IDs are present in the request as the field is required only in the latter case also to reduce number of calls to the API making it efficient
 	if len(req.GetVolumeIds()) > 0 {
 		// Get array config
@@ -257,7 +273,8 @@ func (s *Service) ValidateVolumeHostConnectivity(ctx context.Context, req *podmo
 			// This context is for the set of requests for the current volume.
 			// Used to cancel any pending requests before checking for IO on any
 			// subsequent volumes.
-			ioCtx, ioCtxCancel := context.WithCancel(ctx)
+			probeBase := context.WithoutCancel(ctx) // decouple from caller's cancel/deadline
+			ioCtx, ioCtxCancel := context.WithTimeout(probeBase, identifiers.PodmonArrayConnectivityTimeout)
 
 			// channels for receiving responses from async requests
 			reqChs := make([]<-chan error, 0)
@@ -305,6 +322,7 @@ func waitAndClose(wg *sync.WaitGroup, ch chan error) {
 // fan-in concurrency pattern and returns true if at least one response is a nil error,
 // denoting IO is in-progress.
 func isIOInProgress(ctx context.Context, chs ...<-chan error) bool {
+	log := log.WithContext(ctx)
 	// single channel on which the channels in "chs" will write their results
 	errCh := make(chan error)
 	wg := &sync.WaitGroup{}
@@ -366,6 +384,7 @@ func isIOInProgress(ctx context.Context, chs ...<-chan error) bool {
 // It can be used to dispatch multiple requests in parallel for situations such as metro
 // volumes where multiple volumes need to be checked for IO to determine if the volume is active.
 func asyncGetIOInProgress(ctx context.Context, volID string, array array.PowerStoreArray, protocol string) <-chan error {
+	log := log.WithContext(ctx)
 	errCh := make(chan error)
 	go func() {
 		defer close(errCh)
@@ -388,6 +407,7 @@ func asyncGetIOInProgress(ctx context.Context, volID string, array array.PowerSt
 // checkIfNodeIsConnected looks at the 'nodeId' to determine if there is connectivity to the 'arrayId' array.
 // The 'rep' object will be filled with the results of the check.
 func (s *Service) checkIfNodeIsConnected(ctx context.Context, arrayID string, nodeID string, rep *podmon.ValidateVolumeHostConnectivityResponse) error {
+	log := log.WithContext(ctx)
 	log.Infof("Checking if array %s is connected to node %s", arrayID, nodeID)
 	var message string
 	rep.Connected = false
@@ -422,6 +442,7 @@ func (s *Service) checkIfNodeIsConnected(ctx context.Context, arrayID string, no
 // getIOInProgress attempts to determine if IO has recently occurred for a given volume, volID,
 // and returns a nil error if IO has occurred.
 func getIOInProgress(ctx context.Context, volID string, arrayConfig array.PowerStoreArray, protocol string) (err error) {
+	log := log.WithContext(ctx)
 	// Call PerformanceMetricsByVolume  or  PerformanceMetricsByFileSystem in gopowerstore based on the volume type
 	if protocol == "scsi" {
 		resp, err := arrayConfig.Client.PerformanceMetricsByVolume(ctx, volID, gopowerstore.TwentySec)

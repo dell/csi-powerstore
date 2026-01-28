@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2021-2024 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2021-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,13 +29,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-powerstore/v2/pkg/array"
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers"
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers/fs"
+	"github.com/dell/csmlog"
 	"github.com/dell/gobrick"
 	"github.com/dell/gopowerstore"
-	log "github.com/sirupsen/logrus"
+	"github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -47,7 +47,7 @@ const (
 
 // VolumeStager allows to node stage a volume
 type VolumeStager interface {
-	Stage(ctx context.Context, req *csi.NodeStageVolumeRequest, logFields log.Fields, fs fs.Interface, id string, isRemote bool, client gopowerstore.Client) (*csi.NodeStageVolumeResponse, error)
+	Stage(ctx context.Context, req *csi.NodeStageVolumeRequest, stagingPath string, nodeID string, logFields csmlog.Fields, fs fs.Interface, id string, isRemote bool, client gopowerstore.Client) (*csi.NodeStageVolumeResponse, error)
 }
 
 // ReachableEndPoint checks if the endpoint is reachable or not
@@ -63,13 +63,15 @@ type SCSIStager struct {
 }
 
 // Stage stages volume by connecting it through either FC or iSCSI and creating bind mount to staging path
-func (s *SCSIStager) Stage(ctx context.Context, req *csi.NodeStageVolumeRequest,
-	logFields log.Fields, fs fs.Interface, id string, isRemote bool, client gopowerstore.Client,
+func (s *SCSIStager) Stage(ctx context.Context, req *csi.NodeStageVolumeRequest, stagingPath string, nodeID string,
+	logFields csmlog.Fields, fs fs.Interface, id string, isRemote bool, client gopowerstore.Client,
 ) (*csi.NodeStageVolumeResponse, error) {
-	stagingPath := req.GetStagingTargetPath()
+	log := log.WithContext(ctx)
 	orginalContext := req.PublishContext
-	id, stagingPath = getStagingPath(ctx, stagingPath, id)
 	volume, err := client.GetVolume(ctx, id)
+	if err != nil {
+		return nil, err
+	}
 	targetMap := make(map[string]string)
 	err = s.AddTargetsInfoToMap(targetMap, volume.ApplianceID, client, isRemote)
 	if err != nil {
@@ -77,11 +79,29 @@ func (s *SCSIStager) Stage(ctx context.Context, req *csi.NodeStageVolumeRequest,
 	}
 
 	if !isRemote {
-		targetMap[identifiers.TargetMapDeviceWWN] = orginalContext[identifiers.TargetMapDeviceWWN]
-		targetMap[identifiers.TargetMapLUNAddress] = orginalContext[identifiers.TargetMapLUNAddress]
+		wwn, ok := orginalContext[identifiers.TargetMapDeviceWWN]
+		lun, ok := orginalContext[identifiers.TargetMapLUNAddress]
+		if !ok {
+			wwn = strings.TrimPrefix(volume.Wwn, identifiers.WWNPrefix)
+			lun, err = getLunAddressFromArray(ctx, client, id, nodeID)
+			if err != nil {
+				return nil, err
+			}
+		}
+		targetMap[identifiers.TargetMapDeviceWWN] = wwn
+		targetMap[identifiers.TargetMapLUNAddress] = lun
 	} else {
-		targetMap[identifiers.TargetMapRemoteDeviceWWN] = orginalContext[identifiers.TargetMapRemoteDeviceWWN]
-		targetMap[identifiers.TargetMapRemoteLUNAddress] = orginalContext[identifiers.TargetMapRemoteLUNAddress]
+		wwn, ok := orginalContext[identifiers.TargetMapRemoteDeviceWWN]
+		lun, ok := orginalContext[identifiers.TargetMapRemoteLUNAddress]
+		if !ok {
+			wwn = strings.TrimPrefix(volume.Wwn, identifiers.WWNPrefix)
+			lun, err = getLunAddressFromArray(ctx, client, id, nodeID)
+			if err != nil {
+				return nil, err
+			}
+		}
+		targetMap[identifiers.TargetMapRemoteDeviceWWN] = wwn
+		targetMap[identifiers.TargetMapRemoteLUNAddress] = lun
 	}
 
 	publishContext, err := readSCSIInfoFromPublishContext(targetMap, s.useFC, s.useNVME, isRemote)
@@ -102,7 +122,7 @@ func (s *SCSIStager) Stage(ctx context.Context, req *csi.NodeStageVolumeRequest,
 	logFields["WWN"] = publishContext.deviceWWN
 	logFields["Lun"] = publishContext.volumeLUNAddress
 	logFields["StagingPath"] = stagingPath
-	ctx = identifiers.SetLogFields(ctx, logFields)
+	ctx = csmlog.SetLogFields(ctx, logFields)
 
 	found, ready, err := isReadyToPublish(ctx, stagingPath, fs)
 	if err != nil {
@@ -112,8 +132,7 @@ func (s *SCSIStager) Stage(ctx context.Context, req *csi.NodeStageVolumeRequest,
 		log.WithFields(logFields).Info("device already staged")
 		return &csi.NodeStageVolumeResponse{}, nil
 	} else if found {
-		log.WithFields(logFields).Warning("volume found in staging path but it is not ready for publish," +
-			"try to unmount it and retry staging again")
+		log.WithFields(logFields).Warn("volume found in staging path but it is not ready for publish, try to unmount it and retry staging again")
 		_, err := unstageVolume(ctx, stagingPath, id, logFields, err, fs)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to unmount volume: %s", err.Error())
@@ -144,19 +163,39 @@ func (s *SCSIStager) Stage(ctx context.Context, req *csi.NodeStageVolumeRequest,
 	return &csi.NodeStageVolumeResponse{}, nil
 }
 
+func getLunAddressFromArray(ctx context.Context, client gopowerstore.Client, id string, nodeID string) (string, error) {
+	log := log.WithContext(ctx)
+	log.Infof("GetHostVolumeMappingByVolumeID for volId %s host %s", id, nodeID)
+	var node gopowerstore.Host
+	node, err := client.GetHostByName(ctx, nodeID)
+	if err != nil {
+		return "", status.Errorf(codes.Internal,
+			"failed to find host '%s' during staging: %s", nodeID, err.Error())
+	}
+	mapping, err := client.GetHostVolumeMappingByVolumeID(ctx, id)
+	if err != nil {
+		return "", status.Errorf(codes.Internal,
+			"failed to get mapping for volume with ID '%s' during staging: %s", id, err.Error())
+	}
+	for _, m := range mapping {
+		if m.HostID == node.ID {
+			lun := strconv.FormatInt(m.LogicalUnitNumber, 10)
+			return lun, nil
+		}
+	}
+	return "", status.Errorf(codes.Internal,
+		"failed to get LUN for volume with ID '%s' during staging", id)
+}
+
 // NFSStager implementation of NodeVolumeStager for NFS volumes
 type NFSStager struct {
 	array *array.PowerStoreArray
 }
 
 // Stage stages volume by mounting volumes as nfs to the staging path
-func (n *NFSStager) Stage(ctx context.Context, req *csi.NodeStageVolumeRequest,
-	logFields log.Fields, fs fs.Interface, id string, _ bool, _ gopowerstore.Client,
+func (n *NFSStager) Stage(ctx context.Context, req *csi.NodeStageVolumeRequest, stagingPath string, _ string,
+	logFields csmlog.Fields, fs fs.Interface, id string, _ bool, _ gopowerstore.Client,
 ) (*csi.NodeStageVolumeResponse, error) {
-	stagingPath := req.GetStagingTargetPath()
-
-	id, stagingPath = getStagingPath(ctx, stagingPath, id)
-
 	hostIP := req.PublishContext[identifiers.KeyHostIP]
 	exportID := req.PublishContext[identifiers.KeyExportID]
 	nfsExport := req.PublishContext[identifiers.KeyNfsExportPath]
@@ -177,7 +216,7 @@ func (n *NFSStager) Stage(ctx context.Context, req *csi.NodeStageVolumeRequest,
 	logFields["NatIP"] = natIP
 	logFields["NFSv4ACLs"] = req.PublishContext[identifiers.KeyNfsACL]
 	logFields["NasName"] = nasName
-	ctx = identifiers.SetLogFields(ctx, logFields)
+	log := log.WithContext(ctx).WithFields(logFields)
 
 	found, err := isReadyToPublishNFS(ctx, stagingPath, fs)
 	if err != nil {
@@ -185,7 +224,7 @@ func (n *NFSStager) Stage(ctx context.Context, req *csi.NodeStageVolumeRequest,
 	}
 
 	if found {
-		log.WithFields(logFields).Info("device already staged")
+		log.Info("device already staged")
 		return &csi.NodeStageVolumeResponse{}, nil
 	}
 
@@ -193,7 +232,7 @@ func (n *NFSStager) Stage(ctx context.Context, req *csi.NodeStageVolumeRequest,
 		return nil, status.Errorf(codes.Internal,
 			"can't create target folder %s: %s", stagingPath, err.Error())
 	}
-	log.WithFields(logFields).Info("stage path successfully created")
+	log.Info("stage path successfully created")
 
 	mntFlags := identifiers.GetMountFlags(req.GetVolumeCapability())
 	if err := fs.GetUtil().Mount(ctx, nfsExport, stagingPath, "", mntFlags...); err != nil {
@@ -216,7 +255,7 @@ func (n *NFSStager) Stage(ctx context.Context, req *csi.NodeStageVolumeRequest,
 			if err == nil {
 				mode = os.FileMode(perm) // #nosec: G115 false positive
 			} else {
-				log.WithFields(logFields).Warn("can't parse file mode, invalid mode specified. Default mode permissions will be set.")
+				log.Warn("can't parse file mode, invalid mode specified. Default mode permissions will be set.")
 			}
 		} else {
 			aclsConfigured, err = validateAndSetACLs(ctx, &NFSv4ACLs{}, nasName, n.array.GetClient(), acls, filepath.Join(stagingPath, commonNfsVolumeFolder))
@@ -234,12 +273,14 @@ func (n *NFSStager) Stage(ctx context.Context, req *csi.NodeStageVolumeRequest,
 	}
 
 	if allowRoot == "false" {
-		log.WithFields(logFields).Info("removing allow root from nfs export")
+		log.Info("removing allow root from nfs export")
 		var hostsToRemove []string
 		var hostsToAdd []string
 
-		hostsToRemove = append(hostsToRemove, hostIP+"/255.255.255.255")
-		hostsToAdd = append(hostsToAdd, hostIP)
+		if hostIP != "" {
+			hostsToRemove = append(hostsToRemove, hostIP+"/255.255.255.255")
+			hostsToAdd = append(hostsToAdd, hostIP)
+		}
 
 		if natIP != "" {
 			hostsToRemove = append(hostsToRemove, natIP)
@@ -258,7 +299,7 @@ func (n *NFSStager) Stage(ctx context.Context, req *csi.NodeStageVolumeRequest,
 		}
 	}
 
-	log.WithFields(logFields).Info("nfs share successfully mounted")
+	log.Info("nfs share successfully mounted")
 	return &csi.NodeStageVolumeResponse{}, nil
 }
 
@@ -415,11 +456,11 @@ func readFCTargetsFromPublishContext(pc map[string]string, isRemote bool) []gobr
 }
 
 func (s *SCSIStager) connectDevice(ctx context.Context, data scsiPublishContextData) (string, error) {
-	logFields := identifiers.GetLogFields(ctx)
+	log := log.WithContext(ctx)
 	var err error
 	lun, err := strconv.Atoi(data.volumeLUNAddress)
 	if err != nil {
-		log.WithFields(logFields).Errorf("failed to convert lun number to int: %s", err.Error())
+		log.Errorf("failed to convert lun number to int: %s", err.Error())
 		return "", status.Errorf(codes.Internal,
 			"failed to convert lun number to int: %s", err.Error())
 	}
@@ -434,7 +475,7 @@ func (s *SCSIStager) connectDevice(ctx context.Context, data scsiPublishContextD
 	}
 
 	if err != nil {
-		log.WithFields(logFields).Errorf("Unable to find device after multiple discovery attempts: %s", err.Error())
+		log.Errorf("Unable to find device after multiple discovery attempts: %s", err.Error())
 		return "", status.Errorf(codes.Internal,
 			"unable to find device after multiple discovery attempts: %s", err.Error())
 	}
@@ -445,7 +486,7 @@ func (s *SCSIStager) connectDevice(ctx context.Context, data scsiPublishContextD
 func (s *SCSIStager) connectISCSIDevice(ctx context.Context,
 	lun int, data scsiPublishContextData,
 ) (gobrick.Device, error) {
-	logFields := identifiers.GetLogFields(ctx)
+	logFields := csmlog.ExtractFieldsFromContext(ctx)
 	var targets []gobrick.ISCSITargetInfo
 	for _, t := range data.iscsiTargets {
 		targets = append(targets, gobrick.ISCSITargetInfo{Target: t.Target, Portal: t.Portal})
@@ -454,7 +495,7 @@ func (s *SCSIStager) connectISCSIDevice(ctx context.Context,
 	connectorCtx, cFunc := context.WithTimeout(context.Background(), time.Second*120)
 	defer cFunc()
 
-	connectorCtx = identifiers.SetLogFields(connectorCtx, logFields)
+	connectorCtx = csmlog.SetLogFields(connectorCtx, logFields)
 	return s.iscsiConnector.ConnectVolume(connectorCtx, gobrick.ISCSIVolumeInfo{
 		Targets: targets,
 		Lun:     lun,
@@ -464,7 +505,7 @@ func (s *SCSIStager) connectISCSIDevice(ctx context.Context,
 func (s *SCSIStager) connectNVMEDevice(ctx context.Context,
 	wwn string, data scsiPublishContextData, useFC bool,
 ) (gobrick.Device, error) {
-	logFields := identifiers.GetLogFields(ctx)
+	logFields := csmlog.ExtractFieldsFromContext(ctx)
 	var targets []gobrick.NVMeTargetInfo
 
 	if useFC {
@@ -480,7 +521,7 @@ func (s *SCSIStager) connectNVMEDevice(ctx context.Context,
 	connectorCtx, cFunc := context.WithTimeout(context.Background(), time.Second*120)
 	defer cFunc()
 
-	connectorCtx = identifiers.SetLogFields(connectorCtx, logFields)
+	connectorCtx = csmlog.SetLogFields(connectorCtx, logFields)
 	return s.nvmeConnector.ConnectVolume(connectorCtx, gobrick.NVMeVolumeInfo{
 		Targets: targets,
 		WWN:     wwn,
@@ -490,7 +531,7 @@ func (s *SCSIStager) connectNVMEDevice(ctx context.Context,
 func (s *SCSIStager) connectFCDevice(ctx context.Context,
 	lun int, data scsiPublishContextData,
 ) (gobrick.Device, error) {
-	logFields := identifiers.GetLogFields(ctx)
+	logFields := csmlog.ExtractFieldsFromContext(ctx)
 	var targets []gobrick.FCTargetInfo
 
 	for _, t := range data.fcTargets {
@@ -500,7 +541,7 @@ func (s *SCSIStager) connectFCDevice(ctx context.Context,
 	connectorCtx, cFunc := context.WithTimeout(context.Background(), time.Second*120)
 	defer cFunc()
 
-	connectorCtx = identifiers.SetLogFields(connectorCtx, logFields)
+	connectorCtx = csmlog.SetLogFields(connectorCtx, logFields)
 	return s.fcConnector.ConnectVolume(connectorCtx, gobrick.FCVolumeInfo{
 		Targets: targets,
 		Lun:     lun,
@@ -508,18 +549,18 @@ func (s *SCSIStager) connectFCDevice(ctx context.Context,
 }
 
 func isReadyToPublish(ctx context.Context, stagingPath string, fs fs.Interface) (bool, bool, error) {
-	logFields := identifiers.GetLogFields(ctx)
+	log := log.WithContext(ctx)
 	stageInfo, found, err := getTargetMount(ctx, stagingPath, fs)
 	if err != nil {
 		return found, false, err
 	}
 	if !found {
-		log.WithFields(logFields).Warning("staged device not found")
+		log.Warn("staged device not found")
 		return found, false, nil
 	}
 
 	if strings.HasSuffix(stageInfo.Source, "deleted") {
-		log.WithFields(logFields).Warning("staged device linked with deleted path")
+		log.Warn("staged device linked with deleted path")
 		return found, false, nil
 	}
 
@@ -531,18 +572,18 @@ func isReadyToPublish(ctx context.Context, stagingPath string, fs fs.Interface) 
 }
 
 func isReadyToPublishNFS(ctx context.Context, stagingPath string, fs fs.Interface) (bool, error) {
-	logFields := identifiers.GetLogFields(ctx)
+	log := log.WithContext(ctx)
 	stageInfo, found, err := getTargetMount(ctx, stagingPath, fs)
 	if err != nil {
 		return found, err
 	}
 	if !found {
-		log.WithFields(logFields).Warning("staged device not found")
+		log.Warn("staged device not found")
 		return found, nil
 	}
 
 	if strings.HasSuffix(stageInfo.Source, "deleted") {
-		log.WithFields(logFields).Warning("staged device linked with deleted path")
+		log.Warn("staged device linked with deleted path")
 		return found, nil
 	}
 
@@ -571,7 +612,7 @@ func (s *SCSIStager) AddTargetsInfoToMap(
 
 	iscsiTargetsInfo, err := identifiers.GetISCSITargetsInfoFromStorage(client, volumeApplianceID)
 	if err != nil {
-		log.Error("error unable to get iSCSI targets from array", err)
+		log.Errorf("error unable to get iSCSI targets from array %s", err.Error())
 	}
 	for i, t := range iscsiTargetsInfo {
 		targetMap[fmt.Sprintf("%s%d", iscsiPortalsKey, i)] = t.Portal
@@ -579,7 +620,7 @@ func (s *SCSIStager) AddTargetsInfoToMap(
 	}
 	fcTargetsInfo, err := identifiers.GetFCTargetsInfoFromStorage(client, volumeApplianceID)
 	if err != nil {
-		log.Error("error unable to get FC targets from array", err)
+		log.Errorf("error unable to get FC targets from array %s", err.Error())
 	}
 	for i, t := range fcTargetsInfo {
 		targetMap[fmt.Sprintf("%s%d", fcWwpnKey, i)] = t.WWPN
@@ -587,7 +628,7 @@ func (s *SCSIStager) AddTargetsInfoToMap(
 
 	nvmefcTargetInfo, err := identifiers.GetNVMEFCTargetInfoFromStorage(client, volumeApplianceID)
 	if err != nil {
-		log.Error("error unable to get NVMeFC targets from array", err)
+		log.Errorf("error unable to get NVMeFC targets from array %s", err.Error())
 	}
 	for i, t := range nvmefcTargetInfo {
 		targetMap[fmt.Sprintf("%s%d", nvmeFcPortalsKey, i)] = t.Portal
@@ -596,7 +637,7 @@ func (s *SCSIStager) AddTargetsInfoToMap(
 
 	nvmetcpTargetInfo, err := identifiers.GetNVMETCPTargetsInfoFromStorage(client, volumeApplianceID)
 	if err != nil {
-		log.Error("error unable to get NVMeTCP targets from array", err)
+		log.Errorf("error unable to get NVMeTCP targets from array %s", err.Error())
 	}
 	for i, t := range nvmetcpTargetInfo {
 		targetMap[fmt.Sprintf("%s%d", nvmeTCPPortalsKey, i)] = t.Portal

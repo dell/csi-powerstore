@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2021-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,14 +29,13 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers"
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers/fs"
-	"github.com/dell/csm-sharednfs/nfs"
+	"github.com/dell/csmlog"
 	"github.com/dell/gobrick"
 	csictx "github.com/dell/gocsi/context"
 	"github.com/dell/gofsutil"
-	log "github.com/sirupsen/logrus"
+	"github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -78,6 +77,7 @@ type NVMEConnector interface {
 type FcConnector interface {
 	ConnectVolume(ctx context.Context, info gobrick.FCVolumeInfo) (gobrick.Device, error)
 	DisconnectVolumeByDeviceName(ctx context.Context, name string) error
+	DisconnectVolumeByWWN(ctx context.Context, wwn string) error
 	GetInitiatorPorts(ctx context.Context) ([]string, error)
 }
 
@@ -141,7 +141,7 @@ func getNodeOptions() Opts {
 		if v, ok := csictx.LookupEnv(ctx, n); ok {
 			b, err := strconv.ParseBool(v)
 			if err != nil {
-				log.WithField(n, v).Debug("invalid boolean value. defaulting to false")
+				log.WithFields(csmlog.Fields{n: v}).Debug("invalid boolean value. defaulting to false")
 				return false
 			}
 			return b
@@ -212,20 +212,17 @@ func getStagedDev(ctx context.Context, stagePath string, fs fs.Interface) (strin
 }
 
 func getStagingPath(ctx context.Context, sp string, volID string) (string, string) {
-	if nfs.IsNFSVolumeID(volID) {
-		return nfs.ToArrayVolumeID(volID), sp
-	}
-	logFields := identifiers.GetLogFields(ctx)
+	log := log.WithContext(ctx)
 	if sp == "" || volID == "" {
 		return volID, sp
 	}
 	stagingPath := path.Join(sp, volID)
-	log.WithFields(logFields).Infof("staging path is: %s", stagingPath)
+	log.Infof("staging path is: %s", stagingPath)
 	return volID, path.Join(sp, volID)
 }
 
 func getRemnantTargetMounts(ctx context.Context, target string, fs fs.Interface) ([]gofsutil.Info, bool, error) {
-	logFields := identifiers.GetLogFields(ctx)
+	log := log.WithContext(ctx)
 	var targetMounts []gofsutil.Info
 	var found bool
 	mounts, err := getMounts(ctx, fs)
@@ -236,7 +233,7 @@ func getRemnantTargetMounts(ctx context.Context, target string, fs fs.Interface)
 	for _, mount := range mounts {
 		if strings.Contains(mount.Path, target) {
 			targetMounts = append(targetMounts, mount)
-			log.WithFields(logFields).Infof("matching remnantTargetMount %s target %s", target, mount.Path)
+			log.Infof("matching remnantTargetMount %s target %s", target, mount.Path)
 			found = true
 		}
 	}
@@ -244,7 +241,7 @@ func getRemnantTargetMounts(ctx context.Context, target string, fs fs.Interface)
 }
 
 func getTargetMount(ctx context.Context, target string, fs fs.Interface) (gofsutil.Info, bool, error) {
-	logFields := identifiers.GetLogFields(ctx)
+	log := log.WithContext(ctx)
 	var targetMount gofsutil.Info
 	var found bool
 	mounts, err := getMounts(ctx, fs)
@@ -256,7 +253,7 @@ func getTargetMount(ctx context.Context, target string, fs fs.Interface) (gofsut
 	for _, mount := range mounts {
 		if mount.Path == target {
 			targetMount = mount
-			log.WithFields(logFields).Infof("matching targetMount %s target %s",
+			log.Infof("matching targetMount %s target %s",
 				target, mount.Path)
 			found = true
 			break
@@ -359,12 +356,13 @@ func getRWModeString(isRO bool) string {
 	return "rw"
 }
 
-func format(_ context.Context, source, fsType string, fs fs.Interface, opts ...string) error {
-	f := log.Fields{
+func format(ctx context.Context, source, fsType string, fs fs.Interface, opts ...string) error {
+	f := csmlog.Fields{
 		"source":  source,
 		"fsType":  fsType,
 		"options": opts,
 	}
+	log := log.WithContext(ctx).WithFields(f)
 
 	// Use 'ext4' as the default
 	if fsType == "" {
@@ -379,10 +377,10 @@ func format(_ context.Context, source, fsType string, fs fs.Interface, opts ...s
 	}
 	mkfsArgs = append(mkfsArgs, opts...)
 
-	log.WithFields(f).Infof("formatting with command: %s %v", mkfsCmd, mkfsArgs)
+	log.Infof("formatting with command: %s %v", mkfsCmd, mkfsArgs)
 	out, err := fs.ExecCommand(mkfsCmd, mkfsArgs...)
 	if err != nil {
-		log.WithFields(f).WithError(err).Errorf("formatting disk failed, output: %q", string(out))
+		log.Errorf("formatting disk failed with error: %s, output: %q", err.Error(), string(out))
 		return errors.New(string(out))
 	}
 

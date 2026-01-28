@@ -21,10 +21,9 @@ package mocks
 import (
 	context "context"
 
-	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	fs "github.com/dell/csi-powerstore/v2/pkg/identifiers/fs"
-
-	logrus "github.com/sirupsen/logrus"
+	"github.com/dell/csmlog"
+	csi "github.com/container-storage-interface/spec/lib/go/csi"
 
 	mock "github.com/stretchr/testify/mock"
 )
@@ -35,11 +34,11 @@ type NodeVolumeStager struct {
 }
 
 // Stage provides a mock function with given fields: ctx, req, logFields, _a3, id
-func (_m *NodeVolumeStager) Stage(ctx context.Context, req *csi.NodeStageVolumeRequest, logFields logrus.Fields, _a3 fs.Interface, id string) (*csi.NodeStageVolumeResponse, error) {
+func (_m *NodeVolumeStager) Stage(ctx context.Context, req *csi.NodeStageVolumeRequest, logFields csmlog.Fields, _a3 fs.Interface, id string) (*csi.NodeStageVolumeResponse, error) {
 	ret := _m.Called(ctx, req, logFields, _a3, id)
 
 	var r0 *csi.NodeStageVolumeResponse
-	if rf, ok := ret.Get(0).(func(context.Context, *csi.NodeStageVolumeRequest, logrus.Fields, fs.Interface, string) *csi.NodeStageVolumeResponse); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *csi.NodeStageVolumeRequest, csmlog.Fields, fs.Interface, string) *csi.NodeStageVolumeResponse); ok {
 		r0 = rf(ctx, req, logFields, _a3, id)
 	} else {
 		if ret.Get(0) != nil {
@@ -48,7 +47,7 @@ func (_m *NodeVolumeStager) Stage(ctx context.Context, req *csi.NodeStageVolumeR
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, *csi.NodeStageVolumeRequest, logrus.Fields, fs.Interface, string) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *csi.NodeStageVolumeRequest, csmlog.Fields, fs.Interface, string) error); ok {
 		r1 = rf(ctx, req, logFields, _a3, id)
 	} else {
 		r1 = ret.Error(1)

@@ -13,33 +13,33 @@
 # some arguments that must be supplied
 ARG GOIMAGE
 ARG BASEIMAGE
+ARG VERSION="2.16.0"
 
 # Stage to build the driver
 FROM $GOIMAGE as builder
+ARG VERSION
 
-WORKDIR /workspace
-COPY . .
+RUN mkdir -p /go/src/csi-powerstore
+COPY ./ /go/src/csi-powerstore
 
-RUN go generate ./cmd/csi-powerstore
-RUN GOOS=linux CGO_ENABLED=0 go build -o csi-powerstore ./cmd/csi-powerstore
+WORKDIR /go/src/csi-powerstore
+RUN make build IMAGE_VERSION=$VERSION && \
+    rm -rf /go/src/csi-powerstore/vendor
 
 # Stage to build the driver image
 FROM $BASEIMAGE
+ARG VERSION
 WORKDIR /
 LABEL vendor="Dell Technologies" \
       maintainer="Dell Technologies" \
       name="csi-powerstore" \
       summary="CSI Driver for Dell EMC PowerStore" \
       description="CSI Driver for provisioning persistent storage from Dell EMC PowerStore" \
-      release="1.15.0" \
-      version="2.15.0" \
+      release="1.16.0" \
+      version=$VERSION \
       license="Apache-2.0"
 COPY licenses /licenses
 
-# validate some cli utilities are found
-RUN which mkfs.ext4
-RUN which mkfs.xfs
-RUN echo "export PATH=$PATH:/sbin:/bin" > /etc/profile.d/ubuntu_path.sh
+COPY --from=builder /go/src/csi-powerstore/csi-powerstore /csi-powerstore
 
-COPY --from=builder /workspace/csi-powerstore /
 ENTRYPOINT ["/csi-powerstore"]

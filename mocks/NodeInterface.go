@@ -29,9 +29,9 @@ import (
 	context "context"
 	reflect "reflect"
 
-	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	array "github.com/dell/csi-powerstore/v2/pkg/array"
 	fs "github.com/dell/csi-powerstore/v2/pkg/identifiers/fs"
+	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	gomock "go.uber.org/mock/gomock"
 )
 

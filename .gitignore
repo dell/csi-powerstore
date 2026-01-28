@@ -3,11 +3,15 @@
 semver.mk
 vars.mk
 Dockerfile-debug
+go-code-tester*
+csm-common.mk
+*coverage*.txt
 
 # test directories and artifacts
 service/c.out
 service/test/
 vendor
+**/test-data*
 
 # IDE
 .idea
@@ -27,4 +31,6 @@ gosecresults.csv
 
 # logs
 *.log
+
+vendor/
 

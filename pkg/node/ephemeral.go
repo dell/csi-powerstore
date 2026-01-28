@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2021-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,7 +27,6 @@ import (
 	"strconv"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -54,6 +53,7 @@ func (s *Service) ephemeralNodePublish(
 	req *csi.NodePublishVolumeRequest) (
 	*csi.NodePublishVolumeResponse, error,
 ) {
+	log := log.WithContext(ctx)
 	if _, err := s.Fs.Stat(ephemeralStagingMountPath); os.IsNotExist(err) {
 		log.Debug("path does not exists")
 		err = s.Fs.MkdirAll(ephemeralStagingMountPath, 0o750)
@@ -162,6 +162,7 @@ func (s *Service) ephemeralNodeUnpublish(
 	ctx context.Context,
 	req *csi.NodeUnpublishVolumeRequest,
 ) error {
+	log := log.WithContext(ctx)
 	volID := req.GetVolumeId()
 	if volID == "" {
 		return status.Error(codes.InvalidArgument, "volume ID is required")
@@ -179,7 +180,7 @@ func (s *Service) ephemeralNodeUnpublish(
 		StagingTargetPath: stagingPath,
 	})
 	if err != nil {
-		log.Info(err)
+		log.Info(err.Error())
 		return status.Error(codes.Internal, "Inline ephemeral node unstage unpublish failed")
 	}
 	log.Info("Calling unpublish")

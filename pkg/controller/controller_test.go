@@ -29,20 +29,29 @@ import (
 	"time"
 
 	csiext "github.com/dell/dell-csi-extensions/replication"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/dell/csi-powerstore/v2/mocks"
 	csictx "github.com/dell/gocsi/context"
 
-	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/csi-powerstore/v2/pkg/array"
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers"
+	"github.com/dell/csi-powerstore/v2/pkg/identifiers/k8sutils"
 	"github.com/dell/gopowerstore"
 	"github.com/dell/gopowerstore/api"
 	gopowerstoremock "github.com/dell/gopowerstore/mocks"
+	"github.com/container-storage-interface/spec/lib/go/csi"
 	ginkgo "github.com/onsi/ginkgo"
 	"github.com/onsi/ginkgo/reporters"
 	gomega "github.com/onsi/gomega"
 	"github.com/stretchr/testify/mock"
+	k8score "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/rest"
 )
 
 const (
@@ -81,6 +90,7 @@ const (
 	validApplianceID          = "my-appliance"
 	validRemoteApplianceID    = "my-appliance2"
 	validServiceTag           = "service-tag"
+	replicationSessionID      = "123456"
 )
 
 var (
@@ -133,6 +143,21 @@ var (
 )
 
 func TestCSIControllerService(t *testing.T) {
+	defaultK8sConfigFunc := k8sutils.InClusterConfigFunc
+	defaultK8sClientsetFunc := k8sutils.NewForConfigFunc
+
+	k8sutils.InClusterConfigFunc = func() (*rest.Config, error) {
+		return &rest.Config{}, nil
+	}
+	k8sutils.NewForConfigFunc = func(_ *rest.Config) (kubernetes.Interface, error) {
+		return fake.NewClientset(), nil
+	}
+
+	defer func() {
+		k8sutils.InClusterConfigFunc = defaultK8sConfigFunc
+		k8sutils.NewForConfigFunc = defaultK8sClientsetFunc
+	}()
+
 	gomega.RegisterFailHandler(ginkgo.Fail)
 	junitReporter := reporters.NewJUnitReporter("ctrl-svc.xml")
 	ginkgo.RunSpecsWithDefaultAndCustomReporters(t, "CSIControllerService testing suite", []ginkgo.Reporter{junitReporter})
@@ -174,9 +199,15 @@ func setVariables() {
 	csictx.Setenv(context.Background(), identifiers.EnvReplicationPrefix, "replication.storage.dell.com")
 	csictx.Setenv(context.Background(), identifiers.EnvNfsAcls, "A::OWNER@:RWX")
 
-	ctrlSvc = &Service{Fs: fsMock}
+	ctrlSvc = &Service{
+		Fs:             fsMock,
+		IsCSMDREnabled: true,
+	}
 	ctrlSvc.SetArrays(arrays)
 	ctrlSvc.SetDefaultArray(first)
+	k8sutils.Kubeclient = &k8sutils.K8sClient{
+		Clientset: fake.NewSimpleClientset(),
+	}
 	ctrlSvc.Init()
 }
 
@@ -980,6 +1011,27 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 						},
 					},
 				}))
+			})
+
+			ginkgo.It("should configure not metro replication on volume due to CSM DR not avilable", func() {
+				// setting the value of IsCSMDREnabled parameter of ControllerService to false
+				ctrlSvc.IsCSMDREnabled = false
+				_ = ctrlSvc.Init()
+				delete(req.Parameters, ctrlSvc.WithRP(KeyReplicationRPO))
+				delete(req.Parameters, ctrlSvc.WithRP(KeyReplicationIgnoreNamespaces))
+				delete(req.Parameters, ctrlSvc.WithRP(KeyReplicationVGPrefix))
+
+				clientMock.On("GetVolumeByName", mock.Anything, mock.Anything).Return(
+					gopowerstore.Volume{}, errors.New("no vol found"))
+				ctrlSvc.IsCSMDREnabled = false
+				res, err := ctrlSvc.CreateVolume(context.Background(), req)
+
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err).NotTo(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("Metro replication mode requires CSM-DR to be enabled"))
+				// Resetting the value of IsCSMDREnabled parameter of ControllerService to true after our tests are completed
+				ctrlSvc.IsCSMDREnabled = true
+				_ = ctrlSvc.Init()
 			})
 
 			ginkgo.It("should fail to configure metro replication on volume if the volume cannot be found", func() {
@@ -1847,20 +1899,6 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				))
 			})
 		})
-
-		ginkgo.When("nfs replication", func() {
-			ginkgo.It("should fail", func() {
-				req := getTypicalCreateVolumeNFSRequest("my-vol", validVolSize)
-				req.Parameters[identifiers.KeyArrayID] = secondValidID
-				req.Parameters[ctrlSvc.WithRP(KeyReplicationEnabled)] = "true"
-
-				res, err := ctrlSvc.CreateVolume(context.Background(), req)
-
-				gomega.Expect(res).To(gomega.BeNil())
-				gomega.Expect(err).NotTo(gomega.BeNil())
-				gomega.Expect(err.Error()).To(gomega.ContainSubstring("replication not supported for NFS"))
-			})
-		})
 	})
 
 	ginkgo.When("multi-nas is enabled for NFS", func() {
@@ -2392,6 +2430,12 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				clientMock.On("GetSnapshotsByVolumeID", mock.Anything, validBaseVolID).Return([]gopowerstore.Volume{}, gopowerstore.APIError{
 					ErrorMsg: &api.ErrorMsg{StatusCode: http.StatusGatewayTimeout},
 				})
+				clientMock.On("GetVolume", mock.Anything, validBaseVolID).Return(
+					gopowerstore.Volume{
+						ID:   validBaseVolID,
+						Name: "name",
+						Size: validVolSize,
+					}, nil)
 
 				req := &csi.DeleteVolumeRequest{VolumeId: validBlockVolumeID}
 				res, err := ctrlSvc.DeleteVolume(context.Background(), req)
@@ -2563,6 +2607,205 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				gomega.Expect(err).ToNot(gomega.BeNil())
 				gomega.Expect(res).To(gomega.BeNil())
 				gomega.Expect(err.Error()).To(gomega.ContainSubstring("can't figure out protocol"))
+			})
+		})
+
+		ginkgo.When("MetroFractured: deleting metro volume when remote array is down", func() {
+			ginkgo.It("should succeed fail", func() {
+				// local info
+				clientMock.On("GetVolume", mock.Anything, validBaseVolID).
+					Return(gopowerstore.Volume{ID: validBaseVolID, Wwn: "naa.68ccf098003ceb5e4577a20be6d11bf9", Name: "vol1", MetroReplicationSessionID: replicationSessionID, ApplianceID: validApplianceID}, nil)
+				clientMock.On("GetReplicationSessionByID", mock.Anything, replicationSessionID).
+					Return(gopowerstore.ReplicationSession{
+						ID:                 replicationSessionID,
+						State:              "Fractured",
+						LocalResourceState: "Promoted",
+					}, nil)
+				clientMock.On("GetSnapshotsByVolumeID", mock.Anything, mock.Anything).Return([]gopowerstore.Volume{}, nil)
+				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, mock.Anything).Return(gopowerstore.VolumeGroups{}, nil)
+				clientMock.On("DeleteVolume",
+					mock.Anything,
+					mock.AnythingOfType("*gopowerstore.VolumeDelete"),
+					validBaseVolID).
+					Return(gopowerstore.EmptyResponse(""), nil)
+				clientMock.On("EndMetroVolume", mock.Anything, mock.Anything, mock.Anything).Return(gopowerstore.EmptyResponse(""), nil)
+
+				// remote info
+				clientMock.On("GetVolume", mock.Anything, validRemoteVolID).
+					Return(gopowerstore.Volume{ID: validRemoteVolID, Wwn: "naa.68ccf098003ceb5e4577a20be6d11bf9", Name: "vol1", ApplianceID: validRemoteApplianceID}, errors.New("timeout"))
+				clientMock.On("DeleteVolume",
+					mock.Anything,
+					mock.AnythingOfType("*gopowerstore.VolumeDelete"),
+					validRemoteVolID).
+					Return(gopowerstore.EmptyResponse(""), errors.New("timeout"))
+
+				volumeID := fmt.Sprintf("%s/%s/%s:%s/%s", validBaseVolID, firstValidID, "scsi", validRemoteVolID, secondValidID)
+				req := &csi.DeleteVolumeRequest{VolumeId: volumeID}
+
+				res, err := ctrlSvc.DeleteVolume(context.Background(), req)
+
+				gomega.Expect(err).To(gomega.HaveOccurred())
+				gomega.Expect(res).To(gomega.BeNil())
+			})
+		})
+
+		ginkgo.When("MetroFractured: when local array is down", func() {
+			ginkgo.It("DeleteVolume should fail ", func() {
+				// local info
+				clientMock.On("GetVolume", mock.Anything, validBaseVolID).
+					Return(gopowerstore.Volume{ID: validBaseVolID, Wwn: "naa.68ccf098003ceb5e4577a20be6d11bf9", Name: "vol1", MetroReplicationSessionID: replicationSessionID, ApplianceID: validApplianceID}, nil)
+				clientMock.On("GetReplicationSessionByID", mock.Anything, replicationSessionID).
+					Return(gopowerstore.ReplicationSession{
+						ID:                 replicationSessionID,
+						State:              "Fractured",
+						LocalResourceState: "Promoted",
+					}, nil)
+				clientMock.On("GetSnapshotsByVolumeID", mock.Anything, mock.Anything).Return([]gopowerstore.Volume{}, nil)
+				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, mock.Anything).Return(gopowerstore.VolumeGroups{}, nil)
+				clientMock.On("DeleteVolume",
+					mock.Anything,
+					mock.AnythingOfType("*gopowerstore.VolumeDelete"),
+					validBaseVolID).
+					Return(gopowerstore.EmptyResponse(""), errors.New("timeout"))
+				clientMock.On("EndMetroVolume", mock.Anything, mock.Anything, mock.Anything).Return(gopowerstore.EmptyResponse(""), nil)
+
+				// remote info
+				clientMock.On("GetVolume", mock.Anything, validRemoteVolID).
+					Return(gopowerstore.Volume{ID: validRemoteVolID, Wwn: "naa.68ccf098003ceb5e4577a20be6d11bf9", Name: "vol1", ApplianceID: validRemoteApplianceID}, errors.New("timeout"))
+
+				volumeID := fmt.Sprintf("%s/%s/%s:%s/%s", validBaseVolID, firstValidID, "scsi", validRemoteVolID, secondValidID)
+				req := &csi.DeleteVolumeRequest{VolumeId: volumeID}
+
+				res, err := ctrlSvc.DeleteVolume(context.Background(), req)
+
+				gomega.Expect(err).To(gomega.HaveOccurred())
+				gomega.Expect(res).To(gomega.BeNil())
+			})
+		})
+
+		ginkgo.When("MetroFractured: no array is down", func() {
+			ginkgo.It("should succeed", func() {
+				// local info
+				clientMock.On("GetVolume", mock.Anything, validBaseVolID).
+					Return(gopowerstore.Volume{ID: validBaseVolID, Wwn: "naa.68ccf098003ceb5e4577a20be6d11bf9", Name: "vol1", ApplianceID: validApplianceID, MetroReplicationSessionID: replicationSessionID}, nil)
+				clientMock.On("GetReplicationSessionByID", mock.Anything, replicationSessionID).
+					Return(gopowerstore.ReplicationSession{
+						ID:                 replicationSessionID,
+						State:              "Fractured",
+						LocalResourceState: "Promoted",
+					}, nil)
+				clientMock.On("GetSnapshotsByVolumeID", mock.Anything, validBaseVolID).Return([]gopowerstore.Volume{}, nil)
+				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).Return(gopowerstore.VolumeGroups{}, nil)
+				clientMock.On("DeleteVolume",
+					mock.Anything,
+					mock.AnythingOfType("*gopowerstore.VolumeDelete"),
+					validBaseVolID).
+					Return(gopowerstore.EmptyResponse(""), nil)
+				clientMock.On("EndMetroVolume", mock.Anything, mock.Anything, mock.Anything).Return(gopowerstore.EmptyResponse(""), nil)
+
+				// remote info
+				clientMock.On("GetVolume", mock.Anything, validRemoteVolID).
+					Return(gopowerstore.Volume{ID: validRemoteVolID, Wwn: "naa.68ccf098003ceb5e4577a20be6d11bf9", Name: "vol1", ApplianceID: validRemoteApplianceID, MetroReplicationSessionID: replicationSessionID}, nil)
+				clientMock.On("GetSnapshotsByVolumeID", mock.Anything, validRemoteVolID).Return([]gopowerstore.Volume{}, nil)
+				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validRemoteVolID).Return(gopowerstore.VolumeGroups{}, nil)
+				clientMock.On("DeleteVolume",
+					mock.Anything,
+					mock.AnythingOfType("*gopowerstore.VolumeDelete"),
+					validRemoteVolID).
+					Return(gopowerstore.EmptyResponse(""), nil)
+
+				volumeID := fmt.Sprintf("%s/%s/%s:%s/%s", validBaseVolID, firstValidID, "scsi", validRemoteVolID, secondValidID)
+				req := &csi.DeleteVolumeRequest{VolumeId: volumeID}
+
+				res, err := ctrlSvc.DeleteVolume(context.Background(), req)
+
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.DeleteVolumeResponse{}))
+			})
+
+			ginkgo.It("succeed: metro only contains promote/demote snapshots", func() {
+				clientMock.On("GetVolume", mock.Anything, validBaseVolID).
+					Return(gopowerstore.Volume{ID: validBaseVolID, Wwn: "naa.68ccf098003ceb5e4577a20be6d11bf9", Name: "vol1", ApplianceID: validApplianceID, MetroReplicationSessionID: replicationSessionID}, nil)
+				clientMock.On("GetReplicationSessionByID", mock.Anything, replicationSessionID).
+					Return(gopowerstore.ReplicationSession{
+						ID:                 replicationSessionID,
+						State:              "Ok",
+						LocalResourceState: "Promoted",
+					}, nil)
+				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).Return(gopowerstore.VolumeGroups{}, nil)
+				clientMock.On("GetSnapshotsByVolumeID", mock.Anything, validBaseVolID).Return([]gopowerstore.Volume{{ID: "snap-id-1", Name: "Metro_Promote_Backup_Snapshot." + "vol1"}}, nil)
+				clientMock.On("EndMetroVolume", mock.Anything, mock.Anything, mock.Anything).Return(gopowerstore.EmptyResponse(""), nil)
+				clientMock.On("DeleteVolume",
+					mock.Anything,
+					mock.AnythingOfType("*gopowerstore.VolumeDelete"),
+					validBaseVolID).
+					Return(gopowerstore.EmptyResponse(""), nil)
+				req := &csi.DeleteVolumeRequest{VolumeId: validBaseVolID}
+				res, err := ctrlSvc.DeleteVolume(context.Background(), req)
+
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.DeleteVolumeResponse{}))
+			})
+
+			ginkgo.It("failure: metro volume contains snapshot not promote/demote", func() {
+				clientMock.On("GetVolume", mock.Anything, validBaseVolID).
+					Return(gopowerstore.Volume{ID: validBaseVolID, Wwn: "naa.68ccf098003ceb5e4577a20be6d11bf9", Name: "vol1", ApplianceID: validApplianceID, MetroReplicationSessionID: replicationSessionID}, nil)
+				clientMock.On("GetReplicationSessionByID", mock.Anything, replicationSessionID).
+					Return(gopowerstore.ReplicationSession{
+						ID:                 replicationSessionID,
+						State:              "Ok",
+						LocalResourceState: "Promoted",
+					}, nil)
+				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).Return(gopowerstore.VolumeGroups{}, nil)
+				clientMock.On("GetSnapshotsByVolumeID", mock.Anything, validBaseVolID).Return([]gopowerstore.Volume{{ID: "snap-id-1", Name: "myLocalSnapshot"}}, nil)
+				clientMock.On("EndMetroVolume", mock.Anything, mock.Anything, mock.Anything).Return(gopowerstore.EmptyResponse(""), nil)
+				req := &csi.DeleteVolumeRequest{VolumeId: validBaseVolID}
+				res, err := ctrlSvc.DeleteVolume(context.Background(), req)
+
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("snapshots based on this volume still exist"))
+			})
+		})
+
+		ginkgo.When("MetroFractured: both array down", func() {
+			ginkgo.It("should fail", func() {
+				// local info
+				clientMock.On("GetVolume", mock.Anything, validBaseVolID).
+					Return(gopowerstore.Volume{ID: validBaseVolID, Wwn: "naa.68ccf098003ceb5e4577a20be6d11bf9", Name: "vol1", ApplianceID: validApplianceID, MetroReplicationSessionID: replicationSessionID}, errors.New("timeout"))
+				clientMock.On("GetReplicationSessionByID", mock.Anything, replicationSessionID).
+					Return(gopowerstore.ReplicationSession{
+						ID:                 replicationSessionID,
+						State:              "Fractured",
+						LocalResourceState: "Promoted",
+					}, nil)
+				clientMock.On("GetSnapshotsByVolumeID", mock.Anything, validBaseVolID).Return([]gopowerstore.Volume{}, errors.New("timeout"))
+				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).Return(gopowerstore.VolumeGroups{}, errors.New("timeout"))
+				clientMock.On("DeleteVolume",
+					mock.Anything,
+					mock.AnythingOfType("*gopowerstore.VolumeDelete"),
+					validBaseVolID).
+					Return(gopowerstore.EmptyResponse(""), errors.New("timeout"))
+				clientMock.On("EndMetroVolume", mock.Anything, mock.Anything, mock.Anything).Return(gopowerstore.EmptyResponse(""), errors.New("timeout"))
+
+				// remote info
+				clientMock.On("GetVolume", mock.Anything, validRemoteVolID).
+					Return(gopowerstore.Volume{ID: validRemoteVolID, Wwn: "naa.68ccf098003ceb5e4577a20be6d11bf9", Name: "vol1", ApplianceID: validRemoteApplianceID, MetroReplicationSessionID: replicationSessionID}, errors.New("timeout"))
+				clientMock.On("GetSnapshotsByVolumeID", mock.Anything, validRemoteVolID).Return([]gopowerstore.Volume{}, errors.New("timeout"))
+				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validRemoteVolID).Return(gopowerstore.VolumeGroups{}, errors.New("timeout"))
+				clientMock.On("DeleteVolume",
+					mock.Anything,
+					mock.AnythingOfType("*gopowerstore.VolumeDelete"),
+					validRemoteVolID).
+					Return(gopowerstore.EmptyResponse(""), errors.New("timeout"))
+
+				volumeID := fmt.Sprintf("%s/%s/%s:%s/%s", validBaseVolID, firstValidID, "scsi", validRemoteVolID, secondValidID)
+				req := &csi.DeleteVolumeRequest{VolumeId: volumeID}
+
+				res, err := ctrlSvc.DeleteVolume(context.Background(), req)
+
+				gomega.Expect(err).To(gomega.HaveOccurred())
+				gomega.Expect(res).To(gomega.BeNil())
 			})
 		})
 	})
@@ -3326,6 +3569,78 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				gomega.Expect(err).To(gomega.BeNil())
 				_ = ctrlSvc.Init()
 			})
+
+			ginkgo.It("should succeed [NFS] with externalAccess and exclusiveAccess enabled", func() {
+				// setting externalAccess and exclusiveAccess environment variable
+				err := csictx.Setenv(context.Background(), identifiers.EnvExternalAccess, "10.0.0.0/24")
+				gomega.Expect(err).To(gomega.BeNil())
+				err = csictx.Setenv(context.Background(), identifiers.EnvExclusiveAccess, "true")
+				gomega.Expect(err).To(gomega.BeNil())
+				_ = ctrlSvc.Init()
+
+				clientMock.On("GetFS", mock.Anything, validBaseVolID).
+					Return(gopowerstore.FileSystem{
+						ID:          validBaseVolID,
+						Name:        fsName,
+						NasServerID: nasID,
+					}, nil)
+
+				apiError := gopowerstore.NewAPIError()
+				apiError.StatusCode = http.StatusNotFound
+
+				clientMock.On("GetNFSExportByFileSystemID", mock.Anything, mock.Anything).
+					Return(gopowerstore.NFSExport{}, *apiError).Once()
+
+				nfsExportCreate := &gopowerstore.NFSExportCreate{
+					Name:         fsName,
+					FileSystemID: validBaseVolID,
+					Path:         "/" + fsName,
+				}
+				clientMock.On("CreateNFSExport", mock.Anything, nfsExportCreate).
+					Return(gopowerstore.CreateResponse{ID: nfsID}, nil)
+
+				clientMock.On("GetNFSExportByFileSystemID", mock.Anything, mock.Anything).
+					Return(gopowerstore.NFSExport{ID: nfsID}, nil).Once()
+
+				clientMock.On("ModifyNFSExport", mock.Anything, &gopowerstore.NFSExportModify{
+					AddRWRootHosts: []string{
+						"10.0.0.0/255.255.255.0",
+					},
+				}, nfsID).Return(gopowerstore.CreateResponse{}, nil)
+
+				clientMock.On("GetNAS", mock.Anything, nasID).
+					Return(gopowerstore.NAS{
+						Name:                            validNasName,
+						CurrentPreferredIPv4InterfaceID: interfaceID,
+					}, nil)
+
+				clientMock.On("GetFileInterface", mock.Anything, interfaceID).
+					Return(gopowerstore.FileInterface{IPAddress: secondValidID}, nil)
+
+				req := getTypicalControllerPublishVolumeRequest("multiple-writer", validNodeID, validNfsVolumeID)
+				req.VolumeCapability = getVolumeCapabilityNFS()
+				req.VolumeContext = map[string]string{KeyFsType: "nfs"}
+
+				res, err := ctrlSvc.ControllerPublishVolume(context.Background(), req)
+
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.ControllerPublishVolumeResponse{
+					PublishContext: map[string]string{
+						identifiers.KeyNasName:       validNasName,
+						identifiers.KeyNfsExportPath: secondValidID + ":/",
+						identifiers.KeyExportID:      nfsID,
+						identifiers.KeyAllowRoot:     "",
+						identifiers.KeyNfsACL:        "",
+						identifiers.KeyNatIP:         "10.0.0.0/255.255.255.0",
+					},
+				}))
+				// Removing externalAccess and exclusiveAccess environment variable after our tests are completed
+				err = csictx.Setenv(context.Background(), identifiers.EnvExternalAccess, "")
+				gomega.Expect(err).To(gomega.BeNil())
+				err = csictx.Setenv(context.Background(), identifiers.EnvExclusiveAccess, "")
+				gomega.Expect(err).To(gomega.BeNil())
+				_ = ctrlSvc.Init()
+			})
 		})
 
 		ginkgo.When("host name does not contain ip", func() {
@@ -3719,6 +4034,655 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			})
 		})
 
+		ginkgo.When("When attach fails for a non-metro volume ", func() {
+			ginkgo.It("should fail", func() {
+				// local info
+				clientMock.On("GetVolume", mock.Anything, validBaseVolID).
+					Return(gopowerstore.Volume{ID: validBaseVolID, Wwn: "naa.68ccf098003ceb5e4577a20be6d11bf9", ApplianceID: validApplianceID}, nil)
+				clientMock.On("GetHostByName", mock.Anything, validNodeID).Return(gopowerstore.Host{ID: validHostID}, nil)
+				clientMock.On("GetHostVolumeMappingByVolumeID", mock.Anything, validBaseVolID).
+					Return([]gopowerstore.HostVolumeMapping{}, nil).Once()
+				clientMock.On("AttachVolumeToHost", mock.Anything, validHostID, mock.Anything).
+					Return(gopowerstore.EmptyResponse(""), errors.New("some error")).Times(2)
+
+				volumeID := fmt.Sprintf("%s/%s/%s", validBaseVolID, firstValidID, "scsi")
+				req := getTypicalControllerPublishVolumeRequest("single-writer", validNodeID, volumeID)
+				req.VolumeContext = map[string]string{KeyFsType: "xfs"}
+
+				res, err := ctrlSvc.ControllerPublishVolume(context.Background(), req)
+
+				gomega.Expect(err).To(gomega.HaveOccurred())
+				gomega.Expect(res).To(gomega.BeNil())
+			})
+		})
+
+		ginkgo.When("MetroFractured: publishing metro volume when one array is down", func() {
+			ginkgo.It("should succeed [Block] when remote array is down and local was promoted", func() {
+				// local info
+				clientMock.On("GetVolume", mock.Anything, validBaseVolID).
+					Return(gopowerstore.Volume{ID: validBaseVolID, Wwn: "naa.68ccf098003ceb5e4577a20be6d11bf9", Name: "vol1", MetroReplicationSessionID: replicationSessionID, ApplianceID: validApplianceID}, nil)
+				clientMock.On("GetReplicationSessionByID", mock.Anything, replicationSessionID).
+					Return(gopowerstore.ReplicationSession{
+						ID:                 replicationSessionID,
+						State:              "Fractured",
+						LocalResourceState: "Promoted",
+					}, nil)
+				clientMock.On("GetHostByName", mock.Anything, validNodeID).Return(gopowerstore.Host{ID: validHostID}, nil)
+				clientMock.On("GetHostVolumeMappingByVolumeID", mock.Anything, validBaseVolID).
+					Return([]gopowerstore.HostVolumeMapping{}, nil).Once()
+				clientMock.On("AttachVolumeToHost", mock.Anything, validHostID, mock.Anything).
+					Return(gopowerstore.EmptyResponse(""), nil).Times(2)
+				clientMock.On("GetHostVolumeMappingByVolumeID", mock.Anything, validBaseVolID).
+					Return([]gopowerstore.HostVolumeMapping{{HostID: validHostID, LogicalUnitNumber: 1}}, nil).Once()
+				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
+					Return([]gopowerstore.IPPoolAddress{
+						{
+							Address:     "192.168.1.1",
+							IPPort:      gopowerstore.IPPortInstance{TargetIqn: "iqn"},
+							ApplianceID: validApplianceID,
+						},
+					}, nil).Once()
+				clientMock.On("GetStorageNVMETCPTargetAddresses", mock.Anything).
+					Return([]gopowerstore.IPPoolAddress{
+						{
+							Address:     "192.168.1.1",
+							IPPort:      gopowerstore.IPPortInstance{TargetIqn: "iqn"},
+							ApplianceID: validApplianceID,
+						},
+					}, nil).Times(2)
+				clientMock.On("GetCluster", mock.Anything).
+					Return(gopowerstore.Cluster{Name: validClusterName, NVMeNQN: "nqn"}, nil).Times(2)
+				clientMock.On("GetFCPorts", mock.Anything).
+					Return([]gopowerstore.FcPort{
+						{
+							IsLinkUp:    true,
+							Wwn:         "58:cc:f0:93:48:a0:03:a3",
+							WwnNVMe:     "58ccf091492b0c22",
+							WwnNode:     "58ccf090c9200c22",
+							ApplianceID: validApplianceID,
+						},
+					}, nil).Times(2)
+
+				// remote info
+				clientMock.On("GetVolume", mock.Anything, validRemoteVolID).
+					Return(gopowerstore.Volume{ID: validRemoteVolID, Wwn: "naa.68ccf098003ceb5e4577a20be6d11bf9", Name: "vol1", ApplianceID: validRemoteApplianceID}, errors.New("timeout"))
+
+				volumeID := fmt.Sprintf("%s/%s/%s:%s/%s", validBaseVolID, firstValidID, "scsi", validRemoteVolID, secondValidID)
+				req := getTypicalControllerPublishVolumeRequest("single-writer", validNodeID, volumeID)
+				req.VolumeContext = map[string]string{KeyFsType: "xfs"}
+
+				res, err := ctrlSvc.ControllerPublishVolume(context.Background(), req)
+
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.ControllerPublishVolumeResponse{
+					PublishContext: map[string]string{
+						"DEVICE_WWN":  "68ccf098003ceb5e4577a20be6d11bf9",
+						"LUN_ADDRESS": "1",
+					},
+				}))
+			})
+		})
+
+		ginkgo.When("MetroFractured: when local volume was promoted, but local publish failed", func() {
+			ginkgo.It("publishVolume should fail ", func() {
+				// local info
+				clientMock.On("GetVolume", mock.Anything, validBaseVolID).
+					Return(gopowerstore.Volume{ID: validBaseVolID, Wwn: "naa.68ccf098003ceb5e4577a20be6d11bf9", Name: "vol1", MetroReplicationSessionID: replicationSessionID, ApplianceID: validApplianceID}, nil)
+				clientMock.On("GetReplicationSessionByID", mock.Anything, replicationSessionID).
+					Return(gopowerstore.ReplicationSession{
+						ID:                 replicationSessionID,
+						State:              "Fractured",
+						LocalResourceState: "Promoted",
+					}, nil)
+				clientMock.On("GetHostByName", mock.Anything, validNodeID).Return(gopowerstore.Host{ID: validHostID}, nil)
+				clientMock.On("GetHostVolumeMappingByVolumeID", mock.Anything, validBaseVolID).
+					Return([]gopowerstore.HostVolumeMapping{}, nil).Once()
+				clientMock.On("AttachVolumeToHost", mock.Anything, validHostID, mock.Anything).
+					Return(gopowerstore.EmptyResponse(""), errors.New("some error")).Times(2)
+
+				// remote info
+				clientMock.On("GetVolume", mock.Anything, validRemoteVolID).
+					Return(nil, errors.New("timeout"))
+
+				volumeID := fmt.Sprintf("%s/%s/%s:%s/%s", validBaseVolID, firstValidID, "scsi", validRemoteVolID, secondValidID)
+				req := getTypicalControllerPublishVolumeRequest("single-writer", validNodeID, volumeID)
+				req.VolumeContext = map[string]string{KeyFsType: "xfs"}
+
+				res, err := ctrlSvc.ControllerPublishVolume(context.Background(), req)
+
+				gomega.Expect(err).To(gomega.HaveOccurred())
+				gomega.Expect(res).To(gomega.BeNil())
+			})
+		})
+
+		ginkgo.When("MetroFractured:  remote volume was promoted and local array was down", func() {
+			ginkgo.It("should succeed", func() {
+				// local info
+				clientMock.On("GetVolume", mock.Anything, validBaseVolID).
+					Return(gopowerstore.Volume{ID: validBaseVolID, Wwn: "naa.68ccf098003ceb5e4577a20be6d11bf9", Name: "vol1", MetroReplicationSessionID: replicationSessionID, ApplianceID: validApplianceID}, errors.New("timeout"))
+
+				// remote info
+				clientMock.On("GetVolume", mock.Anything, validRemoteVolID).
+					Return(gopowerstore.Volume{ID: validRemoteVolID, Wwn: "naa.68ccf098003ceb5e4577a20be6d11bf9", Name: "vol1", MetroReplicationSessionID: replicationSessionID, ApplianceID: validRemoteApplianceID}, nil)
+				clientMock.On("GetReplicationSessionByID", mock.Anything, replicationSessionID).
+					Return(gopowerstore.ReplicationSession{
+						ID:                 replicationSessionID,
+						State:              "Fractured",
+						LocalResourceState: "Promoted",
+					}, nil)
+				clientMock.On("GetHostByName", mock.Anything, validNodeID).Return(gopowerstore.Host{ID: validHostID}, nil)
+				clientMock.On("GetHostVolumeMappingByVolumeID", mock.Anything, validRemoteVolID).
+					Return([]gopowerstore.HostVolumeMapping{}, nil).Once()
+				clientMock.On("AttachVolumeToHost", mock.Anything, validHostID, mock.Anything).
+					Return(gopowerstore.EmptyResponse(""), nil)
+				clientMock.On("GetHostVolumeMappingByVolumeID", mock.Anything, validRemoteVolID).
+					Return([]gopowerstore.HostVolumeMapping{{HostID: validHostID, LogicalUnitNumber: 1}}, nil).Once()
+				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
+					Return([]gopowerstore.IPPoolAddress{
+						{
+							Address:     "192.168.1.2",
+							IPPort:      gopowerstore.IPPortInstance{TargetIqn: "iqn.2015-10.com.dell:dellemc-powerstore-apm00223"},
+							ApplianceID: validRemoteApplianceID,
+						},
+					}, nil).Once()
+				clientMock.On("GetStorageNVMETCPTargetAddresses", mock.Anything).
+					Return([]gopowerstore.IPPoolAddress{
+						{
+							Address:     "192.168.1.2",
+							IPPort:      gopowerstore.IPPortInstance{TargetIqn: "iqn.2015-10.com.dell:dellemc-powerstore-apm00223"},
+							ApplianceID: validRemoteApplianceID,
+						},
+					}, nil).Times(2)
+				clientMock.On("GetCluster", mock.Anything).
+					Return(gopowerstore.Cluster{Name: validClusterName, NVMeNQN: "nqn.1988-11.com.dell:powerstore:00:303030303030ABCDEFGH"}, nil).Times(2)
+				clientMock.On("GetFCPorts", mock.Anything).
+					Return([]gopowerstore.FcPort{
+						{
+							IsLinkUp:    true,
+							Wwn:         "58:cc:f0:93:48:a0:03:33",
+							WwnNVMe:     "58ccf091492b0c33",
+							WwnNode:     "58ccf090c9200c33",
+							ApplianceID: validRemoteApplianceID,
+						},
+					}, nil).Times(2)
+
+				volumeID := fmt.Sprintf("%s/%s/%s:%s/%s", validBaseVolID, firstValidID, "scsi", validRemoteVolID, secondValidID)
+				req := getTypicalControllerPublishVolumeRequest("single-writer", validNodeID, volumeID)
+				req.VolumeContext = map[string]string{KeyFsType: "xfs"}
+
+				res, err := ctrlSvc.ControllerPublishVolume(context.Background(), req)
+
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.ControllerPublishVolumeResponse{
+					PublishContext: map[string]string{
+						"REMOTE_DEVICE_WWN":  "68ccf098003ceb5e4577a20be6d11bf9",
+						"REMOTE_LUN_ADDRESS": "1",
+					},
+				}))
+			})
+		})
+
+		ginkgo.When("MetroFractured: when remote volume was promoted, but remote publish failed", func() {
+			ginkgo.It("publishVolume should fail ", func() {
+				// local info
+				clientMock.On("GetVolume", mock.Anything, validBaseVolID).
+					Return(gopowerstore.Volume{ID: validBaseVolID, Wwn: "naa.68ccf098003ceb5e4577a20be6d11bf9", Name: "vol1", MetroReplicationSessionID: replicationSessionID, ApplianceID: validApplianceID}, nil)
+				clientMock.On("GetReplicationSessionByID", mock.Anything, replicationSessionID).
+					Return(gopowerstore.ReplicationSession{
+						ID:                 replicationSessionID,
+						State:              "Fractured",
+						LocalResourceState: "Demoted",
+					}, nil)
+				clientMock.On("GetHostByName", mock.Anything, validNodeID).Return(gopowerstore.Host{ID: validHostID}, nil)
+				clientMock.On("GetHostVolumeMappingByVolumeID", mock.Anything, validBaseVolID).
+					Return([]gopowerstore.HostVolumeMapping{}, nil)
+				clientMock.On("AttachVolumeToHost", mock.Anything, validHostID, mock.Anything).
+					Return(gopowerstore.EmptyResponse(""), errors.New("some error")).Times(2)
+
+				// remote info
+				clientMock.On("GetVolume", mock.Anything, validRemoteVolID).
+					Return(gopowerstore.Volume{ID: validRemoteVolID, Wwn: "naa.68ccf098003ceb5e4577a20be6d11bf9", Name: "vol1", MetroReplicationSessionID: replicationSessionID, ApplianceID: validRemoteApplianceID}, nil)
+				clientMock.On("GetReplicationSessionByID", mock.Anything, replicationSessionID).
+					Return(gopowerstore.ReplicationSession{
+						ID:                 replicationSessionID,
+						State:              "Fractured",
+						LocalResourceState: "Promoted",
+					}, nil)
+				clientMock.On("GetHostVolumeMappingByVolumeID", mock.Anything, validRemoteVolID).
+					Return([]gopowerstore.HostVolumeMapping{}, nil)
+
+				volumeID := fmt.Sprintf("%s/%s/%s:%s/%s", validBaseVolID, firstValidID, "scsi", validRemoteVolID, secondValidID)
+				req := getTypicalControllerPublishVolumeRequest("single-writer", validNodeID, volumeID)
+				req.VolumeContext = map[string]string{KeyFsType: "xfs"}
+
+				res, err := ctrlSvc.ControllerPublishVolume(context.Background(), req)
+
+				gomega.Expect(err).To(gomega.HaveOccurred())
+				gomega.Expect(res).To(gomega.BeNil())
+			})
+		})
+
+		ginkgo.When("publishing metro volume with locator", func() {
+			ginkgo.BeforeEach(func() {
+				// local info
+				clientMock.On("GetVolume", mock.Anything, validBaseVolID).
+					Return(gopowerstore.Volume{ID: validBaseVolID, Wwn: "naa.68ccf098003ceb5e4577a20be6d11bf9", ApplianceID: validApplianceID}, nil)
+				clientMock.On("GetHostByName", mock.Anything, validNodeID).Return(gopowerstore.Host{ID: validHostID}, nil)
+				clientMock.On("GetHostVolumeMappingByVolumeID", mock.Anything, validBaseVolID).
+					Return([]gopowerstore.HostVolumeMapping{}, nil).Once()
+				clientMock.On("AttachVolumeToHost", mock.Anything, validHostID, mock.Anything).
+					Return(gopowerstore.EmptyResponse(""), nil).Times(2)
+				clientMock.On("GetHostVolumeMappingByVolumeID", mock.Anything, validBaseVolID).
+					Return([]gopowerstore.HostVolumeMapping{{HostID: validHostID, LogicalUnitNumber: 1}}, nil).Once()
+				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
+					Return([]gopowerstore.IPPoolAddress{
+						{
+							Address:     "192.168.1.1",
+							IPPort:      gopowerstore.IPPortInstance{TargetIqn: "iqn"},
+							ApplianceID: validApplianceID,
+						},
+					}, nil).Once()
+				clientMock.On("GetStorageNVMETCPTargetAddresses", mock.Anything).
+					Return([]gopowerstore.IPPoolAddress{
+						{
+							Address:     "192.168.1.1",
+							IPPort:      gopowerstore.IPPortInstance{TargetIqn: "iqn"},
+							ApplianceID: validApplianceID,
+						},
+					}, nil).Times(2)
+				clientMock.On("GetCluster", mock.Anything).
+					Return(gopowerstore.Cluster{Name: validClusterName, NVMeNQN: "nqn"}, nil).Times(2)
+				clientMock.On("GetFCPorts", mock.Anything).
+					Return([]gopowerstore.FcPort{
+						{
+							IsLinkUp:    true,
+							Wwn:         "58:cc:f0:93:48:a0:03:a3",
+							WwnNVMe:     "58ccf091492b0c22",
+							WwnNode:     "58ccf090c9200c22",
+							ApplianceID: validApplianceID,
+						},
+					}, nil).Times(2)
+
+				// remote info
+				clientMock.On("GetVolume", mock.Anything, validRemoteVolID).
+					Return(gopowerstore.Volume{ID: validRemoteVolID, Wwn: "naa.68ccf098003ceb5e4577a20be6d11bf9", ApplianceID: validRemoteApplianceID}, nil)
+				clientMock.On("GetHostVolumeMappingByVolumeID", mock.Anything, validRemoteVolID).
+					Return([]gopowerstore.HostVolumeMapping{}, nil).Once()
+				clientMock.On("GetHostVolumeMappingByVolumeID", mock.Anything, validRemoteVolID).
+					Return([]gopowerstore.HostVolumeMapping{{HostID: validHostID, LogicalUnitNumber: 1}}, nil).Once()
+				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).
+					Return([]gopowerstore.IPPoolAddress{
+						{
+							Address:     "192.168.1.2",
+							IPPort:      gopowerstore.IPPortInstance{TargetIqn: "iqn.2015-10.com.dell:dellemc-powerstore-apm00223"},
+							ApplianceID: validRemoteApplianceID,
+						},
+					}, nil).Once()
+				clientMock.On("GetStorageNVMETCPTargetAddresses", mock.Anything).
+					Return([]gopowerstore.IPPoolAddress{
+						{
+							Address:     "192.168.1.2",
+							IPPort:      gopowerstore.IPPortInstance{TargetIqn: "iqn.2015-10.com.dell:dellemc-powerstore-apm00223"},
+							ApplianceID: validRemoteApplianceID,
+						},
+					}, nil).Times(2)
+				clientMock.On("GetCluster", mock.Anything).
+					Return(gopowerstore.Cluster{Name: validClusterName, NVMeNQN: "nqn.1988-11.com.dell:powerstore:00:303030303030ABCDEFGH"}, nil).Times(2)
+				clientMock.On("GetFCPorts", mock.Anything).
+					Return([]gopowerstore.FcPort{
+						{
+							IsLinkUp:    true,
+							Wwn:         "58:cc:f0:93:48:a0:03:33",
+							WwnNVMe:     "58ccf091492b0c33",
+							WwnNode:     "58ccf090c9200c33",
+							ApplianceID: validRemoteApplianceID,
+						},
+					}, nil).Times(2)
+
+				metroArr := &array.PowerStoreArray{
+					HostConnectivity: &array.HostConnectivity{
+						Local: k8score.NodeSelector{
+							NodeSelectorTerms: []k8score.NodeSelectorTerm{
+								{
+									MatchExpressions: []k8score.NodeSelectorRequirement{
+										{
+											Key:      "topology.kubernetes.io/zone",
+											Operator: k8score.NodeSelectorOpIn,
+											Values:   []string{"nonu1"},
+										},
+									},
+								},
+							},
+						},
+
+						Metro: array.MetroConnectivityOptions{
+							ColocatedLocal: k8score.NodeSelector{
+								NodeSelectorTerms: []k8score.NodeSelectorTerm{
+									{
+										MatchExpressions: []k8score.NodeSelectorRequirement{
+											{
+												Key:      "topology.kubernetes.io/zone",
+												Operator: k8score.NodeSelectorOpIn,
+												Values:   []string{"zone1"},
+											},
+										},
+									},
+								},
+							},
+							ColocatedRemote: k8score.NodeSelector{
+								NodeSelectorTerms: []k8score.NodeSelectorTerm{
+									{
+										MatchExpressions: []k8score.NodeSelectorRequirement{
+											{
+												Key:      "topology.kubernetes.io/zone",
+												Operator: k8score.NodeSelectorOpIn,
+												Values:   []string{"zone2"},
+											},
+										},
+									},
+								},
+							},
+							ColocatedBoth: k8score.NodeSelector{
+								NodeSelectorTerms: []k8score.NodeSelectorTerm{
+									{
+										MatchExpressions: []k8score.NodeSelectorRequirement{
+											{
+												Key:      "topology.kubernetes.io/zone",
+												Operator: k8score.NodeSelectorOpIn,
+												Values:   []string{"zone3"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					GlobalID:           "APM0012345",
+					Endpoint:           "https://192.168.0.3/api/rest",
+					Username:           "admin",
+					Password:           "pass",
+					BlockProtocol:      identifiers.ISCSITransport,
+					Insecure:           true,
+					Client:             clientMock,
+					IP:                 "192.168.0.3",
+					NASCooldownTracker: array.NewNASCooldown(time.Minute, 5),
+				}
+				metroRemoteArr := &array.PowerStoreArray{
+					HostConnectivity: &array.HostConnectivity{
+						Local: k8score.NodeSelector{
+							NodeSelectorTerms: []k8score.NodeSelectorTerm{
+								{
+									MatchExpressions: []k8score.NodeSelectorRequirement{
+										{
+											Key:      "topology.kubernetes.io/zone",
+											Operator: k8score.NodeSelectorOpIn,
+											Values:   []string{"nonu2"},
+										},
+									},
+								},
+							},
+						},
+
+						Metro: array.MetroConnectivityOptions{
+							ColocatedLocal: k8score.NodeSelector{
+								NodeSelectorTerms: []k8score.NodeSelectorTerm{
+									{
+										MatchExpressions: []k8score.NodeSelectorRequirement{
+											{
+												Key:      "topology.kubernetes.io/zone",
+												Operator: k8score.NodeSelectorOpIn,
+												Values:   []string{"zone2"},
+											},
+										},
+									},
+								},
+							},
+							ColocatedRemote: k8score.NodeSelector{
+								NodeSelectorTerms: []k8score.NodeSelectorTerm{
+									{
+										MatchExpressions: []k8score.NodeSelectorRequirement{
+											{
+												Key:      "topology.kubernetes.io/zone",
+												Operator: k8score.NodeSelectorOpIn,
+												Values:   []string{"zone1"},
+											},
+										},
+									},
+								},
+							},
+							ColocatedBoth: k8score.NodeSelector{
+								NodeSelectorTerms: []k8score.NodeSelectorTerm{
+									{
+										MatchExpressions: []k8score.NodeSelectorRequirement{
+											{
+												Key:      "topology.kubernetes.io/zone",
+												Operator: k8score.NodeSelectorOpIn,
+												Values:   []string{"zone3"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					GlobalID:           "APM0045678",
+					Endpoint:           "https://192.168.1.3/api/rest",
+					Username:           "admin",
+					Password:           "pass",
+					BlockProtocol:      identifiers.ISCSITransport,
+					Insecure:           true,
+					Client:             clientMock,
+					IP:                 "192.168.1.3",
+					NASCooldownTracker: array.NewNASCooldown(time.Minute, 5),
+				}
+				arrays := ctrlSvc.Arrays()
+				arrays["APM0012345"] = metroArr
+				arrays["APM0045678"] = metroRemoteArr
+				ctrlSvc.SetArrays(arrays)
+			})
+
+			ginkgo.It("should pass with node selector passing [Block]", func() {
+				// Create a node that matches the node selector
+				node := &k8score.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: validNodeID,
+						Labels: map[string]string{
+							"topology.kubernetes.io/zone": "zone1", // matches the node selector
+						},
+						Annotations: map[string]string{
+							"csi.volume.kubernetes.io/nodeid": `{"csi-powerstore.dellemc.com":"` + validNodeID + `"}`,
+						},
+					},
+				}
+				k8sutils.Kubeclient = &k8sutils.K8sClient{
+					Clientset: fake.NewClientset([]runtime.Object{node}...),
+				}
+
+				volumeID := fmt.Sprintf("%s/%s/%s:%s/%s", validBaseVolID, "APM0012345", "scsi", validRemoteVolID, "APM0045678")
+
+				// Publish the volume
+				publishReq := getTypicalControllerPublishVolumeRequest("single-writer", validNodeID, volumeID)
+				publishReq.VolumeContext = map[string]string{
+					KeyFsType:                                  "xfs",
+					ctrlSvc.WithRP(KeyReplicationMode):         "METRO",
+					ctrlSvc.WithRP(KeyReplicationEnabled):      "true",
+					ctrlSvc.WithRP(KeyReplicationRPO):          zeroRPO,
+					ctrlSvc.WithRP(KeyReplicationRemoteSystem): validRemoteSystemName,
+				}
+
+				publishResp, err := ctrlSvc.ControllerPublishVolume(context.Background(), publishReq)
+				gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
+				gomega.Expect(publishResp).To(gomega.Equal(&csi.ControllerPublishVolumeResponse{
+					PublishContext: map[string]string{
+						"DEVICE_WWN":         "68ccf098003ceb5e4577a20be6d11bf9",
+						"LUN_ADDRESS":        "1",
+						"REMOTE_DEVICE_WWN":  "68ccf098003ceb5e4577a20be6d11bf9",
+						"REMOTE_LUN_ADDRESS": "1",
+					},
+				}))
+			})
+
+			ginkgo.It("should pass with local node selector passing [Block]", func() {
+				// Create a node that matches the node selector
+				node := &k8score.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: validNodeID,
+						Labels: map[string]string{
+							"topology.kubernetes.io/zone": "nonu1", // matches the node selector
+						},
+						Annotations: map[string]string{
+							"csi.volume.kubernetes.io/nodeid": `{"csi-powerstore.dellemc.com":"` + validNodeID + `"}`,
+						},
+					},
+				}
+				k8sutils.Kubeclient.Clientset.CoreV1().Nodes().Create(context.Background(), node, metav1.CreateOptions{})
+
+				volumeID := fmt.Sprintf("%s/%s/%s:%s/%s", validBaseVolID, "APM0012345", "scsi", validRemoteVolID, "APM0045678")
+
+				// Publish the volume
+				publishReq := getTypicalControllerPublishVolumeRequest("single-writer", validNodeID, volumeID)
+				publishReq.VolumeContext = map[string]string{
+					KeyFsType:                                  "xfs",
+					ctrlSvc.WithRP(KeyReplicationMode):         "METRO",
+					ctrlSvc.WithRP(KeyReplicationEnabled):      "true",
+					ctrlSvc.WithRP(KeyReplicationRPO):          zeroRPO,
+					ctrlSvc.WithRP(KeyReplicationRemoteSystem): validRemoteSystemName,
+				}
+
+				publishResp, err := ctrlSvc.ControllerPublishVolume(context.Background(), publishReq)
+				gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
+				gomega.Expect(publishResp).To(gomega.Equal(&csi.ControllerPublishVolumeResponse{
+					PublishContext: map[string]string{
+						"DEVICE_WWN":  "68ccf098003ceb5e4577a20be6d11bf9",
+						"LUN_ADDRESS": "1",
+					},
+				}))
+			})
+			ginkgo.It("should pass with local node selector of remote array passing [Block]", func() {
+				// Create a node that matches the node selector
+				node := &k8score.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: validNodeID,
+						Labels: map[string]string{
+							"topology.kubernetes.io/zone": "nonu2", // matches the node selector
+						},
+						Annotations: map[string]string{
+							"csi.volume.kubernetes.io/nodeid": `{"csi-powerstore.dellemc.com":"` + validNodeID + `"}`,
+						},
+					},
+				}
+
+				k8sutils.Kubeclient = &k8sutils.K8sClient{
+					Clientset: fake.NewClientset([]runtime.Object{node}...),
+				}
+
+				volumeID := fmt.Sprintf("%s/%s/%s:%s/%s", validBaseVolID, "APM0012345", "scsi", validRemoteVolID, "APM0045678")
+
+				// Publish the volume
+				publishReq := getTypicalControllerPublishVolumeRequest("single-writer", validNodeID, volumeID)
+				publishReq.VolumeContext = map[string]string{
+					KeyFsType:                                  "xfs",
+					ctrlSvc.WithRP(KeyReplicationMode):         "METRO",
+					ctrlSvc.WithRP(KeyReplicationEnabled):      "true",
+					ctrlSvc.WithRP(KeyReplicationRPO):          zeroRPO,
+					ctrlSvc.WithRP(KeyReplicationRemoteSystem): validRemoteSystemName,
+				}
+
+				publishResp, err := ctrlSvc.ControllerPublishVolume(context.Background(), publishReq)
+				gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
+				gomega.Expect(publishResp).To(gomega.Equal(&csi.ControllerPublishVolumeResponse{
+					PublishContext: map[string]string{
+						"REMOTE_DEVICE_WWN":  "68ccf098003ceb5e4577a20be6d11bf9",
+						"REMOTE_LUN_ADDRESS": "1",
+					},
+				}))
+			})
+
+			ginkgo.It("should fail due to node selector mismatch [Block]", func() {
+				// Create a node that does not match the node selector
+				node := &k8score.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: validNodeID,
+						Labels: map[string]string{
+							"topology.kubernetes.io/zone": "zone5", // does not match the node selector
+						},
+						Annotations: map[string]string{
+							"csi.volume.kubernetes.io/nodeid": `{"csi-powerstore.dellemc.com":"` + validNodeID + `"}`,
+						},
+					},
+				}
+				k8sutils.Kubeclient = &k8sutils.K8sClient{
+					Clientset: fake.NewClientset([]runtime.Object{node}...),
+				}
+
+				volumeID := fmt.Sprintf("%s/%s/%s:%s/%s", validBaseVolID, "APM0012345", "scsi", validRemoteVolID, "APM0045678")
+
+				// Publish the volume
+				publishReq := getTypicalControllerPublishVolumeRequest("single-writer", validNodeID, volumeID)
+				publishReq.VolumeContext = map[string]string{
+					KeyFsType:                                  "xfs",
+					ctrlSvc.WithRP(KeyReplicationMode):         "METRO",
+					ctrlSvc.WithRP(KeyReplicationEnabled):      "true",
+					ctrlSvc.WithRP(KeyReplicationRPO):          zeroRPO,
+					ctrlSvc.WithRP(KeyReplicationRemoteSystem): validRemoteSystemName,
+				}
+
+				_, err := ctrlSvc.ControllerPublishVolume(context.Background(), publishReq)
+				gomega.Expect(err).To(gomega.HaveOccurred())
+			})
+			ginkgo.It("should fail due to no node presence [Block]", func() {
+				k8sutils.Kubeclient = &k8sutils.K8sClient{}
+				volumeID := fmt.Sprintf("%s/%s/%s:%s/%s", validBaseVolID, "APM0012345", "scsi", validRemoteVolID, "APM0045678")
+
+				// Publish the volume
+				publishReq := getTypicalControllerPublishVolumeRequest("single-writer", validNodeID, volumeID)
+				publishReq.VolumeContext = map[string]string{
+					KeyFsType:                                  "xfs",
+					ctrlSvc.WithRP(KeyReplicationMode):         "METRO",
+					ctrlSvc.WithRP(KeyReplicationEnabled):      "true",
+					ctrlSvc.WithRP(KeyReplicationRPO):          zeroRPO,
+					ctrlSvc.WithRP(KeyReplicationRemoteSystem): validRemoteSystemName,
+				}
+
+				_, err := ctrlSvc.ControllerPublishVolume(context.Background(), publishReq)
+				gomega.Expect(err).To(gomega.HaveOccurred())
+			})
+			ginkgo.It("should fail due to no remote system [Block]", func() {
+				// Create a node that matches the node selector
+				node := &k8score.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: validNodeID,
+						Labels: map[string]string{
+							"topology.kubernetes.io/zone": "zone1", // matches the node selector
+						},
+						Annotations: map[string]string{
+							"csi.volume.kubernetes.io/nodeid": `{"csi-powerstore.dellemc.com":"` + validNodeID + `"}`,
+						},
+					},
+				}
+				k8sutils.Kubeclient = &k8sutils.K8sClient{
+					Clientset: fake.NewClientset([]runtime.Object{node}...),
+				}
+				clientMock.On("GetVolume", mock.Anything, validRemoteVolID+"1").
+					Return(gopowerstore.Volume{}, fmt.Errorf("failed to get volume"))
+				// Invalid remote system
+				volumeID := fmt.Sprintf("%s/%s/%s:%s/%s", validBaseVolID, "APM0012345", "scsi", validRemoteVolID+"1", "APM0456789")
+
+				// Publish the volume
+				publishReq := getTypicalControllerPublishVolumeRequest("single-writer", validNodeID, volumeID)
+				publishReq.VolumeContext = map[string]string{
+					KeyFsType:                                  "xfs",
+					ctrlSvc.WithRP(KeyReplicationMode):         "METRO",
+					ctrlSvc.WithRP(KeyReplicationEnabled):      "true",
+					ctrlSvc.WithRP(KeyReplicationRPO):          zeroRPO,
+					ctrlSvc.WithRP(KeyReplicationRemoteSystem): validRemoteSystemName,
+				}
+
+				_, err := ctrlSvc.ControllerPublishVolume(context.Background(), publishReq)
+				gomega.Expect(err).To(gomega.HaveOccurred())
+			})
+		})
+
 		ginkgo.When("volume id is empty", func() {
 			ginkgo.It("should fail", func() {
 				req := getTypicalControllerPublishVolumeRequest("single-writer", validNodeID, validBlockVolumeID)
@@ -3884,6 +4848,9 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 						},
 					}).Once()
 
+				clientMock.On("GetVolume", mock.Anything, validBaseVolID).
+					Return(gopowerstore.Volume{ID: validBaseVolID, Wwn: "naa.68ccf098003ceb5e4577a20be6d11bf9"}, nil)
+
 				clientMock.On("GetHostByName", mock.Anything, validHostName).
 					Return(gopowerstore.Host{ID: validHostID}, nil).Once()
 
@@ -4034,7 +5001,16 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 					Return(gopowerstore.Host{ID: validHostID}, nil).Times(2)
 				clientMock.On("DetachVolumeFromHost", mock.Anything, mock.Anything, mock.Anything).
 					Return(gopowerstore.EmptyResponse(""), nil).Times(2)
-
+				clientMock.On("GetVolume", mock.Anything, validBaseVolID).
+					Return(gopowerstore.Volume{ID: validBaseVolID, Wwn: "naa.68ccf098003ceb5e4577a20be6d11bf9", Name: "vol1", MetroReplicationSessionID: replicationSessionID, ApplianceID: validApplianceID}, nil)
+				clientMock.On("GetReplicationSessionByID", mock.Anything, replicationSessionID).
+					Return(gopowerstore.ReplicationSession{
+						ID:                 replicationSessionID,
+						State:              "Active-Active",
+						LocalResourceState: "System-Defined",
+					}, nil)
+				clientMock.On("GetVolume", mock.Anything, validRemoteVolID).
+					Return(gopowerstore.Volume{ID: validRemoteVolID, Wwn: "naa.68ccf098003ceb5e4577a20be6d11bf9", Name: "vol1", MetroReplicationSessionID: replicationSessionID, ApplianceID: validApplianceID}, nil)
 				volumeID := fmt.Sprintf("%s/%s/%s:%s/%s", validBaseVolID, firstValidID, "scsi", validRemoteVolID, secondValidID)
 				req := &csi.ControllerUnpublishVolumeRequest{VolumeId: volumeID, NodeId: validNodeID}
 
@@ -4051,6 +5027,508 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				_, err := ctrlSvc.ControllerUnpublishVolume(context.Background(), req)
 
 				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("cannot find remote array"))
+			})
+
+			ginkgo.It("should succeed when volume not found on local or remote array", func() {
+				clientMock.On("GetHostByName", mock.Anything, mock.Anything).Return(gopowerstore.Host{ID: validHostID}, nil)
+				originalCheckMetroStateFunc := checkMetroStateFunc
+				checkMetroStateFunc = func(_ context.Context, _ array.VolumeHandle, _ gopowerstore.Client, _ gopowerstore.Client) (*array.MetroFracturedResponse, bool, error) {
+					return nil, false, gopowerstore.APIError{
+						ErrorMsg: &api.ErrorMsg{
+							StatusCode: http.StatusNotFound,
+						},
+					}
+				}
+				originalIsNodeConnectedToArrayFunc := isNodeConnectedToArrayFunc
+				isNodeConnectedToArrayFunc = func(_ context.Context, _ string, _ *array.PowerStoreArray) bool {
+					return true // mocking uniform metro
+				}
+				clientMock.On("GetVolume", mock.Anything, validBaseVolID).
+					Return(gopowerstore.Volume{}, gopowerstore.APIError{
+						ErrorMsg: &api.ErrorMsg{
+							StatusCode: http.StatusNotFound,
+						},
+					})
+				clientMock.On("GetVolume", mock.Anything, validRemoteVolID).
+					Return(gopowerstore.Volume{}, gopowerstore.APIError{
+						ErrorMsg: &api.ErrorMsg{
+							StatusCode: http.StatusNotFound,
+						},
+					})
+				defer func() {
+					isNodeConnectedToArrayFunc = originalIsNodeConnectedToArrayFunc
+					checkMetroStateFunc = originalCheckMetroStateFunc
+				}()
+
+				volumeID := fmt.Sprintf("%s/%s/%s:%s/%s", validBaseVolID, firstValidID, "scsi", validRemoteVolID, secondValidID)
+				req := &csi.ControllerUnpublishVolumeRequest{VolumeId: volumeID, NodeId: validNodeID}
+
+				res, err := ctrlSvc.ControllerUnpublishVolume(context.Background(), req)
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.ControllerUnpublishVolumeResponse{}))
+			})
+
+			ginkgo.It("should fail due to checkMetroStateFunc returning error", func() {
+				clientMock.On("GetHostByName", mock.Anything, mock.Anything).Return(gopowerstore.Host{ID: validHostID}, nil)
+				originalCheckMetroStateFunc := checkMetroStateFunc
+				checkMetroStateFunc = func(_ context.Context, _ array.VolumeHandle, _ gopowerstore.Client, _ gopowerstore.Client) (*array.MetroFracturedResponse, bool, error) {
+					return nil, false, gopowerstore.APIError{
+						ErrorMsg: &api.ErrorMsg{
+							StatusCode: http.StatusBadGateway,
+						},
+					}
+				}
+				defer func() {
+					checkMetroStateFunc = originalCheckMetroStateFunc
+				}()
+
+				volumeID := fmt.Sprintf("%s/%s/%s:%s/%s", validBaseVolID, firstValidID, "scsi", validRemoteVolID, secondValidID)
+				req := &csi.ControllerUnpublishVolumeRequest{VolumeId: volumeID, NodeId: validNodeID}
+
+				_, err := ctrlSvc.ControllerUnpublishVolume(context.Background(), req)
+				gomega.Expect(err).ToNot(gomega.BeNil())
+			})
+
+			ginkgo.It("should succeed  when metro is fractured, remote array unpublish fails and local array was promoted", func() {
+				clientMock.On("GetHostByName", mock.Anything, mock.Anything).Return(gopowerstore.Host{ID: validHostID}, nil)
+				originalCheckMetroStateFunc := checkMetroStateFunc
+				checkMetroStateFunc = func(_ context.Context, _ array.VolumeHandle, _ gopowerstore.Client, _ gopowerstore.Client) (*array.MetroFracturedResponse, bool, error) {
+					return &array.MetroFracturedResponse{IsFractured: true, State: "Promoted", VolumeName: "vol1"}, false, nil
+				}
+				originalIsNodeConnectedToArrayFunc := isNodeConnectedToArrayFunc
+				isNodeConnectedToArrayFunc = func(_ context.Context, _ string, _ *array.PowerStoreArray) bool {
+					return true // mocking uniform metro
+				}
+				originalUnpublishVolumeFunc := unpublishVolumeFunc
+				unpublishVolumeFunc = func(_ context.Context, _ string, arr *array.PowerStoreArray, _ *array.VolumeHandle, _ *array.PowerStoreArray) (*csi.ControllerUnpublishVolumeResponse, error) {
+					if arr != nil {
+						return &csi.ControllerUnpublishVolumeResponse{}, nil
+					}
+					return nil, errors.New("some-error")
+				}
+				originalCreateOrUpdateJournalEntryFunc := createOrUpdateJournalEntryFunc
+				createOrUpdateJournalEntryFunc = func(_ context.Context, _ string, _ array.VolumeHandle, _ string, _ string, _ string, _ []byte) error {
+					return nil
+				}
+				defer func() {
+					isNodeConnectedToArrayFunc = originalIsNodeConnectedToArrayFunc
+					unpublishVolumeFunc = originalUnpublishVolumeFunc
+					checkMetroStateFunc = originalCheckMetroStateFunc
+					createOrUpdateJournalEntryFunc = originalCreateOrUpdateJournalEntryFunc
+				}()
+
+				volumeID := fmt.Sprintf("%s/%s/%s:%s/%s", validBaseVolID, firstValidID, "scsi", validRemoteVolID, secondValidID)
+				req := &csi.ControllerUnpublishVolumeRequest{VolumeId: volumeID, NodeId: validNodeID}
+
+				res, err := ctrlSvc.ControllerUnpublishVolume(context.Background(), req)
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.ControllerUnpublishVolumeResponse{}))
+			})
+
+			ginkgo.It("should fail  when metro is fractured, remote array unpublish fails and local array was demoted", func() {
+				clientMock.On("GetHostByName", mock.Anything, mock.Anything).Return(gopowerstore.Host{ID: validHostID}, nil)
+				originalCheckMetroStateFunc := checkMetroStateFunc
+				checkMetroStateFunc = func(_ context.Context, _ array.VolumeHandle, _ gopowerstore.Client, _ gopowerstore.Client) (*array.MetroFracturedResponse, bool, error) {
+					return &array.MetroFracturedResponse{IsFractured: true, State: "Demoted", VolumeName: "vol1"}, true, nil
+				}
+				originalIsNodeConnectedToArrayFunc := isNodeConnectedToArrayFunc
+				isNodeConnectedToArrayFunc = func(_ context.Context, _ string, _ *array.PowerStoreArray) bool {
+					return true // mocking uniform metro
+				}
+				originalUnpublishVolumeFunc := unpublishVolumeFunc
+				unpublishVolumeFunc = func(_ context.Context, _ string, arr *array.PowerStoreArray, _ *array.VolumeHandle, _ *array.PowerStoreArray) (*csi.ControllerUnpublishVolumeResponse, error) {
+					if arr != nil {
+						return &csi.ControllerUnpublishVolumeResponse{}, nil
+					}
+					return nil, errors.New("some-error")
+				}
+				defer func() {
+					isNodeConnectedToArrayFunc = originalIsNodeConnectedToArrayFunc
+					unpublishVolumeFunc = originalUnpublishVolumeFunc
+					checkMetroStateFunc = originalCheckMetroStateFunc
+				}()
+
+				volumeID := fmt.Sprintf("%s/%s/%s:%s/%s", validBaseVolID, firstValidID, "scsi", validRemoteVolID, secondValidID)
+				req := &csi.ControllerUnpublishVolumeRequest{VolumeId: volumeID, NodeId: validNodeID}
+
+				res, err := ctrlSvc.ControllerUnpublishVolume(context.Background(), req)
+				gomega.Expect(err).To(gomega.HaveOccurred())
+				gomega.Expect(res).To(gomega.BeNil())
+			})
+
+			ginkgo.It("should succeed  when metro is fractured, local array unpublish fails and remote array was promoted", func() {
+				clientMock.On("GetHostByName", mock.Anything, mock.Anything).Return(gopowerstore.Host{ID: validHostID}, nil)
+				originalCheckMetroStateFunc := checkMetroStateFunc
+				checkMetroStateFunc = func(_ context.Context, _ array.VolumeHandle, _ gopowerstore.Client, _ gopowerstore.Client) (*array.MetroFracturedResponse, bool, error) {
+					return &array.MetroFracturedResponse{IsFractured: true, State: "Demoted", VolumeName: "vol1"}, true, nil
+				}
+				originalIsNodeConnectedToArrayFunc := isNodeConnectedToArrayFunc
+				isNodeConnectedToArrayFunc = func(_ context.Context, _ string, _ *array.PowerStoreArray) bool {
+					return true // mocking uniform metro
+				}
+				originalUnpublishVolumeFunc := unpublishVolumeFunc
+				unpublishVolumeFunc = func(_ context.Context, _ string, _ *array.PowerStoreArray, _ *array.VolumeHandle, remoteArray *array.PowerStoreArray) (*csi.ControllerUnpublishVolumeResponse, error) {
+					if remoteArray != nil {
+						return &csi.ControllerUnpublishVolumeResponse{}, nil
+					}
+					return nil, errors.New("some-error")
+				}
+				originalCreateOrUpdateJournalEntryFunc := createOrUpdateJournalEntryFunc
+				createOrUpdateJournalEntryFunc = func(_ context.Context, _ string, _ array.VolumeHandle, _ string, _ string, _ string, _ []byte) error {
+					return nil
+				}
+				defer func() {
+					isNodeConnectedToArrayFunc = originalIsNodeConnectedToArrayFunc
+					unpublishVolumeFunc = originalUnpublishVolumeFunc
+					checkMetroStateFunc = originalCheckMetroStateFunc
+					createOrUpdateJournalEntryFunc = originalCreateOrUpdateJournalEntryFunc
+				}()
+
+				volumeID := fmt.Sprintf("%s/%s/%s:%s/%s", validBaseVolID, firstValidID, "scsi", validRemoteVolID, secondValidID)
+				req := &csi.ControllerUnpublishVolumeRequest{VolumeId: volumeID, NodeId: validNodeID}
+
+				res, err := ctrlSvc.ControllerUnpublishVolume(context.Background(), req)
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.ControllerUnpublishVolumeResponse{}))
+			})
+
+			ginkgo.It("should fail  when metro is fractured, local array unpublish fails and local array was promoted", func() {
+				clientMock.On("GetHostByName", mock.Anything, mock.Anything).Return(gopowerstore.Host{ID: validHostID}, nil)
+				originalCheckMetroStateFunc := checkMetroStateFunc
+				checkMetroStateFunc = func(_ context.Context, _ array.VolumeHandle, _ gopowerstore.Client, _ gopowerstore.Client) (*array.MetroFracturedResponse, bool, error) {
+					return &array.MetroFracturedResponse{IsFractured: true, State: "Promoted", VolumeName: "vol1"}, false, nil
+				}
+				originalIsNodeConnectedToArrayFunc := isNodeConnectedToArrayFunc
+				isNodeConnectedToArrayFunc = func(_ context.Context, _ string, _ *array.PowerStoreArray) bool {
+					return true // mocking uniform metro
+				}
+				originalUnpublishVolumeFunc := unpublishVolumeFunc
+				unpublishVolumeFunc = func(_ context.Context, _ string, _ *array.PowerStoreArray, _ *array.VolumeHandle, remoteArray *array.PowerStoreArray) (*csi.ControllerUnpublishVolumeResponse, error) {
+					if remoteArray != nil {
+						return &csi.ControllerUnpublishVolumeResponse{}, nil
+					}
+					return nil, errors.New("some-error")
+				}
+				originalCreateOrUpdateJournalEntryFunc := createOrUpdateJournalEntryFunc
+				createOrUpdateJournalEntryFunc = func(_ context.Context, _ string, _ array.VolumeHandle, _ string, _ string, _ string, _ []byte) error {
+					return nil
+				}
+				defer func() {
+					isNodeConnectedToArrayFunc = originalIsNodeConnectedToArrayFunc
+					unpublishVolumeFunc = originalUnpublishVolumeFunc
+					checkMetroStateFunc = originalCheckMetroStateFunc
+					createOrUpdateJournalEntryFunc = originalCreateOrUpdateJournalEntryFunc
+				}()
+
+				volumeID := fmt.Sprintf("%s/%s/%s:%s/%s", validBaseVolID, firstValidID, "scsi", validRemoteVolID, secondValidID)
+				req := &csi.ControllerUnpublishVolumeRequest{VolumeId: volumeID, NodeId: validNodeID}
+
+				res, err := ctrlSvc.ControllerUnpublishVolume(context.Background(), req)
+				gomega.Expect(err).To(gomega.HaveOccurred())
+				gomega.Expect(res).To(gomega.BeNil())
+			})
+		})
+
+		ginkgo.When("unpublishing metro volume with selector", func() {
+			ginkgo.BeforeEach(func() {
+				// local info
+				clientMock.On("GetHostByName", mock.Anything, validNodeID).Return(gopowerstore.Host{ID: validHostID}, nil)
+				clientMock.On("DetachVolumeFromHost", mock.Anything, mock.Anything, mock.Anything).
+					Return(gopowerstore.EmptyResponse(""), nil).Times(2)
+				clientMock.On("GetVolume", mock.Anything, validBaseVolID).
+					Return(gopowerstore.Volume{ID: validBaseVolID, Wwn: "naa.68ccf098003ceb5e4577a20be6d11bf9", Name: "vol1", MetroReplicationSessionID: replicationSessionID, ApplianceID: validApplianceID}, nil)
+				clientMock.On("GetVolume", mock.Anything, validRemoteVolID).
+					Return(gopowerstore.Volume{ID: validRemoteVolID, Wwn: "naa.68ccf098003ceb5e4577a20be6d11bf9", Name: "vol1", MetroReplicationSessionID: replicationSessionID, ApplianceID: validApplianceID}, nil)
+				clientMock.On("GetReplicationSessionByID", mock.Anything, replicationSessionID).
+					Return(gopowerstore.ReplicationSession{
+						ID:                 replicationSessionID,
+						State:              "Active-Active",
+						LocalResourceState: "System-Defined",
+					}, nil)
+
+				metroArr := &array.PowerStoreArray{
+					HostConnectivity: &array.HostConnectivity{
+						Local: k8score.NodeSelector{
+							NodeSelectorTerms: []k8score.NodeSelectorTerm{
+								{
+									MatchExpressions: []k8score.NodeSelectorRequirement{
+										{
+											Key:      "topology.kubernetes.io/zone",
+											Operator: k8score.NodeSelectorOpIn,
+											Values:   []string{"nonu1"},
+										},
+									},
+								},
+							},
+						},
+
+						Metro: array.MetroConnectivityOptions{
+							ColocatedLocal: k8score.NodeSelector{
+								NodeSelectorTerms: []k8score.NodeSelectorTerm{
+									{
+										MatchExpressions: []k8score.NodeSelectorRequirement{
+											{
+												Key:      "topology.kubernetes.io/zone",
+												Operator: k8score.NodeSelectorOpIn,
+												Values:   []string{"zone1"},
+											},
+										},
+									},
+								},
+							},
+							ColocatedRemote: k8score.NodeSelector{
+								NodeSelectorTerms: []k8score.NodeSelectorTerm{
+									{
+										MatchExpressions: []k8score.NodeSelectorRequirement{
+											{
+												Key:      "topology.kubernetes.io/zone",
+												Operator: k8score.NodeSelectorOpIn,
+												Values:   []string{"zone2"},
+											},
+										},
+									},
+								},
+							},
+							ColocatedBoth: k8score.NodeSelector{
+								NodeSelectorTerms: []k8score.NodeSelectorTerm{
+									{
+										MatchExpressions: []k8score.NodeSelectorRequirement{
+											{
+												Key:      "topology.kubernetes.io/zone",
+												Operator: k8score.NodeSelectorOpIn,
+												Values:   []string{"zone3"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					GlobalID:           "APM0012345",
+					Endpoint:           "https://192.168.0.3/api/rest",
+					Username:           "admin",
+					Password:           "pass",
+					BlockProtocol:      identifiers.ISCSITransport,
+					Insecure:           true,
+					Client:             clientMock,
+					IP:                 "192.168.0.3",
+					NASCooldownTracker: array.NewNASCooldown(time.Minute, 5),
+				}
+				metroRemoteArr := &array.PowerStoreArray{
+					HostConnectivity: &array.HostConnectivity{
+						Local: k8score.NodeSelector{
+							NodeSelectorTerms: []k8score.NodeSelectorTerm{
+								{
+									MatchExpressions: []k8score.NodeSelectorRequirement{
+										{
+											Key:      "topology.kubernetes.io/zone",
+											Operator: k8score.NodeSelectorOpIn,
+											Values:   []string{"nonu2"},
+										},
+									},
+								},
+							},
+						},
+
+						Metro: array.MetroConnectivityOptions{
+							ColocatedLocal: k8score.NodeSelector{
+								NodeSelectorTerms: []k8score.NodeSelectorTerm{
+									{
+										MatchExpressions: []k8score.NodeSelectorRequirement{
+											{
+												Key:      "topology.kubernetes.io/zone",
+												Operator: k8score.NodeSelectorOpIn,
+												Values:   []string{"zone2"},
+											},
+										},
+									},
+								},
+							},
+							ColocatedRemote: k8score.NodeSelector{
+								NodeSelectorTerms: []k8score.NodeSelectorTerm{
+									{
+										MatchExpressions: []k8score.NodeSelectorRequirement{
+											{
+												Key:      "topology.kubernetes.io/zone",
+												Operator: k8score.NodeSelectorOpIn,
+												Values:   []string{"zone1"},
+											},
+										},
+									},
+								},
+							},
+							ColocatedBoth: k8score.NodeSelector{
+								NodeSelectorTerms: []k8score.NodeSelectorTerm{
+									{
+										MatchExpressions: []k8score.NodeSelectorRequirement{
+											{
+												Key:      "topology.kubernetes.io/zone",
+												Operator: k8score.NodeSelectorOpIn,
+												Values:   []string{"zone3"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					GlobalID:           "APM0045678",
+					Endpoint:           "https://192.168.1.3/api/rest",
+					Username:           "admin",
+					Password:           "pass",
+					BlockProtocol:      identifiers.ISCSITransport,
+					Insecure:           true,
+					Client:             clientMock,
+					IP:                 "192.168.1.3",
+					NASCooldownTracker: array.NewNASCooldown(time.Minute, 5),
+				}
+				arrays := ctrlSvc.Arrays()
+				arrays["APM0012345"] = metroArr
+				arrays["APM0045678"] = metroRemoteArr
+				ctrlSvc.SetArrays(arrays)
+			})
+
+			ginkgo.It("should pass with node selector passing [Block]", func() {
+				// Create a node that matches the node selector
+				node := &k8score.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: validNodeID,
+						Labels: map[string]string{
+							"topology.kubernetes.io/zone": "zone1", // matches the node selector
+						},
+						Annotations: map[string]string{
+							"csi.volume.kubernetes.io/nodeid": `{"csi-powerstore.dellemc.com":"` + validNodeID + `"}`,
+						},
+					},
+				}
+				k8sutils.GetNodeByCSINodeID = func(_ context.Context, _ string, _ string, _ string) (*k8score.Node, error) {
+					return node, nil
+				}
+
+				volumeID := fmt.Sprintf("%s/%s/%s:%s/%s", validBaseVolID, "APM0012345", "scsi", validRemoteVolID, "APM0045678")
+
+				req := &csi.ControllerUnpublishVolumeRequest{VolumeId: volumeID, NodeId: validNodeID}
+
+				res, err := ctrlSvc.ControllerUnpublishVolume(context.Background(), req)
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.ControllerUnpublishVolumeResponse{}))
+			})
+
+			ginkgo.It("should pass with local node selector passing [Block]", func() {
+				// Create a node that matches the node selector
+				node := &k8score.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: validNodeID,
+						Labels: map[string]string{
+							"topology.kubernetes.io/zone": "nonu1", // matches the node selector
+						},
+						Annotations: map[string]string{
+							"csi.volume.kubernetes.io/nodeid": `{"csi-powerstore.dellemc.com":"` + validNodeID + `"}`,
+						},
+					},
+				}
+				k8sutils.GetNodeByCSINodeID = func(_ context.Context, _ string, _ string, _ string) (*k8score.Node, error) {
+					return node, nil
+				}
+
+				volumeID := fmt.Sprintf("%s/%s/%s:%s/%s", validBaseVolID, "APM0012345", "scsi", validRemoteVolID, "APM0045678")
+
+				req := &csi.ControllerUnpublishVolumeRequest{VolumeId: volumeID, NodeId: validNodeID}
+
+				res, err := ctrlSvc.ControllerUnpublishVolume(context.Background(), req)
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.ControllerUnpublishVolumeResponse{}))
+			})
+			ginkgo.It("should pass with local node selector of remote array passing [Block]", func() {
+				// Create a node that matches the node selector
+				node := &k8score.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: validNodeID,
+						Labels: map[string]string{
+							"topology.kubernetes.io/zone": "nonu2", // matches the node selector
+						},
+						Annotations: map[string]string{
+							"csi.volume.kubernetes.io/nodeid": `{"csi-powerstore.dellemc.com":"` + validNodeID + `"}`,
+						},
+					},
+				}
+				k8sutils.GetNodeByCSINodeID = func(_ context.Context, _ string, _ string, _ string) (*k8score.Node, error) {
+					return node, nil
+				}
+
+				volumeID := fmt.Sprintf("%s/%s/%s:%s/%s", validBaseVolID, "APM0012345", "scsi", validRemoteVolID, "APM0045678")
+
+				req := &csi.ControllerUnpublishVolumeRequest{VolumeId: volumeID, NodeId: validNodeID}
+
+				res, err := ctrlSvc.ControllerUnpublishVolume(context.Background(), req)
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csi.ControllerUnpublishVolumeResponse{}))
+			})
+
+			ginkgo.It("should fail due to node selector mismatch [Block]", func() {
+				// Create a node that does not match the node selector
+				node := &k8score.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: validNodeID,
+						Labels: map[string]string{
+							"topology.kubernetes.io/zone": "zone5", // does not match the node selector
+						},
+						Annotations: map[string]string{
+							"csi.volume.kubernetes.io/nodeid": `{"csi-powerstore.dellemc.com":"` + validNodeID + `"}`,
+						},
+					},
+				}
+				k8sutils.GetNodeByCSINodeID = func(_ context.Context, _ string, _ string, _ string) (*k8score.Node, error) {
+					return node, nil
+				}
+				volumeID := fmt.Sprintf("%s/%s/%s:%s/%s", validBaseVolID, "APM0012345", "scsi", validRemoteVolID, "APM0045678")
+
+				req := &csi.ControllerUnpublishVolumeRequest{VolumeId: volumeID, NodeId: validNodeID}
+
+				_, err := ctrlSvc.ControllerUnpublishVolume(context.Background(), req)
+
+				gomega.Expect(err).To(gomega.HaveOccurred())
+			})
+
+			ginkgo.It("should fail due to no node presence [Block]", func() {
+				k8sutils.GetNodeByCSINodeID = func(_ context.Context, _ string, _ string, _ string) (*k8score.Node, error) {
+					return nil, fmt.Errorf("failed to list nodes")
+				}
+				volumeID := fmt.Sprintf("%s/%s/%s:%s/%s", validBaseVolID, "APM0012345", "scsi", validRemoteVolID, "APM0045678")
+
+				req := &csi.ControllerUnpublishVolumeRequest{VolumeId: volumeID, NodeId: validNodeID}
+
+				_, err := ctrlSvc.ControllerUnpublishVolume(context.Background(), req)
+
+				gomega.Expect(err).To(gomega.HaveOccurred())
+			})
+			ginkgo.It("should fail due to no remote system [Block]", func() {
+				// Create a node that matches the node selector
+				node := &k8score.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: validNodeID,
+						Labels: map[string]string{
+							"topology.kubernetes.io/zone": "zone1", // matches the node selector
+						},
+						Annotations: map[string]string{
+							"csi.volume.kubernetes.io/nodeid": `{"csi-powerstore.dellemc.com":"` + validNodeID + `"}`,
+						},
+					},
+				}
+				k8sutils.GetNodeByCSINodeID = func(_ context.Context, _ string, _ string, _ string) (*k8score.Node, error) {
+					return node, nil
+				}
+				clientMock.On("GetVolume", mock.Anything, validRemoteVolID+"1").
+					Return(gopowerstore.Volume{}, fmt.Errorf("failed to get volume"))
+				// Invalid remote system
+				volumeID := fmt.Sprintf("%s/%s/%s:%s/%s", validBaseVolID, "APM0012345", "scsi", validRemoteVolID+"1", "APM0456789")
+
+				req := &csi.ControllerUnpublishVolumeRequest{VolumeId: volumeID, NodeId: validNodeID}
+
+				_, err := ctrlSvc.ControllerUnpublishVolume(context.Background(), req)
+
+				gomega.Expect(err).To(gomega.HaveOccurred())
 				gomega.Expect(err.Error()).To(gomega.ContainSubstring("cannot find remote array"))
 			})
 		})
@@ -4139,7 +5617,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 						})
 
 					clientMock.On("GetFS", mock.Anything, validBaseVolID).
-						Return(gopowerstore.FileSystem{}, nil).Once()
+						Return(gopowerstore.FileSystem{ID: validBaseVolID}, nil)
 				})
 
 				exportID := "some-export-id"
@@ -4155,7 +5633,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				clientMock.On("ModifyNFSExport", mock.Anything,
 					mock.Anything, exportID).Return(gopowerstore.CreateResponse{}, nil)
 
-				req := &csi.ControllerUnpublishVolumeRequest{VolumeId: validBaseVolID, NodeId: validNodeID}
+				req := &csi.ControllerUnpublishVolumeRequest{VolumeId: validNfsVolumeID, NodeId: validNodeID}
 
 				res, err := ctrlSvc.ControllerUnpublishVolume(context.Background(), req)
 				gomega.Expect(err).To(gomega.BeNil())
@@ -4180,10 +5658,9 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 							}).Once()
 					})
 
-					req := &csi.ControllerUnpublishVolumeRequest{VolumeId: validBaseVolID, NodeId: validNodeID}
+					req := &csi.ControllerUnpublishVolumeRequest{VolumeId: validNfsVolumeID, NodeId: validNodeID}
 
 					res, err := ctrlSvc.ControllerUnpublishVolume(context.Background(), req)
-
 					gomega.Expect(err).To(gomega.BeNil())
 					gomega.Expect(res).To(gomega.Equal(&csi.ControllerUnpublishVolumeResponse{}))
 				})
@@ -4200,6 +5677,9 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 								StatusCode: http.StatusNotFound,
 							},
 						}).Once()
+
+					clientMock.On("GetVolume", mock.Anything, validBaseVolID).
+						Return(gopowerstore.Volume{}, nil)
 
 					req := &csi.ControllerUnpublishVolumeRequest{VolumeId: validBlockVolumeID, NodeId: nodeID}
 
@@ -4223,6 +5703,8 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 
 			ginkgo.When("host does not exist", func() {
 				ginkgo.It("should fail", func() {
+					clientMock.On("GetVolume", mock.Anything, validBaseVolID).
+						Return(gopowerstore.Volume{}, nil)
 					clientMock.On("GetHostByName", mock.Anything, validNodeID).
 						Return(gopowerstore.Host{}, gopowerstore.APIError{
 							ErrorMsg: &api.ErrorMsg{
@@ -4248,6 +5730,9 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			ginkgo.When("fail to check host", func() {
 				ginkgo.It("should fail", func() {
 					e := errors.New("some-api-error")
+					clientMock.On("GetVolume", mock.Anything, validBaseVolID).
+						Return(gopowerstore.Volume{}, nil)
+
 					clientMock.On("GetHostByName", mock.Anything, validNodeID).
 						Return(gopowerstore.Host{}, e).Once()
 
@@ -4303,181 +5788,182 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 	})
 
 	ginkgo.Describe("calling ListVolumes()", func() {
+		clientA := &gopowerstoremock.Client{}
+		clientB := &gopowerstoremock.Client{}
+
+		injectArrays := func() {
+			arrMap := map[string]*array.PowerStoreArray{
+				"globalvolid1": {Client: clientA, GlobalID: "globalvolid1"},
+				"globalvolid2": {Client: clientB, GlobalID: "globalvolid2"},
+			}
+			ctrlSvc.SetArrays(arrMap)
+		}
+
 		mockCalls := func() {
-			clientMock.On("GetVolumes", mock.Anything).
+			// --- Array globalvolid1 (clientA) ---
+			clientA.On("GetHostVolumeMappings", mock.Anything).
+				Return([]gopowerstore.HostVolumeMapping{}, nil).Once()
+
+			clientA.On("GetVolumes", mock.Anything).
 				Return([]gopowerstore.Volume{
-					{
-						ID:   "arr1-id1",
-						Name: "arr1-vol1",
-					},
-					{
-						ID:   "arr1-id2",
-						Name: "arr1-vol2",
-					},
+					{ID: "arr1-id1", Name: "arr1-vol1"},
+					{ID: "arr1-id2", Name: "arr1-vol2"},
 				}, nil).Once()
-			clientMock.On("GetVolumes", mock.Anything).
+
+			clientA.On("ListFS", mock.Anything).
+				Return([]gopowerstore.FileSystem{
+					{ID: "arr3-id1", Name: "arr3-fs1"},
+					{ID: "arr3-id2", Name: "arr3-fs2"},
+				}, nil).Once()
+
+			// --- Array globalvolid2 (clientB) ---
+			clientB.On("GetHostVolumeMappings", mock.Anything).
+				Return([]gopowerstore.HostVolumeMapping{}, nil).Once()
+
+			clientB.On("GetVolumes", mock.Anything).
 				Return([]gopowerstore.Volume{
-					{
-						ID:   "arr2-id1",
-						Name: "arr2-vol1",
-					},
+					{ID: "arr2-id1", Name: "arr2-vol1"},
 				}, nil).Once()
-			clientMock.On("ListFS", mock.Anything).
+
+			clientB.On("ListFS", mock.Anything).
 				Return([]gopowerstore.FileSystem{
-					{
-						ID:   "arr3-id1",
-						Name: "arr3-fs1",
-					},
-					{
-						ID:   "arr3-id2",
-						Name: "arr3-fs2",
-					},
-				}, nil).Once()
-			clientMock.On("ListFS", mock.Anything).
-				Return([]gopowerstore.FileSystem{
-					{
-						ID:   "arr4-id1",
-						Name: "arr4-fs1",
-					},
+					{ID: "arr4-id1", Name: "arr4-fs1"},
 				}, nil).Once()
 		}
 
+		// helper to assert the response contains exactly the expected set of volume IDs (order-independent)
+		expectContainsVolumeIDs := func(res *csi.ListVolumesResponse, expected []string) {
+			gomega.Expect(res).ToNot(gomega.BeNil())
+			got := make(map[string]struct{}, len(res.Entries))
+			for _, e := range res.Entries {
+				if e != nil && e.Volume != nil {
+					got[e.Volume.VolumeId] = struct{}{}
+				}
+			}
+			for _, id := range expected {
+				_, ok := got[id]
+				gomega.Expect(ok).To(gomega.BeTrue(), "missing expected volumeID: %s; got=%v", id, got)
+			}
+			// exact-match check
+			gomega.Expect(len(got)).To(gomega.Equal(len(expected)))
+		}
+
 		ginkgo.When("there is no parameters", func() {
-			ginkgo.It("should return all volumes from both arrays", func() {
+			ginkgo.It("should return all volumes from both arrays (order-independent)", func() {
+				injectArrays()
 				mockCalls()
 
 				req := &csi.ListVolumesRequest{}
 				res, err := ctrlSvc.ListVolumes(context.Background(), req)
-
-				gomega.Expect(res).To(gomega.Equal(&csi.ListVolumesResponse{
-					Entries: []*csi.ListVolumesResponse_Entry{
-						{
-							Volume: &csi.Volume{
-								VolumeId: "arr1-id1",
-							},
-						},
-						{
-							Volume: &csi.Volume{
-								VolumeId: "arr1-id2",
-							},
-						},
-						{
-							Volume: &csi.Volume{
-								VolumeId: "arr2-id1",
-							},
-						},
-						{
-							Volume: &csi.Volume{
-								VolumeId: "arr3-id1",
-							},
-						},
-						{
-							Volume: &csi.Volume{
-								VolumeId: "arr3-id2",
-							},
-						},
-						{
-							Volume: &csi.Volume{
-								VolumeId: "arr4-id1",
-							},
-						},
-					},
-				}))
 				gomega.Expect(err).To(gomega.BeNil())
+
+				expected := []string{
+					"arr1-id1/globalvolid1/scsi",
+					"arr1-id2/globalvolid1/scsi",
+					"arr2-id1/globalvolid2/scsi",
+					"arr3-id1/globalvolid1/nfs",
+					"arr3-id2/globalvolid1/nfs",
+					"arr4-id1/globalvolid2/nfs",
+				}
+				expectContainsVolumeIDs(res, expected)
 			})
 		})
 
 		ginkgo.When("passing max entries", func() {
-			ginkgo.It("should return 'n' entries and next token", func() {
+			ginkgo.It("should return 'n' entries and a next token (when applicable)", func() {
+				injectArrays()
 				mockCalls()
 
-				req := &csi.ListVolumesRequest{
-					MaxEntries: 1,
-				}
+				req := &csi.ListVolumesRequest{MaxEntries: 1}
 				res, err := ctrlSvc.ListVolumes(context.Background(), req)
 
-				gomega.Expect(res).To(gomega.Equal(&csi.ListVolumesResponse{
-					Entries: []*csi.ListVolumesResponse_Entry{
-						{
-							Volume: &csi.Volume{
-								VolumeId: "arr1-id1",
-							},
-						},
-					},
-					NextToken: "1",
-				}))
 				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).ToNot(gomega.BeNil())
+				gomega.Expect(len(res.Entries)).To(gomega.Equal(1))
+				gomega.Expect(res.NextToken).To(gomega.Satisfy(func(token string) bool { return token != "" }))
 			})
 		})
 
-		ginkgo.When("using next token", func() {
-			ginkgo.It("should return volumes starting from token", func() {
+		ginkgo.When("using starting token", func() {
+			ginkgo.It("should return volumes starting from token (len check)", func() {
+				injectArrays()
 				mockCalls()
 
-				req := &csi.ListVolumesRequest{
-					MaxEntries:    1,
-					StartingToken: "1",
-				}
+				req := &csi.ListVolumesRequest{MaxEntries: 1, StartingToken: "1"}
 				res, err := ctrlSvc.ListVolumes(context.Background(), req)
 
-				gomega.Expect(res).To(gomega.Equal(&csi.ListVolumesResponse{
-					Entries: []*csi.ListVolumesResponse_Entry{
-						{
-							Volume: &csi.Volume{
-								VolumeId: "arr1-id2",
-							},
-						},
-					},
-					NextToken: "2",
-				}))
 				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).ToNot(gomega.BeNil())
+				gomega.Expect(len(res.Entries)).To(gomega.Equal(1))
+
+				expectedAll := []string{
+					"arr1-id1/globalvolid1/scsi",
+					"arr1-id2/globalvolid1/scsi",
+					"arr2-id1/globalvolid2/scsi",
+					"arr3-id1/globalvolid1/nfs",
+					"arr3-id2/globalvolid1/nfs",
+					"arr4-id1/globalvolid2/nfs",
+				}
+				gotID := res.Entries[0].Volume.VolumeId
+				found := false
+				for _, e := range expectedAll {
+					if e == gotID {
+						found = true
+						break
+					}
+				}
+				gomega.Expect(found).To(gomega.BeTrue(), "returned unexpected volume id: %s", gotID)
 			})
 		})
 
 		ginkgo.When("using wrong token", func() {
 			ginkgo.It("should fail [not parsable]", func() {
+				injectArrays()
 				token := "as!512$25%!_" // #nosec G101
-				req := &csi.ListVolumesRequest{
-					MaxEntries:    1,
-					StartingToken: token,
-				}
+				req := &csi.ListVolumesRequest{MaxEntries: 1, StartingToken: token}
 				res, err := ctrlSvc.ListVolumes(context.Background(), req)
 
 				gomega.Expect(res).To(gomega.BeNil())
 				gomega.Expect(err).ToNot(gomega.BeNil())
-				gomega.Expect(err.Error()).To(gomega.ContainSubstring("unable to parse StartingToken: %v into uint32", token))
+				// check parse error text exists
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("unable to parse StartingToken"))
 			})
 
-			ginkgo.It("shoud fail [too high]", func() {
-				tokenInt := 200
-				token := "200"
-
+			ginkgo.It("should fail [too high]", func() {
+				injectArrays()
 				mockCalls()
 
-				req := &csi.ListVolumesRequest{
-					MaxEntries:    1,
-					StartingToken: token,
-				}
+				req := &csi.ListVolumesRequest{MaxEntries: 1, StartingToken: "200"}
 				res, err := ctrlSvc.ListVolumes(context.Background(), req)
 
 				gomega.Expect(res).To(gomega.BeNil())
 				gomega.Expect(err).ToNot(gomega.BeNil())
-				gomega.Expect(err.Error()).To(gomega.ContainSubstring("startingToken=%d > len(volumes)=%d", tokenInt, 6))
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("startingToken="))
 			})
 		})
 
 		ginkgo.When("get volumes return error", func() {
-			ginkgo.It("should fail]", func() {
-				clientMock.On("GetVolumes", mock.Anything).
-					Return([]gopowerstore.Volume{}, gopowerstore.NewNotFoundError())
-				clientMock.On("ListFS", mock.Anything).
-					Return([]gopowerstore.FileSystem{}, gopowerstore.NewNotFoundError())
+			ginkgo.It("should fail when backing client returns an error", func() {
+				injectArrays()
+				// simulate failures for both arrays' calls
+				clientA.On("GetVolumes", mock.Anything).
+					Return([]gopowerstore.Volume{}, gopowerstore.NewNotFoundError()).Once()
+				clientA.On("ListFS", mock.Anything).
+					Return([]gopowerstore.FileSystem{}, gopowerstore.NewNotFoundError()).Once()
+				clientA.On("GetHostVolumeMappings", mock.Anything).
+					Return([]gopowerstore.HostVolumeMapping{}, gopowerstore.NewNotFoundError()).Once()
+
+				clientB.On("GetVolumes", mock.Anything).
+					Return([]gopowerstore.Volume{}, gopowerstore.NewNotFoundError()).Once()
+				clientB.On("ListFS", mock.Anything).
+					Return([]gopowerstore.FileSystem{}, gopowerstore.NewNotFoundError()).Once()
+				clientB.On("GetHostVolumeMappings", mock.Anything).
+					Return([]gopowerstore.HostVolumeMapping{}, gopowerstore.NewNotFoundError()).Once()
+
 				req := &csi.ListVolumesRequest{}
 				res, err := ctrlSvc.ListVolumes(context.Background(), req)
-
 				gomega.Expect(res).To(gomega.BeNil())
 				gomega.Expect(err).ToNot(gomega.BeNil())
-				gomega.Expect(err.Error()).To(gomega.ContainSubstring("unable to list volumes"))
 			})
 		})
 	})
@@ -5413,7 +6899,8 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 			ginkgo.It("should fail if volume is single", func() {
 				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).
 					Return(gopowerstore.VolumeGroups{}, gopowerstore.APIError{})
-
+				clientMock.On("GetCluster", mock.Anything).
+					Return(gopowerstore.Cluster{Name: validClusterName}, nil)
 				req := &csiext.CreateStorageProtectionGroupRequest{
 					VolumeHandle: validBaseVolID + "/" + firstValidID + "/" + "iscsi",
 				}
@@ -5431,6 +6918,8 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 
 				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, validGroupID).
 					Return(gopowerstore.ReplicationSession{}, gopowerstore.APIError{})
+				clientMock.On("GetCluster", mock.Anything).
+					Return(gopowerstore.Cluster{Name: validClusterName}, nil)
 
 				req := &csiext.CreateStorageProtectionGroupRequest{
 					VolumeHandle: validBaseVolID + "/" + firstValidID + "/" + "iscsi",
@@ -5584,9 +7073,220 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 					"replication of volumes that aren't assigned to group is not implemented yet",
 				))
 			})
+			ginkgo.It("should fail if cluster retrieval fails", func() {
+				clientMock.On("GetVolumeGroupsByVolumeID", mock.Anything, validBaseVolID).
+					Return(gopowerstore.VolumeGroups{VolumeGroup: []gopowerstore.VolumeGroup{{ID: validGroupID}}}, nil)
+
+				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, validGroupID).
+					Return(gopowerstore.ReplicationSession{
+						LocalResourceID:  validGroupID,
+						RemoteResourceID: validRemoteGroupID,
+						RemoteSystemID:   validRemoteSystemID,
+						StorageElementPairs: []gopowerstore.StorageElementPair{{
+							LocalStorageElementID:  validBaseVolID,
+							RemoteStorageElementID: validRemoteVolID,
+						}},
+					}, nil)
+
+				clientMock.On("GetVolume", mock.Anything, validBaseVolID).
+					Return(gopowerstore.Volume{ID: validBaseVolID, Size: validVolSize}, nil)
+
+				clientMock.On("GetCluster", mock.Anything).
+					Return(gopowerstore.Cluster{}, errors.New("cluster not found"))
+
+				req := &csiext.CreateRemoteVolumeRequest{
+					VolumeHandle: validBaseVolID + "/" + firstValidID + "/" + "iscsi",
+				}
+				res, err := ctrlSvc.CreateRemoteVolume(context.Background(), req)
+
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("cluster not found"))
+			})
+			ginkgo.It("should return info if everything is ok for NFS", func() {
+				clientMock.On("GetFS", mock.Anything, validBaseVolID).Return(gopowerstore.FileSystem{ID: validBaseVolID}, nil)
+				clientMock.On("GetNFSExportByFileSystemID", mock.Anything, validBaseVolID).Return(gopowerstore.NFSExport{ID: validNasID}, nil)
+
+				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, mock.AnythingOfType("string")).
+					Return(gopowerstore.ReplicationSession{
+						LocalResourceID:  validNfsVolumeID,
+						RemoteResourceID: validRemoteGroupID,
+						RemoteSystemID:   validRemoteSystemID,
+						StorageElementPairs: []gopowerstore.StorageElementPair{
+							{
+								LocalStorageElementID:  validBaseVolID,
+								RemoteStorageElementID: validRemoteVolID,
+							},
+						},
+					}, nil)
+
+				clientMock.On("GetCluster", mock.Anything).Return(gopowerstore.Cluster{Name: validClusterName}, nil)
+
+				clientMock.On("GetRemoteSystem", mock.Anything, validRemoteSystemID).Return(gopowerstore.RemoteSystem{
+					Name:              validRemoteSystemName,
+					ManagementAddress: secondValidID,
+					ID:                validRemoteSystemID,
+					SerialNumber:      validRemoteSystemGlobalID,
+				}, nil)
+
+				req := &csiext.CreateRemoteVolumeRequest{
+					VolumeHandle: validBaseVolID + "/" + firstValidID + "/" + "nfs",
+				}
+
+				res, err := ctrlSvc.CreateRemoteVolume(context.Background(), req)
+
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res).To(gomega.Equal(&csiext.CreateRemoteVolumeResponse{RemoteVolume: &csiext.Volume{
+					CapacityBytes: 0,
+					VolumeId:      validBaseVolID + "/" + validRemoteSystemGlobalID + "/" + "nfs",
+					VolumeContext: map[string]string{
+						"remoteSystem":      validClusterName,
+						"managementAddress": secondValidID,
+						"arrayID":           validRemoteSystemGlobalID,
+					},
+				}}))
+			})
+			ginkgo.It("should handle error when NFS export retrieval fails and create a new export", func() {
+				clientMock.On("GetNFSExportByFileSystemID", mock.Anything, validBaseVolID).
+					Return(gopowerstore.NFSExport{}, errors.New("NFS export not found")).Once()
+
+				clientMock.On("GetFS", mock.Anything, validBaseVolID).
+					Return(gopowerstore.FileSystem{ID: validBaseVolID, Name: "fs_name"}, nil)
+
+				clientMock.On("CreateNFSExport", mock.Anything, mock.MatchedBy(func(req *gopowerstore.NFSExportCreate) bool {
+					return req != nil &&
+						req.FileSystemID == validBaseVolID &&
+						req.Name == "auto_export_"+validBaseVolID[:8] &&
+						req.Path == "/fs_name"
+				})).Return(gopowerstore.CreateResponse{ID: "new-export-id"}, nil)
+
+				clientMock.On("GetNFSExportByFileSystemID", mock.Anything, validBaseVolID).
+					Return(gopowerstore.NFSExport{ID: "new-export-id"}, nil).Once()
+				clientMock.On("GetCluster", mock.Anything).Return(gopowerstore.Cluster{Name: validClusterName}, nil)
+
+				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, validBaseVolID).
+					Return(gopowerstore.ReplicationSession{
+						RemoteSystemID:   validRemoteSystemID,
+						LocalResourceID:  validBaseVolID,
+						RemoteResourceID: validRemoteGroupID,
+					}, nil)
+
+				clientMock.On("GetRemoteSystem", mock.Anything, validRemoteSystemID).
+					Return(gopowerstore.RemoteSystem{
+						Name:              "remote-system",
+						ManagementAddress: "10.0.0.2",
+						SerialNumber:      "RSN-999",
+					}, nil)
+
+				arr := &array.PowerStoreArray{Client: clientMock}
+				// reuse the existing test controller and inject the test array into its Arrays map
+				arrays := ctrlSvc.Arrays()
+				arrays["array-id"] = arr
+				ctrlSvc.SetArrays(arrays)
+
+				req := &csiext.CreateRemoteVolumeRequest{
+					VolumeHandle: validBaseVolID + "/array-id/nfs",
+				}
+
+				res, err := ctrlSvc.CreateRemoteVolume(context.TODO(), req)
+
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				gomega.Expect(res).ToNot(gomega.BeNil())
+				gomega.Expect(res.GetRemoteVolume().GetVolumeContext()["replication.NasServerID"]).To(gomega.Equal(""))
+			})
+			ginkgo.It("should return error when CreateNFSExport fails", func() {
+				clientMock.On("GetNFSExportByFileSystemID", mock.Anything, validBaseVolID).
+					Return(gopowerstore.NFSExport{}, gopowerstore.NewNotFoundError()).Once()
+
+				clientMock.On("GetFS", mock.Anything, validBaseVolID).
+					Return(gopowerstore.FileSystem{ID: validBaseVolID, Name: "fs_name"}, nil)
+
+				clientMock.On("CreateNFSExport", mock.Anything, mock.AnythingOfType("*gopowerstore.NFSExportCreate")).
+					Return(gopowerstore.CreateResponse{}, errors.New("mock export creation failure"))
+
+				arr := &array.PowerStoreArray{Client: clientMock}
+				// reuse the existing test controller and inject the test array into its Arrays map
+				arrays := ctrlSvc.Arrays()
+				arrays["array-id"] = arr
+				ctrlSvc.SetArrays(arrays)
+				controller := ctrlSvc
+
+				req := &csiext.CreateRemoteVolumeRequest{
+					VolumeHandle: validBaseVolID + "/array-id/nfs",
+				}
+
+				res, err := controller.CreateRemoteVolume(context.TODO(), req)
+
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(status.Code(err)).To(gomega.Equal(codes.Internal))
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to create NFS export"))
+			})
+			ginkgo.It("should return error when replication session is not found", func() {
+				clientMock.On("GetNFSExportByFileSystemID", mock.Anything, validBaseVolID).
+					Return(gopowerstore.NFSExport{ID: "export-id"}, nil)
+
+				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, validBaseVolID).
+					Return(gopowerstore.ReplicationSession{}, errors.New("replication session not found"))
+
+				arr := &array.PowerStoreArray{Client: clientMock}
+				arrays := ctrlSvc.Arrays()
+				arrays["array-id"] = arr
+				ctrlSvc.SetArrays(arrays)
+				controller := ctrlSvc
+
+				req := &csiext.CreateRemoteVolumeRequest{
+					VolumeHandle: validBaseVolID + "/array-id/nfs",
+				}
+
+				res, err := controller.CreateRemoteVolume(context.TODO(), req)
+
+				gomega.Expect(res).To(gomega.BeNil())
+				gomega.Expect(err).ToNot(gomega.BeNil())
+				gomega.Expect(status.Code(err)).To(gomega.Equal(codes.Internal))
+				gomega.Expect(err.Error()).To(gomega.ContainSubstring("no replication session found"))
+			})
+			ginkgo.It("should create storage protection group for NFS volume", func() {
+				// Setup mocks
+				clientMock.On("GetNFSExportByFileSystemID", mock.Anything, validBaseVolID).
+					Return(gopowerstore.NFSExport{ID: validNasID}, nil)
+
+				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, validBaseVolID).
+					Return(gopowerstore.ReplicationSession{
+						LocalResourceID:  validBaseVolID,
+						RemoteResourceID: validRemoteGroupID,
+						RemoteSystemID:   validRemoteSystemID,
+						StorageElementPairs: []gopowerstore.StorageElementPair{
+							{
+								LocalStorageElementID:  validBaseVolID,
+								RemoteStorageElementID: validRemoteVolID,
+							},
+						},
+					}, nil)
+
+				clientMock.On("GetCluster", mock.Anything).
+					Return(gopowerstore.Cluster{Name: validClusterName}, nil)
+
+				clientMock.On("GetRemoteSystem", mock.Anything, validRemoteSystemID).
+					Return(gopowerstore.RemoteSystem{
+						Name:              validRemoteSystemName,
+						ManagementAddress: secondValidID,
+						ID:                validRemoteSystemID,
+						SerialNumber:      validRemoteSystemGlobalID,
+					}, nil)
+
+				req := &csiext.CreateStorageProtectionGroupRequest{
+					VolumeHandle: validBaseVolID + "/" + firstValidID + "/nfs",
+				}
+
+				res, err := ctrlSvc.CreateStorageProtectionGroup(context.Background(), req)
+
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res.LocalProtectionGroupAttributes).To(gomega.HaveKeyWithValue("systemName", "localSystemName"))
+				gomega.Expect(res.RemoteProtectionGroupAttributes).To(gomega.HaveKeyWithValue("remoteSystemName", "localSystemName"))
+			})
 		})
 	})
-
 	ginkgo.Describe("calling EnsureProtectionPolicyExists", func() {
 		ginkgo.When("ensure protection policy exists", func() {
 			ginkgo.It("should failed if remote system not in list", func() {

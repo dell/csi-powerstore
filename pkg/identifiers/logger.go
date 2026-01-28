@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2021 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2021-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,24 +20,22 @@ package identifiers
 
 import (
 	"context"
-
-	log "github.com/sirupsen/logrus"
 )
 
 // CustomLogger is logger wrapper that can be passed to gopowerstore, gobrick allowing to logging context fields with each call
 type CustomLogger struct{}
 
-// Info is a wrapper of logrus Info method
+// Info is a wrapper of csmlog Info method
 func (lg *CustomLogger) Info(ctx context.Context, format string, args ...interface{}) {
-	log.WithFields(GetLogFields(ctx)).Infof(format, args...)
+	log.WithContext(ctx).Infof(format, args...)
 }
 
-// Debug is a wrapper of logrus Debug method
+// Debug is a wrapper of csmlog Debug method
 func (lg *CustomLogger) Debug(ctx context.Context, format string, args ...interface{}) {
-	log.WithFields(GetLogFields(ctx)).Debugf(format, args...)
+	log.WithContext(ctx).Debugf(format, args...)
 }
 
-// Error is a wrapper of logrus Error method
+// Error is a wrapper of csmlog Error method
 func (lg *CustomLogger) Error(ctx context.Context, format string, args ...interface{}) {
-	log.WithFields(GetLogFields(ctx)).Errorf(format, args...)
+	log.WithContext(ctx).Errorf(format, args...)
 }

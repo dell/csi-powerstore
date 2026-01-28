@@ -70,6 +70,18 @@ function check_for_driver() {
     fi
 }
 
+# Since helm does not automatically clean up crds on an uninstall.
+# This step must be done manually. 
+# check here for more information https://helm.sh/docs/chart_best_practices/custom_resource_definitions
+function remove_crd_after_uninstall() {
+  # Remove the volume journals crd
+  decho "Removal of the CSI PowerStore Custom Resource Definitions..."
+  run_command kubectl delete crd volumejournals.dr.storage.dell.com
+  if [ $? -ne 0 ]; then
+      decho "Removal of the CSI PowerStore Custom Resource Definition (volumejournals.dr.storage.dell.com) failed"
+  fi
+}
+
 # get the list of valid CSI Drivers, this will be the list of directories in drivers/ that contain helm charts
 
 DRIVERDIR="${SCRIPTDIR}/../helm-charts/charts"
@@ -124,6 +136,8 @@ if [ $? -ne 0 ]; then
     decho "Removal of the CSI Driver was unsuccessful"
     exit 1
 fi
+
+remove_crd_after_uninstall
 
 decho "Removal of the CSI Driver is in progress."
 decho "It may take a few minutes for all pods to terminate."

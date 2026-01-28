@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2021-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,9 +26,8 @@ import (
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers"
 	"github.com/dell/gopowerstore/api"
 
-	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/dell/gopowerstore"
-	log "github.com/sirupsen/logrus"
+	"github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -83,7 +82,7 @@ func setMetaData(reqParams map[string]string, createParams interface{}) {
 		t.MetaData().Set(HeaderPersistentVolumeClaimName, reqParams[CSIPersistentVolumeClaimName])
 		t.MetaData().Set(HeaderPersistentVolumeClaimNamespace, reqParams[CSIPersistentVolumeClaimNamespace])
 	} else {
-		log.Printf("warning: %T: no MetaData method exists, consider updating gopowerstore library.", createParams)
+		log.Infof("warning: %T: no MetaData method exists, consider updating gopowerstore library.", createParams)
 	}
 }
 
@@ -373,7 +372,8 @@ type NfsCreator struct {
 }
 
 // CheckSize validates that size is correct and returns size in bytes
-func (*NfsCreator) CheckSize(_ context.Context, cr *csi.CapacityRange, isAutoRoundOffFsSizeEnabled bool) (int64, error) {
+func (*NfsCreator) CheckSize(ctx context.Context, cr *csi.CapacityRange, isAutoRoundOffFsSizeEnabled bool) (int64, error) {
+	log := log.WithContext(ctx)
 	minSize := cr.GetRequiredBytes()
 	maxSize := cr.GetLimitBytes()
 
@@ -409,6 +409,7 @@ func (*NfsCreator) CheckName(_ context.Context, name string) error {
 
 // CheckIfAlreadyExists queries storage array if FileSystem with given name exists
 func (c *NfsCreator) CheckIfAlreadyExists(ctx context.Context, name string, sizeInBytes int64, client gopowerstore.Client) (*csi.Volume, error) {
+	log := log.WithContext(ctx)
 	alreadyExistVolume, err := client.GetFSByName(ctx, name)
 	if err != nil {
 		return nil, status.Errorf(status.Code(err), "can't find filesystem '%s': %s", name, err.Error())
