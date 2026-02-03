@@ -234,7 +234,7 @@ PREPARE="false"
 REGISTRY=""
 NIGHTLY="false"
 DRIVER="csi-powerstore"
-HELMCHARTVERSION="csi-powerstore-2.15.0"
+HELMCHARTVERSION="csi-powerstore-2.16.0"
 
 while getopts "cprnv:h" opt; do
   case $opt in
