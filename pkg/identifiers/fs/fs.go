@@ -17,6 +17,8 @@
  */
 
 // Package fs provides wrappers for os/fs dependent operations.
+//
+//revive:disable-next-line:var-naming
 package fs
 
 import (

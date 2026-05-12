@@ -1,0 +1,91 @@
+# VolumeGroupSnapshot Example for CSI PowerStore Driver
+# This example demonstrates how to create a group snapshot of multiple volumes
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: testpowerstore
+---
+# VolumeGroupSnapshotClass - defines how group snapshots should be created
+apiVersion: groupsnapshot.storage.k8s.io/v1beta2
+kind: VolumeGroupSnapshotClass
+metadata:
+  name: powerstore-group-snapshot-class
+driver: csi-powerstore.dellemc.com
+deletionPolicy: Delete  # Delete group snapshots when VolumeGroupSnapshot is deleted
+parameters:
+  # Add any PowerStore-specific parameters here
+  # Example parameters (check documentation for available options)
+  # writeOrderConsistency: "true"
+
+---
+# Example PersistentVolumeClaims that will be snapshotted together
+# These PVCs should already exist before creating the VolumeGroupSnapshot
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: database-data-pvc
+  namespace: testpowerstore
+  labels:
+    app: database
+    component: data
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: powerstore-xfs
+  resources:
+    requests:
+      storage: 4Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: database-log-pvc
+  namespace: testpowerstore
+  labels:
+    app: database
+    component: logs
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: powerstore-xfs
+  resources:
+    requests:
+      storage: 4Gi
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: database-config-pvc
+  namespace: testpowerstore
+  labels:
+    app: database
+    component: config
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: powerstore-xfs
+  resources:
+    requests:
+      storage: 4Gi
+
+---
+# VolumeGroupSnapshot - creates a group snapshot of the above PVCs
+apiVersion: groupsnapshot.storage.k8s.io/v1beta2
+kind: VolumeGroupSnapshot
+metadata:
+  name: database-group-snapshot
+  namespace: testpowerstore
+  labels:
+    app: database
+    backup: "true"
+spec:
+  volumeGroupSnapshotClassName: powerstore-group-snapshot-class
+  source:
+    # Select PVCs to snapshot using a selector
+    # This will snapshot all PVCs with label "app: database"
+    selector:
+      matchLabels:
+        app: database
+
+---

@@ -137,4 +137,25 @@ const (
 
 	// EnvCSMDREnabled indicates if CSM-DR is enabled
 	EnvCSMDREnabled = "X_CSM_DR_ENABLED"
+
+	// EnvFsCheckEnabled enables/disables file system check before mount
+	EnvFsCheckEnabled = "X_CSI_FS_CHECK_ENABLED"
+
+	// EnvFsCheckMode controls the file system check mode: "checkOnly" or "checkAndRepair"
+	EnvFsCheckMode = "X_CSI_FS_CHECK_MODE"
+
+	// EnvCSMDRBindPort specifies the bind port for CSM-DR controller initialization
+	EnvCSMDRBindPort = "X_CSM_DR_BIND_PORT"
+
+	// EnvSpaceReclamationEnabled enables/disables space reclamation
+	EnvSpaceReclamationEnabled = "X_CSI_SPACE_RECLAMATION_ENABLED"
+
+	// EnvSpaceReclamationSchedule is the cron schedule for space reclamation
+	EnvSpaceReclamationSchedule = "X_CSI_SPACE_RECLAMATION_SCHEDULE"
+
+	// EnvSpaceReclamationMaxConcurrent is the max concurrent reclamation operations per node
+	EnvSpaceReclamationMaxConcurrent = "X_CSI_SPACE_RECLAMATION_MAX_CONCURRENT"
+
+	// EnvSpaceReclamationTimeout is the timeout for each reclamation operation in seconds
+	EnvSpaceReclamationTimeout = "X_CSI_SPACE_RECLAMATION_TIMEOUT"
 )

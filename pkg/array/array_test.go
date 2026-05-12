@@ -451,49 +451,48 @@ func TestGetLeastUsedActiveNAS(t *testing.T) {
 	validNAS1 := gopowerstore.NAS{
 		Name:              "nasA",
 		OperationalStatus: gopowerstore.Started,
-		HealthDetails:     gopowerstore.HealthDetails{State: gopowerstore.Info},
 		FileSystems:       make([]gopowerstore.FileSystem, 3), // 3 FS
 	}
 
 	validNAS2 := gopowerstore.NAS{
 		Name:              "nasB",
 		OperationalStatus: gopowerstore.Started,
-		HealthDetails:     gopowerstore.HealthDetails{State: gopowerstore.None},
 		FileSystems:       make([]gopowerstore.FileSystem, 2), // 2 FS (should be chosen)
 	}
 
 	validNAS3 := gopowerstore.NAS{
 		Name:              "nasC",
 		OperationalStatus: gopowerstore.Started,
-		HealthDetails:     gopowerstore.HealthDetails{State: gopowerstore.Info},
 		FileSystems:       make([]gopowerstore.FileSystem, 2), // 2 FS, but lexicographically larger
 	}
 
 	validNAS4 := gopowerstore.NAS{
 		Name:              "nasD",
 		OperationalStatus: gopowerstore.Started,
-		HealthDetails:     gopowerstore.HealthDetails{State: gopowerstore.Info},
 		FileSystems:       make([]gopowerstore.FileSystem, 1),
 	}
 
 	invalidNAS1 := gopowerstore.NAS{
 		Name:              "nasX",
 		OperationalStatus: gopowerstore.Stopped, // Inactive NAS
-		HealthDetails:     gopowerstore.HealthDetails{State: gopowerstore.Info},
 		FileSystems:       make([]gopowerstore.FileSystem, 1),
 	}
 
 	invalidNAS2 := gopowerstore.NAS{
 		Name:              "nasY",
 		OperationalStatus: gopowerstore.Started,
-		HealthDetails:     gopowerstore.HealthDetails{State: gopowerstore.Critical}, // Invalid state
 		FileSystems:       make([]gopowerstore.FileSystem, 1),
 	}
 
 	invalidNAS3 := gopowerstore.NAS{
 		Name:              "nasZ",
 		OperationalStatus: gopowerstore.Started,
-		HealthDetails:     gopowerstore.HealthDetails{State: gopowerstore.Info},
+		FileSystems:       make([]gopowerstore.FileSystem, 1),
+	}
+
+	inactiveNAS := gopowerstore.NAS{
+		Name:              "nasInactive",
+		OperationalStatus: gopowerstore.Stopped,
 		FileSystems:       make([]gopowerstore.FileSystem, 1),
 	}
 
@@ -525,16 +524,16 @@ func TestGetLeastUsedActiveNAS(t *testing.T) {
 			nasServersInSc: []string{"nasA", "nasD", "nasX"},
 		},
 		{
-			name:           "NAS with invalid health state",
+			name:           "NAS without health details is still eligible",
 			nasList:        []gopowerstore.NAS{invalidNAS2},
-			expectedErrMsg: "no suitable NAS server found",
+			expectedNAS:    &invalidNAS2,
 			nasServersInSc: []string{"nasA", "nasD", "nasY"},
 		},
 		{
 			name:           "All NAS servers inactive or unhealthy",
-			nasList:        []gopowerstore.NAS{invalidNAS1, invalidNAS2},
+			nasList:        []gopowerstore.NAS{invalidNAS1, inactiveNAS},
 			expectedErrMsg: "no suitable NAS server found",
-			nasServersInSc: []string{"nasA", "nasB", "nasC", "nasD", "nasX", "nasY", "nasZ"},
+			nasServersInSc: []string{"nasA", "nasB", "nasC", "nasD", "nasX", "nasY", "nasZ", "nasInactive"},
 		},
 		{
 			name:           "All NAS servers are in cooldown 1",
@@ -553,7 +552,7 @@ func TestGetLeastUsedActiveNAS(t *testing.T) {
 		{
 			name:           "Few NAS servers inactive or unhealthy and rest are in cooldown",
 			nasList:        []gopowerstore.NAS{invalidNAS1, invalidNAS2, validNAS3, validNAS4},
-			expectedNAS:    &validNAS3, // nasC has the least Failure count (1)
+			expectedNAS:    &invalidNAS2, // nasY is the only eligible NAS (not in cooldown)
 			markForFailure: []string{"nasC", "nasD", "nasD"},
 			nasServersInSc: []string{"nasA", "nasB", "nasC", "nasD", "nasX", "nasY", "nasZ"},
 		},

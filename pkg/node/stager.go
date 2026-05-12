@@ -130,6 +130,15 @@ func (s *SCSIStager) Stage(ctx context.Context, req *csi.NodeStageVolumeRequest,
 	}
 	if ready {
 		log.WithFields(logFields).Info("device already staged")
+		if isRemote {
+			// Ensure the secondary array sessions are scanned and the LUN is discovered -
+			// then skip the bind-mount step (since it was already done by the primary LUN staging).
+			log.WithFields(logFields).Info("connecting remote device")
+			if _, err := s.connectDevice(ctx, publishContext); err != nil {
+				log.WithFields(logFields).Errorf("failed to connect remote device: %s", err)
+				return nil, status.Errorf(codes.Internal, "failed to connect remote device: %s", err)
+			}
+		}
 		return &csi.NodeStageVolumeResponse{}, nil
 	} else if found {
 		log.WithFields(logFields).Warn("volume found in staging path but it is not ready for publish, try to unmount it and retry staging again")

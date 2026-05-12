@@ -37,15 +37,14 @@ import (
 	commonext "github.com/dell/dell-csi-extensions/common"
 	podmon "github.com/dell/dell-csi-extensions/podmon"
 	csiext "github.com/dell/dell-csi-extensions/replication"
-	vgsext "github.com/dell/dell-csi-extensions/volumeGroupSnapshot"
 	csictx "github.com/dell/gocsi/context"
 	"github.com/dell/gopowerstore"
 	"github.com/dell/gopowerstore/api"
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/golang/protobuf/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 )
 
@@ -61,6 +60,7 @@ type Interface interface {
 
 // Service is a controller service that contains array connection information and implements ControllerServer API
 type Service struct {
+	csi.UnimplementedControllerServer
 	Fs fs.Interface
 
 	externalAccess  string
@@ -85,6 +85,7 @@ var (
 	unpublishVolumeFunc            = unpublishVolume
 	checkMetroStateFunc            = array.CheckMetroState
 	createOrUpdateJournalEntryFunc = array.CreateOrUpdateJournalEntry
+	selectMetroArrayForCloneFunc   = selectMetroArrayForClone
 )
 
 var mutex = &sync.Mutex{}
@@ -142,20 +143,22 @@ func (s *Service) Init() error {
 // CreateVolume creates either FileSystem or Volume on storage array.
 func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
 	log := log.WithContext(ctx)
+	log.Infof("CreateVolume: creating volume %s", req.GetName())
 	params := req.GetParameters()
 
 	// Get array from map
-	arrayID, ok := params[identifiers.KeyArrayID]
+	arrayID, arrayIDSpecified := params[identifiers.KeyArrayID]
 
 	var arr *array.PowerStoreArray
 	// If no ArrayID was provided in storage class we just use default array
-	if !ok {
+	if !arrayIDSpecified {
 		if _, ok := params["arrayIP"]; ok {
 			return nil, status.Error(codes.Internal, "Array IP's been provided, however it is not supported in "+
 				"current version. Configure you storage classes according to the documentation")
 		}
 		arr = s.DefaultArray()
 	} else {
+		var ok bool
 		arr, ok = s.Arrays()[arrayID]
 		if !ok {
 			return nil, status.Errorf(codes.Internal, "can't find array with provided id %s", arrayID)
@@ -267,17 +270,12 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 	}
 	repMode = strings.ToUpper(repMode)
 
+	var cloneRemoteSystemID string
+	var volumeResponse *csi.Volume
 	contentSource := req.GetVolumeContentSource()
 	if contentSource != nil {
 		var volResp *csi.Volume
 		var err error
-		// Configuring Metro is not allowed on clones or volumes created from Metro snapshot.
-		// So, fail the request if the requested volume is to be placed in Metro storage class.
-		// However, one can place the volume in a non-Metro storage class.
-		if replicationEnabled == "true" && repMode == identifiers.MetroMode {
-			return nil, status.Errorf(codes.InvalidArgument,
-				"Configuring Metro is not supported on clones or volumes created from Metro snapshot. Choose a non-Metro storage class.")
-		}
 
 		volumeSource := contentSource.GetVolume()
 		if volumeSource != nil {
@@ -291,6 +289,30 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 				}
 			}
 			volumeSource.VolumeId = volumeHandle.LocalUUID
+			if volumeHandle.IsMetro() {
+
+				var remoteSystemName string
+				if replicationEnabled == "true" {
+					// Convert the remoteStorageName to an arrayID
+					var ok bool
+					remoteSystemName, ok = params[s.WithRP(KeyReplicationRemoteSystem)]
+					if !ok {
+						return nil, status.Error(codes.InvalidArgument, "replication enabled but no remote system specified in storage class")
+					}
+				}
+				// Cloning from a Metro replicated volume: select the optimal array for cloning
+				selectedArr, selectedSession, err := selectMetroArrayForCloneFunc(ctx, arr, remoteSystemName, arrayID, volumeHandle, s)
+				if err != nil {
+					code := status.Code(err)
+					if code == codes.OK || code == codes.Unknown {
+						code = codes.Internal
+					}
+					return nil, status.Errorf(code, "failed to select metro array for clone: %s", status.Convert(err).Message())
+				}
+				arr = selectedArr
+				cloneRemoteSystemID = selectedSession.RemoteSystemID
+				volumeSource.VolumeId = selectedSession.LocalResourceID
+			}
 			volResp, err = creator.Clone(ctx, volumeSource, req.GetName(), sizeInBytes, req.Parameters, arr.GetClient())
 		}
 		snapshotSource := contentSource.GetSnapshot()
@@ -309,7 +331,7 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 				req.GetName(), sizeInBytes, req.Parameters, arr.GetClient())
 		}
 		if err != nil {
-			log.Warnf("Failed to create volume: %s from snapshot: %s", req.GetName(), err.Error())
+			log.Warnf("Failed to create volume: %s from content source: %s", req.GetName(), err.Error())
 			resp, err := creator.CheckIfAlreadyExists(ctx, req.GetName(), sizeInBytes, arr.GetClient())
 			if err != nil {
 				return nil, err
@@ -324,20 +346,26 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 		if volResp == nil {
 			return nil, err
 		}
-		volResp.VolumeId = volResp.VolumeId + "/" + arr.GetGlobalID() + "/" + protocol
-		if useNFS {
-			topology = identifiers.GetNfsTopology(arr.GetIP())
-			log.Infof("Modified topology to nfs for %s", req.GetName())
+		if replicationEnabled != "true" || repMode != identifiers.MetroMode {
+			// Created a clone with a non-Metro enabled storage class: build the full volume ID and return
+			volResp.VolumeId = volResp.VolumeId + "/" + arr.GetGlobalID() + "/" + protocol
+			if useNFS {
+				topology = identifiers.GetNfsTopology(arr.GetIP())
+				log.Infof("Modified topology to nfs for %s", req.GetName())
+			}
+			volResp.AccessibleTopology = topology
+			return &csi.CreateVolumeResponse{
+				Volume: volResp,
+			}, nil
 		}
-		volResp.AccessibleTopology = topology
-		return &csi.CreateVolumeResponse{
-			Volume: volResp,
-		}, nil
+		// Clone is created with a Metro enabled storage class: fall through to the existing Metro enablement code below.
+		// cloneRemoteSystemID has been set if a different array was selected for the clone.
+		// For Metro clones, we already have volResp from the clone operation, so use it directly
+		volumeResponse = volResp
 	}
 
 	var vg gopowerstore.VolumeGroup
 	var remoteSystem gopowerstore.RemoteSystem
-	var remoteSystemName string
 	var vgName string
 	isMetroVolume := false
 	// Check if replication is enabled
@@ -345,7 +373,7 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 
 		log.Info("Preparing volume replication")
 
-		remoteSystemName, ok = params[s.WithRP(KeyReplicationRemoteSystem)]
+		remoteSystemName, ok := params[s.WithRP(KeyReplicationRemoteSystem)]
 		if !ok {
 			return nil, status.Error(codes.InvalidArgument, "replication enabled but no remote system specified in storage class")
 		}
@@ -471,13 +499,21 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 			// Note: Metro on volume group support is not added
 			log.Info("Metro replication mode requested")
 
-			// Get specified remote system object for its ID
-			remoteSystem, err = arr.Client.GetRemoteSystemByName(ctx, remoteSystemName)
-			if err != nil {
-				return nil, status.Errorf(codes.Internal, "can't query remote system by name: %s", err.Error())
+			// Get specified remote system object.
+			// For Metro clones, the preferred array may differ from the original; use the UUID returned
+			// by SelectMetroArrayForClone rather than the storage class remote system name.
+			if cloneRemoteSystemID != "" {
+				remoteSystem, err = arr.Client.GetRemoteSystem(ctx, cloneRemoteSystemID)
+				if err != nil {
+					return nil, status.Errorf(codes.Internal, "can't query remote system by id: %v", err)
+				}
+			} else {
+				remoteSystem, err = arr.Client.GetRemoteSystemByName(ctx, remoteSystemName)
+				if err != nil {
+					return nil, status.Errorf(codes.Internal, "can't query remote system by name: %v", err)
+				}
 			}
-
-			isMetroVolume = true // set to true
+			isMetroVolume = true
 		default:
 			return nil, status.Errorf(codes.InvalidArgument, "replication enabled but invalid replication mode specified in storage class")
 		}
@@ -485,8 +521,6 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 	}
 
 	params[identifiers.KeyVolumeDescription] = getDescription(req.GetParameters())
-
-	var volumeResponse *csi.Volume
 
 	// check if job is already in progress on array, if so, return error and let CO check again
 	if useNFS {
@@ -502,12 +536,15 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 	}
 
 	// check if vol exists before creating it in the array
-	volumeResponse, err = creator.CheckIfAlreadyExists(ctx, req.GetName(), sizeInBytes, arr.GetClient())
-	if err != nil {
-		// internal means something went wrong trying to check the volume and request needs to be retried
-		if status.Code(err) == codes.Internal || status.Code(err) == codes.AlreadyExists {
-			log.Warnf("CheckIfAlreadyExists returned error: %s for vol: %s", err.Error(), req.GetName())
-			return nil, err
+	// Skip if we already have volumeResponse from Metro clone operation
+	if volumeResponse == nil {
+		volumeResponse, err = creator.CheckIfAlreadyExists(ctx, req.GetName(), sizeInBytes, arr.GetClient())
+		if err != nil {
+			// internal means something went wrong trying to check the volume and request needs to be retried
+			if status.Code(err) == codes.Internal || status.Code(err) == codes.AlreadyExists {
+				log.Warnf("CheckIfAlreadyExists returned error: %s for vol: %s", err.Error(), req.GetName())
+				return nil, err
+			}
 		}
 	}
 
@@ -573,6 +610,12 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 	volumeResponse.VolumeContext[identifiers.KeyProtocol] = protocol
 	volumeResponse.VolumeContext[identifiers.KeyServiceTag] = serviceTag
 
+	// For all Metro volumes, update the remoteSystem parameter to reflect the actual remote system
+	// This ensures the parameter always matches the authoritative remote system object
+	if isMetroVolume {
+		volumeResponse.VolumeContext[s.WithRP(KeyReplicationRemoteSystem)] = remoteSystem.Name
+	}
+
 	if useNFS {
 		volumeResponse.VolumeContext[identifiers.KeyNfsACL] = nfsAcls
 		volumeResponse.VolumeContext[identifiers.KeyNasName] = creator.(*NfsCreator).nasName
@@ -583,6 +626,8 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 	volumeResponse.VolumeId = volumeResponse.VolumeId + "/" + arr.GetGlobalID() + "/" + protocol + metroVolumeIDSuffix
 
 	volumeResponse.AccessibleTopology = topology
+
+	log.Infof("CreateVolume: finished creating volume %s", req.GetName())
 	return &csi.CreateVolumeResponse{
 		Volume: volumeResponse,
 	}, nil
@@ -838,6 +883,11 @@ func deleteISCSIVolume(ctx context.Context, _ array.VolumeHandle, arr *array.Pow
 	return err
 }
 
+func (s *Service) ControllerModifyVolume(_ context.Context, in *csi.ControllerModifyVolumeRequest) (*csi.ControllerModifyVolumeResponse, error) {
+	log.Infof("ControllerModifyVolume called with req: %s", in)
+	return nil, status.Error(codes.Unimplemented, "ControllerModifyVolume not implemented yet")
+}
+
 // ControllerPublishVolume prepares Volume/FileSystem to be consumed by node by attaching/allowing access to the host.
 func (s *Service) ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
 	log := log.WithContext(ctx)
@@ -927,7 +977,7 @@ func (s *Service) ControllerPublishVolume(ctx context.Context, req *csi.Controll
 	publishVolumeResponse := &csi.ControllerPublishVolumeResponse{}
 	localPublished, remotePublished := false, false
 
-	hostRegisteredLocalArray := arr.CheckConnectivity(ctx, kubeNodeID)
+	hostRegisteredLocalArray := arr.HasHostEntry(ctx, kubeNodeID)
 	if hostRegisteredLocalArray {
 		log.Infof("Volume is being published on node %s for array %s", kubeNodeID, arr.Endpoint)
 		ctxLocal, cancelLocal := context.WithTimeout(context.Background(), array.MediumTimeout)
@@ -941,7 +991,7 @@ func (s *Service) ControllerPublishVolume(ctx context.Context, req *csi.Controll
 				return nil, publishErr
 			}
 		} else {
-			log.Infof("Local volume %s published", id)
+			log.Infof("Local volume %s published, context: %v", id, publishReponse.PublishContext)
 			publishVolumeResponse = publishReponse
 			localPublished = true
 		}
@@ -951,7 +1001,7 @@ func (s *Service) ControllerPublishVolume(ctx context.Context, req *csi.Controll
 
 	hostRegisteredRemoteArray := false
 	if volumeHandle.IsMetro() {
-		if hostRegisteredRemoteArray = remoteArray.CheckConnectivity(ctx, kubeNodeID); hostRegisteredRemoteArray {
+		if hostRegisteredRemoteArray = remoteArray.HasHostEntry(ctx, kubeNodeID); hostRegisteredRemoteArray {
 			log.Infof("Volume is being published on node %s for remote array %s", kubeNodeID, remoteArray.Endpoint)
 			ctxRemote, cancelRemote := context.WithTimeout(context.Background(), array.MediumTimeout)
 			defer cancelRemote()
@@ -966,7 +1016,7 @@ func (s *Service) ControllerPublishVolume(ctx context.Context, req *csi.Controll
 					return nil, publishErr
 				}
 			} else {
-				log.Infof("Remote volume %s published", remoteVolumeID)
+				log.Infof("Remote volume %s published, context: %v", remoteVolumeID, publishReponse.PublishContext)
 				remotePublished = true
 				publishVolumeResponse = publishReponse
 			}
@@ -1147,7 +1197,7 @@ func (s *Service) ControllerUnpublishVolume(ctx context.Context, req *csi.Contro
 }
 
 func isNodeConnectedToArray(ctx context.Context, kubeNodeID string, arr *array.PowerStoreArray) bool {
-	return arr.CheckConnectivity(ctx, kubeNodeID)
+	return arr.HasHostEntry(ctx, kubeNodeID)
 }
 
 // unpublishVolume removes the mount to the target path and unpublishes the volume
@@ -1791,6 +1841,151 @@ func (s *Service) ListSnapshots(ctx context.Context, req *csi.ListSnapshotsReque
 	}, nil
 }
 
+// return the local and remote array IDs from the source Metro volume
+func getLocalAndRemoteArrays(volumeHandle array.VolumeHandle, s *Service) (*array.PowerStoreArray, *array.PowerStoreArray, error) {
+	localArray, ok := s.Arrays()[volumeHandle.LocalArrayGlobalID]
+	if !ok {
+		return nil, nil, fmt.Errorf("local array %s not found", volumeHandle.LocalArrayGlobalID)
+	}
+
+	remoteArray, ok := s.Arrays()[volumeHandle.RemoteArrayGlobalID]
+	if !ok {
+		return nil, nil, fmt.Errorf("remote array %s not found", volumeHandle.RemoteArrayGlobalID)
+	}
+
+	return localArray, remoteArray, nil
+}
+
+// selectMetroArrayForClone resolves the local and remote arrays from the volume handle
+// and delegates to array.SelectMetroArrayForClone to select the optimal array for cloning.
+func selectMetroArrayForClone(ctx context.Context, arr *array.PowerStoreArray,
+	remoteSystemName string, scArr1 string, volumeHandle array.VolumeHandle, s *Service,
+) (*array.PowerStoreArray, *gopowerstore.ReplicationSession, error) {
+	// Non-Metro SC: the target StorageClass has no replication parameters.
+	// Validate scArr1 (the SC arrayID) directly against the Metro source arrays — no remote
+	// system lookup is needed. Clone from the matched array after checking its state.
+	if remoteSystemName == "" {
+		if scArr1 != volumeHandle.LocalArrayGlobalID && scArr1 != volumeHandle.RemoteArrayGlobalID {
+			return nil, nil, status.Errorf(codes.InvalidArgument, "No matching arrays in the storage class")
+		}
+		localArray, remoteArray, err := getLocalAndRemoteArrays(volumeHandle, s)
+		if err != nil {
+			return nil, nil, err
+		}
+		var arrToCloneFrom *array.PowerStoreArray
+		var arrToCloneFromUUID string
+		if scArr1 == volumeHandle.LocalArrayGlobalID {
+			arrToCloneFrom = localArray
+			arrToCloneFromUUID = volumeHandle.LocalUUID
+		} else {
+			arrToCloneFrom = remoteArray
+			arrToCloneFromUUID = volumeHandle.RemoteUUID
+		}
+		ctxArr, cancelArr := context.WithTimeout(ctx, array.ShortTimeout)
+		defer cancelArr()
+		sourceVol, err := arrToCloneFrom.GetClient().GetVolume(ctxArr, arrToCloneFromUUID)
+		if err != nil {
+			return nil, nil, fmt.Errorf("unable to get source volume from array")
+		}
+		if sourceVol.MetroReplicationSessionID == "" {
+			return nil, nil, fmt.Errorf("source volume is not a metro volume")
+		}
+		session, err := array.DetermineIfArrayCanClone(ctx, sourceVol.MetroReplicationSessionID, arrToCloneFrom)
+		return arrToCloneFrom, session, err
+	}
+
+	// Metro SC path: obtain the arrayID of the remoteSystem, use shortTimeout
+	ctxRemoteSystem, cancelRemoteSystem := context.WithTimeout(ctx, array.ShortTimeout)
+	defer cancelRemoteSystem()
+	remoteSystem, err := arr.Client.GetRemoteSystemByName(ctxRemoteSystem, remoteSystemName)
+	if err != nil {
+		return nil, nil, status.Errorf(codes.Internal, "can't query remote system by name: %v", err)
+	}
+	scArr2 := remoteSystem.SerialNumber
+
+	// General Validation:
+	//  If no sc Array matches either volumeHandle arrays, (no match)
+	//    fail
+	//  else if scArrayA matches one of them and scArray2 matches the other one (both match)
+	//    then clone from the best one (current code)
+	//  else if scArrayA matches one volumeHandle arrays (one match)
+	//    clone from scArrayA, enable metro on the array that is shared i.e. A-B B-C enable metro on B
+	//  else // scArrayB matches one volumeHandle arrays (one match)
+	//    clone from scArrayB, enable metro on the array that is shared i.e. A-B B-C enable metro on B
+
+	// if no sc array matches then fail
+	if (scArr1 != volumeHandle.LocalArrayGlobalID && scArr1 != volumeHandle.RemoteArrayGlobalID) &&
+		(scArr2 != volumeHandle.LocalArrayGlobalID && scArr2 != volumeHandle.RemoteArrayGlobalID) {
+		// fail
+		return nil, nil, status.Errorf(codes.InvalidArgument, "No matching arrays in the storage class")
+	}
+
+	localArray, remoteArray, err := getLocalAndRemoteArrays(volumeHandle, s)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// if both source volume arrays match the arrays from the sc, pick the best one to clone from
+	if (scArr1 == volumeHandle.LocalArrayGlobalID || scArr1 == volumeHandle.RemoteArrayGlobalID) &&
+		(scArr2 == volumeHandle.LocalArrayGlobalID || scArr2 == volumeHandle.RemoteArrayGlobalID) {
+		// Get the metro replication session ID from the source volume
+		// Try local array first, fallback to remote array if local is offline
+		// NOTE: Use separate child contexts with scoped timeouts to prevent the local array
+		// call from consuming the entire parent CSI timeout before reaching the remote fallback
+		ctxLocal, cancelLocal := context.WithTimeout(ctx, array.ShortTimeout)
+		defer cancelLocal()
+		sourceVol, err := localArray.GetClient().GetVolume(ctxLocal, volumeHandle.LocalUUID)
+		if err != nil {
+			log.Warnf("Unable to get volume from local array: %v, trying remote array", err)
+			// We should not query localArray again, since it's either unreachable or has no knowledge of the volume
+			localArray = nil
+
+			ctxRemote, cancelRemote := context.WithTimeout(ctx, array.ShortTimeout)
+			defer cancelRemote()
+			sourceVol, err = remoteArray.GetClient().GetVolume(ctxRemote, volumeHandle.RemoteUUID)
+			if err != nil {
+				log.Errorf("Unable to get volume from remote array: %v", err)
+				return nil, nil, fmt.Errorf("unable to get source volume from either local or remote array")
+			}
+		}
+
+		if sourceVol.MetroReplicationSessionID == "" {
+			return nil, nil, fmt.Errorf("source volume is not a metro volume")
+		}
+
+		return array.SelectMetroArrayForClone(ctx, sourceVol.MetroReplicationSessionID, localArray, remoteArray)
+	}
+
+	// If only one of the arrays match then clone from the matched array only, check if it is
+	// online and has a Data Transfer state == Active/Active OR
+	// LocalResourceState == Promoted/FromPromoted
+
+	var arrToCloneFrom *array.PowerStoreArray
+	var arrToCloneFromUUID string
+
+	if (volumeHandle.LocalArrayGlobalID == scArr1) || (volumeHandle.LocalArrayGlobalID == scArr2) {
+		// clone from local Array
+		arrToCloneFrom = localArray
+		arrToCloneFromUUID = volumeHandle.LocalUUID
+	} else if (volumeHandle.RemoteArrayGlobalID == scArr1) || (volumeHandle.RemoteArrayGlobalID == scArr2) {
+		// clone from remote array
+		arrToCloneFrom = remoteArray
+		arrToCloneFromUUID = volumeHandle.RemoteUUID
+	}
+	ctxOneArr, cancelOneArr := context.WithTimeout(ctx, array.ShortTimeout)
+	defer cancelOneArr()
+	sourceVol, err := arrToCloneFrom.GetClient().GetVolume(ctxOneArr, arrToCloneFromUUID)
+	if err != nil {
+		log.Errorf("Unable to get volume from array: %v", err)
+		return nil, nil, fmt.Errorf("unable to get source volume from array")
+	}
+	if sourceVol.MetroReplicationSessionID == "" {
+		return nil, nil, fmt.Errorf("source volume is not a metro volume")
+	}
+	session, err := array.DetermineIfArrayCanClone(ctx, sourceVol.MetroReplicationSessionID, arrToCloneFrom)
+	return arrToCloneFrom, session, err
+}
+
 func GetMetroSessionState(ctx context.Context, metroSessionID string, arr *array.PowerStoreArray) (gopowerstore.RSStateEnum, error) {
 	metroSession, err := arr.Client.GetReplicationSessionByID(ctx, metroSessionID)
 	if err != nil {
@@ -1816,11 +2011,11 @@ func (s *Service) ControllerExpandVolume(ctx context.Context, req *csi.Controlle
 		return nil, status.Errorf(codes.OutOfRange, "volume exceeds allowed limit")
 	}
 
-	array, ok := s.Arrays()[arrayID]
+	localArr, ok := s.Arrays()[arrayID]
 	if !ok {
 		return nil, status.Errorf(codes.InvalidArgument, "unable to find array with ID %s", arrayID)
 	}
-	client := array.Client
+	client := localArr.Client
 
 	if protocol == "scsi" {
 		vol, err := client.GetVolume(ctx, id)
@@ -1835,29 +2030,51 @@ func (s *Service) ControllerExpandVolume(ctx context.Context, req *csi.Controlle
 		}
 
 		if vol.Size < requiredBytes {
+			expandClient := client
+			expandID := id
+
 			if isMetro {
-				// must pause metro session before modifying the volume
-				state, err := GetMetroSessionState(ctx, vol.MetroReplicationSessionID, array)
-				if err != nil {
-					return nil, status.Errorf(codes.Internal,
-						"failed to expand the volume %q: could not retrieve metro session state: %v", vol.Name, err)
+				// Log PowerStore version for observability
+				majorMinorVersion, vErr := client.GetSoftwareMajorMinorVersion(ctx)
+				if vErr != nil {
+					log.Warnf("[METRO EXPAND] Volume %q: Failed to determine PowerStore version: %v", vol.Name, vErr)
+				} else {
+					log.Infof("[METRO EXPAND] Volume %q: PowerStore version %.1f detected", vol.Name, majorMinorVersion)
 				}
 
-				if state != gopowerstore.RsStatePaused {
-					return nil, status.Errorf(codes.Aborted,
-						"failed to expand the volume %q because the metro replication session is in state %q. Please pause the metro replication session manually.",
-						vol.Name, state)
+				// Always use site selection to expand on the Metro_Preferred + online array.
+				// Even PowerStore 5.0+ requires expanding from the preferred site.
+				remoteArrayID := volumeHandle.RemoteArrayGlobalID
+				remoteArray, rErr := s.GetOneArray(remoteArrayID)
+				if rErr != nil {
+					return nil, status.Errorf(codes.Internal,
+						"failed to retrieve remote array %s for metro volume %q expansion: %v", remoteArrayID, vol.Name, rErr)
 				}
+
+				log.Debugf("[METRO EXPAND] Volume %q: Selecting preferred array between local %s and remote %s for expansion",
+					vol.Name, localArr.GetGlobalID(), remoteArrayID)
+
+				selectedArray, selectedSession, sErr := array.SelectMetroArrayForExpansion(ctx, vol.MetroReplicationSessionID, localArr, remoteArray)
+				if sErr != nil {
+					return nil, status.Errorf(codes.Internal,
+						"failed to select expansion target for metro volume %q: %v", vol.Name, sErr)
+				}
+
+				expandClient = selectedArray.GetClient()
+				expandID = selectedSession.LocalResourceID
+				log.Infof("[METRO EXPAND] Volume %q: Selected array %s (Metro_Preferred) for expansion", vol.Name, selectedArray.GetGlobalID())
 			}
 
-			_, err = client.ModifyVolume(context.Background(), &gopowerstore.VolumeModify{Size: requiredBytes}, id)
+			_, err = expandClient.ModifyVolume(context.Background(), &gopowerstore.VolumeModify{Size: requiredBytes}, expandID)
 			if err != nil {
 				return nil, status.Errorf(codes.Internal, "unable to modify volume size: %s", err.Error())
 			}
 			return &csi.ControllerExpandVolumeResponse{CapacityBytes: requiredBytes, NodeExpansionRequired: true}, nil
 		}
 
-		return &csi.ControllerExpandVolumeResponse{}, nil
+		// Idempotent case: volume already at or above required size
+		// Return actual current size — never return 0
+		return &csi.ControllerExpandVolumeResponse{CapacityBytes: vol.Size, NodeExpansionRequired: true}, nil
 	}
 
 	fs, err := client.GetFS(ctx, id)
@@ -1960,7 +2177,6 @@ func (s *Service) ControllerGetVolume(ctx context.Context, req *csi.ControllerGe
 // RegisterAdditionalServers registers replication extension
 func (s *Service) RegisterAdditionalServers(server *grpc.Server) {
 	csiext.RegisterReplicationServer(server, s)
-	vgsext.RegisterVolumeGroupSnapshotServer(server, s)
 	podmon.RegisterPodmonServer(server, s)
 }
 
@@ -1983,28 +2199,56 @@ func (s *Service) ProbeController(ctx context.Context, _ *commonext.ProbeControl
 func (s *Service) listPowerStoreVolumes(ctx context.Context, startToken, maxEntries int) ([]*csi.ListVolumesResponse_Entry, string, error) {
 	var volResponse []*csi.ListVolumesResponse_Entry
 
-	// Pre-fetch host-volume mappings for every array (so we only call mapping API once)
+	// Pre-fetch host-volume mappings and hosts for every array to avoid numerous API calls
 	mappingsByArray := make(map[string][]gopowerstore.HostVolumeMapping)
+	hostnamesByArray := make(map[string]map[string]string) // arrayID -> hostID -> hostName
+
 	for arrayID, arr := range s.Arrays() {
+		log.Debugf("ListVolumes: getting host-volume mappings for array %s", arrayID)
 		maps, err := arr.GetClient().GetHostVolumeMappings(ctx)
 		if err != nil {
 			log.Warnf("ListVolumes: failed to fetch host-volume mappings for array %s: %v", arrayID, err)
 			continue
 		}
 		mappingsByArray[arrayID] = maps
+
+		log.Debugf("ListVolumes: getting hosts for array %s", arrayID)
+		hosts, err := arr.GetClient().GetHosts(ctx)
+		if err != nil {
+			log.Warnf("ListVolumes: failed to fetch hosts for array %s: %v", arrayID, err)
+			continue
+		}
+
+		hostnamesByID := make(map[string]string, len(hosts))
+		for _, host := range hosts {
+			if host.Name != "" {
+				hostnamesByID[host.ID] = host.Name
+			}
+		}
+		hostnamesByArray[arrayID] = hostnamesByID
 	}
 
 	// ---------------------------
 	// Block Volumes (SCSI)
 	// ---------------------------
 	for arrayID, arr := range s.Arrays() {
+		log.Debugf("ListVolumes: getting block volumes for array %s", arrayID)
 		vols, err := arr.GetClient().GetVolumes(ctx)
 		if err != nil {
 			return nil, "", status.Errorf(codes.Internal, "unable to list volumes: %s", err.Error())
 		}
 
 		// for each volume build CSI-style volume id and populate published node ids
-		maps := mappingsByArray[arrayID]
+		hostVolumeMapping, ok := mappingsByArray[arrayID]
+		if !ok {
+			log.Warnf("ListVolumes: no host-volume mappings found for array %s", arrayID)
+			continue
+		}
+		hostMap, ok := hostnamesByArray[arrayID]
+		if !ok {
+			log.Warnf("ListVolumes: no hosts found for array %s", arrayID)
+			continue
+		}
 		for _, vol := range vols {
 			// build CSI volumeID so it matches PV.spec.csi.volumeHandle
 			// format: "<volumeGUID>/<arrayID>/scsi"
@@ -2019,10 +2263,10 @@ func (s *Service) listPowerStoreVolumes(ctx context.Context, startToken, maxEntr
 
 			// Populate PublishedNodeIds from host_volume_mapping -> host -> host.Name
 			var nodes []string
-			for _, m := range maps {
-				if m.VolumeID == vol.ID && m.HostID != "" {
-					if host, err := arr.GetClient().GetHost(ctx, m.HostID); err == nil && host.Name != "" {
-						nodes = append(nodes, host.Name)
+			for _, mapping := range hostVolumeMapping {
+				if mapping.VolumeID == vol.ID && mapping.HostID != "" {
+					if name, ok := hostMap[mapping.HostID]; ok && name != "" {
+						nodes = append(nodes, name)
 					}
 				}
 			}
@@ -2039,6 +2283,7 @@ func (s *Service) listPowerStoreVolumes(ctx context.Context, startToken, maxEntr
 	// FileSystems (NFS)
 	// ---------------------------
 	for arrayID, arr := range s.Arrays() {
+		log.Debugf("ListVolumes: getting filesystems for array %s", arrayID)
 		fsList, err := arr.GetClient().ListFS(ctx)
 		if err != nil {
 			return nil, "", status.Errorf(codes.Internal, "unable to list filesystems: %s", err.Error())
@@ -2079,6 +2324,7 @@ func (s *Service) listPowerStoreVolumes(ctx context.Context, startToken, maxEntr
 	if nextToken < len(volResponse) {
 		nextTokenStr = fmt.Sprintf("%d", nextToken)
 	}
+	log.Debugf("ListVolumes: returning %d volumes", len(volResponse[startToken:nextToken]))
 
 	return volResponse[startToken:nextToken], nextTokenStr, nil
 }

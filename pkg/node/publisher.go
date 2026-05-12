@@ -37,7 +37,8 @@ type VolumePublisher interface {
 
 // SCSIPublisher implementation of NodeVolumePublisher for SCSI based (FC, iSCSI) volumes
 type SCSIPublisher struct {
-	isBlock bool
+	isBlock    bool
+	fsckRunner *FsCheckRunner
 }
 
 // Publish publishes volume as either raw block or mount by mounting it to the target path
@@ -134,6 +135,20 @@ func (sp *SCSIPublisher) publishMount(ctx context.Context, logFields csmlog.Fiel
 		}
 		log.Infof("staged disk %s successfully formatted to %s", stagingPath, targetFS)
 	}
+
+	// Add additional context to the fsckRunner
+	sp.fsckRunner.fsType = curFS
+	sp.fsckRunner.fsDevice = stagingPath
+	// Make fsckRunner log with fields
+	sp.fsckRunner.SetLogger(log.WithFields(logFields).WithContext(ctx))
+	// Allow fsckRunner to source the PV name from the target path, if not already set
+	sp.fsckRunner.ResolvePVNameFromTargetPath(targetPath)
+	// FS check and repair before mounting the file system.
+	err = sp.fsckRunner.CheckFileSystem(ctx, vc.GetAccessMode().GetMode(), fs)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "Failed to check file system for errors: %v", err)
+	}
+
 	if isRO {
 		mntFlags = append(mntFlags, "ro")
 	}

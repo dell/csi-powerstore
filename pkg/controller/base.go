@@ -72,6 +72,8 @@ const (
 	KeyCSIPVCNamespace = "csi.storage.k8s.io/pvc/namespace"
 	// KeyCSIPVCName represents key for csi pvc name
 	KeyCSIPVCName = "csi.storage.k8s.io/pvc/name"
+	// KeyCSIPVName represents key for csi pv name
+	KeyCSIPVName = "csi.storage.k8s.io/pv/name"
 )
 
 func volumeNameValidation(volumeName string) error {

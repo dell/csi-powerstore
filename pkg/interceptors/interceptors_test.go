@@ -272,6 +272,11 @@ func (m *MockMetadataSidecarClient) GetPVCLabels(ctx context.Context, req *retri
 	return args.Get(0).(*retriever.GetPVCLabelsResponse), args.Error(1)
 }
 
+func (m *MockMetadataSidecarClient) GetPVCLabelsByPVName(ctx context.Context, req *retriever.GetPVCLabelsByPVNameRequest) (*retriever.GetPVCLabelsByPVNameResponse, error) {
+	args := m.Called(ctx, req)
+	return args.Get(0).(*retriever.GetPVCLabelsByPVNameResponse), args.Error(1)
+}
+
 func TestCreateVolume(t *testing.T) {
 	ctx := context.Background()
 	req := &csi.CreateVolumeRequest{

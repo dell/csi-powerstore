@@ -234,7 +234,7 @@ PREPARE="false"
 REGISTRY=""
 NIGHTLY="false"
 DRIVER="csi-powerstore"
-HELMCHARTVERSION="csi-powerstore-2.16.0"
+DEFAULT_VERSION="v2.17.0"
 
 while getopts "cprnv:h" opt; do
   case $opt in
@@ -270,6 +270,13 @@ while getopts "cprnv:h" opt; do
   esac
 done
 
+# Derive DRIVERVERSION from DEFAULT_VERSION (single source of truth)
+DRIVERVERSION="${DRIVER}-${DEFAULT_VERSION#v}"
+
+# Allow override via -v option
+if [ -n "$HELMCHARTVERSION" ]; then
+  DRIVERVERSION=$HELMCHARTVERSION
+fi
 
 # some directories
 SCRIPTDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
@@ -277,7 +284,7 @@ REPODIR="$( dirname "${SCRIPTDIR}" )"
 if [ ! -d "$REPODIR/helm-charts" ]; then
 
   if  [ ! -d "$SCRIPTDIR/helm-charts" ]; then
-    git clone --quiet -c advice.detachedHead=false -b $HELMCHARTVERSION https://github.com/dell/helm-charts
+    git clone --quiet -c advice.detachedHead=false -b $DRIVERVERSION https://github.com/dell/helm-charts
   fi
   mv helm-charts $REPODIR
 else

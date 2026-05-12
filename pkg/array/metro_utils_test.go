@@ -23,14 +23,15 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+	"time"
 
 	drv1 "github.com/dell/csm-dr/api/v1"
 	"github.com/dell/gopowerstore"
 	gopowerstoremock "github.com/dell/gopowerstore/mocks"
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/gogo/protobuf/proto"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/mock"
+	"google.golang.org/protobuf/proto"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -195,8 +196,17 @@ func TestCheckMetroState(t *testing.T) {
 					LocalResourceState: "Demoted",
 				}, nil)
 			},
-			beforeRemote: func(_ *gopowerstoremock.Client) {
-				// Not expected to be called
+			beforeRemote: func(client *gopowerstoremock.Client) {
+				client.On("GetVolume", mock.Anything, "remote-uuid").Once().Return(gopowerstore.Volume{
+					ID:                        "remote-uuid",
+					Name:                      "volume-name",
+					MetroReplicationSessionID: "remote-replication-session-id",
+				}, nil).After(100 * time.Millisecond) // delay the response to simulate offline
+				client.On("GetReplicationSessionByID", mock.Anything, "remote-replication-session-id").Maybe().Return(gopowerstore.ReplicationSession{
+					ID:                 "remote-replication-session-id",
+					State:              "Fractured",
+					LocalResourceState: "Promoted",
+				}, nil)
 			},
 		},
 		{
@@ -226,8 +236,17 @@ func TestCheckMetroState(t *testing.T) {
 					LocalResourceState: "Promoted",
 				}, nil)
 			},
-			beforeRemote: func(_ *gopowerstoremock.Client) {
-				// Not expected to be called
+			beforeRemote: func(client *gopowerstoremock.Client) {
+				client.On("GetVolume", mock.Anything, "remote-uuid").Once().Return(gopowerstore.Volume{
+					ID:                        "remote-uuid",
+					Name:                      "volume-name",
+					MetroReplicationSessionID: "remote-replication-session-id",
+				}, nil)
+				client.On("GetReplicationSessionByID", mock.Anything, "remote-replication-session-id").Once().Return(gopowerstore.ReplicationSession{
+					ID:                 "remote-replication-session-id",
+					State:              "Fracture",
+					LocalResourceState: "Demoted",
+				}, nil)
 			},
 		},
 		{
@@ -310,6 +329,88 @@ func TestCheckMetroState(t *testing.T) {
 				client.On("GetVolume", mock.Anything, "remote-uuid").Return(gopowerstore.Volume{}, fmt.Errorf("error getting remote volume"))
 			},
 		},
+		{
+			name: "CheckMetroState - Local not found, remote different error",
+			volumeHandle: VolumeHandle{
+				LocalUUID:  "local-uuid",
+				RemoteUUID: "remote-uuid",
+			},
+			localClient:      new(gopowerstoremock.Client),
+			remoteClient:     new(gopowerstoremock.Client),
+			wantResponse:     nil,
+			wantLocalDemoted: false,
+			wantErr:          fmt.Errorf("metro session not found on local array, error checking remote array: error getting remote volume"),
+			beforeLocal: func(client *gopowerstoremock.Client) {
+				// Simulate a not found error from local array
+				client.On("GetVolume", mock.Anything, "local-uuid").Return(gopowerstore.Volume{}, gopowerstore.NewNotFoundError())
+			},
+			beforeRemote: func(client *gopowerstoremock.Client) {
+				// Simulate a different error from remote array
+				client.On("GetVolume", mock.Anything, "remote-uuid").Return(gopowerstore.Volume{}, fmt.Errorf("error getting remote volume"))
+			},
+		},
+		{
+			name: "CheckMetroState - Local volume not fractured, remote error",
+			volumeHandle: VolumeHandle{
+				LocalUUID:  "local-uuid",
+				RemoteUUID: "remote-uuid",
+			},
+			localClient:  new(gopowerstoremock.Client),
+			remoteClient: new(gopowerstoremock.Client),
+			wantResponse: &MetroFracturedResponse{
+				IsFractured: false,
+				VolumeName:  "volume-name",
+				State:       "",
+			},
+			wantLocalDemoted: false,
+			wantErr:          nil,
+			beforeLocal: func(client *gopowerstoremock.Client) {
+				client.On("GetVolume", mock.Anything, "local-uuid").Return(gopowerstore.Volume{
+					ID:                        "local-uuid",
+					Name:                      "volume-name",
+					MetroReplicationSessionID: "replication-session-id",
+				}, nil)
+				client.On("GetReplicationSessionByID", mock.Anything, "replication-session-id").Return(gopowerstore.ReplicationSession{
+					ID:                 "replication-session-id",
+					State:              "OK",
+					LocalResourceState: "",
+				}, nil)
+			},
+			beforeRemote: func(client *gopowerstoremock.Client) {
+				client.On("GetVolume", mock.Anything, "remote-uuid").Return(gopowerstore.Volume{}, fmt.Errorf("error getting remote volume"))
+			},
+		},
+		{
+			name: "CheckMetroState - Remote volume not fractured, local error",
+			volumeHandle: VolumeHandle{
+				LocalUUID:  "local-uuid",
+				RemoteUUID: "remote-uuid",
+			},
+			localClient:  new(gopowerstoremock.Client),
+			remoteClient: new(gopowerstoremock.Client),
+			wantResponse: &MetroFracturedResponse{
+				IsFractured: false,
+				VolumeName:  "volume-name",
+				State:       "",
+			},
+			wantLocalDemoted: false,
+			wantErr:          nil,
+			beforeLocal: func(client *gopowerstoremock.Client) {
+				client.On("GetVolume", mock.Anything, "local-uuid").Return(gopowerstore.Volume{}, fmt.Errorf("error getting local volume"))
+			},
+			beforeRemote: func(client *gopowerstoremock.Client) {
+				client.On("GetVolume", mock.Anything, "remote-uuid").Return(gopowerstore.Volume{
+					ID:                        "remote-uuid",
+					Name:                      "volume-name",
+					MetroReplicationSessionID: "replication-session-id",
+				}, nil)
+				client.On("GetReplicationSessionByID", mock.Anything, "replication-session-id").Return(gopowerstore.ReplicationSession{
+					ID:                 "replication-session-id",
+					State:              "OK",
+					LocalResourceState: "",
+				}, nil)
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -331,6 +432,909 @@ func TestCheckMetroState(t *testing.T) {
 
 			if (tt.wantErr != nil && err == nil) || (tt.wantErr == nil && err != nil) {
 				t.Errorf("CheckMetroState() error = %v, want %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestMatchSessionForClone(t *testing.T) {
+	tests := []struct {
+		name        string
+		session     gopowerstore.ReplicationSession
+		asPreferred bool
+		want        bool
+	}{
+		{
+			name: "Preferred with Active_Active DataTransferState - online",
+			session: gopowerstore.ReplicationSession{
+				Role:               "Metro_Preferred",
+				DataTransferState:  gopowerstore.RSDataTransferStateActiveActive,
+				LocalResourceState: "",
+			},
+			asPreferred: true,
+			want:        true,
+		},
+		{
+			name: "Non-Preferred with Active_Active DataTransferState - online",
+			session: gopowerstore.ReplicationSession{
+				Role:               "Metro_Non_Preferred",
+				DataTransferState:  gopowerstore.RSDataTransferStateActiveActive,
+				LocalResourceState: "",
+			},
+			asPreferred: false,
+			want:        true,
+		},
+		{
+			name: "Preferred Promoted - online",
+			session: gopowerstore.ReplicationSession{
+				Role:               "Metro_Preferred",
+				DataTransferState:  "", // Empty DataTransferState, should rely on LocalResourceState
+				LocalResourceState: string(gopowerstore.ReplicationResourceStatePromoted),
+			},
+			asPreferred: true,
+			want:        true,
+		},
+		{
+			name: "Non-Preferred Promoted - online",
+			session: gopowerstore.ReplicationSession{
+				Role:               "Metro_Non_Preferred",
+				DataTransferState:  "", // Empty DataTransferState, should rely on LocalResourceState
+				LocalResourceState: string(gopowerstore.ReplicationResourceStatePromoted),
+			},
+			asPreferred: false,
+			want:        true,
+		},
+		{
+			name: "Preferred System_Promoted - online",
+			session: gopowerstore.ReplicationSession{
+				Role:               "Metro_Preferred",
+				DataTransferState:  "", // Empty DataTransferState, should rely on LocalResourceState
+				LocalResourceState: string(gopowerstore.ReplicationResourceStateSystemPromoted),
+			},
+			asPreferred: true,
+			want:        true,
+		},
+		{
+			name: "Non-Preferred System_Promoted - online",
+			session: gopowerstore.ReplicationSession{
+				Role:               "Metro_Non_Preferred",
+				DataTransferState:  "", // Empty DataTransferState, should rely on LocalResourceState
+				LocalResourceState: string(gopowerstore.ReplicationResourceStateSystemPromoted),
+			},
+			asPreferred: false,
+			want:        true,
+		},
+		{
+			name: "Preferred Demoted - offline",
+			session: gopowerstore.ReplicationSession{
+				Role:               "Metro_Preferred",
+				DataTransferState:  "", // Empty DataTransferState, should rely on LocalResourceState
+				LocalResourceState: string(gopowerstore.ReplicationResourceStateDemoted),
+			},
+			asPreferred: true,
+			want:        false,
+		},
+		{
+			name: "Non-Preferred Demoted - offline",
+			session: gopowerstore.ReplicationSession{
+				Role:               "Metro_Non_Preferred",
+				DataTransferState:  "", // Empty DataTransferState, should rely on LocalResourceState
+				LocalResourceState: string(gopowerstore.ReplicationResourceStateDemoted),
+			},
+			asPreferred: false,
+			want:        false,
+		},
+		{
+			name: "Preferred with Active_Active DataTransferState but wrong role - offline",
+			session: gopowerstore.ReplicationSession{
+				Role:               "Metro_Non_Preferred",
+				DataTransferState:  gopowerstore.RSDataTransferStateActiveActive,
+				LocalResourceState: "",
+			},
+			asPreferred: true,
+			want:        false,
+		},
+		{
+			name: "Non-Preferred with Active_Active DataTransferState but wrong role - offline",
+			session: gopowerstore.ReplicationSession{
+				Role:               "Metro_Preferred",
+				DataTransferState:  gopowerstore.RSDataTransferStateActiveActive,
+				LocalResourceState: "",
+			},
+			asPreferred: false,
+			want:        false,
+		},
+		{
+			name: "Preferred with different DataTransferState - offline",
+			session: gopowerstore.ReplicationSession{
+				Role:               "Metro_Preferred",
+				DataTransferState:  gopowerstore.RSDataTransferStateSynchronous,
+				LocalResourceState: "",
+			},
+			asPreferred: true,
+			want:        false,
+		},
+		{
+			name: "Error state - offline",
+			session: gopowerstore.ReplicationSession{
+				DataTransferState:  "", // Empty DataTransferState
+				LocalResourceState: "",
+			},
+			asPreferred: true,
+			want:        false,
+		},
+	}
+
+	// nil session must always return false
+	tests = append(tests, struct {
+		name        string
+		session     gopowerstore.ReplicationSession
+		asPreferred bool
+		want        bool
+	}{name: "nil session - offline", asPreferred: true, want: false})
+
+	for i, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var sp *gopowerstore.ReplicationSession
+			if i < len(tests)-1 { // all except the nil case
+				sp = &tt.session
+			}
+			got := matchSessionForClone(sp, tt.asPreferred)
+			if got != tt.want {
+				t.Errorf("matchSessionForClone() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSelectMetroArrayForClone(t *testing.T) {
+	metroSessionID := "metro-session-123"
+
+	tests := []struct {
+		name           string
+		beforeLocal    func(*gopowerstoremock.Client)
+		beforeRemote   func(*gopowerstoremock.Client)
+		wantVolID      string
+		wantErr        bool
+		wantErrContain string
+	}{
+		{
+			name: "Preferred array online (local=preferred) - selects preferred",
+			beforeLocal: func(c *gopowerstoremock.Client) {
+				c.On("GetReplicationSessionByID", mock.Anything, metroSessionID).Return(
+					gopowerstore.ReplicationSession{
+						ID:                 metroSessionID,
+						Role:               "Metro_Preferred",
+						State:              gopowerstore.RsStateOk,
+						LocalResourceID:    "local-vol-id",
+						RemoteResourceID:   "remote-vol-id",
+						LocalResourceState: string(gopowerstore.ReplicationResourceStatePromoted),
+					}, nil)
+			},
+			beforeRemote: func(c *gopowerstoremock.Client) {
+				c.On("GetReplicationSessionByID", mock.Anything, metroSessionID).Return(
+					gopowerstore.ReplicationSession{
+						ID:                 metroSessionID,
+						Role:               "Metro_Non_Preferred",
+						State:              gopowerstore.RsStateOk,
+						LocalResourceID:    "remote-vol-id",
+						RemoteResourceID:   "local-vol-id",
+						LocalResourceState: string(gopowerstore.ReplicationResourceStatePromoted),
+					}, nil)
+			},
+			wantVolID: "local-vol-id",
+			wantErr:   false,
+		},
+		{
+			name: "Preferred array online (local=non-preferred) - selects remote as preferred",
+			beforeLocal: func(c *gopowerstoremock.Client) {
+				c.On("GetReplicationSessionByID", mock.Anything, metroSessionID).Return(
+					gopowerstore.ReplicationSession{
+						ID:                 metroSessionID,
+						Role:               "Metro_Non_Preferred",
+						State:              gopowerstore.RsStateOk,
+						LocalResourceID:    "local-vol-id",
+						LocalResourceState: string(gopowerstore.ReplicationResourceStatePromoted),
+					}, nil)
+			},
+			beforeRemote: func(c *gopowerstoremock.Client) {
+				c.On("GetReplicationSessionByID", mock.Anything, metroSessionID).Return(
+					gopowerstore.ReplicationSession{
+						ID:                 metroSessionID,
+						Role:               "Metro_Preferred",
+						State:              gopowerstore.RsStateOk,
+						LocalResourceID:    "remote-vol-id",
+						LocalResourceState: string(gopowerstore.ReplicationResourceStatePromoted),
+					}, nil)
+			},
+			wantVolID: "remote-vol-id",
+			wantErr:   false,
+		},
+		{
+			name: "Preferred fractured/demoted, non-preferred promoted - selects non-preferred",
+			beforeLocal: func(c *gopowerstoremock.Client) {
+				c.On("GetReplicationSessionByID", mock.Anything, metroSessionID).Return(
+					gopowerstore.ReplicationSession{
+						ID:                 metroSessionID,
+						Role:               "Metro_Preferred",
+						State:              gopowerstore.RsStateFractured,
+						LocalResourceID:    "local-vol-id",
+						LocalResourceState: string(gopowerstore.ReplicationResourceStateDemoted),
+					}, nil)
+			},
+			beforeRemote: func(c *gopowerstoremock.Client) {
+				c.On("GetReplicationSessionByID", mock.Anything, metroSessionID).Return(
+					gopowerstore.ReplicationSession{
+						ID:                 metroSessionID,
+						Role:               "Metro_Non_Preferred",
+						State:              gopowerstore.RsStateFractured,
+						LocalResourceID:    "remote-vol-id",
+						LocalResourceState: string(gopowerstore.ReplicationResourceStatePromoted),
+					}, nil)
+			},
+			wantVolID: "remote-vol-id",
+			wantErr:   false,
+		},
+		{
+			name: "Both arrays demoted - returns error",
+			beforeLocal: func(c *gopowerstoremock.Client) {
+				c.On("GetReplicationSessionByID", mock.Anything, metroSessionID).Return(
+					gopowerstore.ReplicationSession{
+						ID:                 metroSessionID,
+						Role:               "Metro_Preferred",
+						State:              gopowerstore.RsStateFractured,
+						LocalResourceID:    "local-vol-id",
+						LocalResourceState: string(gopowerstore.ReplicationResourceStateDemoted),
+					}, nil)
+			},
+			beforeRemote: func(c *gopowerstoremock.Client) {
+				c.On("GetReplicationSessionByID", mock.Anything, metroSessionID).Return(
+					gopowerstore.ReplicationSession{
+						ID:                 metroSessionID,
+						Role:               "Metro_Non_Preferred",
+						State:              gopowerstore.RsStateFractured,
+						LocalResourceID:    "remote-vol-id",
+						LocalResourceState: string(gopowerstore.ReplicationResourceStateDemoted),
+					}, nil)
+			},
+			wantErr:        true,
+			wantErrContain: "neither local nor remote array has a healthy Metro session",
+		},
+		{
+			name: "Both API calls fail - returns error",
+			beforeLocal: func(c *gopowerstoremock.Client) {
+				c.On("GetReplicationSessionByID", mock.Anything, metroSessionID).Return(
+					gopowerstore.ReplicationSession{}, errors.New("local API error"))
+			},
+			beforeRemote: func(c *gopowerstoremock.Client) {
+				c.On("GetReplicationSessionByID", mock.Anything, metroSessionID).Return(
+					gopowerstore.ReplicationSession{}, errors.New("remote API error"))
+			},
+			wantErr:        true,
+			wantErrContain: "unable to get replication session from either local or remote array",
+		},
+		{
+			name:        "localArray nil (local unreachable), remote preferred online - selects remote",
+			beforeLocal: func(_ *gopowerstoremock.Client) {},
+			beforeRemote: func(c *gopowerstoremock.Client) {
+				c.On("GetReplicationSessionByID", mock.Anything, metroSessionID).Return(
+					gopowerstore.ReplicationSession{
+						ID:                 metroSessionID,
+						Role:               "Metro_Preferred",
+						State:              gopowerstore.RsStateOk,
+						LocalResourceID:    "remote-vol-id",
+						LocalResourceState: string(gopowerstore.ReplicationResourceStatePromoted),
+					}, nil)
+			},
+			wantVolID: "remote-vol-id",
+			wantErr:   false,
+		},
+		{
+			name: "Local API fails, remote preferred online - selects remote",
+			beforeLocal: func(c *gopowerstoremock.Client) {
+				c.On("GetReplicationSessionByID", mock.Anything, metroSessionID).Return(
+					gopowerstore.ReplicationSession{}, errors.New("local API error"))
+			},
+			beforeRemote: func(c *gopowerstoremock.Client) {
+				c.On("GetReplicationSessionByID", mock.Anything, metroSessionID).Return(
+					gopowerstore.ReplicationSession{
+						ID:                 metroSessionID,
+						Role:               "Metro_Preferred",
+						State:              gopowerstore.RsStateOk,
+						LocalResourceID:    "remote-vol-id",
+						LocalResourceState: string(gopowerstore.ReplicationResourceStatePromoted),
+					}, nil)
+			},
+			wantVolID: "remote-vol-id",
+			wantErr:   false,
+		},
+		{
+			name: "Preferred arrays unavailable, local non-preferred available - selects local as non-preferred",
+			beforeLocal: func(c *gopowerstoremock.Client) {
+				c.On("GetReplicationSessionByID", mock.Anything, metroSessionID).Return(
+					gopowerstore.ReplicationSession{
+						ID:                 metroSessionID,
+						Role:               "Metro_Non_Preferred",
+						State:              gopowerstore.RsStateFractured,
+						LocalResourceID:    "local-vol-id",
+						LocalResourceState: string(gopowerstore.ReplicationResourceStatePromoted),
+					}, nil)
+			},
+			beforeRemote: func(c *gopowerstoremock.Client) {
+				c.On("GetReplicationSessionByID", mock.Anything, metroSessionID).Return(
+					gopowerstore.ReplicationSession{
+						ID:                 metroSessionID,
+						Role:               "Metro_Non_Preferred",
+						State:              gopowerstore.RsStateFractured,
+						LocalResourceID:    "remote-vol-id",
+						LocalResourceState: string(gopowerstore.ReplicationResourceStateDemoted),
+					}, nil)
+			},
+			wantVolID: "local-vol-id",
+			wantErr:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			localMock := new(gopowerstoremock.Client)
+			remoteMock := new(gopowerstoremock.Client)
+			tt.beforeLocal(localMock)
+			tt.beforeRemote(remoteMock)
+
+			localArray := &PowerStoreArray{
+				GlobalID: "PS-local",
+				Client:   localMock,
+			}
+
+			remoteArray := &PowerStoreArray{
+				GlobalID: "PS-remote",
+				Client:   remoteMock,
+			}
+
+			localArr := localArray
+			if tt.name == "localArray nil (local unreachable), remote preferred online - selects remote" {
+				localArr = nil
+			}
+			selectedArr, selectedSession, err := SelectMetroArrayForClone(t.Context(), metroSessionID, localArr, remoteArray)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("SelectMetroArrayForClone() expected error, got nil")
+				}
+				if tt.wantErrContain != "" {
+					if !contains(err.Error(), tt.wantErrContain) {
+						t.Errorf("SelectMetroArrayForClone() error = %v, want containing %q", err, tt.wantErrContain)
+					}
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("SelectMetroArrayForClone() unexpected error: %v", err)
+			}
+			if selectedArr == nil {
+				t.Fatal("SelectMetroArrayForClone() returned nil array")
+			}
+			if selectedSession.LocalResourceID != tt.wantVolID {
+				t.Errorf("SelectMetroArrayForClone() selectedSession.LocalResourceID = %q, want %q", selectedSession.LocalResourceID, tt.wantVolID)
+			}
+		})
+	}
+}
+
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || len(s) > 0 && containsSubstring(s, substr))
+}
+
+func containsSubstring(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
+}
+
+func TestDetermineIfArrayCanClone(t *testing.T) {
+	metroSessionID := "metro-session-456"
+
+	tests := []struct {
+		name           string
+		before         func(*gopowerstoremock.Client)
+		wantErr        bool
+		wantErrContain string
+		wantVolID      string
+	}{
+		{
+			name: "session Promoted - array can clone",
+			before: func(c *gopowerstoremock.Client) {
+				c.On("GetReplicationSessionByID", mock.Anything, metroSessionID).Return(
+					gopowerstore.ReplicationSession{
+						ID:                 metroSessionID,
+						LocalResourceID:    "local-vol-id",
+						LocalResourceState: string(gopowerstore.ReplicationResourceStatePromoted),
+					}, nil)
+			},
+			wantErr:   false,
+			wantVolID: "local-vol-id",
+		},
+		{
+			name: "session SystemPromoted - array can clone",
+			before: func(c *gopowerstoremock.Client) {
+				c.On("GetReplicationSessionByID", mock.Anything, metroSessionID).Return(
+					gopowerstore.ReplicationSession{
+						ID:                 metroSessionID,
+						LocalResourceID:    "local-vol-id",
+						LocalResourceState: string(gopowerstore.ReplicationResourceStateSystemPromoted),
+					}, nil)
+			},
+			wantErr:   false,
+			wantVolID: "local-vol-id",
+		},
+		{
+			name: "session DataTransferState Active_Active - array can clone",
+			before: func(c *gopowerstoremock.Client) {
+				c.On("GetReplicationSessionByID", mock.Anything, metroSessionID).Return(
+					gopowerstore.ReplicationSession{
+						ID:                metroSessionID,
+						LocalResourceID:   "local-vol-id",
+						DataTransferState: gopowerstore.RSDataTransferStateActiveActive,
+					}, nil)
+			},
+			wantErr:   false,
+			wantVolID: "local-vol-id",
+		},
+		{
+			name: "session Demoted - array cannot clone",
+			before: func(c *gopowerstoremock.Client) {
+				c.On("GetReplicationSessionByID", mock.Anything, metroSessionID).Return(
+					gopowerstore.ReplicationSession{
+						ID:                 metroSessionID,
+						LocalResourceID:    "local-vol-id",
+						LocalResourceState: string(gopowerstore.ReplicationResourceStateDemoted),
+					}, nil)
+			},
+			wantErr:        true,
+			wantErrContain: "array selected for cloning is not in correct state",
+		},
+		{
+			name: "GetReplicationSessionByID fails - session nil - cannot clone",
+			before: func(c *gopowerstoremock.Client) {
+				c.On("GetReplicationSessionByID", mock.Anything, metroSessionID).Return(
+					gopowerstore.ReplicationSession{}, errors.New("API error"))
+			},
+			wantErr:        true,
+			wantErrContain: "unable to get replication session from array",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockClient := new(gopowerstoremock.Client)
+			tt.before(mockClient)
+
+			arr := &PowerStoreArray{
+				GlobalID: "PS-test",
+				Client:   mockClient,
+			}
+
+			session, err := DetermineIfArrayCanClone(t.Context(), metroSessionID, arr)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("DetermineIfArrayCanClone() expected error, got nil")
+				}
+				if tt.wantErrContain != "" && !containsSubstring(err.Error(), tt.wantErrContain) {
+					t.Errorf("DetermineIfArrayCanClone() error = %v, want containing %q", err, tt.wantErrContain)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("DetermineIfArrayCanClone() unexpected error: %v", err)
+			}
+			if session == nil {
+				t.Fatal("DetermineIfArrayCanClone() returned nil session")
+			}
+			if session.LocalResourceID != tt.wantVolID {
+				t.Errorf("DetermineIfArrayCanClone() session.LocalResourceID = %q, want %q", session.LocalResourceID, tt.wantVolID)
+			}
+		})
+	}
+}
+
+func TestMatchSessionForExpansion(t *testing.T) {
+	tests := []struct {
+		name    string
+		session gopowerstore.ReplicationSession
+		want    bool
+	}{
+		{
+			name: "Preferred + Active_Active - eligible",
+			session: gopowerstore.ReplicationSession{
+				Role:              "Metro_Preferred",
+				DataTransferState: gopowerstore.RSDataTransferStateActiveActive,
+			},
+			want: true,
+		},
+		{
+			name: "Preferred + Promoted - eligible",
+			session: gopowerstore.ReplicationSession{
+				Role:               "Metro_Preferred",
+				LocalResourceState: string(gopowerstore.ReplicationResourceStatePromoted),
+			},
+			want: true,
+		},
+		{
+			name: "Preferred + System_Promoted - eligible",
+			session: gopowerstore.ReplicationSession{
+				Role:               "Metro_Preferred",
+				LocalResourceState: string(gopowerstore.ReplicationResourceStateSystemPromoted),
+			},
+			want: true,
+		},
+		{
+			name: "Preferred + Demoted - not eligible",
+			session: gopowerstore.ReplicationSession{
+				Role:               "Metro_Preferred",
+				LocalResourceState: string(gopowerstore.ReplicationResourceStateDemoted),
+			},
+			want: false,
+		},
+		{
+			name: "Non-Preferred + Active_Active - not eligible for expansion",
+			session: gopowerstore.ReplicationSession{
+				Role:              "Metro_Non_Preferred",
+				DataTransferState: gopowerstore.RSDataTransferStateActiveActive,
+			},
+			want: false,
+		},
+		{
+			name: "Preferred + Synchronous DataTransferState - not eligible",
+			session: gopowerstore.ReplicationSession{
+				Role:              "Metro_Preferred",
+				DataTransferState: gopowerstore.RSDataTransferStateSynchronous,
+			},
+			want: false,
+		},
+		{
+			name: "Empty role - not eligible",
+			session: gopowerstore.ReplicationSession{
+				DataTransferState: gopowerstore.RSDataTransferStateActiveActive,
+			},
+			want: false,
+		},
+	}
+
+	// nil session must always return false
+	tests = append(tests, struct {
+		name    string
+		session gopowerstore.ReplicationSession
+		want    bool
+	}{name: "nil session - not eligible", want: false})
+
+	for i, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var sp *gopowerstore.ReplicationSession
+			if i < len(tests)-1 { // all except the nil case
+				sp = &tt.session
+			}
+			got := matchSessionForExpansion(sp)
+			if got != tt.want {
+				t.Errorf("matchSessionForExpansion() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSelectMetroArrayForExpansion(t *testing.T) {
+	metroSessionID := "metro-session-expand-123"
+
+	tests := []struct {
+		name           string
+		localArrayNil  bool
+		remoteArrayNil bool
+		beforeLocal    func(*gopowerstoremock.Client)
+		beforeRemote   func(*gopowerstoremock.Client)
+		wantArrayID    string
+		wantErr        bool
+		wantErrContain string
+	}{
+		{
+			name: "Local is preferred + online - selects local",
+			beforeLocal: func(c *gopowerstoremock.Client) {
+				c.On("GetReplicationSessionByID", mock.Anything, metroSessionID).Return(
+					gopowerstore.ReplicationSession{
+						ID:                metroSessionID,
+						Role:              "Metro_Preferred",
+						State:             gopowerstore.RsStateOk,
+						LocalResourceID:   "local-vol-id",
+						DataTransferState: gopowerstore.RSDataTransferStateActiveActive,
+					}, nil)
+			},
+			beforeRemote: func(c *gopowerstoremock.Client) {
+				c.On("GetReplicationSessionByID", mock.Anything, metroSessionID).Return(
+					gopowerstore.ReplicationSession{
+						ID:              metroSessionID,
+						Role:            "Metro_Non_Preferred",
+						State:           gopowerstore.RsStateOk,
+						LocalResourceID: "remote-vol-id",
+					}, nil)
+			},
+			wantArrayID: "PS-local",
+			wantErr:     false,
+		},
+		{
+			name: "Remote is preferred + online - selects remote",
+			beforeLocal: func(c *gopowerstoremock.Client) {
+				c.On("GetReplicationSessionByID", mock.Anything, metroSessionID).Return(
+					gopowerstore.ReplicationSession{
+						ID:              metroSessionID,
+						Role:            "Metro_Non_Preferred",
+						State:           gopowerstore.RsStateOk,
+						LocalResourceID: "local-vol-id",
+					}, nil)
+			},
+			beforeRemote: func(c *gopowerstoremock.Client) {
+				c.On("GetReplicationSessionByID", mock.Anything, metroSessionID).Return(
+					gopowerstore.ReplicationSession{
+						ID:                 metroSessionID,
+						Role:               "Metro_Preferred",
+						State:              gopowerstore.RsStateOk,
+						LocalResourceID:    "remote-vol-id",
+						LocalResourceState: string(gopowerstore.ReplicationResourceStatePromoted),
+					}, nil)
+			},
+			wantArrayID: "PS-remote",
+			wantErr:     false,
+		},
+		{
+			name: "Local preferred + Promoted - selects local",
+			beforeLocal: func(c *gopowerstoremock.Client) {
+				c.On("GetReplicationSessionByID", mock.Anything, metroSessionID).Return(
+					gopowerstore.ReplicationSession{
+						ID:                 metroSessionID,
+						Role:               "Metro_Preferred",
+						State:              gopowerstore.RsStateOk,
+						LocalResourceID:    "local-vol-id",
+						LocalResourceState: string(gopowerstore.ReplicationResourceStatePromoted),
+					}, nil)
+			},
+			beforeRemote: func(c *gopowerstoremock.Client) {
+				c.On("GetReplicationSessionByID", mock.Anything, metroSessionID).Return(
+					gopowerstore.ReplicationSession{
+						ID:              metroSessionID,
+						Role:            "Metro_Non_Preferred",
+						LocalResourceID: "remote-vol-id",
+					}, nil)
+			},
+			wantArrayID: "PS-local",
+			wantErr:     false,
+		},
+		{
+			name: "Remote preferred + System_Promoted - selects remote",
+			beforeLocal: func(c *gopowerstoremock.Client) {
+				c.On("GetReplicationSessionByID", mock.Anything, metroSessionID).Return(
+					gopowerstore.ReplicationSession{
+						ID:              metroSessionID,
+						Role:            "Metro_Non_Preferred",
+						LocalResourceID: "local-vol-id",
+					}, nil)
+			},
+			beforeRemote: func(c *gopowerstoremock.Client) {
+				c.On("GetReplicationSessionByID", mock.Anything, metroSessionID).Return(
+					gopowerstore.ReplicationSession{
+						ID:                 metroSessionID,
+						Role:               "Metro_Preferred",
+						State:              gopowerstore.RsStateOk,
+						LocalResourceID:    "remote-vol-id",
+						LocalResourceState: string(gopowerstore.ReplicationResourceStateSystemPromoted),
+					}, nil)
+			},
+			wantArrayID: "PS-remote",
+			wantErr:     false,
+		},
+		{
+			name: "Local API fails, remote preferred online - selects remote",
+			beforeLocal: func(c *gopowerstoremock.Client) {
+				c.On("GetReplicationSessionByID", mock.Anything, metroSessionID).Return(
+					gopowerstore.ReplicationSession{}, errors.New("local API error"))
+			},
+			beforeRemote: func(c *gopowerstoremock.Client) {
+				c.On("GetReplicationSessionByID", mock.Anything, metroSessionID).Return(
+					gopowerstore.ReplicationSession{
+						ID:                metroSessionID,
+						Role:              "Metro_Preferred",
+						State:             gopowerstore.RsStateOk,
+						LocalResourceID:   "remote-vol-id",
+						DataTransferState: gopowerstore.RSDataTransferStateActiveActive,
+					}, nil)
+			},
+			wantArrayID: "PS-remote",
+			wantErr:     false,
+		},
+		{
+			name: "Remote API fails, local preferred online - selects local",
+			beforeLocal: func(c *gopowerstoremock.Client) {
+				c.On("GetReplicationSessionByID", mock.Anything, metroSessionID).Return(
+					gopowerstore.ReplicationSession{
+						ID:                metroSessionID,
+						Role:              "Metro_Preferred",
+						State:             gopowerstore.RsStateOk,
+						LocalResourceID:   "local-vol-id",
+						DataTransferState: gopowerstore.RSDataTransferStateActiveActive,
+					}, nil)
+			},
+			beforeRemote: func(c *gopowerstoremock.Client) {
+				c.On("GetReplicationSessionByID", mock.Anything, metroSessionID).Return(
+					gopowerstore.ReplicationSession{}, errors.New("remote API error"))
+			},
+			wantArrayID: "PS-local",
+			wantErr:     false,
+		},
+		{
+			name: "Both API calls fail - error both unavailable",
+			beforeLocal: func(c *gopowerstoremock.Client) {
+				c.On("GetReplicationSessionByID", mock.Anything, metroSessionID).Return(
+					gopowerstore.ReplicationSession{}, errors.New("local API error"))
+			},
+			beforeRemote: func(c *gopowerstoremock.Client) {
+				c.On("GetReplicationSessionByID", mock.Anything, metroSessionID).Return(
+					gopowerstore.ReplicationSession{}, errors.New("remote API error"))
+			},
+			wantErr:        true,
+			wantErrContain: "PS-local and PS-remote are unavailable",
+		},
+		{
+			name: "Both reachable but preferred is demoted on both - error",
+			beforeLocal: func(c *gopowerstoremock.Client) {
+				c.On("GetReplicationSessionByID", mock.Anything, metroSessionID).Return(
+					gopowerstore.ReplicationSession{
+						ID:                 metroSessionID,
+						Role:               "Metro_Preferred",
+						State:              gopowerstore.RsStateFractured,
+						LocalResourceID:    "local-vol-id",
+						LocalResourceState: string(gopowerstore.ReplicationResourceStateDemoted),
+					}, nil)
+			},
+			beforeRemote: func(c *gopowerstoremock.Client) {
+				c.On("GetReplicationSessionByID", mock.Anything, metroSessionID).Return(
+					gopowerstore.ReplicationSession{
+						ID:                 metroSessionID,
+						Role:               "Metro_Non_Preferred",
+						State:              gopowerstore.RsStateFractured,
+						LocalResourceID:    "remote-vol-id",
+						LocalResourceState: string(gopowerstore.ReplicationResourceStateDemoted),
+					}, nil)
+			},
+			wantErr:        true,
+			wantErrContain: "unable to find Metro_Preferred site online for volume expansion",
+		},
+		{
+			name: "Non-preferred is online but preferred is not - error (expansion only uses preferred)",
+			beforeLocal: func(c *gopowerstoremock.Client) {
+				c.On("GetReplicationSessionByID", mock.Anything, metroSessionID).Return(
+					gopowerstore.ReplicationSession{
+						ID:                 metroSessionID,
+						Role:               "Metro_Preferred",
+						State:              gopowerstore.RsStateFractured,
+						LocalResourceID:    "local-vol-id",
+						LocalResourceState: string(gopowerstore.ReplicationResourceStateDemoted),
+					}, nil)
+			},
+			beforeRemote: func(c *gopowerstoremock.Client) {
+				c.On("GetReplicationSessionByID", mock.Anything, metroSessionID).Return(
+					gopowerstore.ReplicationSession{
+						ID:                 metroSessionID,
+						Role:               "Metro_Non_Preferred",
+						State:              gopowerstore.RsStateFractured,
+						LocalResourceID:    "remote-vol-id",
+						LocalResourceState: string(gopowerstore.ReplicationResourceStatePromoted),
+					}, nil)
+			},
+			wantErr:        true,
+			wantErrContain: "unable to find Metro_Preferred site online for volume expansion",
+		},
+		{
+			name:          "Local array nil (unreachable), remote preferred online - selects remote",
+			localArrayNil: true,
+			beforeLocal:   func(_ *gopowerstoremock.Client) {},
+			beforeRemote: func(c *gopowerstoremock.Client) {
+				c.On("GetReplicationSessionByID", mock.Anything, metroSessionID).Return(
+					gopowerstore.ReplicationSession{
+						ID:                 metroSessionID,
+						Role:               "Metro_Preferred",
+						State:              gopowerstore.RsStateOk,
+						LocalResourceID:    "remote-vol-id",
+						LocalResourceState: string(gopowerstore.ReplicationResourceStatePromoted),
+					}, nil)
+			},
+			wantArrayID: "PS-remote",
+			wantErr:     false,
+		},
+		{
+			name:           "Remote array nil (unreachable), local preferred online - selects local",
+			remoteArrayNil: true,
+			beforeLocal: func(c *gopowerstoremock.Client) {
+				c.On("GetReplicationSessionByID", mock.Anything, metroSessionID).Return(
+					gopowerstore.ReplicationSession{
+						ID:                metroSessionID,
+						Role:              "Metro_Preferred",
+						State:             gopowerstore.RsStateOk,
+						LocalResourceID:   "local-vol-id",
+						DataTransferState: gopowerstore.RSDataTransferStateActiveActive,
+					}, nil)
+			},
+			beforeRemote: func(_ *gopowerstoremock.Client) {},
+			wantArrayID:  "PS-local",
+			wantErr:      false,
+		},
+		{
+			name:          "Local nil, remote non-preferred online - error (only preferred eligible)",
+			localArrayNil: true,
+			beforeLocal:   func(_ *gopowerstoremock.Client) {},
+			beforeRemote: func(c *gopowerstoremock.Client) {
+				c.On("GetReplicationSessionByID", mock.Anything, metroSessionID).Return(
+					gopowerstore.ReplicationSession{
+						ID:                 metroSessionID,
+						Role:               "Metro_Non_Preferred",
+						State:              gopowerstore.RsStateOk,
+						LocalResourceID:    "remote-vol-id",
+						LocalResourceState: string(gopowerstore.ReplicationResourceStatePromoted),
+					}, nil)
+			},
+			wantErr:        true,
+			wantErrContain: "unable to verify Preferred site for volume expansion",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			localMock := new(gopowerstoremock.Client)
+			remoteMock := new(gopowerstoremock.Client)
+			tt.beforeLocal(localMock)
+			tt.beforeRemote(remoteMock)
+
+			localArray := &PowerStoreArray{
+				GlobalID: "PS-local",
+				Client:   localMock,
+			}
+			remoteArray := &PowerStoreArray{
+				GlobalID: "PS-remote",
+				Client:   remoteMock,
+			}
+
+			var localArr, remoteArr *PowerStoreArray
+			if !tt.localArrayNil {
+				localArr = localArray
+			}
+			if !tt.remoteArrayNil {
+				remoteArr = remoteArray
+			}
+
+			selectedArr, _, err := SelectMetroArrayForExpansion(t.Context(), metroSessionID, localArr, remoteArr)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("SelectMetroArrayForExpansion() expected error, got nil")
+				}
+				if tt.wantErrContain != "" {
+					if !contains(err.Error(), tt.wantErrContain) {
+						t.Errorf("SelectMetroArrayForExpansion() error = %v, want containing %q", err, tt.wantErrContain)
+					}
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("SelectMetroArrayForExpansion() unexpected error: %v", err)
+			}
+			if selectedArr == nil {
+				t.Fatal("SelectMetroArrayForExpansion() returned nil array")
+			}
+			if selectedArr.GetGlobalID() != tt.wantArrayID {
+				t.Errorf("SelectMetroArrayForExpansion() selected array = %q, want %q", selectedArr.GetGlobalID(), tt.wantArrayID)
 			}
 		})
 	}

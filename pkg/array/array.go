@@ -523,7 +523,7 @@ func ParseVolumeID(ctx context.Context, volumeHandleRaw string,
 	defaultArray *PowerStoreArray, /*legacy support*/
 	vc *csi.VolumeCapability, /*legacy support*/
 ) (volumeHandle VolumeHandle, err error) {
-	log = log.WithContext(ctx)
+	log := log.WithContext(ctx)
 	log.Debugf("ParseVolumeID: parsing volume handle %s", volumeHandleRaw)
 
 	if volumeHandleRaw == "" {
@@ -646,8 +646,8 @@ func GetLeastUsedActiveNAS(ctx context.Context, arr *PowerStoreArray, nasServers
 			log.Debugf("some NAS servers are in cooldown, moving to fallback retry")
 			return arr.NASCooldownTracker.FallbackRetry(nasInCooldown), nil
 		}
-		log.Warnf("all NAS servers are inactive/unhealthy")
-		return "", fmt.Errorf("no suitable NAS server found, please ensure the NAS is running and healthy")
+		log.Warnf("all NAS servers are inactive")
+		return "", fmt.Errorf("no suitable NAS server found, please ensure the NAS is running")
 	}
 
 	return leastUsedNAS.Name, nil
@@ -685,9 +685,6 @@ func isEligibleNAS(arr *PowerStoreArray, nas *gopowerstore.NAS, nasMap map[strin
 	if nas.OperationalStatus != gopowerstore.Started {
 		return false
 	}
-	if !(nas.HealthDetails.State == gopowerstore.Info || nas.HealthDetails.State == gopowerstore.None) {
-		return false
-	}
 	return true
 }
 
@@ -712,8 +709,8 @@ func GetNASInCooldown(arr *PowerStoreArray, nasServers []string) []string {
 	return nasInCooldown
 }
 
-// checkConnectivity checks if kubeNode matches metro selector.
-func (psa *PowerStoreArray) CheckConnectivity(ctx context.Context, kubeNodeID string) bool {
+// HasHostEntry checks if kubeNode matches metro selector.
+func (psa *PowerStoreArray) HasHostEntry(ctx context.Context, kubeNodeID string) bool {
 	var err error
 
 	// Check for backward compatibility
@@ -770,4 +767,12 @@ func (psa *PowerStoreArray) DoesNodeMatchMetroSelectors(node *k8score.Node) bool
 	}
 	log.Debug("Node does not match any metro selectors")
 	return false
+}
+
+// Builds the full handle like: "9f840c56-96e6-4de9-b5a3-27e7c20eaa77/PSabcdef0123/scsi:9f840c56-96e6-4de9-b5a3-27e7c20eaa77/PS0123abcdef"
+func (v *VolumeHandle) ToString() string {
+	if v.RemoteUUID == "" {
+		return fmt.Sprintf("%s/%s/%s", v.LocalUUID, v.LocalArrayGlobalID, v.Protocol)
+	}
+	return fmt.Sprintf("%s/%s/%s:%s/%s", v.LocalUUID, v.LocalArrayGlobalID, v.Protocol, v.RemoteUUID, v.RemoteArrayGlobalID)
 }
