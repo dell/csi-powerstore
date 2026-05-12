@@ -131,7 +131,7 @@ func getCapabilityWithVoltypeAccessFstype(voltype, access, fstype string) *csi.V
 func scsiStageVolumeOK(util *mocks.UtilInterface, fs *mocks.FsInterface) {
 	util.On("BindMount", mock.Anything, "/dev", filepath.Join(nodeStagePrivateDir, validBaseVolumeID)).Return(nil)
 	fs.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
-	fs.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
+	fs.On("ParseProcMounts", mock.Anything, mock.Anything).Return([]gofsutil.Info{}, nil)
 	fs.On("MkFileIdempotent", filepath.Join(nodeStagePrivateDir, validBaseVolumeID)).Return(true, nil)
 	fs.On("GetUtil").Return(util)
 }
@@ -144,7 +144,7 @@ func scsiStageVolumeFail(util *mocks.UtilInterface, fs *mocks.FsInterface) {
 func scsiStageRemoteMetroVolumeOK(util *mocks.UtilInterface, fs *mocks.FsInterface) {
 	util.On("BindMount", mock.Anything, "/dev", filepath.Join(nodeStagePrivateDir, validBaseVolumeID)).Return(nil)
 	fs.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
-	fs.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
+	fs.On("ParseProcMounts", mock.Anything, mock.Anything).Return([]gofsutil.Info{}, nil)
 	fs.On("MkFileIdempotent", filepath.Join(nodeStagePrivateDir, validBaseVolumeID)).Return(true, nil)
 	fs.On("GetUtil").Return(util)
 }
@@ -566,6 +566,110 @@ func TestSCSIStager_Stage(t *testing.T) {
 		}, filepath.Join(nodeStagePrivateDir, validBaseVolumeID), "node-1", csmlog.Fields{}, fsMock, validBaseVolumeID, false, client)
 		assert.NotNil(t, err)
 		assert.Contains(t, err.Error(), "fcTargets data must be in publish context")
+	})
+
+	t.Run("remote device already staged - should connect device but skip bind-mount", func(t *testing.T) {
+		setVariables()
+		setDefaultClientMocks()
+		iscsiConnectorMock := new(mocks.ISCSIConnector)
+		fcConnectorMock := new(mocks.FcConnector)
+		nvmeConnectorMock := new(mocks.NVMEConnector)
+
+		stager := &SCSIStager{
+			useFC:          false,
+			useNVME:        false,
+			iscsiConnector: iscsiConnectorMock,
+			nvmeConnector:  nvmeConnectorMock,
+			fcConnector:    fcConnectorMock,
+		}
+
+		// Mock connectDevice to be called for remote device connection
+		iscsiConnectorMock.On("ConnectVolume", mock.Anything, mock.Anything).Return(gobrick.Device{}, nil)
+
+		utilMock := new(mocks.UtilInterface)
+		fsMock := new(mocks.FsInterface)
+
+		// Mock the scenario where device is already staged (ready=true)
+		// This simulates the isReadyToPublish returning found=true, ready=true
+		stagingPath := filepath.Join(nodeStagePrivateDir, validBaseVolumeID)
+		fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
+		fsMock.On("ParseProcMounts", mock.Anything, mock.Anything).Return([]gofsutil.Info{
+			{
+				Source: "/dev/sdx",  // Valid device path (not "deleted")
+				Path:   stagingPath, // The staging path is already mounted
+			},
+		}, nil)
+		fsMock.On("GetUtil").Return(utilMock)
+		// Mock GetDiskFormat to return something other than "mpath_member" to indicate ready=true
+		utilMock.On("GetDiskFormat", mock.Anything, mock.Anything).Return("ext4", nil)
+
+		// Call Stage with isRemote=true
+		_, err := stager.Stage(context.Background(), &csi.NodeStageVolumeRequest{
+			VolumeId:          validBlockVolumeHandle,
+			PublishContext:    getValidRemoteMetroPublishContext(), // Use remote publish context
+			StagingTargetPath: nodeStagePrivateDir,
+			VolumeCapability: getCapabilityWithVoltypeAccessFstype(
+				"block", "single-writer", "none"),
+		}, filepath.Join(nodeStagePrivateDir, validBaseVolumeID), "node-1", csmlog.Fields{}, fsMock, validBaseVolumeID, true, clientMock) // isRemote=true
+
+		assert.Nil(t, err)
+		// Verify that connectDevice was called (this is the key behavior we're testing)
+		iscsiConnectorMock.AssertCalled(t, "ConnectVolume", mock.Anything, mock.Anything)
+		// Verify that BindMount was NOT called (should be skipped for remote already staged devices)
+		utilMock.AssertNotCalled(t, "BindMount", mock.Anything, mock.Anything, mock.Anything)
+	})
+
+	t.Run("remote device connection failure - should return error", func(t *testing.T) {
+		setVariables()
+		setDefaultClientMocks()
+		iscsiConnectorMock := new(mocks.ISCSIConnector)
+		fcConnectorMock := new(mocks.FcConnector)
+		nvmeConnectorMock := new(mocks.NVMEConnector)
+
+		stager := &SCSIStager{
+			useFC:          false,
+			useNVME:        false,
+			iscsiConnector: iscsiConnectorMock,
+			nvmeConnector:  nvmeConnectorMock,
+			fcConnector:    fcConnectorMock,
+		}
+
+		// Mock connectDevice to fail for remote device connection
+		connectErr := errors.New("failed to connect remote device")
+		iscsiConnectorMock.On("ConnectVolume", mock.Anything, mock.Anything).Return(gobrick.Device{}, connectErr)
+
+		utilMock := new(mocks.UtilInterface)
+		fsMock := new(mocks.FsInterface)
+
+		// Mock the scenario where device is already staged (ready=true)
+		stagingPath := filepath.Join(nodeStagePrivateDir, validBaseVolumeID)
+		fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
+		fsMock.On("ParseProcMounts", mock.Anything, mock.Anything).Return([]gofsutil.Info{
+			{
+				Source: "/dev/sdx",  // Valid device path (not "deleted")
+				Path:   stagingPath, // The staging path is already mounted
+			},
+		}, nil)
+		fsMock.On("GetUtil").Return(utilMock)
+		// Mock GetDiskFormat to return something other than "mpath_member" to indicate ready=true
+		utilMock.On("GetDiskFormat", mock.Anything, mock.Anything).Return("ext4", nil)
+
+		// Call Stage with isRemote=true
+		_, err := stager.Stage(context.Background(), &csi.NodeStageVolumeRequest{
+			VolumeId:          validBlockVolumeHandle,
+			PublishContext:    getValidRemoteMetroPublishContext(), // Use remote publish context
+			StagingTargetPath: nodeStagePrivateDir,
+			VolumeCapability: getCapabilityWithVoltypeAccessFstype(
+				"block", "single-writer", "none"),
+		}, filepath.Join(nodeStagePrivateDir, validBaseVolumeID), "node-1", csmlog.Fields{}, fsMock, validBaseVolumeID, true, clientMock) // isRemote=true
+
+		// Should now return error when remote device connection fails
+		assert.NotNil(t, err)
+		assert.Contains(t, err.Error(), "failed to connect remote device")
+		// Verify that connectDevice was called and failed
+		iscsiConnectorMock.AssertCalled(t, "ConnectVolume", mock.Anything, mock.Anything)
+		// Verify that BindMount was NOT called (should be skipped for remote already staged devices)
+		utilMock.AssertNotCalled(t, "BindMount", mock.Anything, mock.Anything, mock.Anything)
 	})
 }
 

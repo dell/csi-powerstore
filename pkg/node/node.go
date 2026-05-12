@@ -50,12 +50,11 @@ import (
 	"github.com/dell/goiscsi"
 	"github.com/dell/gopowerstore"
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/golang/protobuf/proto"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 	corev1 "k8s.io/api/core/v1"
-
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 )
@@ -83,10 +82,13 @@ type Opts struct {
 	CHAPPassword          string
 	TmpDir                string
 	EnableCHAP            bool
+	FsCheckEnabled        bool
+	FsCheckMode           string
 }
 
 // Service is a controller service that contains scsi connectors and implements NodeServer API
 type Service struct {
+	csi.UnimplementedNodeServer
 	Fs fs.Interface
 
 	ctrlSvc        controller.Interface
@@ -108,6 +110,8 @@ type Service struct {
 	isPodmonEnabled        bool
 
 	array.Locker
+
+	spaceReclaimMgr *SpaceReclamationManager
 }
 
 const (
@@ -225,6 +229,8 @@ func (s *Service) Init() error {
 	if isHealthMonitorEnabled, ok := csictx.LookupEnv(ctx, identifiers.EnvIsHealthMonitorEnabled); ok {
 		s.isHealthMonitorEnabled, _ = strconv.ParseBool(isHealthMonitorEnabled)
 	}
+
+	initSpaceReclamation(ctx, s, k8sutils.Kubeclient.Clientset)
 
 	go s.startAPIService(ctx)
 	return nil
@@ -461,6 +467,7 @@ func (s *Service) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeR
 			log.Infof("[METRO] Metro volume %s created journal entry for operation %s for volume %s node %s array %s", id, "NodeStageVolume", id, s.opts.KubeNodeName, arrayID)
 		}
 	}
+
 	return response, nil
 }
 
@@ -794,7 +801,8 @@ func (s *Service) NodePublishVolume(ctx context.Context, req *csi.NodePublishVol
 		publisher = &NFSPublisher{}
 	} else {
 		publisher = &SCSIPublisher{
-			isBlock: isBlock(req.VolumeCapability),
+			isBlock:    isBlock(req.VolumeCapability),
+			fsckRunner: NewFSCheckRunner(&s.opts, req.VolumeContext, volumeHandle.ToString()),
 		}
 	}
 
@@ -1182,29 +1190,6 @@ func (s *Service) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolum
 	var devMnt *gofsutil.DeviceMountInfo
 	var targetmount string
 	devMnt, err = s.Fs.GetUtil().GetMountInfoFromDevice(ctx, vol.Name)
-
-	// Stop block volume expansion if metro session is paused
-	// User needs to resume it first.
-	remoteVolumeID := volumeHandle.RemoteUUID // metro indicator
-	if remoteVolumeID != "" {
-		if vol.MetroReplicationSessionID == "" {
-			return nil, status.Errorf(codes.Internal,
-				"cannot expand volume %s: missing metro replication session ID", vol.Name)
-		}
-
-		state, err := controller.GetMetroSessionState(ctx, vol.MetroReplicationSessionID, arr)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal,
-				"cannot expand volume %s: failed to get metro session state: %v", vol.Name, err)
-		}
-
-		if state != gopowerstore.RsStateOk {
-			return nil, status.Errorf(codes.Aborted,
-				"cannot expand volume %s: metro session %s is not active, its in %s state",
-				vol.Name, vol.MetroReplicationSessionID, state)
-		}
-	}
-
 	if err != nil {
 		if isBlock {
 			return s.nodeExpandRawBlockVolume(ctx, volumeWWN)
@@ -2770,5 +2755,5 @@ func metroMatchNodeSelectorTerms(terms []corev1.NodeSelectorTerm, nodeLabels map
 }
 
 func isNodeConnectedToArray(ctx context.Context, kubeNodeID string, arr *array.PowerStoreArray) bool {
-	return arr.CheckConnectivity(ctx, kubeNodeID)
+	return arr.HasHostEntry(ctx, kubeNodeID)
 }

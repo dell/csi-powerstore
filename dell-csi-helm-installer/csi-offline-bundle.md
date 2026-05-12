@@ -78,30 +78,9 @@ For example, here is the output of a request to build an offline bundle for the 
 *
 * Pulling and saving container images
 
-   quay.io/dell/container-storage-module/csi-isilon:v2.16.0
-   quay.io/dell/container-storage-module/csi-metadata-retriever:v1.11.0
-   quay.io/dell/container-storage-module/csipowermax-reverseproxy:v2.14.0
-   quay.io/dell/container-storage-module/csi-powermax:v2.16.0
-   quay.io/dell/container-storage-module/csi-powerstore:v2.16.0
-   quay.io/dell/container-storage-module/csi-unity:v2.16.0
-   quay.io/dell/container-storage-module/csi-vxflexos:v2.16.0
-   quay.io/dell/container-storage-module/csm-authorization-sidecar:v2.4.0
-   quay.io/dell/container-storage-module/csm-metrics-powerflex:v1.14.0
-   quay.io/dell/container-storage-module/csm-metrics-powerscale:v1.11.0
-   quay.io/dell/container-storage-module/csm-topology:v1.12.0
-   quay.io/dell/container-storage-module/dell-csi-replicator:v1.14.0
-   quay.io/dell/container-storage-module/dell-replication-controller:v1.14.0
-   quay.io/dell/container-storage-modules/sdc:4.5.2.1
-   quay.io/dell/container-storage-modules/dell-csm-operator:v1.11.0
-   registry.redhat.io/openshift4/ose-kube-rbac-proxy-rhel9:v4.16.0-202409051837.p0.g8ea2c99.assembly.stream.el9
-   nginxinc/nginx-unprivileged:1.29
-   otel/opentelemetry-collector:0.142.0
-   registry.k8s.io/sig-storage/csi-attacher:v4.10.0
-   registry.k8s.io/sig-storage/csi-external-health-monitor-controller:v0.16.0
-   registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.15.0
-   registry.k8s.io/sig-storage/csi-provisioner:v6.1.0
-   registry.k8s.io/sig-storage/csi-resizer:v2.0.0
-   registry.k8s.io/sig-storage/csi-snapshotter:v8.4.0
+...
+   quay.io/dell/container-storage-modules/csi-powerstore:v2.17.0
+...
 
 *
 * Copying necessary files
@@ -176,32 +155,20 @@ Preparing a offline bundle for installation
 *
 * Loading docker images
 
-Loaded image: quay.io/dell/container-storage-modules/csi-powerstore:v2.16.0
-Loaded image: quay.io/dell/container-storage-modules/csi-isilon:v2.16.0
+Loaded image: quay.io/dell/container-storage-modules/csi-powerstore:v2.17.0
 ...
-...
-Loaded image: registry.k8s.io/sig-storage/csi-resizer:v2.0.0
-Loaded image: registry.k8s.io/sig-storage/csi-snapshotter:v8.4.0
 
 *
 * Tagging and pushing images
 
-   quay.io/dell/container-storage-modules/csi-isilon:v2.16.0 -> localregistry:5000/dell-csm-operator/csi-isilon:v2.16.0
-   quay.io/dell/container-storage-modules/csi-metadata-retriever:v1.11.0 -> localregistry:5000/dell-csm-operator/csi-metadata-retriever:v1.11.0
+   quay.io/dell/container-storage-modules/csi-powerstore:v2.17.0 -> localregistry:5000/dell-csm-operator/csi-powerstore:v2.17.0
    ...
-   ...
-   registry.k8s.io/sig-storage/csi-resizer:v2.0.0 -> localregistry:5000/dell-csm-operator/csi-resizer:v2.0.0
-   registry.k8s.io/sig-storage/csi-snapshotter:v8.4.0 -> localregistry:5000/dell-csm-operator/csi-snapshotter:v8.4.0
 
 *
 * Preparing files within /root/dell-csm-operator-bundle
 
-   changing: quay.io/dell/container-storage-modules/csi-isilon:v2.16.0 -> localregistry:5000/dell-csm-operator/csi-isilon:v2.16.0
-   changing: quay.io/dell/container-storage-modules/csi-metadata-retriever:v1.11.0 -> localregistry:5000/dell-csm-operator/csi-metadata-retriever:v1.11.0
+   changing: quay.io/dell/container-storage-modules/csi-powerstore:v2.17.0 -> localregistry:5000/dell-csm-operator/csi-powerstore:v2.17.0
    ...
-   ...
-   changing: registry.k8s.io/sig-storage/csi-resizer:v2.0.0 -> localregistry:5000/dell-csm-operator/csi-resizer:v2.0.0
-   changing: registry.k8s.io/sig-storage/csi-snapshotter:v8.4.0 -> localregistry:5000/dell-csm-operator/csi-snapshotter:v8.4.0
 
 *
 * Complete

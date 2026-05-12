@@ -26,6 +26,7 @@ import (
 
 	"github.com/dell/csi-powerstore/v2/pkg/array"
 	"github.com/dell/csi-powerstore/v2/pkg/controller"
+	"github.com/dell/csi-powerstore/v2/pkg/groupcontroller"
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers"
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers/fs"
 	"github.com/dell/csi-powerstore/v2/pkg/identity"
@@ -99,8 +100,29 @@ func initilizeDriverConfigParams() {
 
 var ManifestSemver string
 
+// validateAndSetDRBindPort validates the CSM DR bind port environment variable
+// and returns a valid port string, defaulting to ":8082" if invalid
+func validateAndSetDRBindPort(envPort string) string {
+	defaultPort := ":8082"
+	if envPort == "" {
+		return defaultPort
+	}
+
+	port, err := strconv.Atoi(envPort)
+	if err != nil {
+		log.Warnf("Invalid CSM DR bind port '%s'. Must be a valid number (e.g., ':8082'). Using default :8082", envPort)
+		return defaultPort
+	}
+
+	if port < 1 || port > 65535 {
+		log.Warnf("Invalid CSM DR bind port '%d'. Must be between 1 and 65535. Using default :8082", port)
+		return defaultPort
+	}
+
+	return ":" + envPort
+}
+
 func main() {
-	log.SetLevel(csmlog.InfoLevel)
 	f := &fs.Fs{Util: &gofsutil.FS{}}
 
 	identifiers.RmSockFile(f)
@@ -113,6 +135,7 @@ func main() {
 
 	identityService := identity.NewIdentityService(identifiers.Name, ManifestSemver, identifiers.Manifest)
 	var controllerService *controller.Service
+	var groupControllerService *groupcontroller.Service
 	var nodeService *node.Service
 
 	mode := csictx.Getenv(context.Background(), gocsi.EnvVarMode)
@@ -144,11 +167,16 @@ func main() {
 			log.Fatalf("couldn't initialize controller service: %s", err.Error())
 		}
 
+		groupControllerService, err = initGroupControllerService(f, configPath)
+		if err != nil {
+			log.Fatalf("couldn't initialize group controller service: %s", err.Error())
+		}
+
 		arrayLocker = &controllerService.Locker
 		controllerService.IsCSMDREnabled = isCSMDREnabled
 	} else if strings.EqualFold(mode, "node") {
 		var err error
-		nodeService, err = initNodeService(f, configPath)
+		nodeService, err = initNodeServiceFunc(f, configPath)
 		if err != nil {
 			log.Fatalf("couldn't initialize node service: %s", err.Error())
 		}
@@ -159,8 +187,11 @@ func main() {
 
 	if isCSMDREnabled {
 		// Initialize CSM DR volume journal reconciler.
-		log.Infof("Initializing CSM-DR controller ")
-		_, err := drController.Initialize(nodeService, controllerService, arrayLocker, mode, nodeName, ":8080", false, ":8081")
+		drBindPort := validateAndSetDRBindPort(os.Getenv(identifiers.EnvCSMDRBindPort))
+
+		log.Infof("Initializing CSM-DR controller with bind port %s", drBindPort)
+
+		_, err := drController.Initialize(nodeService, controllerService, arrayLocker, mode, nodeName, drBindPort, false)
 		if err != nil {
 			log.Errorf("[METRO] Unable to initialize volume journal reconciler: %s", err.Error())
 		}
@@ -176,6 +207,10 @@ func main() {
 			err := controllerService.UpdateArrays(configPath, f)
 			if err != nil {
 				log.Fatalf("couldn't initialize arrays in controller service: %s", err.Error())
+			}
+			err = groupControllerService.UpdateArrays(configPath, f)
+			if err != nil {
+				log.Fatalf("couldn't initialize arrays in group controller service: %s", err.Error())
 			}
 		} else if strings.EqualFold(mode, "node") {
 			err := nodeService.UpdateArrays(configPath, f)
@@ -205,6 +240,7 @@ func main() {
 	storageProvider := &gocsi.StoragePlugin{
 		Controller:                controllerService,
 		Identity:                  identityService,
+		GroupController:           groupControllerService,
 		Node:                      nodeService,
 		Interceptors:              InterceptorsList,
 		RegisterAdditionalServers: controllerService.RegisterAdditionalServers,
@@ -219,6 +255,8 @@ func main() {
 
 	runCSIPlugin(storageProvider)
 }
+
+var initNodeServiceFunc = initNodeService
 
 var runCSIPlugin = func(storageProvider *gocsi.StoragePlugin) {
 	gocsi.Run(context.Background(), identifiers.Name,
@@ -287,6 +325,26 @@ func initControllerService(f fs.Interface, configPath string) (*controller.Servi
 	go ms.Start(context.Background(), 1*time.Minute)
 
 	return cs, nil
+}
+
+func initGroupControllerService(f fs.Interface, configPath string) (*groupcontroller.Service, error) {
+	log.Infof("Initializing group controller service with config path: %s", configPath)
+	gcs := &groupcontroller.Service{
+		Fs: f,
+	}
+
+	err := gcs.UpdateArrays(configPath, f)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't initialize arrays in group controller service: %v", err)
+	}
+
+	err = gcs.Init()
+	if err != nil {
+		return nil, fmt.Errorf("couldn't create group controller service: %v", err)
+	}
+	log.Infof("Done initializing group controller service with config path: %s", configPath)
+
+	return gcs, nil
 }
 
 func initNodeService(f fs.Interface, configPath string) (*node.Service, error) {

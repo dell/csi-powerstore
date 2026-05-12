@@ -29,7 +29,9 @@ import (
 	"path/filepath"
 	"strconv"
 	"testing"
+	"time"
 
+	"github.com/dell/csi-metadata-retriever/retriever"
 	"github.com/dell/csi-powerstore/v2/mocks"
 	"github.com/dell/csi-powerstore/v2/pkg/array"
 	"github.com/dell/csi-powerstore/v2/pkg/controller"
@@ -71,6 +73,20 @@ var (
 	iscsiLibMock       *goiscsi.MockISCSI
 	nvmeLibMock        *gonvme.MockNVMe
 )
+
+type MockMetadataRetrieverClient struct {
+	mock.Mock
+}
+
+func (m *MockMetadataRetrieverClient) GetPVCLabels(ctx context.Context, req *retriever.GetPVCLabelsRequest) (*retriever.GetPVCLabelsResponse, error) {
+	args := m.Called(ctx, req)
+	return args.Get(0).(*retriever.GetPVCLabelsResponse), args.Error(1)
+}
+
+func (m *MockMetadataRetrieverClient) GetPVCLabelsByPVName(ctx context.Context, req *retriever.GetPVCLabelsByPVNameRequest) (*retriever.GetPVCLabelsByPVNameResponse, error) {
+	args := m.Called(ctx, req)
+	return args.Get(0).(*retriever.GetPVCLabelsByPVNameResponse), args.Error(1)
+}
 
 const (
 	validBaseVolumeID       = "39bb1b5f-5624-490d-9ece-18f7b28a904e"
@@ -228,7 +244,7 @@ var usage = []*csi.VolumeUsage{
 
 func setFSmocks() {
 	fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil)
-	fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
+	fsMock.On("ParseProcMounts", mock.Anything, mock.Anything).Return([]gofsutil.Info{}, nil)
 	fsMock.On("MkFileIdempotent", filepath.Join(nodeStagePrivateDir, validBaseVolumeID)).Return(true, nil)
 	fsMock.On("GetUtil").Return(utilMock)
 	utilMock.On("BindMount", mock.Anything, mock.Anything, mock.Anything).Return(nil)
@@ -424,6 +440,14 @@ func setVariables(options ...variableOption) {
 	clientMock = new(gopowerstoremock.Client)
 	iscsiLibMock = goiscsi.NewMockISCSI(mockISCSIOptions)
 	nvmeLibMock = gonvme.NewMockNVMe(mockNVMeOptions)
+
+	// Pre-seed the metadata retriever singleton with a mock so that
+	// NewFSCheckRunner does not attempt a real gRPC connection.
+	mockMDR := new(MockMetadataRetrieverClient)
+	mockMDR.On("GetPVCLabelsByPVName", mock.Anything, mock.Anything).Return(&retriever.GetPVCLabelsByPVNameResponse{}, nil)
+	metadataRetrieverOnce.Do(func() {}) // mark as done so the real init is skipped
+	cachedMetadataRetriever = mockMDR
+
 	arrays := getTestArrays()
 
 	nodeSvc = &Service{
@@ -1459,7 +1483,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				stagingPath := filepath.Join(nodeStagePrivateDir, validBaseVolumeID)
 				utilMock.On("Mount", mock.Anything, validNfsExportPath, stagingPath, "").Return(nil)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
-				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
+				fsMock.On("ParseProcMounts", mock.Anything, mock.Anything).Return([]gofsutil.Info{}, nil)
 				fsMock.On("MkdirAll", stagingPath, mock.Anything).Return(nil).Once()
 				fsMock.On("MkdirAll", filepath.Join(stagingPath, commonNfsVolumeFolder), mock.Anything).Return(nil).Once()
 				fsMock.On("Chmod", filepath.Join(stagingPath, commonNfsVolumeFolder), os.ModeSticky|os.ModePerm).Return(nil)
@@ -1488,7 +1512,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				stagingPath := filepath.Join(nodeStagePrivateDir, validBaseVolumeID)
 				utilMock.On("Mount", mock.Anything, validNfsExportPath, stagingPath, "").Return(nil)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
-				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
+				fsMock.On("ParseProcMounts", mock.Anything, mock.Anything).Return([]gofsutil.Info{}, nil)
 				fsMock.On("MkdirAll", stagingPath, mock.Anything).Return(nil).Once()
 				fsMock.On("MkdirAll", filepath.Join(stagingPath, commonNfsVolumeFolder), mock.Anything).Return(nil).Once()
 				fsMock.On("Chmod", filepath.Join(stagingPath, commonNfsVolumeFolder), os.ModeSticky|os.ModePerm).Return(nil)
@@ -1531,7 +1555,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				stagingPath := filepath.Join(nodeStagePrivateDir, validBaseVolumeID)
 				utilMock.On("Mount", mock.Anything, validNfsExportPath, stagingPath, "").Return(nil)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
-				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
+				fsMock.On("ParseProcMounts", mock.Anything, mock.Anything).Return([]gofsutil.Info{}, nil)
 				fsMock.On("MkdirAll", stagingPath, mock.Anything).Return(nil).Once()
 				fsMock.On("MkdirAll", filepath.Join(stagingPath, commonNfsVolumeFolder), mock.Anything).Return(nil).Once()
 				fsMock.On("Chmod", filepath.Join(stagingPath, commonNfsVolumeFolder), os.ModeSticky|os.ModePerm).Return(nil)
@@ -1583,8 +1607,9 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 			})
 
 			ginkgo.When("hostConnectivity is configured for non-uniform metro", func() {
-				defaultNodeID := nodeSvc.nodeID
+				var defaultNodeID string
 				ginkgo.BeforeEach(func() {
+					defaultNodeID = nodeSvc.nodeID
 					arrays := getTestArrays()
 					arrays[firstValidIP].HostConnectivity = &array.HostConnectivity{
 						Local: k8score.NodeSelector{
@@ -1708,7 +1733,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					},
 				}
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
-				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return(mountInfo, nil)
+				fsMock.On("ParseProcMounts", mock.Anything, mock.Anything).Return(mountInfo, nil)
 				fsMock.On("GetUtil").Return(utilMock)
 				utilMock.On("GetDiskFormat", mock.Anything, stagingPath).Return("", nil)
 
@@ -1734,7 +1759,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					},
 				}
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
-				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return(mountInfo, nil)
+				fsMock.On("ParseProcMounts", mock.Anything, mock.Anything).Return(mountInfo, nil)
 				fsMock.On("GetUtil").Return(utilMock)
 				utilMock.On("GetDiskFormat", mock.Anything, stagingPath).Return("", nil)
 				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).Return([]gopowerstore.IPPoolAddress{}, nil)
@@ -1820,7 +1845,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				utilMock.On("BindMount", mock.Anything, "/dev",
 					filepath.Join(nodeStagePrivateDir, validBaseVolumeID)).Return(nil).Once()
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(4)
-				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).
+				fsMock.On("ParseProcMounts", mock.Anything, mock.Anything).
 					Return(mountInfo, nil).Twice()
 				fsMock.On("MkFileIdempotent", filepath.Join(nodeStagePrivateDir, validBaseVolumeID)).
 					Return(true, nil).Once()
@@ -1994,7 +2019,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				e := errors.New("mount-error")
 				iscsiConnectorMock.On("ConnectVolume", mock.Anything, mock.Anything).Return(gobrick.Device{}, nil)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
-				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
+				fsMock.On("ParseProcMounts", mock.Anything, mock.Anything).Return([]gofsutil.Info{}, nil)
 				fsMock.On("MkFileIdempotent", filepath.Join(nodeStagePrivateDir, validBaseVolumeID)).Return(true, nil)
 				fsMock.On("GetUtil").Return(utilMock)
 
@@ -2030,7 +2055,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 			ginkgo.It("should fail [MkdirAll target folder]", func() {
 				stagingPath := filepath.Join(nodeStagePrivateDir, validBaseVolumeID)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
-				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
+				fsMock.On("ParseProcMounts", mock.Anything, mock.Anything).Return([]gofsutil.Info{}, nil)
 				fsMock.On("MkdirAll", stagingPath, mock.Anything).Return(errors.New("some-error"))
 
 				res, err := nodeSvc.NodeStageVolume(context.Background(), req)
@@ -2043,7 +2068,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 			ginkgo.It("should fail [Mount]", func() {
 				stagingPath := filepath.Join(nodeStagePrivateDir, validBaseVolumeID)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
-				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
+				fsMock.On("ParseProcMounts", mock.Anything, mock.Anything).Return([]gofsutil.Info{}, nil)
 				fsMock.On("MkdirAll", stagingPath, mock.Anything).Return(nil).Once()
 				fsMock.On("GetUtil").Return(utilMock)
 				utilMock.On("Mount", mock.Anything, validNfsExportPath, stagingPath, "").Return(errors.New("some-error"))
@@ -2058,7 +2083,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 			ginkgo.It("should fail [MkdirAll common folder]", func() {
 				stagingPath := filepath.Join(nodeStagePrivateDir, validBaseVolumeID)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
-				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
+				fsMock.On("ParseProcMounts", mock.Anything, mock.Anything).Return([]gofsutil.Info{}, nil)
 				fsMock.On("MkdirAll", stagingPath, mock.Anything).Return(nil).Once()
 				fsMock.On("GetUtil").Return(utilMock)
 				utilMock.On("Mount", mock.Anything, validNfsExportPath, stagingPath, "").Return(nil)
@@ -2074,7 +2099,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 			ginkgo.It("should fail [Chmod]", func() {
 				stagingPath := filepath.Join(nodeStagePrivateDir, validBaseVolumeID)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
-				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
+				fsMock.On("ParseProcMounts", mock.Anything, mock.Anything).Return([]gofsutil.Info{}, nil)
 				fsMock.On("MkdirAll", stagingPath, mock.Anything).Return(nil).Once()
 				fsMock.On("GetUtil").Return(utilMock)
 				utilMock.On("Mount", mock.Anything, validNfsExportPath, stagingPath, "").Return(nil)
@@ -2093,7 +2118,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 			ginkgo.It("should fail", func() {
 				stagingPath := filepath.Join(nodeStagePrivateDir, validBaseVolumeID)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
-				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
+				fsMock.On("ParseProcMounts", mock.Anything, mock.Anything).Return([]gofsutil.Info{}, nil)
 				fsMock.On("MkdirAll", stagingPath, mock.Anything).Return(nil).Once()
 				fsMock.On("GetUtil").Return(utilMock)
 				utilMock.On("Mount", mock.Anything, validNfsExportPath, stagingPath, "").Return(nil)
@@ -2218,6 +2243,10 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				clientMock.On("GetVolume", mock.Anything, validRemoteBaseVolumeID).Return(gopowerstore.Volume{
 					ID:                        validRemoteBaseVolumeID,
 					MetroReplicationSessionID: validMetroSessionID,
+				}, nil).After(100 * time.Millisecond)
+				clientMock.On("GetReplicationSessionByID", mock.Anything, validMetroSessionID).Return(gopowerstore.ReplicationSession{
+					State:              "Fractured",
+					LocalResourceState: "Promoted",
 				}, nil)
 
 				originalIsNodeConnectedToArrayFunc := isNodeConnectedToArrayFunc
@@ -2261,6 +2290,10 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				clientMock.On("GetVolume", mock.Anything, validRemoteBaseVolumeID).Return(gopowerstore.Volume{
 					ID:                        validRemoteBaseVolumeID,
 					MetroReplicationSessionID: validMetroSessionID,
+				}, nil).After(100 * time.Millisecond)
+				clientMock.On("GetReplicationSessionByID", mock.Anything, validMetroSessionID).Return(gopowerstore.ReplicationSession{
+					State:              "Fractured",
+					LocalResourceState: "Demoted",
 				}, nil)
 
 				createOrUpdateJournalEntryFunc = func(_ context.Context, _ string, _ array.VolumeHandle, _ string, _ string, _ string, _ []byte) error {
@@ -2356,7 +2389,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				}, nil)
 				fsMock.On("GetUtil").Return(utilMock)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
-				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return(mountInfo, nil)
+				fsMock.On("ParseProcMounts", mock.Anything, mock.Anything).Return(mountInfo, nil)
 				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).Return([]gopowerstore.IPPoolAddress{}, nil)
 				utilMock.On("Unmount", mock.Anything, stagingPath).Return(nil)
 
@@ -2385,7 +2418,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 				fsMock.On("GetUtil").Return(utilMock)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
-				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return(mountInfo, nil)
+				fsMock.On("ParseProcMounts", mock.Anything, mock.Anything).Return(mountInfo, nil)
 				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).Return([]gopowerstore.IPPoolAddress{}, nil)
 				utilMock.On("Unmount", mock.Anything, stagingPath).Return(nil)
 
@@ -2427,7 +2460,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).Return([]gopowerstore.IPPoolAddress{}, nil)
 				fsMock.On("GetUtil").Return(utilMock)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, errors.New("fail"))
-				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return(mountInfo, nil)
+				fsMock.On("ParseProcMounts", mock.Anything, mock.Anything).Return(mountInfo, nil)
 
 				utilMock.On("Unmount", mock.Anything, stagingPath).Return(nil)
 
@@ -2461,7 +2494,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).Return([]gopowerstore.IPPoolAddress{}, nil)
 				fsMock.On("GetUtil").Return(utilMock)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
-				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return(mountInfo, nil)
+				fsMock.On("ParseProcMounts", mock.Anything, mock.Anything).Return(mountInfo, nil)
 
 				utilMock.On("Unmount", mock.Anything, stagingPath).Return(errors.New("failed unmount"))
 
@@ -2494,7 +2527,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				}, nil)
 				fsMock.On("GetUtil").Return(utilMock)
 				fsMock.On("ReadFile", mock.Anything).Return([]byte{}, nil)
-				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return(mountInfo, nil)
+				fsMock.On("ParseProcMounts", mock.Anything, mock.Anything).Return(mountInfo, nil)
 
 				utilMock.On("Unmount", mock.Anything, stagingPath).Return(nil)
 
@@ -2526,8 +2559,8 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				}, nil)
 				fsMock.On("GetUtil").Return(utilMock)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(4)
-				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return(mountInfo, nil).Once()
-				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return(remoteMountInfo, nil).Once()
+				fsMock.On("ParseProcMounts", mock.Anything, mock.Anything).Return(mountInfo, nil).Once()
+				fsMock.On("ParseProcMounts", mock.Anything, mock.Anything).Return(remoteMountInfo, nil).Once()
 
 				utilMock.On("Unmount", mock.Anything, stagingPath).Return(nil).Once()
 				utilMock.On("Unmount", mock.Anything, remoteStagingPath).Return(nil).Once()
@@ -2570,7 +2603,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 				fsMock.On("GetUtil").Return(utilMock)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
-				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return(mountInfo, nil)
+				fsMock.On("ParseProcMounts", mock.Anything, mock.Anything).Return(mountInfo, nil)
 
 				utilMock.On("Unmount", mock.Anything, stagingPath).Return(nil)
 
@@ -2607,7 +2640,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				}, nil)
 				fsMock.On("GetUtil").Return(utilMock)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
-				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return(mountInfo, nil)
+				fsMock.On("ParseProcMounts", mock.Anything, mock.Anything).Return(mountInfo, nil)
 
 				utilMock.On("Unmount", mock.Anything, stagingPath).Return(nil)
 
@@ -2646,7 +2679,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 				fsMock.On("GetUtil").Return(utilMock)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(4)
-				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return(mountInfo, nil)
+				fsMock.On("ParseProcMounts", mock.Anything, mock.Anything).Return(mountInfo, nil)
 
 				utilMock.On("Unmount", mock.Anything, stagingPath).Return(nil)
 
@@ -2683,7 +2716,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				})
 				fsMock.On("GetUtil").Return(utilMock)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
-				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return(mountInfo, nil)
+				fsMock.On("ParseProcMounts", mock.Anything, mock.Anything).Return(mountInfo, nil)
 				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).Return([]gopowerstore.IPPoolAddress{}, nil)
 				utilMock.On("Unmount", mock.Anything, stagingPath).Return(nil)
 
@@ -2732,7 +2765,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				}, nil)
 				fsMock.On("GetUtil").Return(utilMock)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
-				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return(mountInfo, nil)
+				fsMock.On("ParseProcMounts", mock.Anything, mock.Anything).Return(mountInfo, nil)
 
 				utilMock.On("Unmount", mock.Anything, stagingPath).Return(nil)
 
@@ -2755,7 +2788,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 			ginkgo.It("should succeed", func() {
 				fsMock.On("GetUtil").Return(utilMock)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
-				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
+				fsMock.On("ParseProcMounts", mock.Anything, mock.Anything).Return([]gofsutil.Info{}, nil)
 
 				fsMock.On("MkdirAll", validTargetPath, mock.Anything).Return(nil)
 				utilMock.On("GetDiskFormat", mock.Anything, stagingPath).Return("", nil)
@@ -2778,7 +2811,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 			ginkgo.It("should fail", func() {
 				fsMock.On("GetUtil").Return(utilMock)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
-				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
+				fsMock.On("ParseProcMounts", mock.Anything, mock.Anything).Return([]gofsutil.Info{}, nil)
 
 				fsMock.On("MkdirAll", validTargetPath, mock.Anything).Return(nil)
 				utilMock.On("GetDiskFormat", mock.Anything, stagingPath).Return("", nil)
@@ -2799,8 +2832,8 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 		ginkgo.When("publishing block volume as mount with RO, fs exists", func() {
 			ginkgo.It("should succeed", func() {
 				fsMock.On("GetUtil").Return(utilMock)
-				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
-				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
+				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(4)
+				fsMock.On("ParseProcMounts", mock.Anything, mock.Anything).Return([]gofsutil.Info{}, nil)
 
 				fsMock.On("MkdirAll", validTargetPath, mock.Anything).Return(nil)
 				utilMock.On("GetDiskFormat", mock.Anything, stagingPath).Return("ext4", nil)
@@ -2822,7 +2855,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 			ginkgo.It("should fail", func() {
 				fsMock.On("GetUtil").Return(utilMock)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
-				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
+				fsMock.On("ParseProcMounts", mock.Anything, mock.Anything).Return([]gofsutil.Info{}, nil)
 
 				fsMock.On("MkdirAll", validTargetPath, mock.Anything).Return(errors.New("failed"))
 				utilMock.On("GetDiskFormat", mock.Anything, stagingPath).Return("", nil)
@@ -2844,7 +2877,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 			ginkgo.It("should fail", func() {
 				fsMock.On("GetUtil").Return(utilMock)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
-				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
+				fsMock.On("ParseProcMounts", mock.Anything, mock.Anything).Return([]gofsutil.Info{}, nil)
 
 				fsMock.On("MkdirAll", validTargetPath, mock.Anything).Return(nil)
 				utilMock.On("GetDiskFormat", mock.Anything, stagingPath).Return("", errors.New("failed"))
@@ -2866,7 +2899,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 			ginkgo.It("should fail", func() {
 				fsMock.On("GetUtil").Return(utilMock)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
-				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
+				fsMock.On("ParseProcMounts", mock.Anything, mock.Anything).Return([]gofsutil.Info{}, nil)
 
 				fsMock.On("MkdirAll", validTargetPath, mock.Anything).Return(nil)
 				utilMock.On("GetDiskFormat", mock.Anything, stagingPath).Return("ext4", nil)
@@ -2888,7 +2921,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 			ginkgo.It("should succeed", func() {
 				fsMock.On("GetUtil").Return(utilMock)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
-				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
+				fsMock.On("ParseProcMounts", mock.Anything, mock.Anything).Return([]gofsutil.Info{}, nil)
 
 				fsMock.On("MkdirAll", validTargetPath, mock.Anything).Return(nil)
 				utilMock.On("GetDiskFormat", mock.Anything, stagingPath).Return("", nil)
@@ -2909,7 +2942,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 		ginkgo.When("publishing block volume as mount with multi-writer", func() {
 			ginkgo.It("should succeed", func() {
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil)
-				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
+				fsMock.On("ParseProcMounts", mock.Anything, mock.Anything).Return([]gofsutil.Info{}, nil)
 				fsMock.On("GetUtil").Return(utilMock)
 				fsMock.On("MkFileIdempotent", validTargetPath).Return(true, nil)
 				utilMock.On("BindMount", mock.Anything, stagingPath, validTargetPath).Return(nil)
@@ -2935,7 +2968,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 			ginkgo.It("should succeed", func() {
 				fsMock.On("GetUtil").Return(utilMock)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
-				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
+				fsMock.On("ParseProcMounts", mock.Anything, mock.Anything).Return([]gofsutil.Info{}, nil)
 
 				fsMock.On("MkFileIdempotent", validTargetPath).Return(true, nil)
 				utilMock.On("BindMount", mock.Anything, stagingPath, validTargetPath).Return(nil)
@@ -2956,7 +2989,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 			ginkgo.It("should fail", func() {
 				fsMock.On("GetUtil").Return(utilMock)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
-				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
+				fsMock.On("ParseProcMounts", mock.Anything, mock.Anything).Return([]gofsutil.Info{}, nil)
 
 				fsMock.On("MkFileIdempotent", validTargetPath).Return(true, nil)
 				utilMock.On("BindMount", mock.Anything, stagingPath, validTargetPath, "ro").Return(nil)
@@ -2976,7 +3009,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 			ginkgo.It("should fail", func() {
 				fsMock.On("GetUtil").Return(utilMock)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
-				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
+				fsMock.On("ParseProcMounts", mock.Anything, mock.Anything).Return([]gofsutil.Info{}, nil)
 
 				fsMock.On("MkFileIdempotent", validTargetPath).Return(false, errors.New("failed"))
 				utilMock.On("BindMount", mock.Anything, stagingPath, validTargetPath).Return(nil)
@@ -2996,7 +3029,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 			ginkgo.It("should fail", func() {
 				fsMock.On("GetUtil").Return(utilMock)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
-				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
+				fsMock.On("ParseProcMounts", mock.Anything, mock.Anything).Return([]gofsutil.Info{}, nil)
 
 				fsMock.On("MkFileIdempotent", validTargetPath).Return(true, nil)
 				utilMock.On("BindMount", mock.Anything, stagingPath, validTargetPath).Return(errors.New("failed to bind"))
@@ -3037,7 +3070,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					},
 				}
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil)
-				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return(mountInfo, nil)
+				fsMock.On("ParseProcMounts", mock.Anything, mock.Anything).Return(mountInfo, nil)
 
 				_, err := nodeSvc.NodePublishVolume(context.Background(), &csi.NodePublishVolumeRequest{
 					VolumeId:          validBlockVolumeHandle,
@@ -3054,7 +3087,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 			ginkgo.It("should succeed", func() {
 				fsMock.On("GetUtil").Return(utilMock)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
-				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
+				fsMock.On("ParseProcMounts", mock.Anything, mock.Anything).Return([]gofsutil.Info{}, nil)
 				fsMock.On("Stat", filepath.Join(stagingPath, commonNfsVolumeFolder)).Return(&mocks.FileInfo{}, nil)
 				stagingPath := filepath.Join(stagingPath, commonNfsVolumeFolder)
 
@@ -3133,7 +3166,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 			ginkgo.It("should fail", func() {
 				fsMock.On("GetUtil").Return(utilMock)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
-				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
+				fsMock.On("ParseProcMounts", mock.Anything, mock.Anything).Return([]gofsutil.Info{}, nil)
 				fsMock.On("Stat", filepath.Join(stagingPath, commonNfsVolumeFolder)).Return(&mocks.FileInfo{}, nil)
 				stagingPath := filepath.Join(stagingPath, commonNfsVolumeFolder)
 
@@ -3155,7 +3188,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 			ginkgo.It("should succeed", func() {
 				fsMock.On("GetUtil").Return(utilMock)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
-				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
+				fsMock.On("ParseProcMounts", mock.Anything, mock.Anything).Return([]gofsutil.Info{}, nil)
 				fsMock.On("Stat", filepath.Join(stagingPath, commonNfsVolumeFolder)).Return(&mocks.FileInfo{}, nil)
 				stagingPath := filepath.Join(stagingPath, commonNfsVolumeFolder)
 
@@ -3178,7 +3211,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 			ginkgo.It("should fail", func() {
 				fsMock.On("GetUtil").Return(utilMock)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
-				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
+				fsMock.On("ParseProcMounts", mock.Anything, mock.Anything).Return([]gofsutil.Info{}, nil)
 				fsMock.On("Stat", filepath.Join(stagingPath, commonNfsVolumeFolder)).Return(&mocks.FileInfo{}, nil)
 				stagingPath := filepath.Join(stagingPath, commonNfsVolumeFolder)
 
@@ -3210,7 +3243,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 				fsMock.On("GetUtil").Return(utilMock)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
-				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return(mountInfo, nil)
+				fsMock.On("ParseProcMounts", mock.Anything, mock.Anything).Return(mountInfo, nil)
 
 				fsMock.On("Stat", mock.Anything).Return(&mocks.FileInfo{}, os.ErrNotExist)
 				utilMock.On("Unmount", mock.Anything, validTargetPath).Return(nil)
@@ -3235,7 +3268,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 				fsMock.On("GetUtil").Return(utilMock)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
-				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return(mountInfo, nil)
+				fsMock.On("ParseProcMounts", mock.Anything, mock.Anything).Return(mountInfo, nil)
 
 				fsMock.On("Stat", mock.Anything).Return(&mocks.FileInfo{}, os.ErrNotExist)
 				utilMock.On("Unmount", mock.Anything, validTargetPath).Return(nil)
@@ -3273,7 +3306,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 			ginkgo.It("should fail", func() {
 				fsMock.On("GetUtil").Return(utilMock)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
-				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return(nil, errors.New("error"))
+				fsMock.On("ParseProcMounts", mock.Anything, mock.Anything).Return(nil, errors.New("error"))
 				fsMock.On("Stat", mock.Anything).Return(&mocks.FileInfo{}, os.ErrNotExist)
 				res, err := nodeSvc.NodeUnpublishVolume(context.Background(), &csi.NodeUnpublishVolumeRequest{
 					VolumeId:   validBlockVolumeHandle,
@@ -3294,7 +3327,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 				fsMock.On("GetUtil").Return(utilMock)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
-				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return(mountInfo, nil)
+				fsMock.On("ParseProcMounts", mock.Anything, mock.Anything).Return(mountInfo, nil)
 
 				fsMock.On("Stat", mock.Anything).Return(&mocks.FileInfo{}, os.ErrNotExist)
 				utilMock.On("Unmount", mock.Anything, validTargetPath).Return(errors.New("Unmount failed"))
@@ -3811,9 +3844,9 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				fsMock.On("GetUtil").Return(utilMock)
 				utilMock.On("BindMount", mock.Anything, "/dev", mock.Anything).Return(nil)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil)
-				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
+				fsMock.On("ParseProcMounts", mock.Anything, mock.Anything).Return([]gofsutil.Info{}, nil)
 				fsMock.On("MkFileIdempotent", mock.Anything).Return(true, nil)
-				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
+				fsMock.On("ParseProcMounts", mock.Anything, mock.Anything).Return([]gofsutil.Info{}, nil)
 				fsMock.On("MkdirAll", mock.Anything, mock.Anything).Return(nil)
 				utilMock.On("GetDiskFormat", mock.Anything, mock.Anything).Return("", nil)
 				fsMock.On("ExecCommand", "mkfs.ext4", "-E", "nodiscard", "-F", mock.Anything).Return([]byte{}, nil)
@@ -3886,7 +3919,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 				fsMock.On("GetUtil").Return(utilMock)
 				fsMock.On("ReadFile", mock.Anything).Return([]byte{}, nil)
-				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return(mountInfo, nil)
+				fsMock.On("ParseProcMounts", mock.Anything, mock.Anything).Return(mountInfo, nil)
 
 				fsMock.On("Stat", mock.Anything).Return(&mocks.FileInfo{}, os.ErrNotExist)
 				utilMock.On("Unmount", mock.Anything, mock.Anything).Return(nil)
@@ -3939,7 +3972,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				iscsiConnectorMock.On("ConnectVolume", mock.Anything, mock.Anything).Return(gobrick.Device{}, nil)
 				utilMock.On("BindMount", mock.Anything, "/dev", mock.Anything).Return(nil)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
-				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
+				fsMock.On("ParseProcMounts", mock.Anything, mock.Anything).Return([]gofsutil.Info{}, nil)
 				fsMock.On("MkFileIdempotent", mock.Anything).Return(true, errors.New("error"))
 				fsMock.On("GetUtil").Return(utilMock)
 
@@ -3952,7 +3985,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 				fsMock.On("GetUtil").Return(utilMock)
 				fsMock.On("ReadFile", mock.Anything).Return([]byte{}, nil)
-				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return(mountInfo, nil)
+				fsMock.On("ParseProcMounts", mock.Anything, mock.Anything).Return(mountInfo, nil)
 
 				fsMock.On("Stat", mock.Anything).Return(&mocks.FileInfo{}, os.ErrNotExist)
 				utilMock.On("Unmount", mock.Anything, mock.Anything).Return(nil)
@@ -4133,9 +4166,9 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 			fsMock.On("GetUtil").Return(utilMock)
 			utilMock.On("BindMount", mock.Anything, "/dev", mock.Anything).Return(nil)
 			fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil)
-			fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
+			fsMock.On("ParseProcMounts", mock.Anything, mock.Anything).Return([]gofsutil.Info{}, nil)
 			fsMock.On("MkFileIdempotent", mock.Anything).Return(true, nil)
-			fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
+			fsMock.On("ParseProcMounts", mock.Anything, mock.Anything).Return([]gofsutil.Info{}, nil)
 			fsMock.On("MkdirAll", mock.Anything, mock.Anything).Return(nil)
 			utilMock.On("GetDiskFormat", mock.Anything, mock.Anything).Return("", nil)
 			fsMock.On("ExecCommand", "mkfs.xfs", "-K", mock.Anything, "-m", mock.Anything).Return([]byte{}, nil)
@@ -4176,7 +4209,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 				fsMock.On("GetUtil").Return(utilMock)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil)
-				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return(mountInfo, nil)
+				fsMock.On("ParseProcMounts", mock.Anything, mock.Anything).Return(mountInfo, nil)
 
 				utilMock.On("Unmount", mock.Anything, mock.Anything).Return(nil)
 
@@ -4214,7 +4247,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				utilMock.On("Unmount", mock.Anything, mock.Anything).Return(nil)
 
 				fsMock.On("Remove", mock.Anything).Return(nil)
-				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return(mountInfo, nil)
+				fsMock.On("ParseProcMounts", mock.Anything, mock.Anything).Return(mountInfo, nil)
 				fsMock.On("Stat", mock.Anything).Return(&mocks.FileInfo{}, nil)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil)
 				fsMock.On("GetUtil").Return(utilMock)
@@ -4245,7 +4278,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 				fsMock.On("GetUtil").Return(utilMock)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil)
-				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return(mountInfo, nil)
+				fsMock.On("ParseProcMounts", mock.Anything, mock.Anything).Return(mountInfo, nil)
 
 				utilMock.On("Unmount", mock.Anything, mock.Anything).Return(nil)
 
@@ -4290,7 +4323,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 				fsMock.On("GetUtil").Return(utilMock)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil)
-				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return(mountInfo, nil)
+				fsMock.On("ParseProcMounts", mock.Anything, mock.Anything).Return(mountInfo, nil)
 
 				utilMock.On("Unmount", mock.Anything, mock.Anything).Return(nil)
 
@@ -5774,7 +5807,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 						ROHosts: []string{"127.0.0.1/255.255.255.0"},
 					}, nil)
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil)
-				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{
+				fsMock.On("ParseProcMounts", mock.Anything, mock.Anything).Return([]gofsutil.Info{
 					{
 						Device: validDevName,
 						Path:   validTargetPath,
@@ -5840,7 +5873,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 			ginkgo.It("should return stats as abnormal for getTargetMount() error [stagingPath]", func() {
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil)
-				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
+				fsMock.On("ParseProcMounts", mock.Anything, mock.Anything).Return([]gofsutil.Info{}, nil)
 
 				req := &csi.NodeGetVolumeStatsRequest{
 					VolumeId:          validBlockVolumeHandle,
@@ -5876,7 +5909,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 			ginkgo.It("should return stats as abnormal for getTargetMount() error [volumePath]", func() {
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil)
-				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{}, nil)
+				fsMock.On("ParseProcMounts", mock.Anything, mock.Anything).Return([]gofsutil.Info{}, nil)
 
 				req := &csi.NodeGetVolumeStatsRequest{
 					VolumeId:          validBlockVolumeHandle,
@@ -5897,7 +5930,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 			ginkgo.It("should return stats as abnormal for ReadDir() error", func() {
 				fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil)
-				fsMock.On("ParseProcMounts", context.Background(), mock.Anything).Return([]gofsutil.Info{
+				fsMock.On("ParseProcMounts", mock.Anything, mock.Anything).Return([]gofsutil.Info{
 					{
 						Device: validDevName,
 						Path:   validTargetPath,
@@ -9022,4 +9055,400 @@ func TestCountActiveSessionsInitiators(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestContains(t *testing.T) {
+	tests := []struct {
+		name     string
+		list     []string
+		item     string
+		expected bool
+	}{
+		{
+			name:     "item exists",
+			list:     []string{"a", "b", "c"},
+			item:     "b",
+			expected: true,
+		},
+		{
+			name:     "item does not exist",
+			list:     []string{"a", "b", "c"},
+			item:     "d",
+			expected: false,
+		},
+		{
+			name:     "empty list",
+			list:     []string{},
+			item:     "a",
+			expected: false,
+		},
+		{
+			name:     "empty item",
+			list:     []string{"a", "b", ""},
+			item:     "",
+			expected: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := contains(tc.list, tc.item)
+			if result != tc.expected {
+				t.Errorf("contains() = %v, want %v", result, tc.expected)
+			}
+		})
+	}
+}
+
+func TestFormatWWPN(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "16 character WWPN",
+			input:    "58ccf09348a003a3",
+			expected: "58:cc:f0:93:48:a0:03:a3",
+		},
+		{
+			name:     "8 character WWPN",
+			input:    "58ccf093",
+			expected: "58:cc:f0:93",
+		},
+		{
+			name:     "empty string",
+			input:    "",
+			expected: "",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result, err := formatWWPN(tc.input)
+			if err != nil {
+				t.Errorf("formatWWPN() error = %v", err)
+			}
+			if result != tc.expected {
+				t.Errorf("formatWWPN() = %v, want %v", result, tc.expected)
+			}
+		})
+	}
+}
+
+func TestDeleteMapping(t *testing.T) {
+	// Initialize fsMock if not already done
+	if fsMock == nil {
+		fsMock = new(mocks.FsInterface)
+	}
+
+	// Test successful deletion
+	fsMock.On("Remove", mock.Anything).Return(nil)
+	fsMock.On("IsNotExist", mock.Anything).Return(false)
+	err := deleteMapping("vol-123", "/tmp", fsMock)
+	if err != nil {
+		t.Errorf("deleteMapping() error = %v", err)
+	}
+
+	// Test file doesn't exist (should return nil)
+	fsMock.ExpectedCalls = nil
+	fsMock.On("Remove", mock.Anything).Return(&os.PathError{Err: os.ErrNotExist})
+	fsMock.On("IsNotExist", mock.Anything).Return(true)
+
+	err = deleteMapping("vol-456", "/tmp", fsMock)
+	if err != nil {
+		t.Errorf("deleteMapping() with non-existent file should return nil, got %v", err)
+	}
+}
+
+func TestGetMapping(t *testing.T) {
+	// Initialize fsMock if not already done
+	if fsMock == nil {
+		fsMock = new(mocks.FsInterface)
+	}
+
+	// Test successful read
+	fsMock.On("ReadFile", mock.Anything).Return([]byte("sda"), nil)
+	device, err := getMapping("vol-123", "/tmp", fsMock)
+	if err != nil {
+		t.Errorf("getMapping() error = %v", err)
+	}
+	if device != "sda" {
+		t.Errorf("getMapping() = %v, want sda", device)
+	}
+
+	// Test file read error
+	fsMock.ExpectedCalls = nil
+	fsMock.On("ReadFile", mock.Anything).Return([]byte{}, errors.New("read error"))
+	_, err = getMapping("vol-456", "/tmp", fsMock)
+	if err == nil {
+		t.Errorf("getMapping() with read error should return error")
+	}
+
+	// Test empty data
+	fsMock.ExpectedCalls = nil
+	fsMock.On("ReadFile", mock.Anything).Return([]byte{}, nil)
+	_, err = getMapping("vol-789", "/tmp", fsMock)
+	if err == nil {
+		t.Errorf("getMapping() with empty data should return error")
+	}
+}
+
+func TestGetStagingPath(t *testing.T) {
+	tests := []struct {
+		name        string
+		sp          string
+		volID       string
+		wantVolID   string
+		wantStaging string
+	}{
+		{
+			name:        "both empty",
+			sp:          "",
+			volID:       "",
+			wantVolID:   "",
+			wantStaging: "",
+		},
+		{
+			name:        "sp empty",
+			sp:          "",
+			volID:       "vol-123",
+			wantVolID:   "vol-123",
+			wantStaging: "",
+		},
+		{
+			name:        "volID empty",
+			sp:          "/tmp",
+			volID:       "",
+			wantVolID:   "",
+			wantStaging: "/tmp",
+		},
+		{
+			name:        "both set",
+			sp:          "/tmp",
+			volID:       "vol-123",
+			wantVolID:   "vol-123",
+			wantStaging: "/tmp/vol-123",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			volID, stagingPath := getStagingPath(context.Background(), tc.sp, tc.volID)
+			if volID != tc.wantVolID {
+				t.Errorf("getStagingPath() volID = %v, want %v", volID, tc.wantVolID)
+			}
+			if stagingPath != tc.wantStaging {
+				t.Errorf("getStagingPath() stagingPath = %v, want %v", stagingPath, tc.wantStaging)
+			}
+		})
+	}
+}
+
+func TestFileExists(t *testing.T) {
+	// Initialize fsMock if not already done
+	if fsMock == nil {
+		fsMock = new(mocks.FsInterface)
+	}
+	if nodeSvc == nil {
+		nodeSvc = &Service{}
+	}
+	nodeSvc.Fs = fsMock
+
+	// Test file exists
+	fsMock.On("Stat", mock.Anything).Return(&mocks.FileInfo{}, nil)
+	exists := nodeSvc.fileExists("/tmp/test")
+	if !exists {
+		t.Errorf("fileExists() = false, want true")
+	}
+
+	// Test file does not exist
+	fsMock.ExpectedCalls = nil
+	fsMock.On("Stat", mock.Anything).Return(nil, os.ErrNotExist)
+	exists = nodeSvc.fileExists("/tmp/notexist")
+	if exists {
+		t.Errorf("fileExists() = true, want false for non-existent file")
+	}
+
+	// Test stat error (not IsNotExist)
+	fsMock.ExpectedCalls = nil
+	fsMock.On("Stat", mock.Anything).Return(nil, errors.New("stat error"))
+	exists = nodeSvc.fileExists("/tmp/error")
+	if exists {
+		t.Errorf("fileExists() = true, want false for stat error")
+	}
+}
+
+func TestBuildInitiatorsArrayModify(t *testing.T) {
+	if nodeSvc == nil {
+		nodeSvc = &Service{}
+	}
+	nodeSvc.opts = Opts{
+		EnableCHAP:   true,
+		CHAPUsername: "user",
+		CHAPPassword: "pass",
+	}
+	nodeSvc.useFC = make(map[string]bool)
+	arrayID := "array-1"
+
+	// Test with CHAP enabled and FC not used
+	nodeSvc.useFC[arrayID] = false
+	initiators := []string{"iqn1", "iqn2"}
+	result := nodeSvc.buildInitiatorsArrayModify(initiators, arrayID)
+	if len(result) != 2 {
+		t.Errorf("buildInitiatorsArrayModify() returned %d items, want 2", len(result))
+	}
+	if result[0].ChapSingleUsername == nil || *result[0].ChapSingleUsername != "user" {
+		t.Errorf("buildInitiatorsArrayModify() CHAP username not set correctly")
+	}
+
+	// Test with FC used
+	nodeSvc.useFC[arrayID] = true
+	result = nodeSvc.buildInitiatorsArrayModify(initiators, arrayID)
+	if len(result) != 2 {
+		t.Errorf("buildInitiatorsArrayModify() returned %d items, want 2", len(result))
+	}
+	if result[0].ChapSingleUsername != nil {
+		t.Errorf("buildInitiatorsArrayModify() CHAP username should be nil when FC is used")
+	}
+
+	// Test with CHAP disabled
+	nodeSvc.useFC[arrayID] = false
+	nodeSvc.opts.EnableCHAP = false
+	result = nodeSvc.buildInitiatorsArrayModify(initiators, arrayID)
+	if len(result) != 2 {
+		t.Errorf("buildInitiatorsArrayModify() returned %d items, want 2", len(result))
+	}
+	if result[0].ChapSingleUsername != nil {
+		t.Errorf("buildInitiatorsArrayModify() CHAP username should be nil when CHAP is disabled")
+	}
+}
+
+func TestReadFCPortsFilterFile(t *testing.T) {
+	if nodeSvc == nil {
+		nodeSvc = &Service{}
+	}
+	if fsMock == nil {
+		fsMock = new(mocks.FsInterface)
+	}
+	nodeSvc.Fs = fsMock
+
+	// Test with empty file path
+	nodeSvc.opts.FCPortsFilterFilePath = ""
+	result, err := nodeSvc.readFCPortsFilterFile()
+	if err != nil {
+		t.Errorf("readFCPortsFilterFile() error = %v", err)
+	}
+	if result != nil {
+		t.Errorf("readFCPortsFilterFile() result should be nil when file path is empty")
+	}
+
+	// Test with file not found
+	nodeSvc.opts.FCPortsFilterFilePath = "/tmp/nonexistent"
+	fsMock.On("ReadFile", mock.Anything).Return([]byte{}, os.ErrNotExist)
+	fsMock.On("IsNotExist", mock.Anything).Return(true)
+	result, err = nodeSvc.readFCPortsFilterFile()
+	if err != nil {
+		t.Errorf("readFCPortsFilterFile() error = %v", err)
+	}
+	if result != nil {
+		t.Errorf("readFCPortsFilterFile() result should be nil when file not found")
+	}
+
+	// Test with read error
+	fsMock.ExpectedCalls = nil
+	fsMock.On("ReadFile", mock.Anything).Return([]byte{}, errors.New("read error"))
+	result, err = nodeSvc.readFCPortsFilterFile()
+	if err == nil {
+		t.Errorf("readFCPortsFilterFile() should return error on read error")
+	}
+
+	// Test with empty data
+	fsMock.ExpectedCalls = nil
+	fsMock.On("ReadFile", mock.Anything).Return([]byte{}, nil)
+	result, err = nodeSvc.readFCPortsFilterFile()
+	if err != nil {
+		t.Errorf("readFCPortsFilterFile() error = %v", err)
+	}
+	if result != nil {
+		t.Errorf("readFCPortsFilterFile() result should be nil with empty data")
+	}
+
+	// Test with invalid format (no colons)
+	fsMock.ExpectedCalls = nil
+	fsMock.On("ReadFile", mock.Anything).Return([]byte("invalid"), nil)
+	result, err = nodeSvc.readFCPortsFilterFile()
+	if err != nil {
+		t.Errorf("readFCPortsFilterFile() error = %v", err)
+	}
+	if result != nil {
+		t.Errorf("readFCPortsFilterFile() result should be nil with invalid format")
+	}
+
+	// Test with valid data
+	fsMock.ExpectedCalls = nil
+	fsMock.On("ReadFile", mock.Anything).Return([]byte("wwpn1:wwpn2,wwpn3:wwpn4"), nil)
+	result, err = nodeSvc.readFCPortsFilterFile()
+	if err != nil {
+		t.Errorf("readFCPortsFilterFile() error = %v", err)
+	}
+	if len(result) != 2 {
+		t.Errorf("readFCPortsFilterFile() returned %d items, want 2", len(result))
+	}
+}
+
+// TestCheckForDuplicateUUIDs tests the checkForDuplicateUUIDs function
+func TestCheckForDuplicateUUIDs(_ *testing.T) {
+	// Save original kubeclient
+	originalClient := k8sutils.Kubeclient
+	defer func() { k8sutils.Kubeclient = originalClient }()
+
+	// Test case 1: Error getting UUIDs
+	mockClient := &k8sutils.K8sClient{}
+	k8sutils.Kubeclient = mockClient
+	// Mock will return error since GetNVMeUUIDs will fail with nil client
+
+	s := &Service{}
+	s.checkForDuplicateUUIDs() // Should handle error gracefully
+
+	// Test case 2 & 3: Just verify function doesn't panic
+	// Full testing would require mocking the entire k8s client
+	s.checkForDuplicateUUIDs()
+}
+
+// TestModifyHostInitiators tests the modifyHostInitiators function
+func TestModifyHostInitiators(t *testing.T) {
+	ctx := context.Background()
+
+	// Test case 1: Delete initiators
+	mockClient := new(gopowerstoremock.Client)
+	mockClient.On("ModifyHost", mock.Anything, mock.Anything, "host123").Return(gopowerstore.CreateResponse{ID: "host123"}, nil)
+
+	s := &Service{}
+	err := s.modifyHostInitiators(ctx, "host123", mockClient, []string{}, []string{"iqn1", "iqn2"}, []string{}, "array1", nil)
+	assert.NoError(t, err)
+
+	// Test case 2: Delete initiators error
+	mockClient2 := new(gopowerstoremock.Client)
+	mockClient2.On("ModifyHost", mock.Anything, mock.Anything, "host123").Return(gopowerstore.CreateResponse{}, fmt.Errorf("delete error"))
+
+	err = s.modifyHostInitiators(ctx, "host123", mockClient2, []string{}, []string{"iqn8"}, []string{}, "array1", nil)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to remove initiators")
+
+	// Test case 3: Update connectivity
+	mockClient3 := new(gopowerstoremock.Client)
+	connectivity := gopowerstore.HostConnectivityEnum("LocalOnly")
+	mockClient3.On("ModifyHost", mock.Anything, mock.Anything, "host123").Return(gopowerstore.CreateResponse{ID: "host123"}, nil)
+
+	err = s.modifyHostInitiators(ctx, "host123", mockClient3, []string{}, []string{}, []string{}, "array1", &connectivity)
+	assert.NoError(t, err)
+
+	// Test case 4: Connectivity update error
+	mockClient4 := new(gopowerstoremock.Client)
+	mockClient4.On("ModifyHost", mock.Anything, mock.Anything, "host123").Return(gopowerstore.CreateResponse{}, fmt.Errorf("connectivity error"))
+
+	err = s.modifyHostInitiators(ctx, "host123", mockClient4, []string{}, []string{}, []string{}, "array1", &connectivity)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to update host connectivity")
 }

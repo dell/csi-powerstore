@@ -16,7 +16,7 @@
  *
  */
 
-package fs
+package fs_test
 
 import (
 	"context"
@@ -24,18 +24,19 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/dell/csi-powerstore/v2/pkg/identifiers/fs"
 	"github.com/dell/gofsutil"
 	"github.com/stretchr/testify/suite"
 )
 
 type FsTestSuite struct {
 	suite.Suite
-	fs  Interface
+	fs  fs.Interface
 	tmp string
 }
 
 func (suite *FsTestSuite) SetupSuite() {
-	suite.fs = &Fs{Util: &gofsutil.FS{}}
+	suite.fs = &fs.Fs{Util: &gofsutil.FS{}}
 	suite.tmp = "./tmp"
 	err := os.Mkdir(suite.tmp, 0o750)
 	if err != nil {

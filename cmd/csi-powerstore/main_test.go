@@ -27,6 +27,7 @@ import (
 
 	"github.com/dell/csi-powerstore/v2/mocks"
 	"github.com/dell/csi-powerstore/v2/pkg/controller"
+	"github.com/dell/csi-powerstore/v2/pkg/groupcontroller"
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers"
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers/fs"
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers/k8sutils"
@@ -166,6 +167,18 @@ func TestMainNodeMode(t *testing.T) {
 		k8sutils.InClusterConfigFunc = defaultK8sConfigFunc
 		k8sutils.NewForConfigFunc = defaultK8sClientsetFunc
 	}()
+
+	defaultInitNodeServiceFunc := initNodeServiceFunc
+	initNodeServiceFunc = func(f fs.Interface, configPath string) (*node.Service, error) {
+		ns := &node.Service{
+			Fs: f,
+		}
+		if err := ns.UpdateArrays(configPath, f); err != nil {
+			return nil, err
+		}
+		return ns, nil
+	}
+	defer func() { initNodeServiceFunc = defaultInitNodeServiceFunc }()
 
 	// Set required environment variables
 	t.Setenv(identifiers.EnvArrayConfigFilePath, config)
@@ -320,6 +333,36 @@ func Test_initControllerService(t *testing.T) {
 			wantErr:    true,
 		},
 		{
+			name: "fail to create monitor service",
+			init: func() {
+				tempNewForConfigFunc := k8sutils.NewForConfigFunc
+				callCount := 0
+				k8sutils.NewForConfigFunc = func(_ *rest.Config) (kubernetes.Interface, error) {
+					callCount++
+					if callCount == 1 {
+						return fake.NewClientset(), nil
+					}
+					return nil, errors.New("monitor k8s client error")
+				}
+				tempInClusterConfigFunc := k8sutils.InClusterConfigFunc
+				k8sutils.InClusterConfigFunc = func() (*rest.Config, error) {
+					return nil, nil
+				}
+				t.Cleanup(func() {
+					k8sutils.NewForConfigFunc = tempNewForConfigFunc
+					k8sutils.InClusterConfigFunc = tempInClusterConfigFunc
+				})
+			},
+			f: func() fs.Interface {
+				fs := &mocks.FsInterface{}
+				fs.On("ReadFile", ".").Return([]byte{}, nil)
+				return fs
+			},
+			configPath: "",
+			want:       nil,
+			wantErr:    true,
+		},
+		{
 			name: "fail to initialize the monitor service arrays",
 			init: func() {
 				tempNewForConfigFunc := k8sutils.NewForConfigFunc
@@ -390,6 +433,237 @@ func Test_initControllerService(t *testing.T) {
 			if got == nil {
 				t.Error("initControllerService() expected a service struct but got nil")
 			}
+		})
+	}
+}
+
+func Test_initNodeService(t *testing.T) {
+	tests := []struct {
+		name       string
+		init       func()
+		f          func() fs.Interface
+		configPath string
+		wantErr    bool
+	}{
+		{
+			name: "fail to update arrays",
+			init: func() {},
+			f: func() fs.Interface {
+				fs := &mocks.FsInterface{}
+				fs.On("ReadFile", ".").Return([]byte{}, errors.New("read error"))
+				return fs
+			},
+			configPath: "",
+			wantErr:    true,
+		},
+		{
+			name: "fail to initialize the node service",
+			init: func() {
+				tempNewForConfigFunc := k8sutils.NewForConfigFunc
+				k8sutils.NewForConfigFunc = func(_ *rest.Config) (kubernetes.Interface, error) {
+					return nil, errors.New("k8s client error")
+				}
+				tempInClusterConfigFunc := k8sutils.InClusterConfigFunc
+				k8sutils.InClusterConfigFunc = func() (*rest.Config, error) {
+					return nil, nil
+				}
+				t.Cleanup(func() {
+					k8sutils.NewForConfigFunc = tempNewForConfigFunc
+					k8sutils.InClusterConfigFunc = tempInClusterConfigFunc
+				})
+			},
+			f: func() fs.Interface {
+				fs := &mocks.FsInterface{}
+				fs.On("ReadFile", "/some/config.yaml").Return([]byte{}, nil)
+				return fs
+			},
+			configPath: "/some/config.yaml",
+			wantErr:    true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.init()
+			got, gotErr := initNodeService(tt.f(), tt.configPath)
+			if gotErr != nil {
+				if !tt.wantErr {
+					t.Errorf("initNodeService() failed: %v", gotErr)
+				}
+				return
+			}
+			if tt.wantErr {
+				t.Fatal("initNodeService() succeeded unexpectedly")
+			}
+			if got == nil {
+				t.Error("initNodeService() expected a service struct but got nil")
+			}
+		})
+	}
+}
+
+func Test_initGroupControllerService(t *testing.T) {
+	tests := []struct {
+		name string // description of this test case
+		// Named input parameters for target function.
+		init       func()
+		f          func() fs.Interface
+		configPath string
+		want       *groupcontroller.Service
+		wantErr    bool
+	}{
+		{
+			name: "fail to update arrays",
+			init: func() {},
+			f: func() fs.Interface {
+				fs := &mocks.FsInterface{}
+				fs.On("ReadFile", ".").Return([]byte{}, errors.New("read error"))
+				return fs
+			},
+			configPath: "",
+			want:       nil,
+			wantErr:    true,
+		},
+		{
+			name: "fail to initialize the groupController service",
+			init: func() {
+				tempNewForConfigFunc := k8sutils.NewForConfigFunc
+				k8sutils.NewForConfigFunc = func(_ *rest.Config) (kubernetes.Interface, error) {
+					return nil, errors.New("new for config error")
+				}
+				t.Cleanup(func() {
+					k8sutils.NewForConfigFunc = tempNewForConfigFunc
+				})
+			},
+			f: func() fs.Interface {
+				fs := &mocks.FsInterface{}
+				fs.On("ReadFile", "/some/config.yaml").Return([]byte{}, nil)
+				return fs
+			},
+			configPath: "/some/config.yaml",
+			want:       nil,
+			wantErr:    true,
+		},
+		{
+			name: "success",
+			init: func() {
+				tempNewForConfigFunc := k8sutils.NewForConfigFunc
+				k8sutils.NewForConfigFunc = func(_ *rest.Config) (kubernetes.Interface, error) {
+					return fake.NewClientset(), nil
+				}
+				tempInClusterConfigFunc := k8sutils.InClusterConfigFunc
+				k8sutils.InClusterConfigFunc = func() (*rest.Config, error) {
+					return nil, nil
+				}
+				t.Cleanup(func() {
+					k8sutils.NewForConfigFunc = tempNewForConfigFunc
+					k8sutils.InClusterConfigFunc = tempInClusterConfigFunc
+				})
+			},
+			f: func() fs.Interface {
+				fs := &mocks.FsInterface{}
+				fs.On("ReadFile", ".").Return([]byte{}, nil)
+				return fs
+			},
+			configPath: "",
+			want: &groupcontroller.Service{
+				Fs: &mocks.FsInterface{},
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.init()
+			got, gotErr := initGroupControllerService(tt.f(), tt.configPath)
+			if gotErr != nil {
+				if !tt.wantErr {
+					t.Errorf("initGroupControllerService() failed: %v", gotErr)
+				}
+				return
+			}
+			if tt.wantErr {
+				t.Fatal("initGroupControllerService() succeeded unexpectedly")
+			}
+
+			if got == nil {
+				t.Error("initGroupControllerService() expected a service struct but got nil")
+			}
+		})
+	}
+}
+
+func Test_validateAndSetDRBindPort(t *testing.T) {
+	tests := []struct {
+		name     string
+		envPort  string
+		expected string
+	}{
+		{
+			name:     "Empty environment variable returns default port",
+			envPort:  "",
+			expected: ":8082",
+		},
+		{
+			name:     "Valid port number returns port with colon prefix",
+			envPort:  "9000",
+			expected: ":9000",
+		},
+		{
+			name:     "Valid port number 1 returns port with colon prefix",
+			envPort:  "1",
+			expected: ":1",
+		},
+		{
+			name:     "Valid port number 65535 returns port with colon prefix",
+			envPort:  "65535",
+			expected: ":65535",
+		},
+		{
+			name:     "Invalid non-numeric string returns default port",
+			envPort:  "invalid",
+			expected: ":8082",
+		},
+		{
+			name:     "Invalid port 0 returns default port",
+			envPort:  "0",
+			expected: ":8082",
+		},
+		{
+			name:     "Invalid port -1 returns default port",
+			envPort:  "-1",
+			expected: ":8082",
+		},
+		{
+			name:     "Invalid port 65536 returns default port",
+			envPort:  "65536",
+			expected: ":8082",
+		},
+		{
+			name:     "Invalid port 99999 returns default port",
+			envPort:  "99999",
+			expected: ":8082",
+		},
+		{
+			name:     "Port with whitespace returns default port",
+			envPort:  " 8080 ",
+			expected: ":8082",
+		},
+		{
+			name:     "Decimal port returns default port",
+			envPort:  "8080.5",
+			expected: ":8082",
+		},
+		{
+			name:     "Empty string with spaces returns default port",
+			envPort:  "   ",
+			expected: ":8082",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := validateAndSetDRBindPort(tt.envPort)
+			assert.Equal(t, tt.expected, result)
 		})
 	}
 }

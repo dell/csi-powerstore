@@ -10,14 +10,13 @@
 
 SCRIPTDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 DRIVERDIR="${SCRIPTDIR}/../"
-HELMCHARTVERSION="csi-powerstore-2.16.0"
 DRIVER="csi-powerstore"
 VERIFYSCRIPT="${SCRIPTDIR}/verify.sh"
 PROG="${0}"
 NODE_VERIFY=1
 VERIFY=1
 MODE="install"
-DEFAULT_DRIVER_VERSION="v2.16.0"
+DEFAULT_VERSION="v2.17.0"
 WATCHLIST=""
 
 # export the name of the debug log, so child processes will see it
@@ -377,10 +376,18 @@ while getopts ":h-:" optchar; do
   esac
 done
 
+# Derive helm chart version from DEFAULT_VERSION (single source of truth)
+DRIVERVERSION="${DRIVER}-${DEFAULT_VERSION#v}"
+
+# Allow override via --helm-charts-version
+if [ -n "$HELMCHARTVERSION" ]; then
+  DRIVERVERSION=$HELMCHARTVERSION
+fi
+
 if [ ! -d "$DRIVERDIR/helm-charts" ]; then
 
   if  [ ! -d "$SCRIPTDIR/helm-charts" ]; then
-    git clone --quiet -c advice.detachedHead=false -b $HELMCHARTVERSION https://github.com/dell/helm-charts
+    git clone --quiet -c advice.detachedHead=false -b $DRIVERVERSION https://github.com/dell/helm-charts
   fi
   mv helm-charts $DRIVERDIR
 else
@@ -394,7 +401,7 @@ RELEASE=$(get_release_name "${DRIVER}")
 # by default, NODEUSER is root
 NODEUSER="${NODEUSER:-root}"
 if [[ -z ${DRIVER_VERSION} ]]; then
-   DRIVER_VERSION=${DEFAULT_DRIVER_VERSION}
+   DRIVER_VERSION=${DEFAULT_VERSION}
 fi
 
 

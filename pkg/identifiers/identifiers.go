@@ -129,6 +129,10 @@ const (
 	KeyFlrMinRetention = "csi.dell.com/flr_attributes.flr_create.minimum_retention"
 	// KeyFlrMaxRetention key value to specify flr_attributes.flr_create.maximum_retention
 	KeyFlrMaxRetention = "csi.dell.com/flr_attributes.flr_create.maximum_retention"
+	// PvcLabelFsCheckEnabled key value to enable/disable FS check feature
+	PvcLabelFsCheckEnabled = "csi.dell.com/fs_check_enabled"
+	// PvcLabelFsCheckMode key value to specify FS check mode
+	PvcLabelFsCheckMode = "csi.dell.com/fs_check_mode"
 	// KeyServiceTag has the service tag associated to an Appliance
 	KeyServiceTag = "serviceTag"
 	// VerboseName longer description of the driver

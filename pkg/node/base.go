@@ -156,6 +156,21 @@ func getNodeOptions() Opts {
 		opts.CHAPPassword = identifiers.RandomString(12)
 	}
 
+	opts.FsCheckEnabled = pb(identifiers.EnvFsCheckEnabled)
+
+	if mode, ok := csictx.LookupEnv(ctx, identifiers.EnvFsCheckMode); ok {
+		switch strings.ToLower(mode) {
+		case fsCheckModeCheckOnly, fsCheckModeCheckAndRepair:
+			opts.FsCheckMode = strings.ToLower(mode)
+		default:
+			log.WithFields(csmlog.Fields{identifiers.EnvFsCheckMode: mode}).Warn("invalid value for FS check mode, defaulting to " + fsCheckModeCheckOnly)
+			opts.FsCheckMode = fsCheckModeCheckOnly
+		}
+	} else {
+		log.WithFields(csmlog.Fields{identifiers.EnvFsCheckMode: mode}).Warn("FS check mode not set, defaulting to " + fsCheckModeCheckOnly)
+		opts.FsCheckMode = fsCheckModeCheckOnly
+	}
+
 	return opts
 }
 
@@ -262,13 +277,13 @@ func getTargetMount(ctx context.Context, target string, fs fs.Interface) (gofsut
 	return targetMount, found, nil
 }
 
-func getMounts(_ context.Context, fs fs.Interface) ([]gofsutil.Info, error) {
+func getMounts(ctx context.Context, fs fs.Interface) ([]gofsutil.Info, error) {
 	data, err := consistentRead(procMountsPath, procMountsRetries, fs)
 	if err != nil {
 		return []gofsutil.Info{}, err
 	}
 
-	info, err := fs.ParseProcMounts(context.Background(), bytes.NewReader(data))
+	info, err := fs.ParseProcMounts(ctx, bytes.NewReader(data))
 	if err != nil {
 		return []gofsutil.Info{}, err
 	}

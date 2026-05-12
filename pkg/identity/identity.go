@@ -38,6 +38,7 @@ func NewIdentityService(name string, version string, manifest map[string]string)
 
 // Service is a identity service allows driver to return capabilities, health, and other metadata
 type Service struct {
+	csi.UnimplementedIdentityServer
 	name     string
 	version  string
 	manifest map[string]string
@@ -82,6 +83,13 @@ func (s Service) GetPluginCapabilities(_ context.Context, _ *csi.GetPluginCapabi
 			Type: &csi.PluginCapability_Service_{
 				Service: &csi.PluginCapability_Service{
 					Type: csi.PluginCapability_Service_VOLUME_ACCESSIBILITY_CONSTRAINTS,
+				},
+			},
+		},
+		{
+			Type: &csi.PluginCapability_Service_{
+				Service: &csi.PluginCapability_Service{
+					Type: csi.PluginCapability_Service_GROUP_CONTROLLER_SERVICE,
 				},
 			},
 		},

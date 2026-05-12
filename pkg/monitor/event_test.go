@@ -242,7 +242,7 @@ users:
 	if err != nil {
 		return "", fmt.Errorf("failed to create temp kubeconfig file: %s", err.Error())
 	}
-	if err := os.WriteFile(tmpfile.Name(), []byte(fakeConfig), 0o600); err != nil {
+	if err := os.WriteFile(tmpfile.Name(), []byte(fakeConfig), 0o600); err != nil { // #nosec G703
 		return "", fmt.Errorf("failed to write config to the kubeconfig file: %s", err.Error())
 	}
 	return tmpfile.Name(), nil

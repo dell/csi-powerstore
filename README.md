@@ -55,4 +55,12 @@ If you want to use NVMe/FC be sure that the NVMeFC zoning of the Host Bus Adapte
 ## Documentation
 For more detailed information on the driver, please refer to [Container Storage Modules documentation](https://dell.github.io/csm-docs/).
 
+### VolumeGroupSnapshot Support
+This driver now supports VolumeGroupSnapshot functionality as defined in CSI specification 1.11. This feature allows creating crash-consistent snapshots of multiple volumes simultaneously.
 
+#### Key Features
+- **CreateVolumeGroupSnapshot**: Create snapshots of multiple volumes simultaneously
+- **DeleteVolumeGroupSnapshot**: Delete a group snapshot and all member snapshots  
+- **GetVolumeGroupSnapshot**: Retrieve information about a group snapshot
+- **Write-Order Consistency**: All snapshots in the group are taken at the same point-in-time
+- **CSI Spec 1.11 Compliance**: Full compliance with CSI specification requirements
