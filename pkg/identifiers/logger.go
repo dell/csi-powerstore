@@ -20,6 +20,8 @@ package identifiers
 
 import (
 	"context"
+
+	"github.com/dell/csmlog"
 )
 
 // CustomLogger is logger wrapper that can be passed to gopowerstore, gobrick allowing to logging context fields with each call
@@ -27,15 +29,15 @@ type CustomLogger struct{}
 
 // Info is a wrapper of csmlog Info method
 func (lg *CustomLogger) Info(ctx context.Context, format string, args ...interface{}) {
-	log.WithContext(ctx).Infof(format, args...)
+	csmlog.WithContext(ctx).Infof(format, args...)
 }
 
 // Debug is a wrapper of csmlog Debug method
 func (lg *CustomLogger) Debug(ctx context.Context, format string, args ...interface{}) {
-	log.WithContext(ctx).Debugf(format, args...)
+	csmlog.WithContext(ctx).Debugf(format, args...)
 }
 
 // Error is a wrapper of csmlog Error method
 func (lg *CustomLogger) Error(ctx context.Context, format string, args ...interface{}) {
-	log.WithContext(ctx).Errorf(format, args...)
+	csmlog.WithContext(ctx).Errorf(format, args...)
 }

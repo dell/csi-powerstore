@@ -20,11 +20,11 @@ package node
 
 import (
 	"context"
-	"fmt"
 	"os/exec"
 	"regexp"
 	"strings"
 
+	log "github.com/dell/csmlog"
 	"github.com/dell/gopowerstore"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -40,12 +40,17 @@ type NFSv4ACLsInterface interface {
 type NFSv4ACLs struct{}
 
 func validateAndSetACLs(ctx context.Context, s NFSv4ACLsInterface, nasName string, client gopowerstore.Client, acls string, dir string) (bool, error) {
-	log := log.WithContext(ctx)
 	aclsConfigured := false
 	if nfsv4ACLs(acls) {
 		if isNfsv4Enabled(ctx, client, nasName) {
 			if err := s.SetNfsv4Acls(acls, dir); err != nil {
-				log.Error(fmt.Sprintf("can't assign NFSv4 ACLs to folder %s: %s", dir, err.Error()))
+				log.WithContext(ctx).WithFields(log.Fields{
+					log.FieldComponent: "node",
+					log.FieldOperation: "validateAndSetACLs",
+					log.FieldProtocol:  "NFS",
+					"dir":              dir,
+					log.FieldError:     err.Error(),
+				}).Error("can't assign NFSv4 ACLs to folder")
 				return false, err
 			}
 			aclsConfigured = true
@@ -60,17 +65,16 @@ func validateAndSetACLs(ctx context.Context, s NFSv4ACLsInterface, nasName strin
 }
 
 func posixMode(acls string) bool {
-	if matched, _ := regexp.Match(`\d{3,4}`, []byte(acls)); matched {
-		return true
-	}
-	return false
+	modeRegex := regexp.MustCompile(`\d{3,4}`)
+	return modeRegex.MatchString(acls)
 }
 
 func nfsv4ACLs(acls string) bool {
 	aclsList := strings.Split(acls, ",")
+	aclRegex := regexp.MustCompile(`([ADUL]:\w*:[\w.]*[@]*[\w.]*:\w*)`)
 	for _, acl := range aclsList {
-		matched, err := regexp.Match(`([ADUL]:\w*:[\w.]*[@]*[\w.]*:\w*)`, []byte(acl))
-		if !matched || err != nil {
+		matched := aclRegex.MatchString(acl)
+		if !matched {
 			return false
 		}
 	}
@@ -80,16 +84,25 @@ func nfsv4ACLs(acls string) bool {
 // SetNfsv4Acls sets NFSv4 ACLS
 func (n *NFSv4ACLs) SetNfsv4Acls(acls string, dir string) error {
 	command := []string{"nfs4_setfacl", "-s", acls, dir}
-	log.Infof("NFSv4 ACL command: %s \n", strings.Join(command, " "))
+	log.WithFields(log.Fields{
+		log.FieldComponent: "node",
+		log.FieldOperation: "SetNfsv4Acls",
+		log.FieldProtocol:  "NFS",
+		"command":          strings.Join(command, " "),
+	}).Info("executing NFSv4 ACL command")
 	// arguments for exec.Command() are validated in caller
 	cmd := exec.Command(command[0], command[1:]...) // #nosec G204
 	outStr, err := cmd.Output()
-	log.Infof("NFSv4 ACL output: %s \n", string(outStr))
+	log.WithFields(log.Fields{
+		log.FieldComponent: "node",
+		log.FieldOperation: "SetNfsv4Acls",
+		log.FieldProtocol:  "NFS",
+		"output":           string(outStr),
+	}).Info("NFSv4 ACL command output")
 	return err
 }
 
 func isNfsv4Enabled(ctx context.Context, client gopowerstore.Client, nasName string) bool {
-	log := log.WithContext(ctx)
 	nfsv4Enabled := false
 	nas, err := gopowerstore.Client.GetNASByName(client, ctx, nasName)
 	if err == nil {
@@ -98,13 +111,29 @@ func isNfsv4Enabled(ctx context.Context, client gopowerstore.Client, nasName str
 			if nfsServer.IsNFSv4Enabled {
 				nfsv4Enabled = true
 			} else {
-				log.Error(fmt.Sprintf("NFS v4 not enabled on NAS server: %s\n", nasName))
+				log.WithContext(ctx).WithFields(log.Fields{
+					log.FieldComponent: "node",
+					log.FieldOperation: "isNfsv4Enabled",
+					log.FieldProtocol:  "NFS",
+					"nas_name":         nasName,
+				}).Error("NFSv4 not enabled on NAS server")
 			}
 		} else {
-			log.Error(fmt.Sprintf("can't fetch nfs server with id %s: %s", nas.NfsServers[0].ID, err.Error()))
+			log.WithContext(ctx).WithFields(log.Fields{
+				log.FieldComponent: "node",
+				log.FieldOperation: "isNfsv4Enabled",
+				log.FieldProtocol:  "NFS",
+				"nfs_server_id":    nas.NfsServers[0].ID,
+				log.FieldError:     err.Error(),
+			}).Error("can't fetch NFS server")
 		}
 	} else {
-		log.Error(fmt.Sprintf("can't determine nfsv4 enabled: %s", err.Error()))
+		log.WithContext(ctx).WithFields(log.Fields{
+			log.FieldComponent: "node",
+			log.FieldOperation: "isNfsv4Enabled",
+			log.FieldProtocol:  "NFS",
+			log.FieldError:     err.Error(),
+		}).Error("can't determine if NFSv4 is enabled")
 	}
 	return nfsv4Enabled
 }

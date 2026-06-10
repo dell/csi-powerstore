@@ -28,7 +28,7 @@ import (
 
 	"github.com/dell/csi-powerstore/v2/mocks"
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers"
-	"github.com/dell/csmlog"
+	log "github.com/dell/csmlog"
 	"github.com/dell/gopowerstore"
 	gopowerstoremock "github.com/dell/gopowerstore/mocks"
 	"github.com/container-storage-interface/spec/lib/go/csi"
@@ -264,7 +264,7 @@ func TestSCSIStager_Stage(t *testing.T) {
 			StagingTargetPath: nodeStagePrivateDir,
 			VolumeCapability: getCapabilityWithVoltypeAccessFstype(
 				"block", "single-writer", "none"),
-		}, filepath.Join(nodeStagePrivateDir, validBaseVolumeID), "node-1", csmlog.Fields{}, fsMock, validBaseVolumeID, false, clientMock)
+		}, filepath.Join(nodeStagePrivateDir, validBaseVolumeID), "node-1", log.Fields{}, fsMock, validBaseVolumeID, false, clientMock)
 		assert.Nil(t, err)
 	})
 
@@ -296,7 +296,7 @@ func TestSCSIStager_Stage(t *testing.T) {
 			StagingTargetPath: nodeStagePrivateDir,
 			VolumeCapability: getCapabilityWithVoltypeAccessFstype(
 				"block", "single-writer", "none"),
-		}, filepath.Join(nodeStagePrivateDir, validBaseVolumeID), "node-1", csmlog.Fields{}, fsMock, validBaseVolumeID, false, clientMock)
+		}, filepath.Join(nodeStagePrivateDir, validBaseVolumeID), "node-1", log.Fields{}, fsMock, validBaseVolumeID, false, clientMock)
 
 		assert.Nil(t, err)
 	})
@@ -328,7 +328,7 @@ func TestSCSIStager_Stage(t *testing.T) {
 			StagingTargetPath: nodeStagePrivateDir,
 			VolumeCapability: getCapabilityWithVoltypeAccessFstype(
 				"block", "single-writer", "none"),
-		}, filepath.Join(nodeStagePrivateDir, validBaseVolumeID), "node-1", csmlog.Fields{}, fsMock, validBaseVolumeID, false, clientMock)
+		}, filepath.Join(nodeStagePrivateDir, validBaseVolumeID), "node-1", log.Fields{}, fsMock, validBaseVolumeID, false, clientMock)
 
 		assert.Nil(t, err)
 	})
@@ -372,7 +372,7 @@ func TestSCSIStager_Stage(t *testing.T) {
 			StagingTargetPath: nodeStagePrivateDir,
 			VolumeCapability: getCapabilityWithVoltypeAccessFstype(
 				"block", "single-writer", "none"),
-		}, filepath.Join(nodeStagePrivateDir, validBaseVolumeID), "node-1", csmlog.Fields{}, fsMock, validBaseVolumeID, false, client)
+		}, filepath.Join(nodeStagePrivateDir, validBaseVolumeID), "node-1", log.Fields{}, fsMock, validBaseVolumeID, false, client)
 		assert.NotNil(t, err)
 		assert.Contains(t, err.Error(), "unable to get targets for any protocol")
 	})
@@ -419,7 +419,7 @@ func TestSCSIStager_Stage(t *testing.T) {
 			StagingTargetPath: nodeStagePrivateDir,
 			VolumeCapability: getCapabilityWithVoltypeAccessFstype(
 				"block", "single-writer", "none"),
-		}, filepath.Join(nodeStagePrivateDir, validBaseVolumeID), "node-1", csmlog.Fields{}, fsMock, validBaseVolumeID, false, client)
+		}, filepath.Join(nodeStagePrivateDir, validBaseVolumeID), "node-1", log.Fields{}, fsMock, validBaseVolumeID, false, client)
 		assert.NotNil(t, err)
 		assert.Contains(t, err.Error(), "NVMeFC Targets data must be in publish context")
 	})
@@ -467,7 +467,7 @@ func TestSCSIStager_Stage(t *testing.T) {
 			StagingTargetPath: nodeStagePrivateDir,
 			VolumeCapability: getCapabilityWithVoltypeAccessFstype(
 				"block", "single-writer", "none"),
-		}, filepath.Join(nodeStagePrivateDir, validBaseVolumeID), "node-1", csmlog.Fields{}, fsMock, validBaseVolumeID, false, client)
+		}, filepath.Join(nodeStagePrivateDir, validBaseVolumeID), "node-1", log.Fields{}, fsMock, validBaseVolumeID, false, client)
 		assert.NotNil(t, err)
 		assert.Contains(t, err.Error(), "NVMeTCP Targets data must be in publish context")
 	})
@@ -516,7 +516,7 @@ func TestSCSIStager_Stage(t *testing.T) {
 			StagingTargetPath: nodeStagePrivateDir,
 			VolumeCapability: getCapabilityWithVoltypeAccessFstype(
 				"block", "single-writer", "none"),
-		}, filepath.Join(nodeStagePrivateDir, validBaseVolumeID), "node-1", csmlog.Fields{}, fsMock, validBaseVolumeID, false, client)
+		}, filepath.Join(nodeStagePrivateDir, validBaseVolumeID), "node-1", log.Fields{}, fsMock, validBaseVolumeID, false, client)
 		assert.NotNil(t, err)
 		assert.Contains(t, err.Error(), "iscsiTargets data must be in publish context")
 	})
@@ -563,7 +563,7 @@ func TestSCSIStager_Stage(t *testing.T) {
 			StagingTargetPath: nodeStagePrivateDir,
 			VolumeCapability: getCapabilityWithVoltypeAccessFstype(
 				"block", "single-writer", "none"),
-		}, filepath.Join(nodeStagePrivateDir, validBaseVolumeID), "node-1", csmlog.Fields{}, fsMock, validBaseVolumeID, false, client)
+		}, filepath.Join(nodeStagePrivateDir, validBaseVolumeID), "node-1", log.Fields{}, fsMock, validBaseVolumeID, false, client)
 		assert.NotNil(t, err)
 		assert.Contains(t, err.Error(), "fcTargets data must be in publish context")
 	})
@@ -610,7 +610,7 @@ func TestSCSIStager_Stage(t *testing.T) {
 			StagingTargetPath: nodeStagePrivateDir,
 			VolumeCapability: getCapabilityWithVoltypeAccessFstype(
 				"block", "single-writer", "none"),
-		}, filepath.Join(nodeStagePrivateDir, validBaseVolumeID), "node-1", csmlog.Fields{}, fsMock, validBaseVolumeID, true, clientMock) // isRemote=true
+		}, filepath.Join(nodeStagePrivateDir, validBaseVolumeID), "node-1", log.Fields{}, fsMock, validBaseVolumeID, true, clientMock) // isRemote=true
 
 		assert.Nil(t, err)
 		// Verify that connectDevice was called (this is the key behavior we're testing)
@@ -661,7 +661,7 @@ func TestSCSIStager_Stage(t *testing.T) {
 			StagingTargetPath: nodeStagePrivateDir,
 			VolumeCapability: getCapabilityWithVoltypeAccessFstype(
 				"block", "single-writer", "none"),
-		}, filepath.Join(nodeStagePrivateDir, validBaseVolumeID), "node-1", csmlog.Fields{}, fsMock, validBaseVolumeID, true, clientMock) // isRemote=true
+		}, filepath.Join(nodeStagePrivateDir, validBaseVolumeID), "node-1", log.Fields{}, fsMock, validBaseVolumeID, true, clientMock) // isRemote=true
 
 		// Should now return error when remote device connection fails
 		assert.NotNil(t, err)

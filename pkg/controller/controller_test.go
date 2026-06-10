@@ -196,8 +196,8 @@ func setVariables() {
 	arrays[firstValidID] = first
 	arrays[secondValidID] = second
 
-	csictx.Setenv(context.Background(), identifiers.EnvReplicationPrefix, "replication.storage.dell.com")
-	csictx.Setenv(context.Background(), identifiers.EnvNfsAcls, "A::OWNER@:RWX")
+	_ = csictx.Setenv(context.Background(), identifiers.EnvReplicationPrefix, "replication.storage.dell.com")
+	_ = csictx.Setenv(context.Background(), identifiers.EnvNfsAcls, "A::OWNER@:RWX")
 
 	ctrlSvc = &Service{
 		Fs:             fsMock,
@@ -208,7 +208,7 @@ func setVariables() {
 	k8sutils.Kubeclient = &k8sutils.K8sClient{
 		Clientset: fake.NewSimpleClientset(),
 	}
-	ctrlSvc.Init()
+	_ = ctrlSvc.Init()
 }
 
 func addMetaData(createParams interface{}) {
@@ -1348,7 +1348,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 				req.Parameters[KeyCSIPVCNamespace] = validNamespaceName
 
 				ctrlSvc.Arrays()[secondValidID].NfsAcls = ""
-				csictx.Setenv(context.Background(), identifiers.EnvNfsAcls, "")
+				_ = csictx.Setenv(context.Background(), identifiers.EnvNfsAcls, "")
 
 				_ = ctrlSvc.Init()
 
@@ -5014,7 +5014,7 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 						},
 					},
 				}
-				k8sutils.Kubeclient.Clientset.CoreV1().Nodes().Create(context.Background(), node, metav1.CreateOptions{})
+				_, _ = k8sutils.Kubeclient.Clientset.CoreV1().Nodes().Create(context.Background(), node, metav1.CreateOptions{})
 
 				volumeID := fmt.Sprintf("%s/%s/%s:%s/%s", validBaseVolID, "APM0012345", "scsi", validRemoteVolID, "APM0045678")
 
@@ -7320,8 +7320,8 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 	ginkgo.Describe("calling ControllerGetCapabilities()", func() {
 		ginkgo.When("plugin functions correctly with health monitor capabilities", func() {
 			ginkgo.It("should return supported capabilities", func() {
-				csictx.Setenv(context.Background(), identifiers.EnvIsHealthMonitorEnabled, "true")
-				ctrlSvc.Init()
+				_ = csictx.Setenv(context.Background(), identifiers.EnvIsHealthMonitorEnabled, "true")
+				_ = ctrlSvc.Init()
 				res, err := ctrlSvc.ControllerGetCapabilities(context.Background(), &csi.ControllerGetCapabilitiesRequest{})
 				gomega.Expect(err).To(gomega.BeNil())
 				gomega.Expect(res).To(gomega.Equal(&csi.ControllerGetCapabilitiesResponse{
@@ -7416,8 +7416,8 @@ var _ = ginkgo.Describe("CSIControllerService", func() {
 		})
 		ginkgo.When("plugin functions correctly without health monitor capabilities", func() {
 			ginkgo.It("should return supported capabilities", func() {
-				csictx.Setenv(context.Background(), identifiers.EnvIsHealthMonitorEnabled, "false")
-				ctrlSvc.Init()
+				_ = csictx.Setenv(context.Background(), identifiers.EnvIsHealthMonitorEnabled, "false")
+				_ = ctrlSvc.Init()
 				res, err := ctrlSvc.ControllerGetCapabilities(context.Background(), &csi.ControllerGetCapabilitiesRequest{})
 				gomega.Expect(err).To(gomega.BeNil())
 				gomega.Expect(res).To(gomega.Equal(&csi.ControllerGetCapabilitiesResponse{
@@ -8387,16 +8387,12 @@ func getTypicalControllerPublishVolumeRequest(access, nodeID, volumeID string) *
 	switch access {
 	case "single-writer":
 		accessMode.Mode = csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER
-		break
 	case "multiple-reader":
 		accessMode.Mode = csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY
-		break
 	case "multiple-writer":
 		accessMode.Mode = csi.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER
-		break
 	case "unknown":
 		accessMode.Mode = csi.VolumeCapability_AccessMode_UNKNOWN
-		break
 	}
 	capability.AccessMode = accessMode
 

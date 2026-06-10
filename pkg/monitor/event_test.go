@@ -116,24 +116,6 @@ var (
 		},
 		Message: testMessageWarning,
 	}
-	testVolumeEventNormal *corev1.Event = &corev1.Event{
-		TypeMeta: v1.TypeMeta{
-			Kind: "PersistentVolume",
-		},
-		ObjectMeta: v1.ObjectMeta{
-			Name:      "event2",
-			Namespace: testNamespace,
-		},
-		InvolvedObject: corev1.ObjectReference{
-			Name:      testVolName,
-			Namespace: testNamespace,
-		},
-		Type: corev1.EventTypeNormal,
-		LastTimestamp: v1.Time{
-			Time: testTime.Add(-2 * time.Minute),
-		},
-		Message: testMessageNormal,
-	}
 
 	testVolume *corev1.PersistentVolume = &corev1.PersistentVolume{
 		ObjectMeta: v1.ObjectMeta{

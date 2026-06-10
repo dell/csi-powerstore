@@ -32,10 +32,9 @@ import (
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers/fs"
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers/k8sutils"
 	"github.com/dell/csi-powerstore/v2/pkg/node"
-	"github.com/dell/csmlog"
+	log "github.com/dell/csmlog"
 	"github.com/dell/gocsi"
 	"github.com/fsnotify/fsnotify"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -80,15 +79,16 @@ func TestInitilizeDriverConfigParams(t *testing.T) {
 	writeToFile(t, driverConfigParams, content)
 	t.Setenv(identifiers.EnvConfigParamsFilePath, driverConfigParams)
 	initilizeDriverConfigParams()
-	assert.Equal(t, csmlog.DebugLevel, csmlog.GetLevel())
+	assert.Equal(t, log.InfoLevel, log.GetLevel())
 	writeToFile(t, driverConfigParams, "CSI_LOG_LEVEL: \"info\"")
 	time.Sleep(time.Second)
-	assert.Equal(t, csmlog.InfoLevel, csmlog.GetLevel())
+	assert.Equal(t, log.InfoLevel, log.GetLevel())
 }
 
 func TestMainControllerMode(t *testing.T) {
 	tmpDir := t.TempDir()
 	config := copyConfigFileToTmpDir(t, "../../pkg/array/testdata/one-arr.yaml", tmpDir)
+	kubeconfig := createFakeKubeconfig(t, tmpDir)
 
 	defaultK8sConfigFunc := k8sutils.InClusterConfigFunc
 	defaultK8sClientsetFunc := k8sutils.NewForConfigFunc
@@ -116,6 +116,7 @@ func TestMainControllerMode(t *testing.T) {
 	t.Setenv("JAEGER_SERVICE_NAME", "controller-test")
 	t.Setenv(string(gocsi.EnvVarMode), "controller")
 	t.Setenv(identifiers.EnvCSMDREnabled, "true")
+	t.Setenv("KUBECONFIG", kubeconfig)
 
 	array2 := `  - endpoint: "https://127.0.0.2/api/rest"
     username: "admin"
@@ -152,6 +153,7 @@ func TestMainControllerMode(t *testing.T) {
 func TestMainNodeMode(t *testing.T) {
 	tmpDir := t.TempDir()
 	config := copyConfigFileToTmpDir(t, "../../pkg/array/testdata/one-arr.yaml", tmpDir)
+	kubeconfig := createFakeKubeconfig(t, tmpDir)
 
 	defaultK8sConfigFunc := k8sutils.InClusterConfigFunc
 	defaultK8sClientsetFunc := k8sutils.NewForConfigFunc
@@ -184,6 +186,8 @@ func TestMainNodeMode(t *testing.T) {
 	t.Setenv(identifiers.EnvArrayConfigFilePath, config)
 	t.Setenv(gocsi.EnvVarMode, "node")
 	t.Setenv(identifiers.EnvDebugEnableTracing, "")
+	t.Setenv(identifiers.EnvCSMDREnabled, "true")
+	t.Setenv("KUBECONFIG", kubeconfig)
 	tempNodeIDFile, err := os.CreateTemp(tmpDir, "node-id")
 	require.NoError(t, err)
 	t.Setenv("X_CSI_POWERSTORE_NODE_ID_PATH", tempNodeIDFile.Name())
@@ -225,11 +229,11 @@ func copyConfigFileToTmpDir(t *testing.T, src string, tmpDir string) string {
 
 	srcF, err := os.Open(src)
 	require.NoError(t, err)
-	defer srcF.Close()
+	defer func() { _ = srcF.Close() }()
 
 	dstF, err := os.CreateTemp(tmpDir, "config_*.yaml")
 	require.NoError(t, err)
-	defer dstF.Close()
+	defer func() { _ = dstF.Close() }()
 
 	_, err = io.Copy(dstF, srcF)
 	require.NoError(t, err)
@@ -237,12 +241,37 @@ func copyConfigFileToTmpDir(t *testing.T, src string, tmpDir string) string {
 	return dstF.Name()
 }
 
+func createFakeKubeconfig(t *testing.T, tmpDir string) string {
+	t.Helper()
+
+	fakeKubeconfig := `
+apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    server: https://localhost:8443
+  name: fake-cluster
+contexts:
+- context:
+    cluster: fake-cluster
+    user: fake-user
+  name: fake-context
+current-context: fake-context
+users:
+- name: fake-user
+`
+	kubeconfigPath := filepath.Join(tmpDir, "kubeconfig")
+	err := os.WriteFile(kubeconfigPath, []byte(fakeKubeconfig), 0o644)
+	require.NoError(t, err)
+	return kubeconfigPath
+}
+
 func writeToFile(t *testing.T, controllerConfigFile string, array2 string) {
 	f, err := os.OpenFile(controllerConfigFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
 		t.Errorf("failed to open confg file %s, err %v", controllerConfigFile, err)
 	} else {
-		defer f.Close()
+		defer func() { _ = f.Close() }()
 		_, err = f.WriteString(array2 + "\n")
 		if err != nil {
 			t.Errorf("failed to update confg file %s, err %v", controllerConfigFile, err)
@@ -267,27 +296,21 @@ func TestUpdateDriverConfigParams(t *testing.T) {
 	assert.Equal(t, "text", logFormat)
 
 	updateDriverConfigParams(v)
-	level := csmlog.GetLevel()
+	level := log.GetLevel()
 
-	assert.Equal(t, csmlog.DebugLevel, level)
+	assert.Equal(t, log.DebugLevel, level)
 
 	v.Set("CSI_LOG_FORMAT", "json")
 	v.Set("CSI_LOG_LEVEL", "info")
 	updateDriverConfigParams(v)
-	level = csmlog.GetLevel()
+	level = log.GetLevel()
 
-	assert.Equal(t, csmlog.InfoLevel, level)
-	logFormatter := &csmlog.MyTextFormatter{
-		Base: &logrus.TextFormatter{
-			TimestampFormat: time.RFC3339,
-		},
-	}
-	assert.Equal(t, time.RFC3339, logFormatter.Base.TimestampFormat)
+	assert.Equal(t, log.InfoLevel, level)
 
 	v.Set("CSI_LOG_LEVEL", "notalevel")
 	updateDriverConfigParams(v)
-	level = csmlog.GetLevel()
-	assert.Equal(t, csmlog.DebugLevel, level)
+	level = log.GetLevel()
+	assert.Equal(t, log.InfoLevel, level)
 }
 
 func Test_initControllerService(t *testing.T) {

@@ -26,6 +26,7 @@ import (
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers"
 	"github.com/dell/gopowerstore/api"
 
+	log "github.com/dell/csmlog"
 	"github.com/dell/gopowerstore"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc/codes"
@@ -376,7 +377,6 @@ type NfsCreator struct {
 
 // CheckSize validates that size is correct and returns size in bytes
 func (*NfsCreator) CheckSize(ctx context.Context, cr *csi.CapacityRange, isAutoRoundOffFsSizeEnabled bool) (int64, error) {
-	log := log.WithContext(ctx)
 	minSize := cr.GetRequiredBytes()
 	maxSize := cr.GetLimitBytes()
 
@@ -394,7 +394,7 @@ func (*NfsCreator) CheckSize(ctx context.Context, cr *csi.CapacityRange, isAutoR
 
 	// TODO: This roundoff logic to be removed once platform supports minimum filesystem size
 	if isAutoRoundOffFsSizeEnabled && minSize < MinFilesystemSizeBytes {
-		log.Warn("Auto round off Filesystem size has been enabled! Rounding off PVC size to 3Gi.")
+		log.WithContext(ctx).Warn("Auto round off Filesystem size has been enabled! Rounding off PVC size to 3Gi.")
 		return MinFilesystemSizeBytes, nil
 	}
 
@@ -412,7 +412,6 @@ func (*NfsCreator) CheckName(_ context.Context, name string) error {
 
 // CheckIfAlreadyExists queries storage array if FileSystem with given name exists
 func (c *NfsCreator) CheckIfAlreadyExists(ctx context.Context, name string, sizeInBytes int64, client gopowerstore.Client) (*csi.Volume, error) {
-	log := log.WithContext(ctx)
 	alreadyExistVolume, err := client.GetFSByName(ctx, name)
 	if err != nil {
 		return nil, status.Errorf(status.Code(err), "can't find filesystem '%s': %s", name, err.Error())
@@ -423,7 +422,7 @@ func (c *NfsCreator) CheckIfAlreadyExists(ctx context.Context, name string, size
 			"filesystem '%s' already exists but is incompatible volume size: %d < %d",
 			name, alreadyExistVolume.SizeTotal, sizeInBytes)
 	}
-	log.Infof("filesystem '%s' already exists", name)
+	log.WithContext(ctx).Infof("filesystem '%s' already exists", name)
 
 	// update the nas server name for the volume to ensure CreateVolume adds the correct nas to volume context
 	nasServerID := alreadyExistVolume.NasServerID

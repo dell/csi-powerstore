@@ -20,8 +20,10 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/signal"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/dell/csi-powerstore/v2/pkg/array"
@@ -35,36 +37,24 @@ import (
 	"github.com/dell/csi-powerstore/v2/pkg/node"
 	"github.com/dell/csi-powerstore/v2/pkg/tracer"
 	drController "github.com/dell/csm-dr/pkg/controller"
-	"github.com/dell/csmlog"
+	log "github.com/dell/csmlog"
 	"github.com/dell/gocsi"
 	csictx "github.com/dell/gocsi/context"
 	"github.com/dell/gofsutil"
 	"github.com/fsnotify/fsnotify"
 	grpc_opentracing "github.com/grpc-ecosystem/go-grpc-middleware/tracing/opentracing"
 	"github.com/opentracing/opentracing-go"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"github.com/uber/jaeger-client-go/config"
 	"google.golang.org/grpc"
 )
 
-var log = csmlog.GetLogger()
-
 //go:generate go generate ../../core
 
 func init() {
-	// We set X_CSI_DEBUG to false, because we don't want gocsi to override our logging level
-	_ = os.Setenv(identifiers.EnvGOCSIDebug, "false")
-	// Enable X_CSI_REQ_LOGGING and X_CSI_REP_LOGGING to see gRPC request information
-	_ = os.Setenv(gocsi.EnvVarReqLogging, "true")
-	_ = os.Setenv(gocsi.EnvVarRepLogging, "true")
-
 	updateDriverName()
 
 	initilizeDriverConfigParams()
-
-	// If we don't set this env gocsi will overwrite log level with default Info level
-	_ = os.Setenv(gocsi.EnvVarLogLevel, csmlog.GetLevel().String())
 }
 
 func updateDriverName() {
@@ -74,7 +64,7 @@ func updateDriverName() {
 }
 
 func initilizeDriverConfigParams() {
-	log.SetLevel(csmlog.InfoLevel)
+	log.SetLevel(log.InfoLevel)
 	paramsPath, ok := csictx.LookupEnv(context.Background(), identifiers.EnvConfigParamsFilePath)
 	if !ok {
 		log.Warn("config path X_CSI_POWERSTORE_CONFIG_PARAMS_PATH is not specified")
@@ -91,7 +81,7 @@ func initilizeDriverConfigParams() {
 	}
 	paramsViper.WatchConfig()
 	paramsViper.OnConfigChange(func(e fsnotify.Event) {
-		fmt.Println("Params config file changed:", e.Name)
+		log.Infof("Configuration change: driver parameters config file changed: %s", e.Name)
 		updateDriverConfigParams(paramsViper)
 	})
 
@@ -123,6 +113,13 @@ func validateAndSetDRBindPort(envPort string) string {
 }
 
 func main() {
+	log.WithFields(log.Fields{
+		log.FieldComponent: "driver",
+		log.FieldOperation: "startup",
+		"version":          ManifestSemver,
+		"driver_name":      identifiers.Name,
+	}).Info("initializing CSI PowerStore driver")
+
 	f := &fs.Fs{Util: &gofsutil.FS{}}
 
 	identifiers.RmSockFile(f)
@@ -139,6 +136,11 @@ func main() {
 	var nodeService *node.Service
 
 	mode := csictx.Getenv(context.Background(), gocsi.EnvVarMode)
+	log.WithFields(log.Fields{
+		log.FieldComponent: "driver",
+		log.FieldOperation: "startup",
+		"mode":             mode,
+	}).Info("operating mode determined")
 
 	configPath, ok := csictx.LookupEnv(context.Background(), identifiers.EnvArrayConfigFilePath)
 	if !ok {
@@ -160,12 +162,21 @@ func main() {
 	}
 
 	if strings.EqualFold(mode, "controller") {
+		log.WithFields(log.Fields{
+			log.FieldComponent: "driver",
+			log.FieldOperation: "startup",
+			"config_path":      configPath,
+		}).Info("initializing controller service")
 
 		var err error
 		controllerService, err = initControllerService(f, configPath)
 		if err != nil {
 			log.Fatalf("couldn't initialize controller service: %s", err.Error())
 		}
+		log.WithFields(log.Fields{
+			log.FieldComponent: "driver",
+			log.FieldOperation: "startup",
+		}).Info("controller service initialized successfully")
 
 		groupControllerService, err = initGroupControllerService(f, configPath)
 		if err != nil {
@@ -175,11 +186,21 @@ func main() {
 		arrayLocker = &controllerService.Locker
 		controllerService.IsCSMDREnabled = isCSMDREnabled
 	} else if strings.EqualFold(mode, "node") {
+		log.WithFields(log.Fields{
+			log.FieldComponent: "driver",
+			log.FieldOperation: "startup",
+			"config_path":      configPath,
+		}).Info("initializing node service")
+
 		var err error
 		nodeService, err = initNodeServiceFunc(f, configPath)
 		if err != nil {
 			log.Fatalf("couldn't initialize node service: %s", err.Error())
 		}
+		log.WithFields(log.Fields{
+			log.FieldComponent: "driver",
+			log.FieldOperation: "startup",
+		}).Info("node service initialized successfully")
 
 		nodeName = os.Getenv(identifiers.EnvKubeNodeName)
 		arrayLocker = &nodeService.Locker
@@ -201,22 +222,47 @@ func main() {
 	viper.SetConfigType("yaml")
 	viper.WatchConfig()
 	viper.OnConfigChange(func(e fsnotify.Event) {
-		log.Infof("Config file changed: %s", e.Name)
+		log.WithFields(log.Fields{
+			log.FieldComponent: "driver",
+			log.FieldOperation: "ConfigChange",
+			"file":             e.Name,
+			"op":               e.Op.String(),
+		}).Info("configuration change detected")
 
 		if strings.EqualFold(mode, "controller") {
+			log.WithFields(log.Fields{
+				log.FieldComponent: "driver",
+				log.FieldOperation: "ConfigChange",
+			}).Info("reloading arrays for controller and group controller services")
 			err := controllerService.UpdateArrays(configPath, f)
 			if err != nil {
 				log.Fatalf("couldn't initialize arrays in controller service: %s", err.Error())
 			}
+			log.WithFields(log.Fields{
+				log.FieldComponent: "driver",
+				log.FieldOperation: "ConfigChange",
+			}).Info("controller service arrays reloaded successfully")
 			err = groupControllerService.UpdateArrays(configPath, f)
 			if err != nil {
 				log.Fatalf("couldn't initialize arrays in group controller service: %s", err.Error())
 			}
+			log.WithFields(log.Fields{
+				log.FieldComponent: "driver",
+				log.FieldOperation: "ConfigChange",
+			}).Info("group controller service arrays reloaded successfully")
 		} else if strings.EqualFold(mode, "node") {
+			log.WithFields(log.Fields{
+				log.FieldComponent: "driver",
+				log.FieldOperation: "ConfigChange",
+			}).Info("reloading arrays for node service")
 			err := nodeService.UpdateArrays(configPath, f)
 			if err != nil {
 				log.Fatalf("couldn't initialize arrays in node service: %s", err.Error())
 			}
+			log.WithFields(log.Fields{
+				log.FieldComponent: "driver",
+				log.FieldOperation: "ConfigChange",
+			}).Info("node service arrays reloaded successfully")
 		}
 	})
 
@@ -232,7 +278,7 @@ func main() {
 		if err != nil {
 			log.Fatalf("couldn't create tracer for Jaeger: %s", err.Error())
 		}
-		defer closer.Close() // #nosec G307
+		defer func() { _ = closer.Close() }() // #nosec G307
 		opentracing.SetGlobalTracer(t)
 		InterceptorsList = append(InterceptorsList, grpc_opentracing.UnaryServerInterceptor(grpc_opentracing.WithTracer(t)))
 	}
@@ -253,6 +299,30 @@ func main() {
 		},
 	}
 
+	// Graceful shutdown handling
+	go func() {
+		sigChan := make(chan os.Signal, 1)
+		signal.Notify(sigChan, syscall.SIGTERM, syscall.SIGINT)
+		sig := <-sigChan
+		log.WithFields(log.Fields{
+			log.FieldComponent: "driver",
+			log.FieldOperation: "shutdown",
+			"signal":           sig.String(),
+		}).Info("received signal, initiating graceful shutdown")
+		log.WithFields(log.Fields{
+			log.FieldComponent: "driver",
+			log.FieldOperation: "shutdown",
+			"driver_name":      identifiers.Name,
+			"mode":             mode,
+		}).Info("CSI PowerStore driver shutting down")
+	}()
+
+	log.WithFields(log.Fields{
+		log.FieldComponent: "driver",
+		log.FieldOperation: "startup",
+		"driver_name":      identifiers.Name,
+		"mode":             mode,
+	}).Info("CSI PowerStore driver ready to serve")
 	runCSIPlugin(storageProvider)
 }
 
@@ -269,33 +339,40 @@ var runCSIPlugin = func(storageProvider *gocsi.StoragePlugin) {
 func updateDriverConfigParams(v *viper.Viper) {
 	logLevelParam := "CSI_LOG_LEVEL"
 	logFormatParam := "CSI_LOG_FORMAT"
-	logFormat := strings.ToLower(v.GetString(logFormatParam))
-	fmt.Printf("Read CSI_LOG_FORMAT from log configuration file, format: %s\n", logFormat)
+	logFormat := "json"
 
-	// Use JSON logger as default
-	if strings.EqualFold(logFormat, "JSON") {
-		log.SetFormatter(&logrus.JSONFormatter{
-			TimestampFormat: time.RFC3339,
-		})
+	if v.IsSet(logFormatParam) {
+		logFormat = strings.ToLower(v.GetString(logFormatParam))
+		if logFormat == "" || (logFormat != "json" && logFormat != "text") {
+			log.Info("CSI_LOG_FORMAT not specified or invalid, setting to default (JSON)")
+			logFormat = "json"
+		}
 	}
+	log.SetFormat(logFormat)
 
-	level := csmlog.DebugLevel
+	level := log.InfoLevel
 	if v.IsSet(logLevelParam) {
 		logLevel := v.GetString(logLevelParam)
 		if logLevel != "" {
 			logLevel = strings.ToLower(logLevel)
-			fmt.Printf("Read CSI_LOG_LEVEL from log configuration file, level: %s\n", logLevel)
+
 			var err error
 
-			l, err := csmlog.ParseLevel(logLevel)
+			l, err := log.ParseLevel(logLevel)
 			if err != nil {
-				log.Errorf("LOG_LEVEL %s value not recognized, setting to default error: %s ", logLevel, err.Error())
+				log.Errorf("LOG_LEVEL %s value not recognized, setting to default (info): %s ", logLevel, err.Error())
 			} else {
 				level = l
 			}
 		}
 	}
-	csmlog.SetLevel(level)
+	log.SetLevel(level)
+	log.WithFields(log.Fields{
+		log.FieldComponent: "driver",
+		log.FieldOperation: "ConfigChange",
+		"log_level":        level.String(),
+		"log_format":       logFormat,
+	}).Info("log level and format applied")
 }
 
 func initControllerService(f fs.Interface, configPath string) (*controller.Service, error) {

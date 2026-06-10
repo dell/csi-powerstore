@@ -340,14 +340,14 @@ func TestSetPollingFrequency(t *testing.T) {
 	for i, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if i == 0 {
-				os.Setenv("X_CSI_PODMON_ARRAY_CONNECTIVITY_POLL_RATE", "100")
+				_ = os.Setenv("X_CSI_PODMON_ARRAY_CONNECTIVITY_POLL_RATE", "100")
 			}
 			// need to import this function because the package name in this file is not common
 			// @TO-DO rename package name to common
 			if got := identifiers.SetPollingFrequency(tt.args.ctx); got != tt.want {
 				t.Errorf("SetPollingFrequency() = %v, want %v", got, tt.want)
 			}
-			os.Unsetenv("X_CSI_PODMON_ARRAY_CONNECTIVITY_POLL_RATE")
+			_ = os.Unsetenv("X_CSI_PODMON_ARRAY_CONNECTIVITY_POLL_RATE")
 		})
 	}
 }
@@ -367,12 +367,12 @@ func Test_setAPIPort(t *testing.T) {
 	for i, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if i == 0 {
-				os.Setenv("X_CSI_PODMON_API_PORT", "8090")
+				_ = os.Setenv("X_CSI_PODMON_API_PORT", "8090")
 				identifiers.SetAPIPort(tt.args.ctx)
 				if identifiers.APIPort != ":8090" {
 					t.Errorf("setAPIPort() error, want 8090 port found %v", identifiers.APIPort)
 				}
-				os.Unsetenv("X_CSI_PODMON_API_PORT")
+				_ = os.Unsetenv("X_CSI_PODMON_API_PORT")
 			}
 			identifiers.SetAPIPort(tt.args.ctx)
 			if identifiers.APIPort != ":8083" {
@@ -439,8 +439,7 @@ func TestGetIPListFromString(t *testing.T) {
 	type args struct {
 		input string
 	}
-	x := []string{}
-	x = nil
+	var x []string
 	tests := []struct {
 		name string
 		args args
@@ -577,14 +576,14 @@ func TestGetPowerStoreAPITimeout(t *testing.T) {
 		{
 			name:         "env variable is set to valid value",
 			expected:     10 * time.Second,
-			setupFunc:    func() { os.Setenv("X_CSI_POWERSTORE_API_TIMEOUT", "10s") },
-			teardownFunc: func() { os.Unsetenv("X_CSI_POWERSTORE_API_TIMEOUT") },
+			setupFunc:    func() { _ = os.Setenv("X_CSI_POWERSTORE_API_TIMEOUT", "10s") },
+			teardownFunc: func() { _ = os.Unsetenv("X_CSI_POWERSTORE_API_TIMEOUT") },
 		},
 		{
 			name:         "env variable is set to invalid value",
 			expected:     120 * time.Second,
-			setupFunc:    func() { os.Setenv("X_CSI_POWERSTORE_API_TIMEOUT", "abc") },
-			teardownFunc: func() { os.Unsetenv("X_CSI_POWERSTORE_API_TIMEOUT") },
+			setupFunc:    func() { _ = os.Setenv("X_CSI_POWERSTORE_API_TIMEOUT", "abc") },
+			teardownFunc: func() { _ = os.Unsetenv("X_CSI_POWERSTORE_API_TIMEOUT") },
 		},
 	}
 
@@ -616,14 +615,14 @@ func TestGetPodmonArrayConnectivityTimeout(t *testing.T) {
 		{
 			name:         "env variable is set to valid value",
 			expected:     25 * time.Second,
-			setupFunc:    func() { os.Setenv("X_CSI_PODMON_ARRAY_CONNECTIVITY_TIMEOUT", "25s") },
-			teardownFunc: func() { os.Unsetenv("X_CSI_PODMON_ARRAY_CONNECTIVITY_TIMEOUT") },
+			setupFunc:    func() { _ = os.Setenv("X_CSI_PODMON_ARRAY_CONNECTIVITY_TIMEOUT", "25s") },
+			teardownFunc: func() { _ = os.Unsetenv("X_CSI_PODMON_ARRAY_CONNECTIVITY_TIMEOUT") },
 		},
 		{
 			name:         "env variable is set to invalid value",
 			expected:     10 * time.Second,
-			setupFunc:    func() { os.Setenv("X_CSI_PODMON_ARRAY_CONNECTIVITY_TIMEOUT", "abc") },
-			teardownFunc: func() { os.Unsetenv("X_CSI_PODMON_ARRAY_CONNECTIVITY_TIMEOUT") },
+			setupFunc:    func() { _ = os.Setenv("X_CSI_PODMON_ARRAY_CONNECTIVITY_TIMEOUT", "abc") },
+			teardownFunc: func() { _ = os.Unsetenv("X_CSI_PODMON_ARRAY_CONNECTIVITY_TIMEOUT") },
 		},
 	}
 
@@ -656,14 +655,14 @@ func TestGetVolumeDisconnectTimeout(t *testing.T) {
 		{
 			name:         "env variable is set to valid value",
 			expected:     45 * time.Second,
-			setupFunc:    func() { os.Setenv("X_CSI_VOLUME_DISCONNECT_TIMEOUT_SECONDS", "45s") },
-			teardownFunc: func() { os.Unsetenv("X_CSI_VOLUME_DISCONNECT_TIMEOUT_SECONDS") },
+			setupFunc:    func() { _ = os.Setenv("X_CSI_VOLUME_DISCONNECT_TIMEOUT_SECONDS", "45s") },
+			teardownFunc: func() { _ = os.Unsetenv("X_CSI_VOLUME_DISCONNECT_TIMEOUT_SECONDS") },
 		},
 		{
 			name:         "env variable is set to invalid value",
 			expected:     120 * time.Second,
-			setupFunc:    func() { os.Setenv("X_CSI_VOLUME_DISCONNECT_TIMEOUT_SECONDS", "invalid") },
-			teardownFunc: func() { os.Unsetenv("X_CSI_VOLUME_DISCONNECT_TIMEOUT_SECONDS") },
+			setupFunc:    func() { _ = os.Setenv("X_CSI_VOLUME_DISCONNECT_TIMEOUT_SECONDS", "invalid") },
+			teardownFunc: func() { _ = os.Unsetenv("X_CSI_VOLUME_DISCONNECT_TIMEOUT_SECONDS") },
 		},
 	}
 
@@ -696,14 +695,14 @@ func TestGetVolumeDisconnectRetryInterval(t *testing.T) {
 		{
 			name:         "env variable is set to valid value",
 			expected:     15 * time.Second,
-			setupFunc:    func() { os.Setenv("X_CSI_VOLUME_DISCONNECT_RETRY_INTERVAL", "15s") },
-			teardownFunc: func() { os.Unsetenv("X_CSI_VOLUME_DISCONNECT_RETRY_INTERVAL") },
+			setupFunc:    func() { _ = os.Setenv("X_CSI_VOLUME_DISCONNECT_RETRY_INTERVAL", "15s") },
+			teardownFunc: func() { _ = os.Unsetenv("X_CSI_VOLUME_DISCONNECT_RETRY_INTERVAL") },
 		},
 		{
 			name:         "env variable is set to invalid value",
 			expected:     5 * time.Second,
-			setupFunc:    func() { os.Setenv("X_CSI_VOLUME_DISCONNECT_RETRY_INTERVAL", "invalid") },
-			teardownFunc: func() { os.Unsetenv("X_CSI_VOLUME_DISCONNECT_RETRY_INTERVAL") },
+			setupFunc:    func() { _ = os.Setenv("X_CSI_VOLUME_DISCONNECT_RETRY_INTERVAL", "invalid") },
+			teardownFunc: func() { _ = os.Unsetenv("X_CSI_VOLUME_DISCONNECT_RETRY_INTERVAL") },
 		},
 	}
 
@@ -736,14 +735,14 @@ func TestGetVolumeDisconnectMaxRetries(t *testing.T) {
 		{
 			name:         "env variable is set to valid value",
 			expected:     7,
-			setupFunc:    func() { os.Setenv("X_CSI_VOLUME_DISCONNECT_MAX_RETRIES", "7") },
-			teardownFunc: func() { os.Unsetenv("X_CSI_VOLUME_DISCONNECT_MAX_RETRIES") },
+			setupFunc:    func() { _ = os.Setenv("X_CSI_VOLUME_DISCONNECT_MAX_RETRIES", "7") },
+			teardownFunc: func() { _ = os.Unsetenv("X_CSI_VOLUME_DISCONNECT_MAX_RETRIES") },
 		},
 		{
 			name:         "env variable is set to invalid value",
 			expected:     5,
-			setupFunc:    func() { os.Setenv("X_CSI_VOLUME_DISCONNECT_MAX_RETRIES", "invalid") },
-			teardownFunc: func() { os.Unsetenv("X_CSI_VOLUME_DISCONNECT_MAX_RETRIES") },
+			setupFunc:    func() { _ = os.Setenv("X_CSI_VOLUME_DISCONNECT_MAX_RETRIES", "invalid") },
+			teardownFunc: func() { _ = os.Unsetenv("X_CSI_VOLUME_DISCONNECT_MAX_RETRIES") },
 		},
 	}
 

@@ -28,12 +28,13 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/dell/csi-powerstore/v2/pkg/array"
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers"
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers/fs"
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers/k8sutils"
-	"github.com/dell/csmlog"
+	log "github.com/dell/csmlog"
 	commonext "github.com/dell/dell-csi-extensions/common"
 	podmon "github.com/dell/dell-csi-extensions/podmon"
 	csiext "github.com/dell/dell-csi-extensions/replication"
@@ -90,9 +91,6 @@ var (
 
 var mutex = &sync.Mutex{}
 
-// Instantiate csmlog at package level
-var log = csmlog.GetLogger()
-
 // Init is a method that initializes internal variables of controller service
 func (s *Service) Init() error {
 	ctx := context.Background()
@@ -133,7 +131,11 @@ func (s *Service) Init() error {
 	}
 
 	if isAutoRoundOffFsSizeEnabled, ok := csictx.LookupEnv(ctx, identifiers.EnvAllowAutoRoundOffFilesystemSize); ok {
-		log.Warn("Auto round off Filesystem size has been enabled! This will round off NFS PVC size to 3Gi when the requested size is less than 3Gi.")
+		log.WithFields(log.Fields{
+			log.FieldComponent: "controller",
+			log.FieldOperation: "Init",
+			log.FieldProtocol:  "NFS",
+		}).Warn("Auto round off Filesystem size has been enabled! This will round off NFS PVC size to 3Gi when the requested size is less than 3Gi.")
 		s.isAutoRoundOffFsSizeEnabled, _ = strconv.ParseBool(isAutoRoundOffFsSizeEnabled)
 	}
 
@@ -142,8 +144,12 @@ func (s *Service) Init() error {
 
 // CreateVolume creates either FileSystem or Volume on storage array.
 func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
-	log := log.WithContext(ctx)
-	log.Infof("CreateVolume: creating volume %s", req.GetName())
+	log.WithContext(ctx).WithFields(log.Fields{
+		log.FieldComponent:  "controller",
+		log.FieldOperation:  "CreateVolume",
+		log.FieldVolumeName: req.GetName(),
+	}).Info("starting volume creation")
+	startTime := time.Now()
 	params := req.GetParameters()
 
 	// Get array from map
@@ -173,7 +179,11 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 	// If capability does not have NFS, check if params request NFS
 	// This can happen when running csi-sanity tests
 	if !useNFS && params[KeyFsType] == "nfs" {
-		log.Infof("Request's volume capability does not specify NFS, but params do, using NFS")
+		log.WithContext(ctx).WithFields(log.Fields{
+			log.FieldComponent: "controller",
+			log.FieldOperation: "CreateVolume",
+			log.FieldProtocol:  "NFS",
+		}).Info("Request's volume capability does not specify NFS, but params do, using NFS")
 		useNFS = true
 	}
 
@@ -248,6 +258,14 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 		creator = &SCSICreator{}
 	}
 
+	log.WithContext(ctx).WithFields(log.Fields{
+		log.FieldComponent:  "controller",
+		log.FieldOperation:  "CreateVolume",
+		log.FieldVolumeName: req.GetName(),
+		log.FieldProtocol:   protocol,
+		log.FieldArrayID:    arr.Endpoint,
+	}).Info("protocol selected")
+
 	var topology []*csi.Topology
 	if req.AccessibilityRequirements != nil {
 		topology = req.AccessibilityRequirements.Preferred
@@ -279,12 +297,12 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 
 		volumeSource := contentSource.GetVolume()
 		if volumeSource != nil {
-			log.Infof("volume %s specified as volume content source", volumeSource.VolumeId)
+			log.WithContext(ctx).Infof("volume %s specified as volume content source", volumeSource.VolumeId)
 			volumeHandle, parseVolErr := array.ParseVolumeID(ctx, volumeSource.VolumeId, s.DefaultArray(), nil)
 			if parseVolErr != nil {
 				if apiError, ok := parseVolErr.(gopowerstore.APIError); ok && apiError.NotFound() {
 					// Return error code csi-sanity test expects
-					log.Errorf("Volume source: %s not found", volumeSource.VolumeId)
+					log.WithContext(ctx).Errorf("Volume source: %s not found", volumeSource.VolumeId)
 					return nil, status.Error(codes.NotFound, parseVolErr.Error())
 				}
 			}
@@ -317,12 +335,12 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 		}
 		snapshotSource := contentSource.GetSnapshot()
 		if snapshotSource != nil {
-			log.Infof("snapshot %s specified as volume content source", snapshotSource.SnapshotId)
+			log.WithContext(ctx).Infof("snapshot %s specified as volume content source", snapshotSource.SnapshotId)
 			volumeHandle, parseVolErr := array.ParseVolumeID(ctx, snapshotSource.SnapshotId, s.DefaultArray(), nil)
 			if parseVolErr != nil {
 				if apiError, ok := parseVolErr.(gopowerstore.APIError); ok && apiError.NotFound() {
 					// Return error code csi-sanity test expects
-					log.Errorf("Snapshot source: %s not found", snapshotSource.SnapshotId)
+					log.WithContext(ctx).Errorf("Snapshot source: %s not found", snapshotSource.SnapshotId)
 					return nil, status.Error(codes.NotFound, parseVolErr.Error())
 				}
 			}
@@ -331,7 +349,7 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 				req.GetName(), sizeInBytes, req.Parameters, arr.GetClient())
 		}
 		if err != nil {
-			log.Warnf("Failed to create volume: %s from content source: %s", req.GetName(), err.Error())
+			log.WithContext(ctx).Warnf("Failed to create volume: %s from content source: %s", req.GetName(), err.Error())
 			resp, err := creator.CheckIfAlreadyExists(ctx, req.GetName(), sizeInBytes, arr.GetClient())
 			if err != nil {
 				return nil, err
@@ -351,7 +369,12 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 			volResp.VolumeId = volResp.VolumeId + "/" + arr.GetGlobalID() + "/" + protocol
 			if useNFS {
 				topology = identifiers.GetNfsTopology(arr.GetIP())
-				log.Infof("Modified topology to nfs for %s", req.GetName())
+				log.WithContext(ctx).WithFields(log.Fields{
+					log.FieldComponent:  "controller",
+					log.FieldOperation:  "CreateVolume",
+					log.FieldProtocol:   "NFS",
+					log.FieldVolumeName: req.GetName(),
+				}).Info("modified topology to NFS")
 			}
 			volResp.AccessibleTopology = topology
 			return &csi.CreateVolumeResponse{
@@ -371,7 +394,7 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 	// Check if replication is enabled
 	if replicationEnabled == "true" {
 
-		log.Info("Preparing volume replication")
+		log.WithContext(ctx).Info("Preparing volume replication")
 
 		remoteSystemName, ok := params[s.WithRP(KeyReplicationRemoteSystem)]
 		if !ok {
@@ -381,7 +404,7 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 		switch repMode {
 		case identifiers.SyncMode, identifiers.AsyncMode:
 			// handle Sync and Async modes where protection policy with replication rule is applied on volume group
-			log.Infof("%s replication mode requested", repMode)
+			log.WithContext(ctx).Infof("%s replication mode requested", repMode)
 			vgPrefix, ok := params[s.WithRP(KeyReplicationVGPrefix)]
 			if !ok {
 				return nil, status.Error(codes.InvalidArgument, "replication enabled but no volume group prefix specified in storage class")
@@ -403,7 +426,7 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 
 			// Validating RPO to be non Zero when replication mode is ASYNC
 			if repMode == identifiers.AsyncMode && rpo == identifiers.Zero {
-				log.Errorf("RPO value for %s cannot be : %s", repMode, rpo)
+				log.WithContext(ctx).Errorf("RPO value for %s cannot be : %s", repMode, rpo)
 				return nil, status.Error(codes.InvalidArgument, "replication mode ASYNC requires RPO value to be non Zero")
 			}
 
@@ -431,7 +454,7 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 				vg, err = arr.Client.GetVolumeGroupByName(ctx, vgName)
 				if err != nil {
 					if apiError, ok := err.(gopowerstore.APIError); ok && apiError.NotFound() {
-						log.Infof("Volume group with name %s not found, creating it", vgName)
+						log.WithContext(ctx).Infof("Volume group with name %s not found, creating it", vgName)
 
 						// ensure protection policy exists
 						pp, err := EnsureProtectionPolicyExists(ctx, arr, vgName, remoteSystemName, rpoEnum)
@@ -485,19 +508,19 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 				if err != nil {
 					return nil, status.Errorf(codes.Internal, "can't ensure protection policy exists %s", err.Error())
 				}
-				log.Infof("Protection policy %s verified or created successfully.", pp)
+				log.WithContext(ctx).Infof("Protection policy %s verified or created successfully.", pp)
 				err = arr.Client.ModifyNASByName(ctx, &gopowerstore.NASModify{ProtectionPolicyID: pp}, selectedNasName)
 				if err != nil {
 					return nil, status.Errorf(codes.Internal, "can't update NAS protection policy %s", err.Error())
 				}
 
-				log.Infof("Protection policy %s applied to NAS server %s", pp, remoteSystemName)
+				log.WithContext(ctx).Infof("Protection policy %s applied to NAS server %s", pp, remoteSystemName)
 
 			}
 		case identifiers.MetroMode:
 			// handle Metro mode where metro is configured directly on the volume
 			// Note: Metro on volume group support is not added
-			log.Info("Metro replication mode requested")
+			log.WithContext(ctx).Info("Metro replication mode requested")
 
 			// Get specified remote system object.
 			// For Metro clones, the preferred array may differ from the original; use the UUID returned
@@ -526,11 +549,11 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 	if useNFS {
 		jobs, err := arr.Client.GetInProgressJobsByFsName(ctx, req.GetName())
 		if err != nil {
-			log.Errorf("Error getting jobs that are in progress for FileSystem: %s error: %s", req.Name, err.Error())
+			log.WithContext(ctx).Errorf("Error getting jobs that are in progress for FileSystem: %s error: %s", req.Name, err.Error())
 			return nil, status.Errorf(codes.Internal, "Error getting jobs that are in progress for FileSystem: %s error: %s", req.Name, err.Error())
 		}
 		if len(jobs) > 0 {
-			log.Infof("Job already in progress to create FileSystem %s", req.GetName())
+			log.WithContext(ctx).Infof("Job already in progress to create FileSystem %s", req.GetName())
 			return nil, status.Errorf(codes.AlreadyExists, "Job already in progress to create FileSystem %s", req.GetName())
 		}
 	}
@@ -542,21 +565,21 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 		if err != nil {
 			// internal means something went wrong trying to check the volume and request needs to be retried
 			if status.Code(err) == codes.Internal || status.Code(err) == codes.AlreadyExists {
-				log.Warnf("CheckIfAlreadyExists returned error: %s for vol: %s", err.Error(), req.GetName())
+				log.WithContext(ctx).Warnf("CheckIfAlreadyExists returned error: %s for vol: %s", err.Error(), req.GetName())
 				return nil, err
 			}
 		}
 	}
 
 	if isMetroVolume && !s.IsCSMDREnabled {
-		log.Info("Failed to create metro volume due to CSM DR not available.")
+		log.WithContext(ctx).Info("Failed to create metro volume due to CSM DR not available.")
 		return nil, status.Error(codes.InvalidArgument, "Metro replication mode requires CSM-DR to be enabled")
 	}
 
 	if volumeResponse == nil {
 		resp, createError := creator.Create(ctx, req, sizeInBytes, arr.GetClient())
 		if createError != nil {
-			log.Warnf("create volume for %s failed: '%s'", req.GetName(), createError.Error())
+			log.WithContext(ctx).Warnf("create volume for %s failed: '%s'", req.GetName(), createError.Error())
 			if useNFS {
 				arr.NASCooldownTracker.MarkFailure(selectedNasName)
 				return nil, status.Error(codes.ResourceExhausted, createError.Error())
@@ -573,19 +596,19 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 	if isMetroVolume {
 		// Configure Metro on volume
 		volID := volumeResponse.VolumeId
-		log.Infof("Configuring Metro on volume %s", volID)
+		log.WithContext(ctx).Infof("Configuring Metro on volume %s", volID)
 
 		metroSession, err := arr.GetClient().ConfigureMetroVolume(ctx, volID, &gopowerstore.MetroConfig{
 			RemoteSystemID: remoteSystem.ID,
 		})
 		if err != nil {
 			if apiError, ok := err.(gopowerstore.APIError); ok && apiError.ReplicationSessionAlreadyCreated() { // idempotency check
-				log.Debugf("Metro has already been configured on volume %s", volID)
+				log.WithContext(ctx).Debugf("Metro has already been configured on volume %s", volID)
 			} else {
 				return nil, status.Errorf(codes.Internal, "can't configure metro on volume: %s", err.Error())
 			}
 		} else {
-			log.Infof("Metro Session %s created for volume %s", metroSession.ID, volID)
+			log.WithContext(ctx).Infof("Metro Session %s created for volume %s", metroSession.ID, volID)
 		}
 
 		// Get the remote volume ID from the replication session.
@@ -620,14 +643,24 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 		volumeResponse.VolumeContext[identifiers.KeyNfsACL] = nfsAcls
 		volumeResponse.VolumeContext[identifiers.KeyNasName] = creator.(*NfsCreator).nasName
 		topology = identifiers.GetNfsTopology(arr.GetIP())
-		log.Infof("Modified topology to nfs for %s", req.GetName())
+		log.WithContext(ctx).WithFields(log.Fields{
+			log.FieldComponent:  "controller",
+			log.FieldOperation:  "CreateVolume",
+			log.FieldProtocol:   "NFS",
+			log.FieldVolumeName: req.GetName(),
+		}).Info("modified topology to NFS")
 	}
 
 	volumeResponse.VolumeId = volumeResponse.VolumeId + "/" + arr.GetGlobalID() + "/" + protocol + metroVolumeIDSuffix
 
 	volumeResponse.AccessibleTopology = topology
 
-	log.Infof("CreateVolume: finished creating volume %s", req.GetName())
+	log.WithContext(ctx).WithFields(log.Fields{
+		log.FieldComponent:  "controller",
+		log.FieldOperation:  "CreateVolume",
+		log.FieldVolumeName: req.GetName(),
+		log.FieldDurationMs: time.Since(startTime).Milliseconds(),
+	}).Info("volume creation completed")
 	return &csi.CreateVolumeResponse{
 		Volume: volumeResponse,
 	}, nil
@@ -635,11 +668,17 @@ func (s *Service) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest
 
 // DeleteVolume deletes either FileSystem or Volume from storage array.
 func (s *Service) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
-	log := log.WithContext(ctx)
 	id := req.GetVolumeId()
 	if id == "" {
 		return nil, status.Error(codes.InvalidArgument, "volume ID is required")
 	}
+
+	log.WithContext(ctx).WithFields(log.Fields{
+		log.FieldComponent: "controller",
+		log.FieldOperation: "DeleteVolume",
+		log.FieldVolumeID:  id,
+	}).Info("starting volume deletion")
+	startTime := time.Now()
 
 	volumeHandle, err := array.ParseVolumeID(ctx, id, s.DefaultArray(), nil)
 	if err != nil {
@@ -658,7 +697,22 @@ func (s *Service) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest
 		return nil, status.Errorf(codes.Internal, "can't find array with provided id %s", arrayID)
 	}
 
-	if protocol == "nfs" {
+	log.WithContext(ctx).WithFields(log.Fields{
+		log.FieldComponent: "controller",
+		log.FieldOperation: "DeleteVolume",
+		log.FieldVolumeID:  id,
+		log.FieldProtocol:  protocol,
+		log.FieldArrayID:   arr.Endpoint,
+	}).Info("volume info resolved")
+
+	switch protocol {
+	case "nfs":
+		log.WithContext(ctx).WithFields(log.Fields{
+			log.FieldComponent: "controller",
+			log.FieldOperation: "DeleteVolume",
+			log.FieldVolumeID:  id,
+			log.FieldProtocol:  "nfs",
+		}).Info("checking snapshots for NFS volume")
 		listSnaps, err := arr.GetClient().GetFsSnapshotsByVolumeID(ctx, id)
 		if err != nil {
 			return nil, status.Errorf(codes.Unknown, "failure getting snapshot: %s", err.Error())
@@ -681,7 +735,7 @@ func (s *Service) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest
 			if (len(nfsExportResp.RWRootHosts) == 1 || len(nfsExportResp.RWHosts) == 1) && s.externalAccess != "" {
 				externalAccess, err := identifiers.ParseCIDR(s.externalAccess)
 				if err != nil {
-					log.Debugf("error occurred %s while parsing externalAccess: %s ", err.Error(), s.externalAccess)
+					log.WithContext(ctx).Debugf("error occurred %s while parsing externalAccess: %s ", err.Error(), s.externalAccess)
 					return nil, status.Errorf(codes.FailedPrecondition,
 						"filesystem %s cannot be deleted as it has associated NFS or SMB shares.",
 						id)
@@ -691,12 +745,12 @@ func (s *Service) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest
 				var modifyHostPayload gopowerstore.NFSExportModify
 				// Removing externalAccess from RWHosts as well as RWRootHosts
 				if len(nfsExportResp.RWRootHosts) == 1 && externalAccess == nfsExportResp.RWRootHosts[0] {
-					log.Debugf("Trying to remove externalAccess IP with mask having RWRootHosts access while deleting the volume: %s", externalAccess)
+					log.WithContext(ctx).Debugf("Trying to remove externalAccess IP with mask having RWRootHosts access while deleting the volume: %s", externalAccess)
 					modifyNFSExport = true
 					modifyHostPayload.RemoveRWRootHosts = []string{externalAccess}
 				}
 				if len(nfsExportResp.RWHosts) == 1 && externalAccess == nfsExportResp.RWHosts[0] {
-					log.Debugf("Trying to remove externalAccess IP with mask having RWHosts access while deleting the volume: %s", externalAccess)
+					log.WithContext(ctx).Debugf("Trying to remove externalAccess IP with mask having RWHosts access while deleting the volume: %s", externalAccess)
 					modifyNFSExport = true
 					modifyHostPayload.RemoveRWHosts = []string{externalAccess}
 				}
@@ -704,8 +758,14 @@ func (s *Service) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest
 				if modifyNFSExport {
 					_, err = arr.GetClient().ModifyNFSExport(ctx, &modifyHostPayload, nfsExportResp.ID)
 					if err != nil {
-						log.Debugf("failure when removing externalAccess from nfs export: %s", err.Error())
-						if apiError, ok := err.(gopowerstore.APIError); !(ok && apiError.HostAlreadyRemovedFromNFSExport()) {
+						log.WithContext(ctx).WithFields(log.Fields{
+							log.FieldComponent: "controller",
+							log.FieldOperation: "DeleteVolume",
+							log.FieldProtocol:  "NFS",
+							log.FieldVolumeID:  id,
+							log.FieldError:     err.Error(),
+						}).Debug("failure when removing externalAccess from NFS export")
+						if apiError, ok := err.(gopowerstore.APIError); !ok || !apiError.HostAlreadyRemovedFromNFSExport() {
 							return nil, status.Errorf(codes.FailedPrecondition,
 								"filesystem %s cannot be deleted as it has associated NFS or SMB shares.",
 								id)
@@ -723,8 +783,20 @@ func (s *Service) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest
 					id)
 			}
 		}
+		log.WithContext(ctx).WithFields(log.Fields{
+			log.FieldComponent: "controller",
+			log.FieldOperation: "DeleteVolume",
+			log.FieldVolumeID:  id,
+		}).Info("calling DeleteFS API")
 		_, err = arr.GetClient().DeleteFS(ctx, id)
 		if err == nil {
+			log.WithContext(ctx).WithFields(log.Fields{
+				log.FieldComponent:  "controller",
+				log.FieldOperation:  "DeleteVolume",
+				log.FieldVolumeID:   id,
+				log.FieldProtocol:   "nfs",
+				log.FieldDurationMs: time.Since(startTime).Milliseconds(),
+			}).Info("NFS volume deleted successfully")
 			return &csi.DeleteVolumeResponse{}, nil
 		}
 		if apiError, ok := err.(gopowerstore.APIError); ok {
@@ -734,7 +806,7 @@ func (s *Service) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest
 		}
 		return nil, err
 
-	} else if protocol == "scsi" {
+	case "scsi":
 		localDeleted := false
 		remoteDeleted := false
 
@@ -758,21 +830,39 @@ func (s *Service) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest
 				return nil, err
 			}
 			if metroResp.IsFractured {
-				log.Warnf("[METRO] metro volume %s is in a fractured state", req.GetVolumeId())
+				log.WithContext(ctx).Warnf("[METRO] metro volume %s is in a fractured state", req.GetVolumeId())
 			}
 		}
 
 		// Delete local volume
+		log.WithContext(ctx).WithFields(log.Fields{
+			log.FieldComponent: "controller",
+			log.FieldOperation: "DeleteVolume",
+			log.FieldVolumeID:  id,
+			log.FieldProtocol:  "scsi",
+			log.FieldArrayID:   arr.Endpoint,
+		}).Info("deleting local SCSI volume")
 		err = deleteISCSIVolume(ctx, volumeHandle, arr, id)
 		if err == nil {
+			log.WithContext(ctx).WithFields(log.Fields{
+				log.FieldComponent: "controller",
+				log.FieldOperation: "DeleteVolume",
+				log.FieldVolumeID:  id,
+			}).Info("local SCSI volume deleted successfully")
 			localDeleted = true
 		} else {
-			log.Errorf("failed to delete volume %s: %v", id, err)
+			log.WithContext(ctx).Errorf("failed to delete volume %s: %v", id, err)
 		}
 
 		// non-metro or not fractured just return results
 		if !volumeHandle.IsMetro() || !metroResp.IsFractured {
 			if localDeleted {
+				log.WithContext(ctx).WithFields(log.Fields{
+					log.FieldComponent:  "controller",
+					log.FieldOperation:  "DeleteVolume",
+					log.FieldVolumeID:   id,
+					log.FieldDurationMs: time.Since(startTime).Milliseconds(),
+				}).Info("volume deleted successfully")
 				return &csi.DeleteVolumeResponse{}, nil
 			}
 			return nil, err
@@ -783,21 +873,26 @@ func (s *Service) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest
 		if err == nil {
 			remoteDeleted = true
 		} else {
-			log.Errorf("failed to delete remote volume %s: %v", id, err)
+			log.WithContext(ctx).Errorf("failed to delete remote volume %s: %v", id, err)
 		}
 
 		if localDeleted && remoteDeleted {
+			log.WithContext(ctx).WithFields(log.Fields{
+				log.FieldComponent:  "controller",
+				log.FieldOperation:  "DeleteVolume",
+				log.FieldVolumeID:   id,
+				log.FieldDurationMs: time.Since(startTime).Milliseconds(),
+			}).Info("metro volume deleted successfully")
 			return &csi.DeleteVolumeResponse{}, nil
 		}
 		// return error if anything not deleted and k8s will retry
 		return nil, err
+	default:
+		return nil, status.Errorf(codes.InvalidArgument, "can't figure out protocol")
 	}
-
-	return nil, status.Errorf(codes.InvalidArgument, "can't figure out protocol")
 }
 
 func deleteISCSIVolume(ctx context.Context, _ array.VolumeHandle, arr *array.PowerStoreArray, id string) error {
-	log := log.WithContext(ctx)
 	vgs, err := arr.GetClient().GetVolumeGroupsByVolumeID(ctx, id)
 	if err != nil {
 		if apiError, ok := err.(gopowerstore.APIError); !ok || !apiError.NotFound() {
@@ -812,7 +907,7 @@ func deleteISCSIVolume(ctx context.Context, _ array.VolumeHandle, arr *array.Pow
 		_, err := arr.GetClient().RemoveMembersFromVolumeGroup(ctx, &gopowerstore.VolumeGroupMembers{VolumeIDs: []string{id}}, vgs.VolumeGroup[0].ID)
 		if err != nil {
 			if apiError, ok := err.(gopowerstore.APIError); ok && apiError.VolumeAlreadyRemovedFromVolumeGroup() { // idempotency check
-				log.Debugf("Volume %s has already been removed from volume group %s", id, vgs.VolumeGroup[0].ID) // continue to delete volume
+				log.WithContext(ctx).Debugf("Volume %s has already been removed from volume group %s", id, vgs.VolumeGroup[0].ID) // continue to delete volume
 			} else {
 				return status.Errorf(codes.Internal, "failed to remove volume %s from volume group: %s", id, err.Error())
 			}
@@ -828,7 +923,7 @@ func deleteISCSIVolume(ctx context.Context, _ array.VolumeHandle, arr *array.Pow
 	volume, err := arr.GetClient().GetVolume(ctx, id)
 	if err != nil {
 		if apiError, ok := err.(gopowerstore.APIError); ok && apiError.NotFound() {
-			log.Infof("Volume %s not found, it may have been deleted.", id)
+			log.WithContext(ctx).Infof("Volume %s not found, it may have been deleted.", id)
 			return nil
 		}
 		return status.Errorf(codes.Internal, "failure getting volume: %s", err.Error())
@@ -848,7 +943,7 @@ func deleteISCSIVolume(ctx context.Context, _ array.VolumeHandle, arr *array.Pow
 		// Note: There is no other way to check if it is a metro user snapshot from the response.
 		regex := regexp.MustCompile(array.MetroPrefixRegex + volume.Name)
 		if !regex.MatchString(snap.Name) {
-			log.Warnf("Snapshot detected for metro volume %s, delete this to finish cleanup: %s", volume.Name, snap.Name)
+			log.WithContext(ctx).Warnf("Snapshot detected for metro volume %s, delete this to finish cleanup: %s", volume.Name, snap.Name)
 			blockingDeleteSnapshotCount++
 		}
 	}
@@ -860,25 +955,78 @@ func deleteISCSIVolume(ctx context.Context, _ array.VolumeHandle, arr *array.Pow
 
 	// Check if volume has metro session and end it
 	if volume.MetroReplicationSessionID != "" {
+		log.WithContext(ctx).WithFields(log.Fields{
+			log.FieldComponent: "controller",
+			log.FieldOperation: "EndMetroVolume",
+			log.FieldVolumeID:  id,
+			"session_id":       volume.MetroReplicationSessionID,
+		}).Info("ending metro session")
+		endMetroStart := time.Now()
 		_, err = arr.GetClient().EndMetroVolume(ctx, id, &gopowerstore.EndMetroVolumeOptions{
 			DeleteRemoteVolume: true, // delete remote volume when deleting local volume
 		})
 		if err != nil {
+			log.WithContext(ctx).WithFields(log.Fields{
+				log.FieldComponent:  "controller",
+				log.FieldOperation:  "EndMetroVolume",
+				log.FieldVolumeID:   id,
+				log.FieldError:      err.Error(),
+				log.FieldDurationMs: time.Since(endMetroStart).Milliseconds(),
+			}).Error("EndMetroVolume API call failed")
 			return status.Errorf(codes.Internal, "failure ending metro session on volume: %s", err.Error())
 		}
+		log.WithContext(ctx).WithFields(log.Fields{
+			log.FieldComponent:  "controller",
+			log.FieldOperation:  "EndMetroVolume",
+			log.FieldVolumeID:   id,
+			log.FieldDurationMs: time.Since(endMetroStart).Milliseconds(),
+		}).Info("EndMetroVolume API call succeeded")
 	}
 
+	log.WithContext(ctx).WithFields(log.Fields{
+		log.FieldComponent: "controller",
+		log.FieldOperation: "DeleteVolume",
+		log.FieldVolumeID:  id,
+	}).Info("calling DeleteVolume API")
+	deleteStart := time.Now()
 	_, err = arr.GetClient().DeleteVolume(ctx, nil, id)
 	if err != nil {
 		if apiError, ok := err.(gopowerstore.APIError); ok {
 			if apiError.NotFound() {
+				log.WithContext(ctx).WithFields(log.Fields{
+					log.FieldComponent:  "controller",
+					log.FieldOperation:  "DeleteVolume",
+					log.FieldVolumeID:   id,
+					log.FieldDurationMs: time.Since(deleteStart).Milliseconds(),
+				}).Info("volume not found (already deleted)")
 				return nil
 			}
 			if apiError.VolumeAttachedToHost() {
+				log.WithContext(ctx).WithFields(log.Fields{
+					log.FieldComponent:  "controller",
+					log.FieldOperation:  "DeleteVolume",
+					log.FieldVolumeID:   id,
+					log.FieldError:      apiError.Error(),
+					log.FieldDurationMs: time.Since(deleteStart).Milliseconds(),
+				}).Error("volume still attached to host")
 				return status.Errorf(codes.Internal,
 					"volume with ID '%s' is still attached to host: %s", id, apiError.Error())
 			}
 		}
+		log.WithContext(ctx).WithFields(log.Fields{
+			log.FieldComponent:  "controller",
+			log.FieldOperation:  "DeleteVolume",
+			log.FieldVolumeID:   id,
+			log.FieldError:      err.Error(),
+			log.FieldDurationMs: time.Since(deleteStart).Milliseconds(),
+		}).Error("DeleteVolume API call failed")
+	} else {
+		log.WithContext(ctx).WithFields(log.Fields{
+			log.FieldComponent:  "controller",
+			log.FieldOperation:  "DeleteVolume",
+			log.FieldVolumeID:   id,
+			log.FieldDurationMs: time.Since(deleteStart).Milliseconds(),
+		}).Info("DeleteVolume API call succeeded")
 	}
 	return err
 }
@@ -890,7 +1038,6 @@ func (s *Service) ControllerModifyVolume(_ context.Context, in *csi.ControllerMo
 
 // ControllerPublishVolume prepares Volume/FileSystem to be consumed by node by attaching/allowing access to the host.
 func (s *Service) ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
-	log := log.WithContext(ctx)
 	id := req.GetVolumeId()
 	kubeNodeID := req.GetNodeId()
 
@@ -904,7 +1051,7 @@ func (s *Service) ControllerPublishVolume(ctx context.Context, req *csi.Controll
 
 	volumeHandle, err := array.ParseVolumeID(ctx, id, s.DefaultArray(), req.VolumeCapability)
 	if err != nil {
-		log.Error(err.Error())
+		log.WithContext(ctx).Error(err.Error())
 		return nil, err
 	}
 
@@ -939,13 +1086,34 @@ func (s *Service) ControllerPublishVolume(ctx context.Context, req *csi.Controll
 		return nil, status.Error(codes.InvalidArgument, ErrUnknownAccessMode)
 	}
 
+	log.WithContext(ctx).WithFields(log.Fields{
+		log.FieldComponent: "controller",
+		log.FieldOperation: "ControllerPublishVolume",
+		log.FieldVolumeID:  id,
+		log.FieldNodeID:    kubeNodeID,
+		log.FieldProtocol:  protocol,
+		log.FieldArrayID:   arr.Endpoint,
+	}).Info("publishing volume to node")
+
 	var publisher VolumePublisher
 	if protocol == "nfs" {
+		log.WithContext(ctx).WithFields(log.Fields{
+			log.FieldComponent: "controller",
+			log.FieldOperation: "ControllerPublishVolume",
+			log.FieldVolumeID:  id,
+			log.FieldProtocol:  "nfs",
+		}).Info("using NFS publisher")
 		publisher = &NfsPublisher{
 			ExternalAccess:  s.externalAccess,
 			ExclusiveAccess: s.exclusiveAccess,
 		}
 	} else {
+		log.WithContext(ctx).WithFields(log.Fields{
+			log.FieldComponent: "controller",
+			log.FieldOperation: "ControllerPublishVolume",
+			log.FieldVolumeID:  id,
+			log.FieldProtocol:  "scsi",
+		}).Info("using SCSI publisher")
 		publisher = &SCSIPublisher{}
 	}
 
@@ -962,10 +1130,10 @@ func (s *Service) ControllerPublishVolume(ctx context.Context, req *csi.Controll
 		}
 		isMetroFractured = metroResp.IsFractured
 		if isMetroFractured {
-			log.Warnf("[METRO] metro volume %s is in a fractured state", req.GetVolumeId())
+			log.WithContext(ctx).Warnf("[METRO] metro volume %s is in a fractured state", req.GetVolumeId())
 		}
 		if localDemoted {
-			log.Warnf("[METRO] metro volume %s has been demoted", req.GetVolumeId())
+			log.WithContext(ctx).Warnf("[METRO] metro volume %s has been demoted", req.GetVolumeId())
 		}
 	} else {
 		if err := publisher.CheckIfVolumeExists(ctx, arr.GetClient(), id); err != nil {
@@ -979,49 +1147,49 @@ func (s *Service) ControllerPublishVolume(ctx context.Context, req *csi.Controll
 
 	hostRegisteredLocalArray := arr.HasHostEntry(ctx, kubeNodeID)
 	if hostRegisteredLocalArray {
-		log.Infof("Volume is being published on node %s for array %s", kubeNodeID, arr.Endpoint)
+		log.WithContext(ctx).Infof("Volume is being published on node %s for array %s", kubeNodeID, arr.Endpoint)
 		ctxLocal, cancelLocal := context.WithTimeout(context.Background(), array.MediumTimeout)
 		defer cancelLocal()
 		publishReponse, publishErr := publisher.Publish(ctxLocal, publishContext, req, arr.GetClient(), kubeNodeID, id, false)
 		if publishErr != nil {
 			if isMetroFractured && localDemoted {
-				log.Infof("[METRO] Could not publish volume %s on node %s for array %s due to Metro Session Fracture", id, kubeNodeID, arr.Endpoint)
+				log.WithContext(ctx).Infof("[METRO] Could not publish volume %s on node %s for array %s due to Metro Session Fracture", id, kubeNodeID, arr.Endpoint)
 			} else {
-				log.Errorf("Failed to publish volume %s on node %s for array %s: %s", id, kubeNodeID, arr.Endpoint, publishErr)
+				log.WithContext(ctx).Errorf("Failed to publish volume %s on node %s for array %s: %s", id, kubeNodeID, arr.Endpoint, publishErr)
 				return nil, publishErr
 			}
 		} else {
-			log.Infof("Local volume %s published, context: %v", id, publishReponse.PublishContext)
+			log.WithContext(ctx).Infof("Local volume %s published, context: %v", id, publishReponse.PublishContext)
 			publishVolumeResponse = publishReponse
 			localPublished = true
 		}
 	} else {
-		log.Infof("skipping volume publish on node %s for array %s, topology does not match", kubeNodeID, arr.Endpoint)
+		log.WithContext(ctx).Infof("skipping volume publish on node %s for array %s, topology does not match", kubeNodeID, arr.Endpoint)
 	}
 
 	hostRegisteredRemoteArray := false
 	if volumeHandle.IsMetro() {
 		if hostRegisteredRemoteArray = remoteArray.HasHostEntry(ctx, kubeNodeID); hostRegisteredRemoteArray {
-			log.Infof("Volume is being published on node %s for remote array %s", kubeNodeID, remoteArray.Endpoint)
+			log.WithContext(ctx).Infof("Volume is being published on node %s for remote array %s", kubeNodeID, remoteArray.Endpoint)
 			ctxRemote, cancelRemote := context.WithTimeout(context.Background(), array.MediumTimeout)
 			defer cancelRemote()
 			publishReponse, publishErr := publisher.Publish(ctxRemote, publishContext, req, remoteArray.GetClient(), kubeNodeID, remoteVolumeID, true)
 			if publishErr != nil {
 				if isMetroFractured && !localDemoted {
 					// localDemoted == false  implies local is Promoted and Remote is Demoted.
-					log.Infof("[METRO] Could not publish volume %s on node %s for array %s due to Metro Session Fracture", remoteVolumeID, kubeNodeID, remoteArray.Endpoint)
+					log.WithContext(ctx).Infof("[METRO] Could not publish volume %s on node %s for array %s due to Metro Session Fracture", remoteVolumeID, kubeNodeID, remoteArray.Endpoint)
 				} else {
 					// remote is Promoted
-					log.Errorf("Failed to publish volume %s on node %s for array %s: %s", id, kubeNodeID, remoteArray.Endpoint, publishErr)
+					log.WithContext(ctx).Errorf("Failed to publish volume %s on node %s for array %s: %s", id, kubeNodeID, remoteArray.Endpoint, publishErr)
 					return nil, publishErr
 				}
 			} else {
-				log.Infof("Remote volume %s published, context: %v", remoteVolumeID, publishReponse.PublishContext)
+				log.WithContext(ctx).Infof("Remote volume %s published, context: %v", remoteVolumeID, publishReponse.PublishContext)
 				remotePublished = true
 				publishVolumeResponse = publishReponse
 			}
 		} else {
-			log.Debugf("skipping volume publish on node %s for remote array %s, topology does not match", kubeNodeID, remoteArray.Endpoint)
+			log.WithContext(ctx).Debugf("skipping volume publish on node %s for remote array %s, topology does not match", kubeNodeID, remoteArray.Endpoint)
 		}
 	}
 
@@ -1039,7 +1207,7 @@ func (s *Service) ControllerPublishVolume(ctx context.Context, req *csi.Controll
 		if (localPublished && !remotePublished) || (!localPublished && remotePublished) {
 			deferredRequest, err := proto.Marshal(req)
 			if err != nil {
-				log.Errorf("[METRO] Error marshalling req: %s", err.Error())
+				log.WithContext(ctx).Errorf("[METRO] Error marshalling req: %s", err.Error())
 			}
 			deferredArrayID := arrayID
 			if !remotePublished {
@@ -1048,17 +1216,22 @@ func (s *Service) ControllerPublishVolume(ctx context.Context, req *csi.Controll
 
 			err = createOrUpdateJournalEntryFunc(ctx, metroResp.VolumeName, volumeHandle, deferredArrayID, kubeNodeID, "ControllerPublishVolume", deferredRequest)
 			if err != nil {
-				log.Errorf("Could not create journal entry for operation %s for volume %s node %s array %s", "ControllerPublishVolume", id, kubeNodeID, arr.Endpoint)
+				log.WithContext(ctx).Errorf("Could not create journal entry for operation %s for volume %s node %s array %s", "ControllerPublishVolume", id, kubeNodeID, arr.Endpoint)
 			}
 		}
 	}
 
+	log.WithContext(ctx).WithFields(log.Fields{
+		log.FieldComponent: "controller",
+		log.FieldOperation: "ControllerPublishVolume",
+		log.FieldVolumeID:  id,
+		log.FieldNodeID:    kubeNodeID,
+	}).Info("publish completed")
 	return publishVolumeResponse, nil
 }
 
 // ControllerUnpublishVolume prepares Volume/FileSystem to be deleted by unattaching/disabling access to the host.
 func (s *Service) ControllerUnpublishVolume(ctx context.Context, req *csi.ControllerUnpublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) {
-	log := log.WithContext(ctx)
 	id := req.GetVolumeId()
 	if id == "" {
 		return nil, status.Error(codes.InvalidArgument, "volume ID is required")
@@ -1068,9 +1241,16 @@ func (s *Service) ControllerUnpublishVolume(ctx context.Context, req *csi.Contro
 	if kubeNodeID == "" {
 		return nil, status.Error(codes.InvalidArgument, "node ID is required")
 	}
+	log.WithContext(ctx).WithFields(log.Fields{
+		log.FieldComponent: "controller",
+		log.FieldOperation: "ControllerUnpublishVolume",
+		log.FieldVolumeID:  id,
+		log.FieldNodeID:    kubeNodeID,
+	}).Info("unpublishing volume from node")
+
 	volumeHandle, err := array.ParseVolumeID(ctx, id, s.DefaultArray(), nil)
 	if err != nil {
-		log.Error(err.Error())
+		log.WithContext(ctx).Error(err.Error())
 		return nil, err
 	}
 	arrayID := volumeHandle.LocalArrayGlobalID
@@ -1080,6 +1260,13 @@ func (s *Service) ControllerUnpublishVolume(ctx context.Context, req *csi.Contro
 	if !ok {
 		return nil, status.Errorf(codes.InvalidArgument, "cannot find array %s", arrayID)
 	}
+	log.WithContext(ctx).WithFields(log.Fields{
+		log.FieldComponent: "controller",
+		log.FieldOperation: "ControllerUnpublishVolume",
+		log.FieldVolumeID:  id,
+		log.FieldProtocol:  volumeHandle.Protocol,
+		log.FieldArrayID:   arr.Endpoint,
+	}).Info("volume info resolved")
 	var remoteArray *array.PowerStoreArray
 	isMetroFractured := false
 	localDemoted := false
@@ -1101,7 +1288,7 @@ func (s *Service) ControllerUnpublishVolume(ctx context.Context, req *csi.Contro
 				}
 
 				// Not found due to potentially deleted volume through UI. Still need to unpublish.
-				log.Infof("[Metro] Volume with ID %s not found", id)
+				log.WithContext(ctx).Infof("[Metro] Volume with ID %s not found", id)
 			}
 		}
 
@@ -1110,11 +1297,11 @@ func (s *Service) ControllerUnpublishVolume(ctx context.Context, req *csi.Contro
 		}
 
 		if isMetroFractured {
-			log.Warnf("[METRO] metro volume %s is in a fractured state", req.GetVolumeId())
+			log.WithContext(ctx).Warnf("[METRO] metro volume %s is in a fractured state", req.GetVolumeId())
 		}
 
 		if localDemoted {
-			log.Warnf("[METRO] metro volume %s has been demoted", req.GetVolumeId())
+			log.WithContext(ctx).Warnf("[METRO] metro volume %s has been demoted", req.GetVolumeId())
 		}
 	}
 
@@ -1125,20 +1312,20 @@ func (s *Service) ControllerUnpublishVolume(ctx context.Context, req *csi.Contro
 	// Check if it is Metro volume and with newer secret configuation
 	nodeConnectedToLocalArray := isNodeConnectedToArrayFunc(ctx, kubeNodeID, arr)
 	if nodeConnectedToLocalArray {
-		log.Debugf("Volume is being unpublished on node %s for array %s", kubeNodeID, arr.Endpoint)
+		log.WithContext(ctx).Debugf("Volume is being unpublished on node %s for array %s", kubeNodeID, arr.Endpoint)
 		ctxLocal, cancelLocal := context.WithTimeout(context.Background(), array.MediumTimeout)
 		defer cancelLocal()
 		resp, unpublishErr := unpublishVolumeFunc(ctxLocal, kubeNodeID, arr, &volumeHandle, nil)
 		if unpublishErr != nil {
 			if isMetroFractured && localDemoted {
 				// expected failure if Metro is Fractured and local array is down
-				log.Infof("[METRO] Could not unpublish volume %s on node %s for array %s due to Metro Session Fracture", id, kubeNodeID, arr.Endpoint)
+				log.WithContext(ctx).Infof("[METRO] Could not unpublish volume %s on node %s for array %s due to Metro Session Fracture", id, kubeNodeID, arr.Endpoint)
 			} else {
-				log.Errorf("Failed to unpublish volume %s  for array %s: %s", id, arr.Endpoint, err)
+				log.WithContext(ctx).Errorf("Failed to unpublish volume %s  for array %s: %s", id, arr.Endpoint, err)
 				return nil, unpublishErr
 			}
 		} else {
-			log.Infof("Unpublished volume %s for array %s", id, arr.Endpoint)
+			log.WithContext(ctx).Infof("Unpublished volume %s for array %s", id, arr.Endpoint)
 			localVolumeUnpublished = true
 			response = resp
 		}
@@ -1147,26 +1334,32 @@ func (s *Service) ControllerUnpublishVolume(ctx context.Context, req *csi.Contro
 	if volumeHandle.IsMetro() {
 		nodeConnectedToRemoteArray = isNodeConnectedToArrayFunc(ctx, kubeNodeID, remoteArray)
 		if nodeConnectedToRemoteArray {
-			log.Debugf("Volume is being unpublished on node %s for remote array %s", kubeNodeID, remoteArray.Endpoint)
+			log.WithContext(ctx).Debugf("Volume is being unpublished on node %s for remote array %s", kubeNodeID, remoteArray.Endpoint)
 			ctxRemote, cancelRemote := context.WithTimeout(context.Background(), array.MediumTimeout)
 			defer cancelRemote()
 			resp, unpublishErr := unpublishVolumeFunc(ctxRemote, kubeNodeID, nil, &volumeHandle, remoteArray)
 			if unpublishErr != nil {
 				if isMetroFractured && !localDemoted {
 					// expected failure if Metro is Fractured and remote array is down
-					log.Infof("[METRO] Could not unpublish volume %s on node %s for array %s due to Metro Session Fracture", id, kubeNodeID, remoteArray.Endpoint)
+					log.WithContext(ctx).Infof("[METRO] Could not unpublish volume %s on node %s for array %s due to Metro Session Fracture", id, kubeNodeID, remoteArray.Endpoint)
 				} else {
-					log.Errorf("Failed to unpublish volume %s for array %s: %s", id, remoteArray.Endpoint, err)
+					log.WithContext(ctx).Errorf("Failed to unpublish volume %s for array %s: %s", id, remoteArray.Endpoint, err)
 					return nil, unpublishErr
 				}
 			} else {
-				log.Infof("Unpublished volume %s for array %s", id, remoteArray.Endpoint)
+				log.WithContext(ctx).Infof("Unpublished volume %s for array %s", id, remoteArray.Endpoint)
 				remoteVolumeUnpublished = true
 				response = resp
 			}
 		}
 	}
 	if !localVolumeUnpublished && !remoteVolumeUnpublished {
+		log.WithContext(ctx).WithFields(log.Fields{
+			log.FieldComponent: "controller",
+			log.FieldOperation: "ControllerUnpublishVolume",
+			log.FieldVolumeID:  id,
+			log.FieldNodeID:    kubeNodeID,
+		}).Error("failed to unpublish volume")
 		return nil, status.Error(codes.Internal, "failed to unpublish volume")
 	}
 
@@ -1174,7 +1367,7 @@ func (s *Service) ControllerUnpublishVolume(ctx context.Context, req *csi.Contro
 		if (localVolumeUnpublished && !remoteVolumeUnpublished) || (!localVolumeUnpublished && remoteVolumeUnpublished) {
 			deferredRequest, err := proto.Marshal(req)
 			if err != nil {
-				log.Errorf("[METRO] Error marshalling req: %s", err.Error())
+				log.WithContext(ctx).Errorf("[METRO] Error marshalling req: %s", err.Error())
 				return nil, err
 			}
 
@@ -1185,11 +1378,11 @@ func (s *Service) ControllerUnpublishVolume(ctx context.Context, req *csi.Contro
 
 			err = createOrUpdateJournalEntryFunc(ctx, metroResp.VolumeName, volumeHandle, deferredArrayID, kubeNodeID, "ControllerUnpublishVolume", deferredRequest)
 			if err != nil {
-				log.Errorf("Could not create journal entry for operation %s for volume %s node %s array %s", "ControllerUnpublishVolume", id, kubeNodeID, arrayID)
+				log.WithContext(ctx).Errorf("Could not create journal entry for operation %s for volume %s node %s array %s", "ControllerUnpublishVolume", id, kubeNodeID, arrayID)
 				return nil, err
 			}
 
-			log.Infof("[METRO] Metro volume %s created journal entry for operation %s for volume %s node %s array %s", id, "ControllerUnpublishVolume", id, kubeNodeID, arrayID)
+			log.WithContext(ctx).Infof("[METRO] Metro volume %s created journal entry for operation %s for volume %s node %s array %s", id, "ControllerUnpublishVolume", id, kubeNodeID, arrayID)
 		}
 	}
 
@@ -1324,8 +1517,13 @@ func unpublishVolume(ctx context.Context, kubeNodeID string, arr *array.PowerSto
 		// Detach host from nfs export
 		_, err = arr.GetClient().ModifyNFSExport(ctx, &modifyHostPayload, export.ID)
 		if err != nil {
-			if apiError, ok := err.(gopowerstore.APIError); !(ok && apiError.HostAlreadyRemovedFromNFSExport()) {
-				log.Debugf("Error occured while modifying NFS export during UnPublishVolume %s", err.Error())
+			if apiError, ok := err.(gopowerstore.APIError); !ok || !apiError.HostAlreadyRemovedFromNFSExport() {
+				log.WithFields(log.Fields{
+					log.FieldComponent: "controller",
+					log.FieldOperation: "ControllerUnpublishVolume",
+					log.FieldProtocol:  "NFS",
+					log.FieldError:     err.Error(),
+				}).Debug("error modifying NFS export during unpublish")
 				return nil, status.Errorf(codes.Internal,
 					"failure when removing new host to nfs export: %s", err.Error())
 			}
@@ -1345,49 +1543,48 @@ func GetServiceTag(ctx context.Context, req *csi.CreateVolumeRequest, arr *array
 	var applianceName string
 	var err error
 
-	log := log.WithContext(ctx)
 	// Check if appliance id is present in PVC manifest
 	if applianceID, ok := (req.Parameters)["appliance_id"]; ok {
 		// Fetching appliance information using the appliance id
 		ap, err = arr.Client.GetAppliance(ctx, applianceID)
 		if err != nil {
-			log.Warnf("Received error while calling GetAppliance %s", err.Error())
+			log.WithContext(ctx).Warnf("Received error while calling GetAppliance %s", err.Error())
 		}
 	} else {
 		if protocol != "nfs" {
 			vol, err = arr.Client.GetVolume(ctx, volID)
 			if err != nil {
-				log.Warnf("Received error while calling GetVolume %s", err.Error())
+				log.WithContext(ctx).Warnf("Received error while calling GetVolume %s", err.Error())
 			}
 			if vol.ApplianceID == "" {
-				log.Warn("Unable to fetch ApplianceID from the volume")
+				log.WithContext(ctx).Warn("Unable to fetch ApplianceID from the volume")
 			} else {
 				ap, err = arr.Client.GetAppliance(ctx, vol.ApplianceID)
 				if err != nil {
-					log.Warnf("Received error while calling GetAppliance %s", err.Error())
+					log.WithContext(ctx).Warnf("Received error while calling GetAppliance %s", err.Error())
 				}
 			}
 		} else {
 			f, err = arr.Client.GetFS(ctx, volID)
 			if err != nil {
-				log.Warnf("Received error while calling GetFS %s", err.Error())
+				log.WithContext(ctx).Warnf("Received error while calling GetFS %s", err.Error())
 			}
 			if f.NasServerID == "" {
-				log.Warn("Unable to fetch the NasServerID from the file system")
+				log.WithContext(ctx).Warn("Unable to fetch the NasServerID from the file system")
 			} else {
 				nas, err = arr.Client.GetNAS(ctx, f.NasServerID)
 				if err != nil {
-					log.Warnf("Received error while calling GetNAS %s", err.Error())
+					log.WithContext(ctx).Warnf("Received error while calling GetNAS %s", err.Error())
 				}
 				if nas.CurrentNodeID == "" {
-					log.Warn("Unable to fetch the CurrentNodeId from the nas server")
+					log.WithContext(ctx).Warn("Unable to fetch the CurrentNodeId from the nas server")
 				} else {
 					// Removing "-node-X" from the end of CurrentNodeId to get Appliance Name
 					applianceName = strings.Split(nas.CurrentNodeID, "-node-")[0]
 					// Fetching appliance information using the appliance name
 					ap, err = arr.Client.GetApplianceByName(ctx, applianceName)
 					if err != nil {
-						log.Warnf("Received error while calling GetApplianceByName %s", err.Error())
+						log.WithContext(ctx).Warnf("Received error while calling GetApplianceByName %s", err.Error())
 					}
 				}
 			}
@@ -1420,26 +1617,19 @@ func (s *Service) ValidateVolumeCapabilities(ctx context.Context, req *csi.Valid
 		case csi.VolumeCapability_AccessMode_UNKNOWN:
 			supported = false
 			reason = ErrUnknownAccessMode
-			break
 		// SINGLE_NODE_WRITER to be deprecated in future
-		case csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER:
-			break
-		case csi.VolumeCapability_AccessMode_SINGLE_NODE_SINGLE_WRITER:
-			break
-		case csi.VolumeCapability_AccessMode_SINGLE_NODE_MULTI_WRITER:
-			break
-		case csi.VolumeCapability_AccessMode_SINGLE_NODE_READER_ONLY:
-			break
-		case csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY:
-			break
-		case csi.VolumeCapability_AccessMode_MULTI_NODE_SINGLE_WRITER:
-			fallthrough
-		case csi.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER:
+		case csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+			csi.VolumeCapability_AccessMode_SINGLE_NODE_SINGLE_WRITER,
+			csi.VolumeCapability_AccessMode_SINGLE_NODE_MULTI_WRITER,
+			csi.VolumeCapability_AccessMode_SINGLE_NODE_READER_ONLY,
+			csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY:
+			// supported, no action needed
+		case csi.VolumeCapability_AccessMode_MULTI_NODE_SINGLE_WRITER,
+			csi.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER:
 			if !isBlock {
 				supported = false
 				reason = ErrNoMultiNodeWriter
 			}
-			break
 		default:
 			// This is to guard against new access modes not understood
 			supported = false
@@ -1554,7 +1744,6 @@ func (s *Service) GetCapacity(ctx context.Context, req *csi.GetCapacityRequest) 
 }
 
 func getMaximumVolumeSize(ctx context.Context, arr *array.PowerStoreArray) int64 {
-	log := log.WithContext(ctx)
 	valueInCache, found := getCachedMaximumVolumeSize(arr.GlobalID)
 	if !found || valueInCache < 0 {
 		defaultHeaders := arr.Client.GetCustomHTTPHeaders()
@@ -1567,7 +1756,7 @@ func getMaximumVolumeSize(ctx context.Context, arr *array.PowerStoreArray) int64
 
 		value, err := arr.Client.GetMaxVolumeSize(ctx)
 		if err != nil {
-			log.Debug(fmt.Sprintf("GetMaxVolumeSize returning: %v for Array having GlobalId %s", err, arr.GlobalID))
+			log.WithContext(ctx).Debug(fmt.Sprintf("GetMaxVolumeSize returning: %v for Array having GlobalId %s", err, arr.GlobalID))
 		}
 		// reset custom header
 		customHeaders.Del("DELL-VISIBILITY")
@@ -1996,6 +2185,8 @@ func GetMetroSessionState(ctx context.Context, metroSessionID string, arr *array
 
 // ControllerExpandVolume resizes Volume or FileSystem by increasing available volume capacity in the storage array.
 func (s *Service) ControllerExpandVolume(ctx context.Context, req *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
+	startTime := time.Now()
+
 	volumeHandle, err := array.ParseVolumeID(ctx, req.VolumeId, s.DefaultArray(), nil)
 	if err != nil {
 		return nil, status.Errorf(codes.OutOfRange, "unable to parse the volume id")
@@ -2005,6 +2196,14 @@ func (s *Service) ControllerExpandVolume(ctx context.Context, req *csi.Controlle
 	arrayID := volumeHandle.LocalArrayGlobalID
 	protocol := volumeHandle.Protocol
 	remoteVolumeID := volumeHandle.RemoteUUID
+
+	log.WithContext(ctx).WithFields(log.Fields{
+		log.FieldComponent: "controller",
+		log.FieldOperation: "ControllerExpandVolume",
+		log.FieldVolumeID:  id,
+		log.FieldProtocol:  protocol,
+		log.FieldArrayID:   arrayID,
+	}).Info("starting volume expansion")
 
 	requiredBytes := req.GetCapacityRange().GetRequiredBytes()
 	if requiredBytes > MaxVolumeSizeBytes {
@@ -2037,9 +2236,9 @@ func (s *Service) ControllerExpandVolume(ctx context.Context, req *csi.Controlle
 				// Log PowerStore version for observability
 				majorMinorVersion, vErr := client.GetSoftwareMajorMinorVersion(ctx)
 				if vErr != nil {
-					log.Warnf("[METRO EXPAND] Volume %q: Failed to determine PowerStore version: %v", vol.Name, vErr)
+					log.WithContext(ctx).Warnf("[METRO EXPAND] Volume %q: Failed to determine PowerStore version: %v", vol.Name, vErr)
 				} else {
-					log.Infof("[METRO EXPAND] Volume %q: PowerStore version %.1f detected", vol.Name, majorMinorVersion)
+					log.WithContext(ctx).Infof("[METRO EXPAND] Volume %q: PowerStore version %.1f detected", vol.Name, majorMinorVersion)
 				}
 
 				// Always use site selection to expand on the Metro_Preferred + online array.
@@ -2051,7 +2250,7 @@ func (s *Service) ControllerExpandVolume(ctx context.Context, req *csi.Controlle
 						"failed to retrieve remote array %s for metro volume %q expansion: %v", remoteArrayID, vol.Name, rErr)
 				}
 
-				log.Debugf("[METRO EXPAND] Volume %q: Selecting preferred array between local %s and remote %s for expansion",
+				log.WithContext(ctx).Debugf("[METRO EXPAND] Volume %q: Selecting preferred array between local %s and remote %s for expansion",
 					vol.Name, localArr.GetGlobalID(), remoteArrayID)
 
 				selectedArray, selectedSession, sErr := array.SelectMetroArrayForExpansion(ctx, vol.MetroReplicationSessionID, localArr, remoteArray)
@@ -2062,18 +2261,34 @@ func (s *Service) ControllerExpandVolume(ctx context.Context, req *csi.Controlle
 
 				expandClient = selectedArray.GetClient()
 				expandID = selectedSession.LocalResourceID
-				log.Infof("[METRO EXPAND] Volume %q: Selected array %s (Metro_Preferred) for expansion", vol.Name, selectedArray.GetGlobalID())
+				log.WithContext(ctx).Infof("[METRO EXPAND] Volume %q: Selected array %s (Metro_Preferred) for expansion", vol.Name, selectedArray.GetGlobalID())
 			}
 
 			_, err = expandClient.ModifyVolume(context.Background(), &gopowerstore.VolumeModify{Size: requiredBytes}, expandID)
 			if err != nil {
 				return nil, status.Errorf(codes.Internal, "unable to modify volume size: %s", err.Error())
 			}
+			log.WithContext(ctx).WithFields(log.Fields{
+				log.FieldComponent:  "controller",
+				log.FieldOperation:  "ControllerExpandVolume",
+				log.FieldVolumeID:   id,
+				log.FieldProtocol:   protocol,
+				log.FieldArrayID:    arrayID,
+				log.FieldDurationMs: time.Since(startTime).Milliseconds(),
+			}).Info("SCSI volume expanded successfully")
 			return &csi.ControllerExpandVolumeResponse{CapacityBytes: requiredBytes, NodeExpansionRequired: true}, nil
 		}
 
 		// Idempotent case: volume already at or above required size
 		// Return actual current size — never return 0
+		log.WithContext(ctx).WithFields(log.Fields{
+			log.FieldComponent:  "controller",
+			log.FieldOperation:  "ControllerExpandVolume",
+			log.FieldVolumeID:   id,
+			log.FieldProtocol:   protocol,
+			log.FieldArrayID:    arrayID,
+			log.FieldDurationMs: time.Since(startTime).Milliseconds(),
+		}).Info("SCSI volume already at required size")
 		return &csi.ControllerExpandVolumeResponse{CapacityBytes: vol.Size, NodeExpansionRequired: true}, nil
 	}
 
@@ -2086,6 +2301,14 @@ func (s *Service) ControllerExpandVolume(ctx context.Context, req *csi.Controlle
 			}
 		}
 	}
+	log.WithContext(ctx).WithFields(log.Fields{
+		log.FieldComponent:  "controller",
+		log.FieldOperation:  "ControllerExpandVolume",
+		log.FieldVolumeID:   id,
+		log.FieldProtocol:   protocol,
+		log.FieldArrayID:    arrayID,
+		log.FieldDurationMs: time.Since(startTime).Milliseconds(),
+	}).Info("NFS volume expansion completed")
 	return &csi.ControllerExpandVolumeResponse{CapacityBytes: requiredBytes, NodeExpansionRequired: false}, nil
 }
 
@@ -2182,7 +2405,6 @@ func (s *Service) RegisterAdditionalServers(server *grpc.Server) {
 
 // ProbeController probes the controller service
 func (s *Service) ProbeController(ctx context.Context, _ *commonext.ProbeControllerRequest) (*commonext.ProbeControllerResponse, error) {
-	log := log.WithContext(ctx)
 	ready := new(wrapperspb.BoolValue)
 	ready.Value = true
 	rep := new(commonext.ProbeControllerResponse)
@@ -2192,7 +2414,7 @@ func (s *Service) ProbeController(ctx context.Context, _ *commonext.ProbeControl
 	identifiers.Manifest["semver"] = identifiers.ManifestSemver
 	rep.Manifest = identifiers.Manifest
 
-	log.Debug(fmt.Sprintf("ProbeController returning: %v", rep.Ready.GetValue()))
+	log.WithContext(ctx).Debug(fmt.Sprintf("ProbeController returning: %v", rep.Ready.GetValue()))
 	return rep, nil
 }
 
@@ -2330,11 +2552,10 @@ func (s *Service) listPowerStoreVolumes(ctx context.Context, startToken, maxEntr
 }
 
 func (s *Service) listPowerStoreSnapshots(ctx context.Context, startToken, maxEntries int, snapID, srcID string) ([]GeneralSnapshot, string, error) {
-	log := log.WithContext(ctx)
 	var generalSnapshots []GeneralSnapshot
 
 	if snapID == "" && srcID == "" {
-		log.Info("Requested all snapshots, iterating through arrays")
+		log.WithContext(ctx).Info("Requested all snapshots, iterating through arrays")
 		for _, arr := range s.Arrays() {
 			// List block snapshots
 			snaps, err := arr.GetClient().GetSnapshots(ctx)
@@ -2357,10 +2578,10 @@ func (s *Service) listPowerStoreSnapshots(ctx context.Context, startToken, maxEn
 			}
 		}
 	} else if snapID != "" {
-		log.Infof("Requested snapshot via snapshot id %s", snapID)
+		log.WithContext(ctx).Infof("Requested snapshot via snapshot id %s", snapID)
 		volumeHandle, err := array.ParseVolumeID(ctx, snapID, s.DefaultArray(), nil)
 		if err != nil {
-			log.Error(err.Error())
+			log.WithContext(ctx).Error(err.Error())
 			return []GeneralSnapshot{}, "", nil
 		}
 
@@ -2383,7 +2604,7 @@ func (s *Service) listPowerStoreSnapshots(ctx context.Context, startToken, maxEn
 				return nil, "", status.Errorf(codes.Internal, "unable to get filesystem snapshot: %s", getErr.Error())
 			}
 
-			log.Infof("%+v", fsSnapshot)
+			log.WithContext(ctx).Infof("%+v", fsSnapshot)
 
 			fsSnapshot.ID = fsSnapshot.ID + "/" + arrayID + "/" + protocol
 			generalSnapshots = append(generalSnapshots, FilesystemSnapshot(fsSnapshot))
@@ -2400,11 +2621,11 @@ func (s *Service) listPowerStoreSnapshots(ctx context.Context, startToken, maxEn
 			generalSnapshots = append(generalSnapshots, VolumeSnapshot(blockSnap))
 		}
 	} else {
-		log.Infof("Requested snapshot via source id %s", srcID)
+		log.WithContext(ctx).Infof("Requested snapshot via source id %s", srcID)
 		// This works VGS on single default array, But for multiple array scenario this default array should be changed to dynamic array
 		volumeHandle, err := array.ParseVolumeID(ctx, srcID, s.DefaultArray(), nil)
 		if err != nil {
-			log.Error(err.Error())
+			log.WithContext(ctx).Error(err.Error())
 			return []GeneralSnapshot{}, "", nil
 		}
 

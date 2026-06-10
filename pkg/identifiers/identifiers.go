@@ -37,7 +37,7 @@ import (
 
 	"github.com/dell/csi-powerstore/v2/core"
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers/fs"
-	"github.com/dell/csmlog"
+	log "github.com/dell/csmlog"
 	"github.com/dell/gobrick"
 	csictx "github.com/dell/gocsi/context"
 	csiutils "github.com/dell/gocsi/utils/csi"
@@ -45,9 +45,6 @@ import (
 	"github.com/apparentlymart/go-cidr/cidr"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 )
-
-// Instantiate csmlog on a package level
-var log = csmlog.GetLogger()
 
 // Name contains default name of the driver, can be overridden
 var Name = "csi-powerstore.dellemc.com"
@@ -63,8 +60,6 @@ var Manifest = map[string]string{
 	"semver": ManifestSemver,
 	"formed": core.CommitTime.Format(time.RFC1123),
 }
-
-type key int
 
 // ArrayConnectivityStatus Status of the array probe
 type ArrayConnectivityStatus struct {
@@ -196,8 +191,6 @@ const (
 	// Zero indicates value zero for RPO
 	Zero = "Zero"
 
-	contextLogFieldsKey key = iota
-
 	// DefaultPodmonAPIPortNumber is the port number in default to expose internal health APIs
 	DefaultPodmonAPIPortNumber = "8083"
 
@@ -296,15 +289,15 @@ func isDomain(str string) bool {
 }
 
 func parseMask(ipaddr string) (mask string, err error) {
-	removeExtra := regexp.MustCompile("^(.*[\\/])")
+	removeExtra := regexp.MustCompile(`^(.*[\\/])`)
 	asd := ipaddr[len(ipaddr)-3:]
 	findSubnet := removeExtra.ReplaceAll([]byte(asd), []byte(""))
 	subnet, err := strconv.ParseInt(string(findSubnet), 10, 64)
 	if err != nil {
-		return "", errors.New("Parse Mask: Error parsing mask")
+		return "", errors.New("parse mask: error parsing mask")
 	}
 	if subnet < 0 || subnet > 32 {
-		return "", errors.New("Invalid subnet mask")
+		return "", errors.New("invalid subnet mask")
 	}
 	var buff bytes.Buffer
 	for i := 0; i < int(subnet); i++ {
@@ -417,7 +410,7 @@ func GetFCTargetsInfoFromStorage(client gopowerstore.Client, volumeApplianceID s
 	var result []gobrick.FCTargetInfo
 	for _, t := range fcPorts {
 		if t.IsLinkUp && t.ApplianceID == volumeApplianceID {
-			result = append(result, gobrick.FCTargetInfo{WWPN: strings.Replace(t.Wwn, ":", "", -1)})
+			result = append(result, gobrick.FCTargetInfo{WWPN: strings.ReplaceAll(t.Wwn, ":", "")})
 		}
 	}
 	return result, nil
@@ -442,6 +435,10 @@ func IsK8sMetadataSupported(client gopowerstore.Client) bool {
 // GetNVMEFCTargetInfoFromStorage returns a list of gobrick compatible NVMeFC targets by quering Powerstore Array
 func GetNVMEFCTargetInfoFromStorage(client gopowerstore.Client, volumeApplianceID string) ([]gobrick.NVMeTargetInfo, error) {
 	clusterInfo, err := client.GetCluster(context.Background())
+	if err != nil {
+		log.Error(err.Error())
+		return nil, err
+	}
 	nvmeNQN := clusterInfo.NVMeNQN
 
 	fcPorts, err := client.GetFCPorts(context.Background())
@@ -452,7 +449,7 @@ func GetNVMEFCTargetInfoFromStorage(client gopowerstore.Client, volumeApplianceI
 	var result []gobrick.NVMeTargetInfo
 	for _, t := range fcPorts {
 		if t.IsLinkUp && (t.ApplianceID == volumeApplianceID || volumeApplianceID == "") {
-			targetAddress := strings.Replace(fmt.Sprintf("nn-0x%s:pn-0x%s", strings.Replace(t.WwnNode, ":", "", -1), strings.Replace(t.WwnNVMe, ":", "", -1)), "\n", "", -1)
+			targetAddress := strings.ReplaceAll(fmt.Sprintf("nn-0x%s:pn-0x%s", strings.ReplaceAll(t.WwnNode, ":", ""), strings.ReplaceAll(t.WwnNVMe, ":", "")), "\n", "")
 			result = append(result, gobrick.NVMeTargetInfo{Target: nvmeNQN, Portal: targetAddress})
 		}
 	}
@@ -531,29 +528,27 @@ func ExternalAccessAlreadyAdded(export gopowerstore.NFSExport, externalAccess st
 
 // SetPollingFrequency reads the pollingFrequency from Env, sets default vale if ENV not found
 func SetPollingFrequency(ctx context.Context) int64 {
-	log := log.WithContext(ctx)
 	var pollingFrequency int64
 	if pollRateEnv, ok := csictx.LookupEnv(ctx, EnvPodmonArrayConnectivityPollRate); ok {
 		if pollingFrequency, _ = strconv.ParseInt(pollRateEnv, 10, 32); pollingFrequency != 0 {
-			log.Debugf("use pollingFrequency as %d seconds", pollingFrequency)
+			log.WithContext(ctx).Debugf("use pollingFrequency as %d seconds", pollingFrequency)
 			return pollingFrequency
 		}
 	}
-	log.Debugf("use default pollingFrequency as %d seconds", DefaultPodmonPollRate)
+	log.WithContext(ctx).Debugf("use default pollingFrequency as %d seconds", DefaultPodmonPollRate)
 	return DefaultPodmonPollRate
 }
 
 // SetAPIPort set the port for running server
 func SetAPIPort(ctx context.Context) {
-	log := log.WithContext(ctx)
 	if port, ok := csictx.LookupEnv(ctx, EnvPodmonAPIPORT); ok && strings.TrimSpace(port) != "" {
 		APIPort = fmt.Sprintf(":%s", port)
-		log.Debugf("set podmon API port to %s", APIPort)
+		log.WithContext(ctx).Debugf("set podmon API port to %s", APIPort)
 		return
 	}
 	// If the port number cannot be fetched, set it to default
 	APIPort = ":" + DefaultPodmonAPIPortNumber
-	log.Debugf("set podmon API port to default %s", APIPort)
+	log.WithContext(ctx).Debugf("set podmon API port to default %s", APIPort)
 }
 
 // ReachableEndPoint checks if this endpoint is reachable or not

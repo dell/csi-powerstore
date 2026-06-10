@@ -158,14 +158,14 @@ func (suite *FsTestSuite) TestParseProcMounts() {
 func (suite *FsTestSuite) TestNetDial() {
 	conn, err := suite.fs.NetDial("localhost")
 	suite.Assert().NoError(err)
-	conn.Close()
+	_ = conn.Close()
 }
 
 func (suite *FsTestSuite) TestNetDialWithPort() {
 	conn, err := suite.fs.NetDial("localhost:9400")
 	suite.Assert().NoError(err)
 	suite.Assert().NotNil(conn)
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 }
 
 func (suite *FsTestSuite) TestNetDialWithHttpsPort() {

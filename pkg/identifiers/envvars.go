@@ -87,9 +87,6 @@ const (
 	// EnvReplicationPrefix is used as a prefix to find out if replication is enabled
 	EnvReplicationPrefix = "X_CSI_REPLICATION_PREFIX" // #nosec G101
 
-	// EnvGOCSIDebug indicates whether to print REQUESTs and RESPONSEs of all CSI method calls(from gocsi)
-	EnvGOCSIDebug = "X_CSI_DEBUG"
-
 	// EnvIsHealthMonitorEnabled specifies if health monitor is enabled.
 	EnvIsHealthMonitorEnabled = "X_CSI_HEALTH_MONITOR_ENABLED"
 

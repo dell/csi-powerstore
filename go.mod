@@ -3,18 +3,18 @@ module github.com/dell/csi-powerstore/v2
 go 1.26
 
 require (
-	github.com/dell/csi-metadata-retriever v1.14.0
-	github.com/dell/csm-dr v1.1.0
-	github.com/dell/csmlog v1.1.0
+	github.com/dell/csi-metadata-retriever v1.14.1-0.20260604183105-890fa5cc6e3c
+	github.com/dell/csm-dr v1.1.1-0.20260604163042-ff62be77a04c
+	github.com/dell/csmlog v1.1.1-0.20260602192201-a1f3f51990a8
 	github.com/dell/dell-csi-extensions/common v1.11.0
 	github.com/dell/dell-csi-extensions/podmon v1.11.0
 	github.com/dell/dell-csi-extensions/replication v1.14.0
-	github.com/dell/gobrick v1.17.0
-	github.com/dell/gocsi v1.17.0
-	github.com/dell/gofsutil v1.22.0
-	github.com/dell/goiscsi v1.15.0
-	github.com/dell/gonvme v1.14.0
-	github.com/dell/gopowerstore v1.22.0
+	github.com/dell/gobrick v1.17.1-0.20260604140748-1e5fa0e518ea
+	github.com/dell/gocsi v1.17.1-0.20260604162940-35d0aa613b85
+	github.com/dell/gofsutil v1.22.1-0.20260604183036-c90c11915e94
+	github.com/dell/goiscsi v1.15.1-0.20260604150525-2b990f6024d3
+	github.com/dell/gonvme v1.14.1-0.20260604160926-e72357816bd2
+	github.com/dell/gopowerstore v1.22.1-0.20260604161519-aba1b4536ef1
 	github.com/akutz/gosync v0.1.0
 	github.com/apparentlymart/go-cidr v1.1.0
 	github.com/container-storage-interface/spec v1.11.0
@@ -29,7 +29,6 @@ require (
 	github.com/onsi/gomega v1.40.0
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/robfig/cron/v3 v3.0.1
-	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/viper v1.21.0
 	github.com/stretchr/testify v1.11.1
 	github.com/uber/jaeger-client-go v2.30.0+incompatible
@@ -49,7 +48,6 @@ require (
 	github.com/HdrHistogram/hdrhistogram-go v1.1.2 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
-	github.com/bombsimon/logrusr/v4 v4.1.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/coreos/go-semver v0.3.1 // indirect
 	github.com/coreos/go-systemd/v22 v22.6.0 // indirect

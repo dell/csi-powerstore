@@ -34,12 +34,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/dell/csmlog"
+	log "github.com/dell/csmlog"
 	"github.com/dell/gofsutil"
 )
-
-// Instantiate csmlog on a package level
-var log = csmlog.GetLogger()
 
 // A FileInfo describes a file and is returned by Stat and Lstat.
 type FileInfo interface {
@@ -219,7 +216,7 @@ func (fs *Fs) MkFileIdempotent(path string) (bool, error) {
 	if fs.IsNotExist(err) {
 		file, err := fs.OpenFile(path, os.O_CREATE, 0o600)
 		if err != nil {
-			log.WithFields(csmlog.Fields{
+			log.WithFields(log.Fields{
 				"path": path,
 			}).Error("Unable to create file" + err.Error())
 			return false, err
@@ -227,7 +224,7 @@ func (fs *Fs) MkFileIdempotent(path string) (bool, error) {
 		if err = file.Close(); err != nil {
 			return false, fmt.Errorf("could not close file")
 		}
-		log.WithFields(csmlog.Fields{
+		log.WithFields(log.Fields{
 			"path": path,
 		}).Debug("created file")
 

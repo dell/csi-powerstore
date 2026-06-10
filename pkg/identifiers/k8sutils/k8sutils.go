@@ -23,7 +23,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/dell/csmlog"
+	log "github.com/dell/csmlog"
 	k8score "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -34,9 +34,6 @@ import (
 type K8sClient struct {
 	Clientset kubernetes.Interface
 }
-
-// Instantiate csmlog on a package level
-var log = csmlog.GetLogger()
 
 // Kube Kubeclient
 var Kubeclient *K8sClient

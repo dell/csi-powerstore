@@ -37,7 +37,7 @@ import (
 	"github.com/dell/csi-powerstore/v2/pkg/controller"
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers"
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers/k8sutils"
-	"github.com/dell/csmlog"
+	log "github.com/dell/csmlog"
 	"github.com/dell/gobrick"
 	csictx "github.com/dell/gocsi/context"
 	"github.com/dell/gofsutil"
@@ -53,7 +53,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	corev1 "k8s.io/api/core/v1"
-	k8score "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
@@ -145,13 +144,9 @@ var (
 	validFCTargetWWNNVMe         = []string{"58ccf090496008aa", "58ccf090496008aa"}
 	validFCTargetWWNNode         = []string{"58ccf090c96008aa", "58ccf090c96008aa"}
 	validFCTargetsWWPNPowerstore = []string{"58:cc:f0:93:48:a0:03:a3", "58:cc:f0:93:48:a0:02:a3"}
-	validFCTargetsInfo           = []gobrick.FCTargetInfo{
-		{WWPN: validFCTargetsWWPN[0]},
-		{WWPN: validFCTargetsWWPN[1]},
-	}
-	validISCSIInitiators = []string{"iqn.1994-05.com.redhat:4db86abbe3c", "iqn.1994-05.com.redhat:2950c9ca441b"}
-	validISCSIPortals    = []string{"192.168.1.1:3260", "192.168.1.2:3260"}
-	validISCSITargets    = []string{
+	validISCSIInitiators         = []string{"iqn.1994-05.com.redhat:4db86abbe3c", "iqn.1994-05.com.redhat:2950c9ca441b"}
+	validISCSIPortals            = []string{"192.168.1.1:3260", "192.168.1.2:3260"}
+	validISCSITargets            = []string{
 		"iqn.2015-10.com.dell:dellemc-powerstore-fnm00180700173-a-39f17e0e",
 		"iqn.2015-10.com.dell:dellemc-powerstore-fnm00180700173-b-10de15a5",
 	}
@@ -169,67 +164,13 @@ var (
 		"nqn.1988-11.com.dell:powerstore:00:e6e2d5b871f1403E169D",
 		"nqn.1988-11.com.dell:powerstore:00:e6e2d5b871f1403E169D",
 	}
-	validISCSITargetInfo = []gobrick.ISCSITargetInfo{
-		{Portal: validISCSIPortals[0], Target: validISCSITargets[0]},
-		{Portal: validISCSIPortals[1], Target: validISCSITargets[1]},
-	}
-	validGobrickISCSIVolumeINFO = gobrick.ISCSIVolumeInfo{
-		Targets: []gobrick.ISCSITargetInfo{
-			{
-				Portal: validISCSITargetInfo[0].Portal,
-				Target: validISCSITargetInfo[0].Target,
-			},
-			{Portal: validISCSITargetInfo[1].Portal, Target: validISCSITargetInfo[1].Target},
-		},
-		Lun: validLUNIDINT,
-	}
-	validNVMETCPTargetInfo = []gobrick.NVMeTargetInfo{
-		{Portal: validNVMETCPPortals[0], Target: validNVMETCPTargets[0]},
-		{Portal: validNVMETCPPortals[1], Target: validNVMETCPTargets[1]},
-	}
-	validGobrickNVMETCPVolumeINFO = gobrick.NVMeVolumeInfo{
-		Targets: []gobrick.NVMeTargetInfo{
-			{
-				Portal: validNVMETCPTargetInfo[0].Portal,
-				Target: validNVMETCPTargetInfo[0].Target,
-			},
-			{Portal: validNVMETCPTargetInfo[1].Portal, Target: validNVMETCPTargetInfo[1].Target},
-		},
-		WWN: validDeviceWWN,
-	}
-	validNVMEFCTargetInfo = []gobrick.NVMeTargetInfo{
-		{Portal: validNVMEFCPortals[0], Target: validNVMEFCTargets[0]},
-		{Portal: validNVMEFCPortals[1], Target: validNVMEFCTargets[1]},
-	}
-	validGobrickNVMEFCVolumeINFO = gobrick.NVMeVolumeInfo{
-		Targets: []gobrick.NVMeTargetInfo{
-			{
-				Portal: validNVMEFCTargetInfo[0].Portal,
-				Target: validNVMEFCTargetInfo[0].Target,
-			},
-			{Portal: validNVMEFCTargetInfo[1].Portal, Target: validNVMEFCTargetInfo[1].Target},
-		},
-		WWN: validDeviceWWN,
-	}
-	validGobrickFCVolumeINFO = gobrick.FCVolumeInfo{
-		Targets: []gobrick.FCTargetInfo{
-			{WWPN: validFCTargetsWWPN[0]},
-			{WWPN: validFCTargetsWWPN[1]},
-		},
-		Lun: validLUNIDINT,
-	}
-	validGobrickDevice = gobrick.Device{Name: validDevName, WWN: validDeviceWWN, MultipathID: validDeviceWWN}
 
 	validRemoteISCSIPortals = []string{"192.168.1.3:3260", "192.168.1.4:3260"}
 	validRemoteISCSITargets = []string{
 		"iqn.2015-10.com.dell:dellemc-powerstore-fnm00180700174-a-39f17e0e",
 		"iqn.2015-10.com.dell:dellemc-powerstore-fnm00180700174-b-10de15a5",
 	}
-	validRemoteFCTargetsWWPN   = []string{"58ccf09348a003a4", "58ccf09348a002a4"}
-	validRemoteISCSITargetInfo = []gobrick.ISCSITargetInfo{
-		{Portal: validRemoteISCSIPortals[0], Target: validRemoteISCSITargets[0]},
-		{Portal: validRemoteISCSIPortals[1], Target: validRemoteISCSITargets[1]},
-	}
+	validRemoteFCTargetsWWPN = []string{"58ccf09348a003a4", "58ccf09348a002a4"}
 )
 
 // default empty usage
@@ -313,26 +254,26 @@ func getMetroTestArrays() map[string]*array.PowerStoreArray {
 		BlockProtocol: "auto",
 		HostConnectivity: &array.HostConnectivity{
 			Metro: array.MetroConnectivityOptions{
-				ColocatedLocal: k8score.NodeSelector{
-					NodeSelectorTerms: []k8score.NodeSelectorTerm{
+				ColocatedLocal: corev1.NodeSelector{
+					NodeSelectorTerms: []corev1.NodeSelectorTerm{
 						{
-							MatchExpressions: []k8score.NodeSelectorRequirement{
+							MatchExpressions: []corev1.NodeSelectorRequirement{
 								{
 									Key:      "topology.kubernetes.io/zone",
-									Operator: k8score.NodeSelectorOpIn,
+									Operator: corev1.NodeSelectorOpIn,
 									Values:   []string{"zone1"},
 								},
 							},
 						},
 					},
 				},
-				ColocatedRemote: k8score.NodeSelector{
-					NodeSelectorTerms: []k8score.NodeSelectorTerm{
+				ColocatedRemote: corev1.NodeSelector{
+					NodeSelectorTerms: []corev1.NodeSelectorTerm{
 						{
-							MatchExpressions: []k8score.NodeSelectorRequirement{
+							MatchExpressions: []corev1.NodeSelectorRequirement{
 								{
 									Key:      "topology.kubernetes.io/zone",
-									Operator: k8score.NodeSelectorOpIn,
+									Operator: corev1.NodeSelectorOpIn,
 									Values:   []string{"zone2"},
 								},
 							},
@@ -353,13 +294,13 @@ func getMetroTestArrays() map[string]*array.PowerStoreArray {
 		BlockProtocol: "auto",
 		HostConnectivity: &array.HostConnectivity{
 			Metro: array.MetroConnectivityOptions{
-				ColocatedRemote: k8score.NodeSelector{
-					NodeSelectorTerms: []k8score.NodeSelectorTerm{
+				ColocatedRemote: corev1.NodeSelector{
+					NodeSelectorTerms: []corev1.NodeSelectorTerm{
 						{
-							MatchExpressions: []k8score.NodeSelectorRequirement{
+							MatchExpressions: []corev1.NodeSelectorRequirement{
 								{
 									Key:      "topology.kubernetes.io/zone",
-									Operator: k8score.NodeSelectorOpIn,
+									Operator: corev1.NodeSelectorOpIn,
 									Values:   []string{"zone2"},
 								},
 							},
@@ -490,7 +431,7 @@ func setDefaultNodeLabelsMock() {
 var options []variableOption
 
 var _ = ginkgo.Describe("CSINodeService", func() {
-	os.Setenv(identifiers.EnvKubeNodeName, "node1")
+	_ = os.Setenv(identifiers.EnvKubeNodeName, "node1")
 
 	ginkgo.BeforeEach(func() {
 		setVariables(options...)
@@ -874,8 +815,8 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				setDefaultNodeLabelsMock()
 				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).Return([]gopowerstore.IPPoolAddress{}, nil)
 
-				k8sutils.Kubeclient.SetNodeLabel(context.Background(), "node1", "hostnqn-uuid", "duplicate-uuid")
-				k8sutils.Kubeclient.SetNodeLabel(context.Background(), "node2", "hostnqn-uuid", "duplicate-uuid")
+				_ = k8sutils.Kubeclient.SetNodeLabel(context.Background(), "node1", "hostnqn-uuid", "duplicate-uuid")
+				_ = k8sutils.Kubeclient.SetNodeLabel(context.Background(), "node2", "hostnqn-uuid", "duplicate-uuid")
 
 				err := nodeSvc.Init()
 				gomega.Expect(err).To(gomega.BeNil())
@@ -1576,7 +1517,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				clientMock.On("GetNASByName", mock.Anything, "").Return(gopowerstore.NAS{ID: validNasID, NfsServers: nfsServers}, nil)
 				clientMock.On("GetNfsServer", mock.Anything, mock.Anything).Return(gopowerstore.NFSServerInstance{ID: validNfsServerID, IsNFSv4Enabled: true}, nil)
 				clientMock.On("GetStorageISCSITargetAddresses", mock.Anything).Return([]gopowerstore.IPPoolAddress{}, nil)
-				nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
+				_, _ = nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
 					VolumeId:          validNfsVolumeID,
 					PublishContext:    publishContext,
 					StagingTargetPath: nodeStagePrivateDir,
@@ -1612,10 +1553,10 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					defaultNodeID = nodeSvc.nodeID
 					arrays := getTestArrays()
 					arrays[firstValidIP].HostConnectivity = &array.HostConnectivity{
-						Local: k8score.NodeSelector{
-							NodeSelectorTerms: []k8score.NodeSelectorTerm{
+						Local: corev1.NodeSelector{
+							NodeSelectorTerms: []corev1.NodeSelectorTerm{
 								{
-									MatchExpressions: []k8score.NodeSelectorRequirement{
+									MatchExpressions: []corev1.NodeSelectorRequirement{
 										{
 											Key:      zoneLabelKey,
 											Operator: "In",
@@ -1627,10 +1568,10 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 						},
 					}
 					arrays[secondValidIP].HostConnectivity = &array.HostConnectivity{
-						Local: k8score.NodeSelector{
-							NodeSelectorTerms: []k8score.NodeSelectorTerm{
+						Local: corev1.NodeSelector{
+							NodeSelectorTerms: []corev1.NodeSelectorTerm{
 								{
-									MatchExpressions: []k8score.NodeSelectorRequirement{
+									MatchExpressions: []corev1.NodeSelectorRequirement{
 										{
 											Key:      zoneLabelKey,
 											Operator: "In",
@@ -3382,7 +3323,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				utilMock.On("FindFSType", mock.Anything, mock.Anything).Return("ext4", nil)
 				fsMock.On("ExecCommandOutput", mock.Anything, mock.Anything, mock.Anything).Return([]byte("version 5.0.0"), nil)
 				utilMock.On("ResizeFS", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
-				os.Setenv("X_CSM_AUTH_ENABLED", "true")
+				_ = os.Setenv("X_CSM_AUTH_ENABLED", "true")
 				res, err := nodeSvc.NodeExpandVolume(context.Background(), getNodeVolumeExpandValidRequest(validBlockVolumeHandle, false))
 				gomega.Ω(err).To(gomega.BeNil())
 				gomega.Ω(res).To(gomega.Equal(&csi.NodeExpandVolumeResponse{}))
@@ -4487,7 +4428,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 					nil,
 				)
 
-				k8sutils.Kubeclient.SetNodeLabel(context.Background(), nodeSvc.opts.KubeNodeName, "max-powerstore-volumes-per-node", "2")
+				_ = k8sutils.Kubeclient.SetNodeLabel(context.Background(), nodeSvc.opts.KubeNodeName, "max-powerstore-volumes-per-node", "2")
 
 				res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
 				gomega.Expect(err).To(gomega.BeNil())
@@ -4591,7 +4532,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				)
 				nodeSvc.SetArrays(getMetroTestArrays())
 
-				k8sutils.Kubeclient.SetNodeLabel(context.Background(), nodeSvc.opts.KubeNodeName, "topology.kubernetes.io/zone", "zone2")
+				_ = k8sutils.Kubeclient.SetNodeLabel(context.Background(), nodeSvc.opts.KubeNodeName, "topology.kubernetes.io/zone", "zone2")
 
 				res, err := nodeSvc.NodeGetInfo(context.Background(), &csi.NodeGetInfoRequest{})
 				gomega.Expect(err).To(gomega.BeNil())
@@ -5252,7 +5193,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 	ginkgo.Describe("Calling NodeGetCapabilities()", func() {
 		ginkgo.It("should return predefined parameters with health monitor", func() {
-			csictx.Setenv(context.Background(), identifiers.EnvIsHealthMonitorEnabled, "true")
+			_ = csictx.Setenv(context.Background(), identifiers.EnvIsHealthMonitorEnabled, "true")
 
 			nodeSvc.nodeID = ""
 
@@ -5292,7 +5233,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				Return(gopowerstore.CreateResponse{ID: validHostID}, nil)
 			setDefaultNodeLabelsMock()
 			nodeSvc.opts.NodeNamePrefix = ""
-			nodeSvc.Init()
+			_ = nodeSvc.Init()
 
 			res, err := nodeSvc.NodeGetCapabilities(context.Background(), &csi.NodeGetCapabilitiesRequest{})
 			gomega.Ω(err).To(gomega.BeNil())
@@ -5991,15 +5932,15 @@ func TestGetNodeOptions(t *testing.T) {
 
 	t.Run("success test with valid maxVolumesPerNode", func(_ *testing.T) {
 		ctx := context.Background()
-		csictx.Setenv(ctx, identifiers.EnvNodeIDFilePath, "")
-		csictx.Setenv(ctx, identifiers.EnvNodeNamePrefix, "")
-		csictx.Setenv(ctx, identifiers.EnvKubeNodeName, "")
-		csictx.Setenv(ctx, identifiers.EnvNodeChrootPath, "")
-		csictx.Setenv(ctx, identifiers.EnvTmpDir, "")
-		csictx.Setenv(ctx, identifiers.EnvFCPortsFilterFilePath, "")
-		csictx.Setenv(ctx, identifiers.EnvEnableCHAP, "")
-		csictx.Setenv(ctx, identifiers.EnvMaxVolumesPerNode, "42") // ✅ valid value
-		csictx.Setenv(ctx, identifiers.EnvKubeConfigPath, "myConfigPath")
+		_ = csictx.Setenv(ctx, identifiers.EnvNodeIDFilePath, "")
+		_ = csictx.Setenv(ctx, identifiers.EnvNodeNamePrefix, "")
+		_ = csictx.Setenv(ctx, identifiers.EnvKubeNodeName, "")
+		_ = csictx.Setenv(ctx, identifiers.EnvNodeChrootPath, "")
+		_ = csictx.Setenv(ctx, identifiers.EnvTmpDir, "")
+		_ = csictx.Setenv(ctx, identifiers.EnvFCPortsFilterFilePath, "")
+		_ = csictx.Setenv(ctx, identifiers.EnvEnableCHAP, "")
+		_ = csictx.Setenv(ctx, identifiers.EnvMaxVolumesPerNode, "42") // ✅ valid value
+		_ = csictx.Setenv(ctx, identifiers.EnvKubeConfigPath, "myConfigPath")
 
 		opts := getNodeOptions()
 		if opts.MaxVolumesPerNode != 42 {
@@ -6009,7 +5950,7 @@ func TestGetNodeOptions(t *testing.T) {
 
 	t.Run("fallback test with invalid maxVolumesPerNode", func(_ *testing.T) {
 		ctx := context.Background()
-		csictx.Setenv(ctx, identifiers.EnvMaxVolumesPerNode, "invalid") // ❌ invalid value
+		_ = csictx.Setenv(ctx, identifiers.EnvMaxVolumesPerNode, "invalid") // ❌ invalid value
 
 		opts := getNodeOptions()
 		if opts.MaxVolumesPerNode != 0 {
@@ -7319,13 +7260,13 @@ func TestService_createHost(t *testing.T) {
 							Insecure:      true,
 							BlockProtocol: "auto",
 							HostConnectivity: &array.HostConnectivity{
-								Local: k8score.NodeSelector{
-									NodeSelectorTerms: []k8score.NodeSelectorTerm{
+								Local: corev1.NodeSelector{
+									NodeSelectorTerms: []corev1.NodeSelectorTerm{
 										{
-											MatchExpressions: []k8score.NodeSelectorRequirement{
+											MatchExpressions: []corev1.NodeSelectorRequirement{
 												{
 													Key:      "topology.kubernetes.io/zone",
-													Operator: k8score.NodeSelectorOpIn,
+													Operator: corev1.NodeSelectorOpIn,
 													Values:   []string{"zone1"},
 												},
 											},
@@ -7380,13 +7321,13 @@ func TestService_createHost(t *testing.T) {
 							BlockProtocol: "auto",
 							HostConnectivity: &array.HostConnectivity{
 								Metro: array.MetroConnectivityOptions{
-									ColocatedLocal: k8score.NodeSelector{
-										NodeSelectorTerms: []k8score.NodeSelectorTerm{
+									ColocatedLocal: corev1.NodeSelector{
+										NodeSelectorTerms: []corev1.NodeSelectorTerm{
 											{
-												MatchExpressions: []k8score.NodeSelectorRequirement{
+												MatchExpressions: []corev1.NodeSelectorRequirement{
 													{
 														Key:      "topology.kubernetes.io/zone",
-														Operator: k8score.NodeSelectorOpIn,
+														Operator: corev1.NodeSelectorOpIn,
 														Values:   []string{"zone1"},
 													},
 												},
@@ -7407,13 +7348,13 @@ func TestService_createHost(t *testing.T) {
 							BlockProtocol: "auto",
 							HostConnectivity: &array.HostConnectivity{
 								Metro: array.MetroConnectivityOptions{
-									ColocatedRemote: k8score.NodeSelector{
-										NodeSelectorTerms: []k8score.NodeSelectorTerm{
+									ColocatedRemote: corev1.NodeSelector{
+										NodeSelectorTerms: []corev1.NodeSelectorTerm{
 											{
-												MatchExpressions: []k8score.NodeSelectorRequirement{
+												MatchExpressions: []corev1.NodeSelectorRequirement{
 													{
 														Key:      "topology.kubernetes.io/zone",
-														Operator: k8score.NodeSelectorOpIn,
+														Operator: corev1.NodeSelectorOpIn,
 														Values:   []string{"zone1"},
 													},
 												},
@@ -7469,13 +7410,13 @@ func TestService_createHost(t *testing.T) {
 							BlockProtocol: "auto",
 							HostConnectivity: &array.HostConnectivity{
 								Metro: array.MetroConnectivityOptions{
-									ColocatedBoth: k8score.NodeSelector{
-										NodeSelectorTerms: []k8score.NodeSelectorTerm{
+									ColocatedBoth: corev1.NodeSelector{
+										NodeSelectorTerms: []corev1.NodeSelectorTerm{
 											{
-												MatchExpressions: []k8score.NodeSelectorRequirement{
+												MatchExpressions: []corev1.NodeSelectorRequirement{
 													{
 														Key:      "topology.kubernetes.io/zone",
-														Operator: k8score.NodeSelectorOpIn,
+														Operator: corev1.NodeSelectorOpIn,
 														Values:   []string{"zone1"},
 													},
 												},
@@ -7576,13 +7517,13 @@ func TestService_createHost(t *testing.T) {
 							Insecure:      true,
 							BlockProtocol: "auto",
 							HostConnectivity: &array.HostConnectivity{
-								Local: k8score.NodeSelector{
-									NodeSelectorTerms: []k8score.NodeSelectorTerm{
+								Local: corev1.NodeSelector{
+									NodeSelectorTerms: []corev1.NodeSelectorTerm{
 										{
-											MatchExpressions: []k8score.NodeSelectorRequirement{
+											MatchExpressions: []corev1.NodeSelectorRequirement{
 												{
 													Key:      "topology.kubernetes.io/zone",
-													Operator: k8score.NodeSelectorOpIn,
+													Operator: corev1.NodeSelectorOpIn,
 													Values:   []string{"nomatch"},
 												},
 											},
@@ -7633,26 +7574,26 @@ func TestService_createHost(t *testing.T) {
 							BlockProtocol: "auto",
 							HostConnectivity: &array.HostConnectivity{
 								Metro: array.MetroConnectivityOptions{
-									ColocatedLocal: k8score.NodeSelector{
-										NodeSelectorTerms: []k8score.NodeSelectorTerm{
+									ColocatedLocal: corev1.NodeSelector{
+										NodeSelectorTerms: []corev1.NodeSelectorTerm{
 											{
-												MatchExpressions: []k8score.NodeSelectorRequirement{
+												MatchExpressions: []corev1.NodeSelectorRequirement{
 													{
 														Key:      "topology.kubernetes.io/zone",
-														Operator: k8score.NodeSelectorOpIn,
+														Operator: corev1.NodeSelectorOpIn,
 														Values:   []string{"zone1"},
 													},
 												},
 											},
 										},
 									},
-									ColocatedBoth: k8score.NodeSelector{
-										NodeSelectorTerms: []k8score.NodeSelectorTerm{
+									ColocatedBoth: corev1.NodeSelector{
+										NodeSelectorTerms: []corev1.NodeSelectorTerm{
 											{
-												MatchExpressions: []k8score.NodeSelectorRequirement{
+												MatchExpressions: []corev1.NodeSelectorRequirement{
 													{
 														Key:      "topology.kubernetes.io/zone",
-														Operator: k8score.NodeSelectorOpIn,
+														Operator: corev1.NodeSelectorOpIn,
 														Values:   []string{"zone1"},
 													},
 												},
@@ -7704,13 +7645,13 @@ func TestService_createHost(t *testing.T) {
 							BlockProtocol: "auto",
 							MetroTopology: "Uniform",
 							HostConnectivity: &array.HostConnectivity{
-								Local: k8score.NodeSelector{
-									NodeSelectorTerms: []k8score.NodeSelectorTerm{
+								Local: corev1.NodeSelector{
+									NodeSelectorTerms: []corev1.NodeSelectorTerm{
 										{
-											MatchExpressions: []k8score.NodeSelectorRequirement{
+											MatchExpressions: []corev1.NodeSelectorRequirement{
 												{
 													Key:      "topology.kubernetes.io/zone",
-													Operator: k8score.NodeSelectorOpIn,
+													Operator: corev1.NodeSelectorOpIn,
 													Values:   []string{"nomatch"},
 												},
 											},
@@ -8219,13 +8160,13 @@ func TestService_createHost(t *testing.T) {
 							Insecure:      true,
 							BlockProtocol: "auto",
 							HostConnectivity: &array.HostConnectivity{
-								Local: k8score.NodeSelector{
-									NodeSelectorTerms: []k8score.NodeSelectorTerm{
+								Local: corev1.NodeSelector{
+									NodeSelectorTerms: []corev1.NodeSelectorTerm{
 										{
-											MatchExpressions: []k8score.NodeSelectorRequirement{
+											MatchExpressions: []corev1.NodeSelectorRequirement{
 												{
 													Key:      "topology.kubernetes.io/zone",
-													Operator: k8score.NodeSelectorOpIn,
+													Operator: corev1.NodeSelectorOpIn,
 													Values:   []string{"zone1"},
 												},
 											},
@@ -8777,19 +8718,19 @@ func TestService_updateHost(t *testing.T) {
 func TestMetroMatchNodeSelectorTerms(t *testing.T) {
 	tests := []struct {
 		name       string
-		terms      []k8score.NodeSelectorTerm
+		terms      []corev1.NodeSelectorTerm
 		nodeLabels map[string]string
 		wantMatch  bool
 		wantLabels map[string]string
 	}{
 		{
 			name: "Match with NodeSelectorOpIn",
-			terms: []k8score.NodeSelectorTerm{
+			terms: []corev1.NodeSelectorTerm{
 				{
-					MatchExpressions: []k8score.NodeSelectorRequirement{
+					MatchExpressions: []corev1.NodeSelectorRequirement{
 						{
 							Key:      "zone",
-							Operator: k8score.NodeSelectorOpIn,
+							Operator: corev1.NodeSelectorOpIn,
 							Values:   []string{"us-east-1a", "us-east-1b"},
 						},
 					},
@@ -8801,12 +8742,12 @@ func TestMetroMatchNodeSelectorTerms(t *testing.T) {
 		},
 		{
 			name: "Mismatch with NodeSelectorOpIn",
-			terms: []k8score.NodeSelectorTerm{
+			terms: []corev1.NodeSelectorTerm{
 				{
-					MatchExpressions: []k8score.NodeSelectorRequirement{
+					MatchExpressions: []corev1.NodeSelectorRequirement{
 						{
 							Key:      "zone",
-							Operator: k8score.NodeSelectorOpIn,
+							Operator: corev1.NodeSelectorOpIn,
 							Values:   []string{"us-west-1a"},
 						},
 					},
@@ -8818,12 +8759,12 @@ func TestMetroMatchNodeSelectorTerms(t *testing.T) {
 		},
 		{
 			name: "Match with NodeSelectorOpExists",
-			terms: []k8score.NodeSelectorTerm{
+			terms: []corev1.NodeSelectorTerm{
 				{
-					MatchExpressions: []k8score.NodeSelectorRequirement{
+					MatchExpressions: []corev1.NodeSelectorRequirement{
 						{
 							Key:      "diskType",
-							Operator: k8score.NodeSelectorOpExists,
+							Operator: corev1.NodeSelectorOpExists,
 						},
 					},
 				},
@@ -8834,12 +8775,12 @@ func TestMetroMatchNodeSelectorTerms(t *testing.T) {
 		},
 		{
 			name: "Mismatch with NodeSelectorOpDoesNotExist",
-			terms: []k8score.NodeSelectorTerm{
+			terms: []corev1.NodeSelectorTerm{
 				{
-					MatchExpressions: []k8score.NodeSelectorRequirement{
+					MatchExpressions: []corev1.NodeSelectorRequirement{
 						{
 							Key:      "gpu",
-							Operator: k8score.NodeSelectorOpDoesNotExist,
+							Operator: corev1.NodeSelectorOpDoesNotExist,
 						},
 					},
 				},
@@ -8850,12 +8791,12 @@ func TestMetroMatchNodeSelectorTerms(t *testing.T) {
 		},
 		{
 			name: "Match with NodeSelectorOpNotIn",
-			terms: []k8score.NodeSelectorTerm{
+			terms: []corev1.NodeSelectorTerm{
 				{
-					MatchExpressions: []k8score.NodeSelectorRequirement{
+					MatchExpressions: []corev1.NodeSelectorRequirement{
 						{
 							Key:      "env",
-							Operator: k8score.NodeSelectorOpNotIn,
+							Operator: corev1.NodeSelectorOpNotIn,
 							Values:   []string{"prod"},
 						},
 					},
@@ -8910,6 +8851,95 @@ func TestService_setupHost(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestService_setupHostWithRetry(t *testing.T) {
+	// Test that setupHost succeeds when host already exists on the array with matching nodeID
+	mockClient := new(gopowerstoremock.Client)
+
+	iqn := "iqn.1994-05.com.redhat:test"
+	hostID := "host-123"
+	// nodeID matches host Name/ID so modifyHostName is not triggered
+	mockClient.On("GetHosts", mock.Anything).Return([]gopowerstore.Host{
+		{
+			ID:   hostID,
+			Name: "test-node",
+			Initiators: []gopowerstore.InitiatorInstance{
+				{
+					PortName: iqn,
+					PortType: gopowerstore.InitiatorProtocolTypeEnumISCSI,
+				},
+			},
+		},
+	}, nil)
+
+	var s Service
+	s.opts = Opts{}
+	s.nodeID = hostID // matches existingHost.ID so modifyHostName is skipped
+	s.useNVME = map[string]bool{}
+
+	err := s.setupHost([]string{iqn}, mockClient, "10.0.0.1", "array-1")
+	if err != nil {
+		t.Errorf("setupHost() failed: %v", err)
+	}
+
+	mockClient.AssertExpectations(t)
+}
+
+func TestService_setupHostConnectionRefused(t *testing.T) {
+	// Test that setupHost returns error after exhausting retries
+	mockClient := new(gopowerstoremock.Client)
+
+	// Fail all retries with error
+	mockClient.On("GetHosts", mock.Anything).Return([]gopowerstore.Host{}, fmt.Errorf("internal server error"))
+
+	var s Service
+	s.opts = Opts{}
+	s.nodeID = "test-node"
+	s.useNVME = map[string]bool{}
+
+	err := s.setupHost([]string{"iqn.test"}, mockClient, "10.0.0.1", "array-1")
+	if err == nil {
+		t.Error("setupHost() should have failed after retries but succeeded")
+	}
+
+	mockClient.AssertExpectations(t)
+}
+
+func TestService_setupHostRetryOnFailure(t *testing.T) {
+	// Test that setupHost retries when GetHosts fails, then succeeds
+	mockClient := new(gopowerstoremock.Client)
+
+	iqn := "iqn.1994-05.com.redhat:test"
+	hostID := "host-123"
+
+	// First call fails with error
+	mockClient.On("GetHosts", mock.Anything).Return([]gopowerstore.Host{}, fmt.Errorf("dial tcp 127.0.0.1:9400: connect: connection refused")).Once()
+	// Second call succeeds
+	mockClient.On("GetHosts", mock.Anything).Return([]gopowerstore.Host{
+		{
+			ID:   hostID,
+			Name: "test-node",
+			Initiators: []gopowerstore.InitiatorInstance{
+				{
+					PortName: iqn,
+					PortType: gopowerstore.InitiatorProtocolTypeEnumISCSI,
+				},
+			},
+		},
+	}, nil)
+
+	var s Service
+	s.opts = Opts{}
+	s.nodeID = hostID // matches existingHost.ID so modifyHostName is skipped
+	s.useNVME = map[string]bool{}
+
+	err := s.setupHost([]string{iqn}, mockClient, "10.0.0.1", "array-1")
+	if err != nil {
+		t.Errorf("setupHost() should have retried and succeeded but failed: %v", err)
+	}
+
+	mockClient.AssertExpectations(t)
 }
 
 func TestIsHostAlreadyRegistered(t *testing.T) {
@@ -8985,7 +9015,7 @@ func TestRemoveRemnantMounts(t *testing.T) {
 		mockFs := new(mocks.FsInterface)
 		mockFs.On("ReadFile", mock.Anything).Return(nil, fmt.Errorf("error"))
 
-		_, err := removeRemnantMounts(context.Background(), "/var/lib/test", mockFs, csmlog.Fields{})
+		_, err := removeRemnantMounts(context.Background(), "/var/lib/test", mockFs, log.Fields{})
 		if err == nil {
 			t.Errorf("expected an error, got nil")
 		}
@@ -8999,7 +9029,7 @@ func TestRemoveRemnantMounts(t *testing.T) {
 				Path: "/var/lib/other",
 			},
 		}, nil)
-		_, err := removeRemnantMounts(context.Background(), "/var/lib/test", mockFs, csmlog.Fields{})
+		_, err := removeRemnantMounts(context.Background(), "/var/lib/test", mockFs, log.Fields{})
 		if err == nil {
 			t.Errorf("expected an error, got nil")
 		}
@@ -9358,7 +9388,7 @@ func TestReadFCPortsFilterFile(t *testing.T) {
 	// Test with read error
 	fsMock.ExpectedCalls = nil
 	fsMock.On("ReadFile", mock.Anything).Return([]byte{}, errors.New("read error"))
-	result, err = nodeSvc.readFCPortsFilterFile()
+	_, err = nodeSvc.readFCPortsFilterFile()
 	if err == nil {
 		t.Errorf("readFCPortsFilterFile() should return error on read error")
 	}

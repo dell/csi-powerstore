@@ -29,6 +29,7 @@ import (
 
 	"github.com/dell/csi-powerstore/v2/pkg/array"
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers"
+	log "github.com/dell/csmlog"
 	"github.com/dell/goiscsi"
 	"github.com/dell/gonvme"
 	"github.com/dell/gopowerstore"
@@ -43,9 +44,8 @@ var probeStatus *sync.Map
 
 // startAPIService reads nodes to array status periodically
 func (s *Service) startAPIService(ctx context.Context) {
-	log := log.WithContext(ctx)
 	if !s.isPodmonEnabled {
-		log.Info("podmon is not enabled")
+		log.WithContext(ctx).Info("podmon is not enabled")
 		return
 	}
 	pollingFrequencyInSeconds = identifiers.SetPollingFrequency(ctx)
@@ -55,8 +55,7 @@ func (s *Service) startAPIService(ctx context.Context) {
 
 // apiRouter serves http requests
 func (s *Service) apiRouter(ctx context.Context) {
-	log := log.WithContext(ctx)
-	log.Infof("starting http server on port %s", identifiers.APIPort)
+	log.WithContext(ctx).Infof("starting http server on port %s", identifiers.APIPort)
 	// create a new mux router
 	router := mux.NewRouter()
 	// route to connectivity status
@@ -72,7 +71,7 @@ func (s *Service) apiRouter(ctx context.Context) {
 	}
 	err := server.ListenAndServe()
 	if err != nil {
-		log.Errorf("unable to start http server to serve status requests due to %s", err)
+		log.WithContext(ctx).Errorf("unable to start http server to serve status requests due to %s", err)
 	}
 }
 
@@ -136,7 +135,7 @@ func getArrayConnectivityStatus(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 		w.Header().Set("Content-Type", "application/json")
 		// update response writer
-		fmt.Fprintf(w, "array %s not found \n", arrayID)
+		_, _ = fmt.Fprintf(w, "array %s not found \n", arrayID)
 		return
 	}
 	// convert status struct to JSON
@@ -157,8 +156,7 @@ func getArrayConnectivityStatus(w http.ResponseWriter, r *http.Request) {
 
 // startNodeToArrayConnectivityCheck starts connectivityTest as one goroutine for each array
 func (s *Service) startNodeToArrayConnectivityCheck(ctx context.Context) {
-	log := log.WithContext(ctx)
-	log.Debug("startNodeToArrayConnectivityCheck called")
+	log.WithContext(ctx).Debug("startNodeToArrayConnectivityCheck called")
 	probeStatus = new(sync.Map)
 	// in case if we want to store the status of default array, uncomment below line
 	// powerStoreArray := s.DefaultArray()
@@ -168,16 +166,15 @@ func (s *Service) startNodeToArrayConnectivityCheck(ctx context.Context) {
 		// should we really store the status of all array instead of default one, currently podman query only default array?
 		go s.testConnectivityAndUpdateStatus(ctx, array, identifiers.PodmonArrayConnectivityTimeout)
 	}
-	log.Infof("startNodeToArrayConnectivityCheck is running probes at pollingFrequency %d ", pollingFrequencyInSeconds/2)
+	log.WithContext(ctx).Infof("startNodeToArrayConnectivityCheck is running probes at pollingFrequency %d ", pollingFrequencyInSeconds/2)
 }
 
 // testConnectivityAndUpdateStatus runs probe to test connectivity from node to array
 // updates probeStatus map[array]ArrayConnectivityStatus
 func (s *Service) testConnectivityAndUpdateStatus(ctx context.Context, array *array.PowerStoreArray, timeout time.Duration) {
-	log := log.WithContext(ctx)
 	defer func() {
 		if err := recover(); err != nil {
-			log.Errorf("panic occurred in testConnectivityAndUpdateStatus: %s for array having %s", err, array.GlobalID)
+			log.WithContext(ctx).Errorf("panic occurred in testConnectivityAndUpdateStatus: %s for array having %s", err, array.GlobalID)
 		}
 		// if panic occurs restart new goroutine
 		go s.testConnectivityAndUpdateStatus(ctx, array, timeout)
@@ -186,38 +183,38 @@ func (s *Service) testConnectivityAndUpdateStatus(ctx context.Context, array *ar
 	for {
 		select {
 		case <-ctx.Done():
-			log.Infof("Context cancelled, stopping connectivity check for array %s", array.GlobalID)
+			log.WithContext(ctx).Infof("Context cancelled, stopping connectivity check for array %s", array.GlobalID)
 			return
 		default:
 		}
 		// add timeout to context
 		timeOutCtx, cancel := context.WithTimeout(ctx, timeout)
-		log.Debugf("Running probe for array %s at time %v \n", array.GlobalID, time.Now())
+		log.WithContext(ctx).Debugf("Running probe for array %s at time %v \n", array.GlobalID, time.Now())
 		if existingStatus, ok := probeStatus.Load(array.GlobalID); !ok {
-			log.Debugf("%s not in probeStatus ", array.GlobalID)
+			log.WithContext(ctx).Debugf("%s not in probeStatus ", array.GlobalID)
 		} else {
 			if status, ok = existingStatus.(identifiers.ArrayConnectivityStatus); !ok {
-				log.Errorf("failed to extract ArrayConnectivityStatus for array '%s'", array.GlobalID)
+				log.WithContext(ctx).Errorf("failed to extract ArrayConnectivityStatus for array '%s'", array.GlobalID)
 			}
 		}
 		// for the first time status will not be there.
-		log.Debugf("array %s , status is %+v", array.GlobalID, status)
+		log.WithContext(ctx).Debugf("array %s , status is %+v", array.GlobalID, status)
 		// run nodeProbe to test connectivity
 		err := s.nodeProbe(timeOutCtx, array)
 		if err == nil {
-			log.Debugf("Probe successful for %s", array.GlobalID)
+			log.WithContext(ctx).Debugf("Probe successful for %s", array.GlobalID)
 			status.LastSuccess = time.Now().Unix()
 		} else {
-			log.Debugf("Probe failed for array '%s' error:'%s'", array.GlobalID, err)
+			log.WithContext(ctx).Debugf("Probe failed for array '%s' error:'%s'", array.GlobalID, err)
 		}
 		status.LastAttempt = time.Now().Unix()
-		log.Debugf("array %s , storing status %+v", array.GlobalID, status)
+		log.WithContext(ctx).Debugf("array %s , storing status %+v", array.GlobalID, status)
 		probeStatus.Store(array.GlobalID, status)
 		cancel()
 		// sleep for half the pollingFrequency and run check again
 		select {
 		case <-ctx.Done():
-			log.Infof("Context cancelled, stopping connectivity check for array %s", array.GlobalID)
+			log.WithContext(ctx).Infof("Context cancelled, stopping connectivity check for array %s", array.GlobalID)
 			return
 		case <-time.After(time.Second * time.Duration(pollingFrequencyInSeconds/2)):
 		}
@@ -226,29 +223,39 @@ func (s *Service) testConnectivityAndUpdateStatus(ctx context.Context, array *ar
 
 // nodeProbe function used to store the status of array
 func (s *Service) nodeProbe(ctx context.Context, array *array.PowerStoreArray) error {
-	log := log.WithContext(ctx)
 	// try to get the host
 	host, err := array.Client.GetHostByName(context.Background(), s.nodeID)
 	// possibly NFS could be there.
 	if err != nil {
 		if apiError, ok := err.(gopowerstore.APIError); ok && apiError.NotFound() && s.useNFS {
-			log.Debugf("Error %s, while probing %s but since it's NFS this is expected", err.Error(), array.GlobalID)
+			log.WithContext(ctx).WithFields(log.Fields{
+				log.FieldComponent: "node",
+				log.FieldOperation: "nodeProbe",
+				log.FieldProtocol:  "NFS",
+				log.FieldArrayID:   array.GlobalID,
+				log.FieldError:     err.Error(),
+			}).Debug("host not found but NFS is enabled, this is expected")
 			return nil
 		}
 		// nodeId is not right or it's not NFS and still host is not preset
-		log.Infof("Error %s, while probing %s", err.Error(), array.GlobalID)
+		log.WithContext(ctx).Infof("Error %s, while probing %s", err.Error(), array.GlobalID)
 		return err
 	}
 
-	log.Debugf("Successfully got Host on %s", array.GlobalID)
+	log.WithContext(ctx).Debugf("Successfully got Host on %s", array.GlobalID)
 	s.populateTargetsInCache(array)
 	// check if nvme sessions are active
 	if s.useNVME[array.GlobalID] {
-		log.Debugf("Checking if nvme sessions are active on node or not")
+		log.WithContext(ctx).WithFields(log.Fields{
+			log.FieldComponent: "node",
+			log.FieldOperation: "nodeProbe",
+			log.FieldProtocol:  "NVMe",
+			log.FieldArrayID:   array.GlobalID,
+		}).Debug("checking if NVMe sessions are active on node")
 		sessions, _ := s.nvmeLib.GetSessions()
 		for _, target := range s.nvmeTargets[array.GlobalID] {
 			for _, session := range sessions {
-				log.Debugf("matching %v with %v", target, session)
+				log.WithContext(ctx).Debugf("matching %v with %v", target, session)
 				if session.Target == target && session.NVMESessionState == gonvme.NVMESessionStateLive {
 					if s.useNFS {
 						s.useNFS = false
@@ -258,12 +265,22 @@ func (s *Service) nodeProbe(ctx context.Context, array *array.PowerStoreArray) e
 			}
 		}
 		if s.useNFS {
-			log.Infof("Host Entry found but failed to login to nvme target, seems to be this worker has only NFS")
+			log.WithContext(ctx).WithFields(log.Fields{
+				log.FieldComponent: "node",
+				log.FieldOperation: "nodeProbe",
+				log.FieldProtocol:  "NFS",
+				log.FieldArrayID:   array.GlobalID,
+			}).Info("host found but NVMe login failed, worker has only NFS")
 			return nil
 		}
 		return fmt.Errorf("no active nvme sessions")
 	} else if s.useFC[array.GlobalID] {
-		log.Debugf("Checking if FC sessions are active on node or not")
+		log.WithContext(ctx).WithFields(log.Fields{
+			log.FieldComponent: "node",
+			log.FieldOperation: "nodeProbe",
+			log.FieldProtocol:  "FC",
+			log.FieldArrayID:   array.GlobalID,
+		}).Debug("checking if FC sessions are active on node")
 		for _, initiator := range host.Initiators {
 			if len(initiator.ActiveSessions) > 0 {
 				return nil
@@ -273,11 +290,16 @@ func (s *Service) nodeProbe(ctx context.Context, array *array.PowerStoreArray) e
 	}
 	// check if iscsi sessions are active
 	// if !s.useNVME && !s.useFC {
-	log.Debugf("Checking if iscsi sessions are active on node or not")
+	log.WithContext(ctx).WithFields(log.Fields{
+		log.FieldComponent: "node",
+		log.FieldOperation: "nodeProbe",
+		log.FieldProtocol:  "iSCSI",
+		log.FieldArrayID:   array.GlobalID,
+	}).Debug("checking if iSCSI sessions are active on node")
 	sessions, _ := s.iscsiLib.GetSessions()
 	for _, target := range s.iscsiTargets[array.GlobalID] {
 		for _, session := range sessions {
-			log.Debugf("matching %v with %v", target, session)
+			log.WithContext(ctx).Debugf("matching %v with %v", target, session)
 			if session.Target == target && session.ISCSISessionState == goiscsi.ISCSISessionStateLOGGEDIN {
 				if s.useNFS {
 					s.useNFS = false
@@ -287,7 +309,12 @@ func (s *Service) nodeProbe(ctx context.Context, array *array.PowerStoreArray) e
 		}
 	}
 	if s.useNFS {
-		log.Infof("Host Entry found but failed to login to iscsi target, seems to be this worker has only NFS")
+		log.WithContext(ctx).WithFields(log.Fields{
+			log.FieldComponent: "node",
+			log.FieldOperation: "nodeProbe",
+			log.FieldProtocol:  "NFS",
+			log.FieldArrayID:   array.GlobalID,
+		}).Info("host found but iSCSI login failed, worker has only NFS")
 		return nil
 	}
 	return fmt.Errorf("no active iscsi sessions")
@@ -311,7 +338,11 @@ func (s *Service) populateTargetsInCache(array *array.PowerStoreArray) {
 			for _, info := range nvmefcInfo {
 				NVMeFCTargets, err := s.nvmeLib.DiscoverNVMeFCTargets(info.Portal, false)
 				if err != nil {
-					log.Errorf("couldn't discover NVMeFC targets")
+					log.WithFields(log.Fields{
+						log.FieldComponent: "node",
+						log.FieldOperation: "populateTargetsInCache",
+						log.FieldProtocol:  "NVMeFC",
+					}).Error("couldn't discover NVMeFC targets")
 					continue
 				}
 				for _, target := range NVMeFCTargets {
@@ -337,10 +368,22 @@ func (s *Service) populateTargetsInCache(array *array.PowerStoreArray) {
 				}
 
 				nvmeIP := strings.Split(address.Portal, ":")[0]
-				log.Infof("Trying to discover NVMe targets from portal %s on network %s", nvmeIP, address.NetworkID)
+				log.WithFields(log.Fields{
+					log.FieldComponent: "node",
+					log.FieldOperation: "populateTargetsInCache",
+					log.FieldProtocol:  "NVMeTCP",
+					"portal":           nvmeIP,
+					"network_id":       address.NetworkID,
+				}).Info("discovering NVMeTCP targets from portal")
 				nvmeTargets, err := s.nvmeLib.DiscoverNVMeTCPTargets(nvmeIP, false)
 				if err != nil {
-					log.Errorf("discovering portal: %s: %v", nvmeIP, err)
+					log.WithFields(log.Fields{
+						log.FieldComponent: "node",
+						log.FieldOperation: "populateTargetsInCache",
+						log.FieldProtocol:  "NVMeTCP",
+						"portal":           nvmeIP,
+						log.FieldError:     fmt.Sprintf("%v", err),
+					}).Error("error discovering portal")
 					continue
 				}
 				for _, target := range nvmeTargets {
@@ -378,7 +421,12 @@ func (s *Service) populateTargetsInCache(array *array.PowerStoreArray) {
 				ipAddressList := splitIPAddress(address.Portal)
 				ipAddress = ipAddressList[0]
 				// doesn't matter how many portals are present, discovering from any one will list out all targets
-				log.Infof("Trying to discover iSCSI target from portal %s ", ipAddress)
+				log.WithFields(log.Fields{
+					log.FieldComponent: "node",
+					log.FieldOperation: "populateTargetsInCache",
+					log.FieldProtocol:  "iSCSI",
+					"portal":           ipAddress,
+				}).Info("discovering iSCSI target from portal")
 				ipInterface, err := s.iscsiLib.GetInterfaceForTargetIP(ipAddress)
 				if err != nil {
 					log.Errorf("couldn't get interface: %s", err.Error())

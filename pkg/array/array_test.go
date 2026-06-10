@@ -377,7 +377,7 @@ func (s *LegacyParseVolumeTestSuite) TestVolumeUnknownError() {
 	s.mockAPI.GetFS.Return(gopowerstore.FileSystem{}, error(s.mockAPI.APIError))
 
 	_, err := array.ParseVolumeID(context.Background(), validFileSystemUUID, s.psArray, nil)
-	assert.ErrorContains(s.T(), err, s.mockAPI.APIError.ErrorMsg.Message)
+	assert.ErrorContains(s.T(), err, s.mockAPI.APIError.Message)
 }
 
 func (s *LegacyParseVolumeTestSuite) TestIPAsArrayID() {

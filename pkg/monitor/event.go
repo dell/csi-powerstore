@@ -28,7 +28,7 @@ import (
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers"
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers/fs"
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers/k8sutils"
-	"github.com/dell/csmlog"
+	log "github.com/dell/csmlog"
 	"github.com/dell/gopowerstore"
 
 	csictx "github.com/dell/gocsi/context"
@@ -71,9 +71,6 @@ type PersistentVolumeEvent struct {
 
 	Volume corev1.PersistentVolume
 }
-
-// Instantiate csmlog on a package level
-var log = csmlog.GetLogger()
 
 const (
 	timeFormat         = "2006-01-02T15:04:05Z"
@@ -150,7 +147,7 @@ func (s *Service) monitorSince(lastTime time.Time) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	for _, arr := range s.Locker.Arrays() {
+	for _, arr := range s.Arrays() {
 		alerts := []gopowerstore.Alert{}
 
 		log.Debugf("[Monitor] Getting latest alerts for array %q", arr.GlobalID)
@@ -228,7 +225,11 @@ func (s *Service) createVolumeMap(ctx context.Context) map[string]PersistentVolu
 		return nil
 	}
 
-	log.Debugf("[Monitor] got persistent volumes: %v", volumes.Items)
+	log.WithFields(log.Fields{
+		log.FieldComponent: "monitor",
+		log.FieldOperation: "VolumeDiscovery",
+		"pv_count":         len(volumes.Items),
+	}).Info("enumerated persistent volumes from Kubernetes")
 
 	// Create map to easily navigate through volumes.
 	volumesMap := make(map[string]PersistentVolumeEvent)

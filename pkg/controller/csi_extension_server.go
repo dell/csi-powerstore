@@ -26,6 +26,7 @@ import (
 
 	"github.com/dell/csi-powerstore/v2/pkg/array"
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers"
+	log "github.com/dell/csmlog"
 	podmon "github.com/dell/dell-csi-extensions/podmon"
 	"github.com/dell/gopowerstore"
 	"github.com/go-openapi/strfmt"
@@ -36,8 +37,7 @@ const StateReady = "Ready"
 
 // ValidateVolumeHostConnectivity menthod will be called by podmon sidecars to check host connectivity with array
 func (s *Service) ValidateVolumeHostConnectivity(ctx context.Context, req *podmon.ValidateVolumeHostConnectivityRequest) (*podmon.ValidateVolumeHostConnectivityResponse, error) {
-	log := log.WithContext(ctx)
-	log.Infof("ValidateVolumeHostConnectivity called %+v", req)
+	log.WithContext(ctx).Infof("ValidateVolumeHostConnectivity called %+v", req)
 	rep := &podmon.ValidateVolumeHostConnectivityResponse{
 		Messages: make([]string, 0),
 	}
@@ -66,20 +66,18 @@ func (s *Service) ValidateVolumeHostConnectivity(ctx context.Context, req *podmo
 		}
 	}
 
-	log.Infof("ValidateVolumeHostConnectivity reply %+v", rep)
+	log.WithContext(ctx).Infof("ValidateVolumeHostConnectivity reply %+v", rep)
 	return rep, nil
 }
 
 // validateNodeConnectivity checks if the node is connected to the array
 func (s *Service) validateNodeConnectivity(ctx context.Context, arrayID, nodeID string, volumeIDs []string, rep *podmon.ValidateVolumeHostConnectivityResponse) error {
-	log := log.WithContext(ctx)
-
 	// create the map of all the array with array's GloabalID as key
 	globalIDs := make(map[string]bool)
 	globalID := arrayID
 	if globalID == "" {
 		if len(volumeIDs) == 0 {
-			log.Info("neither globalId nor volumeID is present in request")
+			log.WithContext(ctx).Info("neither globalId nor volumeID is present in request")
 			// need to put all arrays to check not only default array and not matched ID will be filtered later.
 			for _, array := range s.Arrays() {
 				globalIDs[array.GlobalID] = true
@@ -89,7 +87,7 @@ func (s *Service) validateNodeConnectivity(ctx context.Context, arrayID, nodeID 
 		for _, volID := range volumeIDs {
 			volumeHandle, err := array.ParseVolumeID(ctx, volID, s.DefaultArray(), nil)
 			if err != nil || (volumeHandle.LocalArrayGlobalID == "" && volumeHandle.RemoteArrayGlobalID == "") {
-				log.Errorf("unable to retrieve array's globalID after parsing volumeID")
+				log.WithContext(ctx).Errorf("unable to retrieve array's globalID after parsing volumeID")
 				globalIDs[s.DefaultArray().GlobalID] = true
 			} else {
 				if volumeHandle.LocalArrayGlobalID != "" {
@@ -113,16 +111,16 @@ func (s *Service) validateNodeConnectivity(ctx context.Context, arrayID, nodeID 
 		// Check if array is non-uniform and matches the node label
 		arr, err := s.GetOneArray(globalID)
 		if err != nil {
-			log.Errorf("failed to get array %s: %s", globalID, err.Error())
+			log.WithContext(ctx).Errorf("failed to get array %s: %s", globalID, err.Error())
 			return err
 		}
 		if arr == nil {
-			log.Errorf("failed to find secret entry for array %s", globalID)
+			log.WithContext(ctx).Errorf("failed to find secret entry for array %s", globalID)
 			return fmt.Errorf("failed to find secret entry for array %s", globalID)
 		}
 
 		if !arr.HasHostEntry(ctx, nodeID) {
-			log.Warnf("Not a match for node %s on array %s, skipping connectivity check", nodeID, globalID)
+			log.WithContext(ctx).Warnf("Not a match for node %s on array %s, skipping connectivity check", nodeID, globalID)
 			continue
 		}
 
@@ -133,11 +131,11 @@ func (s *Service) validateNodeConnectivity(ctx context.Context, arrayID, nodeID 
 		if err != nil {
 			// consider timeout and host unreachable as not connected
 			if err == context.DeadlineExceeded || errors.Is(err, syscall.EHOSTUNREACH) {
-				log.Warnf("ValidateVolumeHostConnectivity: check failed for node %s and array %s: %v", nodeID, globalID, err)
+				log.WithContext(ctx).Warnf("ValidateVolumeHostConnectivity: check failed for node %s and array %s: %v", nodeID, globalID, err)
 				rep.Connected = false
 				continue
 			}
-			log.Errorf("ValidateVolumeHostConnectivity: check failed for node %s and array %s: %v", nodeID, globalID, err)
+			log.WithContext(ctx).Errorf("ValidateVolumeHostConnectivity: check failed for node %s and array %s: %v", nodeID, globalID, err)
 			return err
 		}
 	}
@@ -158,20 +156,18 @@ func (s *Service) validateNodeConnectivity(ctx context.Context, arrayID, nodeID 
 
 // validateVolumeIOProgress checks if IO is in-progress for the volumes
 func (s *Service) validateVolumeIOProgress(ctx context.Context, volumeIDs []string, rep *podmon.ValidateVolumeHostConnectivityResponse) error {
-	log := log.WithContext(ctx)
-
 	// Get array config
 	for _, volID := range volumeIDs {
 		volume, err := array.ParseVolumeID(ctx, volID, s.DefaultArray(), nil)
 		if err != nil {
-			log.Errorf("failed to parse volumeID, %s, for querying IO metrics. err: %s", volID, err.Error())
+			log.WithContext(ctx).Errorf("failed to parse volumeID, %s, for querying IO metrics. err: %s", volID, err.Error())
 			return err
 		}
 		isMetroVol := volume.IsMetro()
 
 		localArray, err := s.GetOneArray(volume.LocalArrayGlobalID)
 		if err != nil || localArray == nil {
-			log.Errorf("failed to get local array configuration for array %s for volume activity validation: %s",
+			log.WithContext(ctx).Errorf("failed to get local array configuration for array %s for volume activity validation: %s",
 				volume.LocalArrayGlobalID, err.Error())
 			return err
 		}
@@ -181,7 +177,7 @@ func (s *Service) validateVolumeIOProgress(ctx context.Context, volumeIDs []stri
 		if isMetroVol {
 			remoteArray, err = s.GetOneArray(volume.RemoteArrayGlobalID)
 			if err != nil {
-				log.Errorf("failed to get remote array configuration for array %s for volume activity validation: %s",
+				log.WithContext(ctx).Errorf("failed to get remote array configuration for array %s for volume activity validation: %s",
 					volume.RemoteArrayGlobalID, err.Error())
 				return err
 			}
@@ -201,7 +197,7 @@ func (s *Service) validateVolumeIOProgress(ctx context.Context, volumeIDs []stri
 			if err != nil {
 				// default to checking both sides if we can't get the metro state
 
-				log.Warnf("failed to determine metro fracture state for volume %s: %s, proceeding to check both sides", volID, err.Error())
+				log.WithContext(ctx).Warnf("failed to determine metro fracture state for volume %s: %s, proceeding to check both sides", volID, err.Error())
 				// check if any IO is inProgress for the current local globalID/array
 				reqChs = append(reqChs, asyncGetIOInProgress(ioCtx, volume.LocalUUID, *localArray, volume.Protocol))
 				// check if any IO is inProgress for the current remote globalID/array
@@ -211,7 +207,7 @@ func (s *Service) validateVolumeIOProgress(ctx context.Context, volumeIDs []stri
 				// if metro is fractured, we only want to check the promoted side,
 				// because the other side might time out and delay the response.
 
-				log.Infof("metro volume %s is fractured, localDemoted: %v, checking only promoted side", volID, localDemoted)
+				log.WithContext(ctx).Infof("metro volume %s is fractured, localDemoted: %v, checking only promoted side", volID, localDemoted)
 				if localDemoted {
 					// Local is demoted, so check remote (promoted) side
 					reqChs = append(reqChs, asyncGetIOInProgress(ioCtx, volume.RemoteUUID, *remoteArray, volume.Protocol))
@@ -235,7 +231,7 @@ func (s *Service) validateVolumeIOProgress(ctx context.Context, volumeIDs []stri
 			// we should report it.
 			// This status is effectively a logical OR of all the volumes
 			ioCtxCancel()
-			log.Infof("IO detected for volume %s", volID)
+			log.WithContext(ctx).Infof("IO detected for volume %s", volID)
 			break
 		}
 
@@ -244,7 +240,7 @@ func (s *Service) validateVolumeIOProgress(ctx context.Context, volumeIDs []stri
 		ioCtxCancel()
 	}
 
-	log.Infof("ValidateVolumeHostConnectivity reply %+v", rep)
+	log.WithContext(ctx).Infof("ValidateVolumeHostConnectivity reply %+v", rep)
 	return nil
 }
 
@@ -263,7 +259,6 @@ func waitAndClose(wg *sync.WaitGroup, ch chan error) {
 // fan-in concurrency pattern and returns true if at least one response is a nil error,
 // denoting IO is in-progress.
 func isIOInProgress(ctx context.Context, chs ...<-chan error) bool {
-	log := log.WithContext(ctx)
 	// single channel on which the channels in "chs" will write their results
 	errCh := make(chan error)
 	wg := &sync.WaitGroup{}
@@ -305,18 +300,18 @@ func isIOInProgress(ctx context.Context, chs ...<-chan error) bool {
 	// received, assume there is no IO in-progress.
 	for err := range errCh {
 		if err != nil {
-			log.Debugf("error received while validating volume connectivity: %s", err.Error())
+			log.WithContext(ctx).Debugf("error received while validating volume connectivity: %s", err.Error())
 			continue
 		}
 
 		// cancel any remaining goroutines so we can report IO in-progress ASAP
 		// and we don't leave any goroutines blocking, trying to write to the channel.
 		cancel()
-		log.Info("IO in-progress detected while validating volume connectivity")
+		log.WithContext(ctx).Info("IO in-progress detected while validating volume connectivity")
 		return true
 	}
 
-	log.Info("no IO in-progress was detected while validating volume connectivity")
+	log.WithContext(ctx).Info("no IO in-progress was detected while validating volume connectivity")
 	return false
 }
 
@@ -325,11 +320,10 @@ func isIOInProgress(ctx context.Context, chs ...<-chan error) bool {
 // It can be used to dispatch multiple requests in parallel for situations such as metro
 // volumes where multiple volumes need to be checked for IO to determine if the volume is active.
 func asyncGetIOInProgress(ctx context.Context, volID string, array array.PowerStoreArray, protocol string) <-chan error {
-	log := log.WithContext(ctx)
 	errCh := make(chan error)
 	go func() {
 		defer close(errCh)
-		log.Infof("checking if IO is in-progress for volume %s on array %s", volID, array.GlobalID)
+		log.WithContext(ctx).Infof("checking if IO is in-progress for volume %s on array %s", volID, array.GlobalID)
 
 		// This blocks until both functions have been evaluated, which can be slow.
 		// Only then can the select statement determine which case to execute. If context has
@@ -339,7 +333,7 @@ func asyncGetIOInProgress(ctx context.Context, volID string, array array.PowerSt
 		select {
 		case errCh <- getIOInProgress(ctx, volID, array, protocol):
 		case <-ctx.Done():
-			log.Errorf("context deadline exceeded while querying for IOs in-progress for volume %s on array %s", volID, array.GlobalID)
+			log.WithContext(ctx).Errorf("context deadline exceeded while querying for IOs in-progress for volume %s on array %s", volID, array.GlobalID)
 		}
 	}()
 	return errCh
@@ -348,13 +342,12 @@ func asyncGetIOInProgress(ctx context.Context, volID string, array array.PowerSt
 // checkIfNodeIsConnected looks at the 'nodeId' to determine if there is connectivity to the 'arrayId' array.
 // The 'rep' object will be filled with the results of the check.
 func (s *Service) checkIfNodeIsConnected(ctx context.Context, arrayID string, nodeID string) (isConnected bool, messages []string, err error) {
-	log := log.WithContext(ctx)
-	log.Infof("Checking if array %s is connected to node %s", arrayID, nodeID)
+	log.WithContext(ctx).Infof("Checking if array %s is connected to node %s", arrayID, nodeID)
 	connected := false
 
 	nodeIP := identifiers.GetIPListFromString(nodeID)
 	if len(nodeIP) == 0 {
-		log.Errorf("failed to parse node ID '%s'", nodeID)
+		log.WithContext(ctx).Errorf("failed to parse node ID '%s'", nodeID)
 		return false, messages, fmt.Errorf("failed to parse node ID")
 	}
 	ip := nodeIP[len(nodeIP)-1]
@@ -363,18 +356,18 @@ func (s *Service) checkIfNodeIsConnected(ctx context.Context, arrayID string, no
 	connected, err = s.QueryArrayStatus(ctx, url)
 	if err != nil {
 		msg := fmt.Sprintf("connectivity unknown for array %s to node %s due to %s", arrayID, nodeID, err)
-		log.Error(msg)
+		log.WithContext(ctx).Error(msg)
 		messages = append(messages, msg)
-		log.Errorf("%s", err.Error())
+		log.WithContext(ctx).Errorf("%s", err.Error())
 	}
 
 	if connected {
 		msg := fmt.Sprintf("array %s is connected to node %s", arrayID, nodeID)
-		log.Info(msg)
+		log.WithContext(ctx).Info(msg)
 		messages = append(messages, msg)
 	} else {
 		msg := fmt.Sprintf("array %s is not connected to node %s", arrayID, nodeID)
-		log.Info(msg)
+		log.WithContext(ctx).Info(msg)
 		messages = append(messages, msg)
 	}
 	return connected, messages, nil
@@ -383,17 +376,16 @@ func (s *Service) checkIfNodeIsConnected(ctx context.Context, arrayID string, no
 // getIOInProgress attempts to determine if IO has recently occurred for a given volume, volID,
 // and returns a nil error if IO has occurred.
 func getIOInProgress(ctx context.Context, volID string, arrayConfig array.PowerStoreArray, protocol string) (err error) {
-	log := log.WithContext(ctx)
 	// Call PerformanceMetricsByVolume  or  PerformanceMetricsByFileSystem in gopowerstore based on the volume type
 	if protocol == "scsi" {
 		resp, err := arrayConfig.Client.PerformanceMetricsByVolume(ctx, volID, gopowerstore.TwentySec)
 		if err != nil {
-			log.Errorf("Error %v while checking IsIOInProgress for array having globalId %s for volumeId %s", err.Error(), arrayConfig.GlobalID, volID)
+			log.WithContext(ctx).Errorf("Error %v while checking IsIOInProgress for array having globalId %s for volumeId %s", err.Error(), arrayConfig.GlobalID, volID)
 			return fmt.Errorf("error %v while while checking IsIOInProgress", err.Error())
 		}
 		// check last four entries status recieved in the response
 		for i := len(resp) - 1; i >= (len(resp)-4) && i >= 0; i-- {
-			if resp[i].TotalIops > 0.0 && checkIfEntryIsLatest(resp[i].CommonMetricsFields.Timestamp) {
+			if resp[i].TotalIops > 0.0 && checkIfEntryIsLatest(resp[i].Timestamp) {
 				return nil
 			}
 		}
@@ -402,12 +394,12 @@ func getIOInProgress(ctx context.Context, volID string, arrayConfig array.PowerS
 	// nfs volume type logic
 	resp, err := arrayConfig.Client.PerformanceMetricsByFileSystem(ctx, volID, gopowerstore.TwentySec)
 	if err != nil {
-		log.Errorf("Error %v while checking IsIOInProgress for array having globalId %s for volumeId %s", err.Error(), arrayConfig.GlobalID, volID)
+		log.WithContext(ctx).Errorf("Error %v while checking IsIOInProgress for array having globalId %s for volumeId %s", err.Error(), arrayConfig.GlobalID, volID)
 		return fmt.Errorf("error %v while while checking IsIOInProgress", err.Error())
 	}
 	// check last four entries status recieved in the response
 	for i := len(resp) - 1; i >= len(resp)-4 && i >= 0; i-- {
-		if resp[i].TotalIops > 0.0 && checkIfEntryIsLatest(resp[i].CommonMetricsFields.Timestamp) {
+		if resp[i].TotalIops > 0.0 && checkIfEntryIsLatest(resp[i].Timestamp) {
 			return nil
 		}
 	}

@@ -27,6 +27,7 @@ import (
 
 	drv1 "github.com/dell/csm-dr/api/v1"
 	drv1Client "github.com/dell/csm-dr/pkg/client"
+	log "github.com/dell/csmlog"
 	"github.com/dell/gopowerstore"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -51,24 +52,23 @@ const (
 )
 
 func IsMetroFractured(ctx context.Context, client gopowerstore.Client, id string) (*MetroFracturedResponse, error) {
-	log := log.WithContext(ctx)
 	arrayVolume, err := client.GetVolume(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 
 	if arrayVolume.MetroReplicationSessionID != "" {
-		log.Infof("[METRO] MetroReplicationSessionID %s", arrayVolume.MetroReplicationSessionID)
+		log.WithContext(ctx).Infof("[METRO] MetroReplicationSessionID %s", arrayVolume.MetroReplicationSessionID)
 
 		replicationSession, err := client.GetReplicationSessionByID(ctx, arrayVolume.MetroReplicationSessionID)
 		if err != nil {
-			log.Errorf("[METRO] Unable to get replication session information by ID: %s, errror: %s", arrayVolume.MetroReplicationSessionID, err.Error())
+			log.WithContext(ctx).Errorf("[METRO] Unable to get replication session information by ID: %s, errror: %s", arrayVolume.MetroReplicationSessionID, err.Error())
 			return nil, err
 		}
 
 		if replicationSession.State == "Fractured" {
 			// We should only go here if the replicationSession is Fractured.
-			log.Infof("[METRO] ReplicationSession Status %s, LocalResourceState %s", replicationSession.State, replicationSession.LocalResourceState)
+			log.WithContext(ctx).Infof("[METRO] ReplicationSession Status %s, LocalResourceState %s", replicationSession.State, replicationSession.LocalResourceState)
 
 			return &MetroFracturedResponse{true, arrayVolume.Name, replicationSession.LocalResourceState}, nil
 		}
@@ -87,7 +87,6 @@ func IsMetroFractured(ctx context.Context, client gopowerstore.Client, id string
 //
 // MetroFracturedResponse  ( includes isFractured and volumeName which are used from the response) , a boolean that indicates whether the localVolume of the metro was demoted or not and error.
 func CheckMetroState(ctx context.Context, volumeHandle VolumeHandle, localClient gopowerstore.Client, remoteClient gopowerstore.Client) (*MetroFracturedResponse, bool, error) {
-	log := log.WithContext(ctx)
 	localDemoted := false
 	type metroStatus struct {
 		isLocal bool
@@ -104,7 +103,7 @@ func CheckMetroState(ctx context.Context, volumeHandle VolumeHandle, localClient
 		go func() {
 			defer close(ch)
 
-			log.Debug("checking if local volume is fractured")
+			log.WithContext(ctx).Debug("checking if local volume is fractured")
 			resp, err := IsMetroFractured(metroCtx, localClient, volumeHandle.LocalUUID)
 
 			select {
@@ -122,12 +121,12 @@ func CheckMetroState(ctx context.Context, volumeHandle VolumeHandle, localClient
 
 		go func() {
 			defer close(ch)
-			log.Debug("checking if remote volume is fractured")
+			log.WithContext(ctx).Debug("checking if remote volume is fractured")
 
 			var resp *MetroFracturedResponse
 			var err error
 			if volumeHandle.RemoteUUID == "" {
-				log.Debug("remote volume UUID is empty, skipping check")
+				log.WithContext(ctx).Debug("remote volume UUID is empty, skipping check")
 				resp = nil
 				err = errors.New("metro volume remote volume UUID is empty")
 			} else {
@@ -180,7 +179,7 @@ func CheckMetroState(ctx context.Context, volumeHandle VolumeHandle, localClient
 		if status.err == nil && status.resp != nil && status.resp.IsFractured {
 			// if we found a fractured session, cancel the context to stop other checks and return
 			// because the other array may not respond before the context times out
-			log.Infof("metro session fractured detected for volume %s", status.resp.VolumeName)
+			log.WithContext(ctx).Infof("metro session fractured detected for volume %s", status.resp.VolumeName)
 			cancel()
 			if status.isLocal {
 				if status.resp.State == string(gopowerstore.ReplicationResourceStateSystemDemoted) || status.resp.State == string(gopowerstore.ReplicationResourceStateDemoted) {
@@ -208,7 +207,7 @@ func CheckMetroState(ctx context.Context, volumeHandle VolumeHandle, localClient
 	if localErr != nil && remoteErr != nil {
 		if localErr, ok := localErr.(gopowerstore.APIError); ok && localErr.NotFound() {
 			if remoteErr, ok := remoteErr.(gopowerstore.APIError); ok && remoteErr.NotFound() {
-				log.Infof("metro session not found on both arrays for volume %s", volumeHandle)
+				log.WithContext(ctx).Infof("metro session not found on both arrays for volume %s", volumeHandle)
 
 				// Since both arrays returned not found, we assume the volume is not part of a metro session or deleted.
 				// The localErr will contain this information.
@@ -216,12 +215,12 @@ func CheckMetroState(ctx context.Context, volumeHandle VolumeHandle, localClient
 			}
 
 			// Only local array returned not found, remote array has a different error.
-			log.Errorf("metro session not found on local array but error checking metro state on remote array - remote: %s", remoteErr.Error())
+			log.WithContext(ctx).Errorf("metro session not found on local array but error checking metro state on remote array - remote: %s", remoteErr.Error())
 			return nil, false, fmt.Errorf("metro session not found on local array, error checking remote array: %s", remoteErr.Error())
 		}
 
 		// Both arrays returned errors, but they are not both not found.
-		log.Errorf("error checking metro state on both arrays - local: %s, remote: %s", localErr.Error(), remoteErr.Error())
+		log.WithContext(ctx).Errorf("error checking metro state on both arrays - local: %s, remote: %s", localErr.Error(), remoteErr.Error())
 		return nil, false, fmt.Errorf("error checking metro state on both arrays - local: %s, remote: %s", localErr.Error(), remoteErr.Error())
 	}
 
@@ -281,8 +280,6 @@ func DetermineIfArrayCanClone(ctx context.Context, metroSessionID string, arr *P
 func SelectMetroArrayForClone(ctx context.Context, metroSessionID string,
 	localArray *PowerStoreArray, remoteArray *PowerStoreArray,
 ) (selectedArray *PowerStoreArray, selectedSession *gopowerstore.ReplicationSession, err error) {
-	log := log.WithContext(ctx)
-
 	// Query replication session info from local and remote array
 	localSession := getMetroSessionByID(ctx, localArray, metroSessionID, "local")
 	remoteSession := getMetroSessionByID(ctx, remoteArray, metroSessionID, "remote")
@@ -316,12 +313,12 @@ func SelectMetroArrayForClone(ctx context.Context, metroSessionID string,
 	}
 
 	if selectedLocal {
-		log.Infof("[METRO CLONE] Selected local array %s as %s for cloning from volume UUID %s",
+		log.WithContext(ctx).Infof("[METRO CLONE] Selected local array %s as %s for cloning from volume UUID %s",
 			localArray.GetGlobalID(), selectedAs, localSession.LocalResourceID)
 		return localArray, localSession, nil
 	}
 
-	log.Infof("[METRO CLONE] Selected remote array %s as %s for cloning from volume UUID %s",
+	log.WithContext(ctx).Infof("[METRO CLONE] Selected remote array %s as %s for cloning from volume UUID %s",
 		remoteArray.GetGlobalID(), selectedAs, remoteSession.LocalResourceID)
 	return remoteArray, remoteSession, nil
 }
@@ -353,8 +350,6 @@ func matchSessionForExpansion(session *gopowerstore.ReplicationSession) bool {
 func SelectMetroArrayForExpansion(ctx context.Context, metroSessionID string,
 	localArray *PowerStoreArray, remoteArray *PowerStoreArray,
 ) (selectedArray *PowerStoreArray, selectedSession *gopowerstore.ReplicationSession, err error) {
-	log := log.WithContext(ctx)
-
 	// Query replication session info from local and remote array
 	localSession := getMetroSessionByID(ctx, localArray, metroSessionID, "local")
 	remoteSession := getMetroSessionByID(ctx, remoteArray, metroSessionID, "remote")
@@ -377,14 +372,14 @@ func SelectMetroArrayForExpansion(ctx context.Context, metroSessionID string,
 
 	// Check if local array is the preferred side and online
 	if matchSessionForExpansion(localSession) {
-		log.Infof("[METRO EXPAND] Selected local array %s (Metro_Preferred) for volume expansion, session=%s",
+		log.WithContext(ctx).Infof("[METRO EXPAND] Selected local array %s (Metro_Preferred) for volume expansion, session=%s",
 			localID, metroSessionID)
 		return localArray, localSession, nil
 	}
 
 	// Check if remote array is the preferred side and online
 	if matchSessionForExpansion(remoteSession) {
-		log.Infof("[METRO EXPAND] Selected remote array %s (Metro_Preferred) for volume expansion, session=%s",
+		log.WithContext(ctx).Infof("[METRO EXPAND] Selected remote array %s (Metro_Preferred) for volume expansion, session=%s",
 			remoteID, metroSessionID)
 		return remoteArray, remoteSession, nil
 	}
@@ -427,15 +422,13 @@ func CreateOrUpdateJournalEntry(ctx context.Context, name string,
 	volumeHandle VolumeHandle, deferredArrayID, nodeName, operation string,
 	request []byte,
 ) error {
-	log := log.WithContext(ctx)
-
 	id := volumeHandle.LocalUUID
 	arrayID := volumeHandle.LocalArrayGlobalID
 	remoteArrayID := volumeHandle.RemoteArrayGlobalID
 
 	drClient, err := GetDRClientFunc(ctx)
 	if err != nil {
-		log.Errorf("[METRO] Unable to get dr client, error: %s", err.Error())
+		log.WithContext(ctx).Errorf("[METRO] Unable to get dr client, error: %s", err.Error())
 		return err
 	}
 
@@ -456,7 +449,7 @@ func CreateOrUpdateJournalEntry(ctx context.Context, name string,
 	err = drClient.Get(ctx, key, &journal)
 	if err != nil {
 		if !k8sErrors.IsNotFound(err) {
-			log.Errorf("Unable to retrieve volume journal: %s", err.Error())
+			log.WithContext(ctx).Errorf("Unable to retrieve volume journal: %s", err.Error())
 			return err
 		}
 
@@ -477,11 +470,11 @@ func CreateOrUpdateJournalEntry(ctx context.Context, name string,
 
 		err = drClient.Create(context.Background(), &journal)
 		if err != nil {
-			log.Errorf("[METRO] Error creating volume journals: %s", err.Error())
+			log.WithContext(ctx).Errorf("[METRO] Error creating volume journals: %s", err.Error())
 			return err
 		}
 
-		log.Infof("[METRO] Successfully created volume journal: %s", journal.Name)
+		log.WithContext(ctx).Infof("[METRO] Successfully created volume journal: %s", journal.Name)
 		return nil
 	}
 
@@ -504,7 +497,7 @@ func CreateOrUpdateJournalEntry(ctx context.Context, name string,
 
 	err = drClient.Update(ctx, &journal)
 	if err != nil {
-		log.Errorf("Unable to update volume journal: %s", err)
+		log.WithContext(ctx).Errorf("Unable to update volume journal: %s", err)
 		return err
 	}
 

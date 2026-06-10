@@ -28,7 +28,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
@@ -43,10 +42,10 @@ const (
 
 var (
 	testPV *corev1.PersistentVolume = &corev1.PersistentVolume{
-		TypeMeta: v1.TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			Kind: "PersistentVolume",
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      testVolName,
 			Namespace: "",
 		},
@@ -62,11 +61,11 @@ var (
 		},
 	}
 	testVolumeEvent *corev1.Event = &corev1.Event{
-		TypeMeta: v1.TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			APIVersion: "v1",
 			Kind:       "Event",
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "event1",
 			Namespace: "default",
 		},
@@ -79,11 +78,11 @@ var (
 		Reason: "Minor",
 	}
 	testPodEvent *corev1.Event = &corev1.Event{
-		TypeMeta: v1.TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			APIVersion: "v1",
 			Kind:       "Event",
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "powerstore-node-event",
 			Namespace: "powerstore",
 		},
@@ -195,7 +194,7 @@ func TestCreateKubeClientSet(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.before(t)
+			_ = tt.before(t)
 			defer tt.after()
 
 			_, err := CreateKubeClientSet()

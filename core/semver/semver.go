@@ -162,9 +162,9 @@ func main() {
 	case "env":
 		for _, v := range ver.EnvVars() {
 			if export {
-				fmt.Fprint(w, "export ")
+				_, _ = fmt.Fprint(w, "export ")
 			}
-			fmt.Fprintln(w, v)
+			_, _ = fmt.Fprintln(w, v)
 		}
 	case "go":
 	case "json":
@@ -177,27 +177,27 @@ func main() {
 		for _, v := range ver.EnvVars() {
 			p := strings.SplitN(v, "=", 2)
 			key := p[0]
-			fmt.Fprintf(w, "%s ?=", key)
+			_, _ = fmt.Fprintf(w, "%s ?=", key)
 			if len(p) == 1 {
-				fmt.Fprintln(w)
+				_, _ = fmt.Fprintln(w)
 			} else {
 				val := p[1]
 				if strings.HasPrefix(val, `"`) &&
 					strings.HasSuffix(val, `"`) {
 					val = val[1 : len(val)-1]
 				}
-				val = strings.Replace(val, "$", "$$", -1)
-				fmt.Fprintf(w, " %s\n", val)
+				val = strings.ReplaceAll(val, "$", "$$")
+				_, _ = fmt.Fprintf(w, " %s\n", val)
 			}
 		}
 	case "rpm":
-		fmt.Fprintln(w, ver.RPM())
+		_, _ = fmt.Fprintln(w, ver.RPM())
 	case "tpl":
 		if err := tpl.Execute(w, ver); err != nil {
 			errorExit(fmt.Sprintf("error: template failed: %v\n", err))
 		}
 	case "ver":
-		fmt.Fprintln(w, ver.String())
+		_, _ = fmt.Fprintln(w, ver.String())
 	}
 }
 
@@ -268,7 +268,7 @@ func (v *semver) String() string {
 }
 
 func (v *semver) RPM() string {
-	return strings.Replace(v.String(), "-", "+", -1)
+	return strings.ReplaceAll(v.String(), "-", "+")
 }
 
 func (v *semver) EnvVars() []string {

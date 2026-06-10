@@ -52,6 +52,9 @@ If you want to use NVMe/TCP be sure that the `nvme-cli` package is installed on 
 
 If you want to use NVMe/FC be sure that the NVMeFC zoning of the Host Bus Adapters to the Fibre Channel port is done.
 
+## Documentation
+For more detailed information on the driver, please refer to [Container Storage Modules documentation](https://dell.github.io/csm-docs/).
+
 ### VolumeGroupSnapshot Support
 This driver now supports VolumeGroupSnapshot functionality as defined in CSI specification 1.11. This feature allows creating crash-consistent snapshots of multiple volumes simultaneously.
 

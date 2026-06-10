@@ -36,7 +36,7 @@ import (
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers/fs"
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers/k8sutils"
 	"github.com/dell/csm-dr/pkg/storage"
-	"github.com/dell/csmlog"
+	log "github.com/dell/csmlog"
 	csictx "github.com/dell/gocsi/context"
 	"github.com/dell/gopowerstore"
 	"github.com/container-storage-interface/spec/lib/go/csi"
@@ -53,7 +53,6 @@ var (
 	ipToArrayMux             sync.Mutex
 	defaultMultiNasThreshold = 5
 	defaultMultiNasCooldown  = 5 * time.Minute
-	log                      = csmlog.GetLogger()
 )
 
 // Consumer provides methods for safe management of arrays
@@ -153,6 +152,11 @@ func (s *Locker) UpdateArrays(configPath string, fs fs.Interface) error {
 	s.SetArrays(arrays)
 	setIPToArray(matcher)
 	s.SetDefaultArray(defaultArray)
+	log.WithFields(log.Fields{
+		log.FieldComponent: "array",
+		log.FieldOperation: "UpdateArrays",
+		"array_count":      len(arrays),
+	}).Info("array configuration updated")
 	return nil
 }
 
@@ -405,12 +409,32 @@ func GetPowerStoreArrays(fs fs.Interface, filePath string) (map[string]*PowerSto
 			}
 		}
 
+		log.WithFields(log.Fields{
+			log.FieldComponent: "array",
+			log.FieldOperation: "GetPowerStoreArrays",
+			log.FieldArrayID:   array.GlobalID,
+			"endpoint":         array.Endpoint,
+		}).Info("establishing connection to PowerStore array")
 		c, err := gopowerstore.NewClientWithArgs(
 			array.Endpoint, array.Username, array.Password, clientOptions)
 		if err != nil {
+			log.WithFields(log.Fields{
+				log.FieldComponent: "array",
+				log.FieldOperation: "GetPowerStoreArrays",
+				log.FieldArrayID:   array.GlobalID,
+				log.FieldError:     err.Error(),
+			}).Error("failed to create client for array")
 			return nil, nil, nil, status.Errorf(codes.FailedPrecondition,
 				"unable to create PowerStore client: %s", err.Error())
 		}
+		log.WithFields(log.Fields{
+			log.FieldComponent: "array",
+			log.FieldOperation: "GetPowerStoreArrays",
+			log.FieldArrayID:   array.GlobalID,
+			"endpoint":         array.Endpoint,
+			"user":             array.Username,
+			"insecure":         array.Insecure,
+		}).Info("successfully authenticated to PowerStore array")
 		c.SetCustomHTTPHeaders(http.Header{
 			"Application-Type": {fmt.Sprintf("%s/%s", identifiers.VerboseName, identifiers.ManifestSemver)},
 		})
@@ -471,6 +495,13 @@ func GetPowerStoreArrays(fs fs.Interface, filePath string) (map[string]*PowerSto
 		array.NASCooldownTracker = NewNASCooldown(cooldownPeriod, failureThreshold)
 	}
 
+	log.WithFields(log.Fields{
+		log.FieldComponent: "array",
+		log.FieldOperation: "GetPowerStoreArrays",
+		"array_count":      len(arrayMap),
+		"default_array":    defaultArray.GlobalID,
+	}).Info("array initialization completed")
+
 	return arrayMap, mapper, defaultArray, nil
 }
 
@@ -523,8 +554,7 @@ func ParseVolumeID(ctx context.Context, volumeHandleRaw string,
 	defaultArray *PowerStoreArray, /*legacy support*/
 	vc *csi.VolumeCapability, /*legacy support*/
 ) (volumeHandle VolumeHandle, err error) {
-	log := log.WithContext(ctx)
-	log.Debugf("ParseVolumeID: parsing volume handle %s", volumeHandleRaw)
+	log.WithContext(ctx).Debugf("ParseVolumeID: parsing volume handle %s", volumeHandleRaw)
 
 	if volumeHandleRaw == "" {
 		return volumeHandle, status.Errorf(codes.FailedPrecondition,
@@ -539,7 +569,7 @@ func ParseVolumeID(ctx context.Context, volumeHandleRaw string,
 	// parse the first (potentially only) volume handle
 	localVolumeHandle := strings.Split(volumeHandles[0], "/")
 	volumeHandle.LocalUUID = localVolumeHandle[0]
-	log.Debugf("ParseVolumeID: local volume handle: %s", localVolumeHandle)
+	log.WithContext(ctx).Debugf("ParseVolumeID: local volume handle: %s", localVolumeHandle)
 
 	if len(localVolumeHandle) == 1 {
 		// Legacy support where the volume name consists of only the volume ID.
@@ -587,13 +617,13 @@ func ParseVolumeID(ctx context.Context, volumeHandleRaw string,
 	// Parse the second portion of a metro volume handle
 	if len(volumeHandles) > 1 {
 		remoteVolumeHandle := strings.Split(volumeHandles[1], "/")
-		log.Debugf("ParseVolumeID: remote volume handle: %s", remoteVolumeHandle)
+		log.WithContext(ctx).Debugf("ParseVolumeID: remote volume handle: %s", remoteVolumeHandle)
 
 		volumeHandle.RemoteUUID = remoteVolumeHandle[0]
 		volumeHandle.RemoteArrayGlobalID = remoteVolumeHandle[1]
 	}
 
-	log.Debugf(
+	log.WithContext(ctx).Debugf(
 		"ParseVolumeID: volumeID: %s, arrayID: %s, protocol: %s, remoteVolumeID: %s, remoteArrayID: %s",
 		volumeHandle.LocalUUID, volumeHandle.LocalArrayGlobalID, volumeHandle.Protocol, volumeHandle.RemoteUUID, volumeHandle.RemoteArrayGlobalID,
 	)
@@ -630,10 +660,9 @@ func GetVolumeUUIDPrefix(volumeID string) (prefix string) {
 
 // GetLeastUsedActiveNAS finds the active NAS with the least FS count
 func GetLeastUsedActiveNAS(ctx context.Context, arr *PowerStoreArray, nasServers []string) (string, error) {
-	log := log.WithContext(ctx)
 	nasList, err := arr.Client.GetNASServers(ctx)
 	if err != nil {
-		log.Errorf("Failed to fetch NAS servers: %v", err)
+		log.WithContext(ctx).Errorf("Failed to fetch NAS servers: %v", err)
 		return "", err
 	}
 
@@ -643,10 +672,10 @@ func GetLeastUsedActiveNAS(ctx context.Context, arr *PowerStoreArray, nasServers
 	if leastUsedNAS == nil {
 		nasInCooldown := GetNASInCooldown(arr, nasServers)
 		if len(nasInCooldown) != 0 {
-			log.Debugf("some NAS servers are in cooldown, moving to fallback retry")
+			log.WithContext(ctx).Debugf("some NAS servers are in cooldown, moving to fallback retry")
 			return arr.NASCooldownTracker.FallbackRetry(nasInCooldown), nil
 		}
-		log.Warnf("all NAS servers are inactive")
+		log.WithContext(ctx).Warnf("all NAS servers are inactive")
 		return "", fmt.Errorf("no suitable NAS server found, please ensure the NAS is running")
 	}
 

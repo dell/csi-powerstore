@@ -43,7 +43,7 @@ import (
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers"
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers/fs"
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers/k8sutils"
-	"github.com/dell/csmlog"
+	log "github.com/dell/csmlog"
 	"github.com/dell/gobrick"
 	csictx "github.com/dell/gocsi/context"
 	"github.com/dell/gofsutil"
@@ -58,9 +58,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 )
-
-// Instantiate csmlog on a package level
-var log = csmlog.GetLogger()
 
 // For unit testing
 var (
@@ -122,13 +119,20 @@ const (
 // Will init ISCSIConnector, FcConnector and ControllerService if they are nil.
 func (s *Service) Init() error {
 	ctx := context.Background()
-	log := log.WithContext(ctx)
+	log.WithContext(ctx).WithFields(log.Fields{
+		log.FieldComponent: "node",
+		log.FieldOperation: "Init",
+	}).Info("initializing node service")
 	s.opts = getNodeOptions()
 
 	_, err := k8sutils.CreateKubeClientSet(s.opts.KubeConfigPath)
 	if err != nil {
 		return fmt.Errorf("failed to create Kubernetes client: %s", err.Error())
 	}
+	log.WithContext(ctx).WithFields(log.Fields{
+		log.FieldComponent: "node",
+		log.FieldOperation: "Init",
+	}).Info("Kubernetes client created successfully")
 
 	s.initConnectors()
 
@@ -150,8 +154,20 @@ func (s *Service) Init() error {
 		s.isPodmonEnabled, _ = strconv.ParseBool(isPodmonEnabled)
 	}
 
+	log.WithContext(ctx).WithFields(log.Fields{
+		log.FieldComponent: "node",
+		log.FieldOperation: "Init",
+		"iscsi_count":      len(iscsiInitiators),
+		"fc_count":         len(fcInitiators),
+		"nvme_count":       len(nvmeInitiators),
+	}).Info("detected initiators")
+
 	if len(iscsiInitiators) == 0 && len(fcInitiators) == 0 && len(nvmeInitiators) == 0 {
 		s.useNFS = true
+		log.WithContext(ctx).WithFields(log.Fields{
+			log.FieldComponent: "node",
+			log.FieldOperation: "Init",
+		}).Info("no block initiators found, NFS-only mode enabled")
 		go s.startAPIService(ctx)
 		return nil
 	}
@@ -159,7 +175,7 @@ func (s *Service) Init() error {
 	if len(nvmeInitiators) != 0 {
 		err = k8sutils.Kubeclient.AddNVMeLabels(ctx, s.opts.KubeNodeName, "hostnqn-uuid", nvmeInitiators)
 		if err != nil {
-			log.Warnf("Unable to add hostnqn uuid label for node %s: %v", s.opts.KubeNodeName, err.Error())
+			log.WithContext(ctx).Warnf("Unable to add hostnqn uuid label for node %s: %v", s.opts.KubeNodeName, err.Error())
 		}
 	}
 
@@ -175,25 +191,45 @@ func (s *Service) Init() error {
 		switch arr.BlockProtocol {
 		case identifiers.NVMETCPTransport:
 			if len(nvmeInitiators) == 0 {
-				log.Errorf("NVMeTCP transport was requested but NVMe initiator is not available")
+				log.WithContext(ctx).WithFields(log.Fields{
+					log.FieldComponent: "node",
+					log.FieldOperation: "Init",
+					log.FieldProtocol:  "NVMeTCP",
+					log.FieldArrayID:   arr.GlobalID,
+				}).Error("transport requested but initiator is not available")
 			}
 			useNVME = true
 			useFC = false
 		case identifiers.NVMEFCTransport:
 			if len(nvmeInitiators) == 0 {
-				log.Errorf("NVMeFC transport was requested but NVMe initiator is not available")
+				log.WithContext(ctx).WithFields(log.Fields{
+					log.FieldComponent: "node",
+					log.FieldOperation: "Init",
+					log.FieldProtocol:  "NVMeFC",
+					log.FieldArrayID:   arr.GlobalID,
+				}).Error("transport requested but initiator is not available")
 			}
 			useNVME = true
 			useFC = true
 		case identifiers.ISCSITransport:
 			if len(iscsiInitiators) == 0 {
-				log.Errorf("iSCSI transport was requested but iSCSI initiator is not available")
+				log.WithContext(ctx).WithFields(log.Fields{
+					log.FieldComponent: "node",
+					log.FieldOperation: "Init",
+					log.FieldProtocol:  "iSCSI",
+					log.FieldArrayID:   arr.GlobalID,
+				}).Error("transport requested but initiator is not available")
 			}
 			useNVME = false
 			useFC = false
 		case identifiers.FcTransport:
 			if len(fcInitiators) == 0 {
-				log.Errorf("FC transport was requested but FC initiator is not available")
+				log.WithContext(ctx).WithFields(log.Fields{
+					log.FieldComponent: "node",
+					log.FieldOperation: "Init",
+					log.FieldProtocol:  "FC",
+					log.FieldArrayID:   arr.GlobalID,
+				}).Error("transport requested but initiator is not available")
 			}
 			useNVME = false
 			useFC = true
@@ -204,25 +240,64 @@ func (s *Service) Init() error {
 		if useNVME {
 			initiators = nvmeInitiators
 			if useFC {
-				log.Infof("NVMeFC Protocol is requested")
+				log.WithContext(ctx).WithFields(log.Fields{
+					log.FieldComponent: "node",
+					log.FieldOperation: "Init",
+					log.FieldProtocol:  "NVMeFC",
+					log.FieldArrayID:   arr.GlobalID,
+				}).Info("protocol selected")
 			} else {
-				log.Infof("NVMeTCP Protocol is requested")
+				log.WithContext(ctx).WithFields(log.Fields{
+					log.FieldComponent: "node",
+					log.FieldOperation: "Init",
+					log.FieldProtocol:  "NVMeTCP",
+					log.FieldArrayID:   arr.GlobalID,
+				}).Info("protocol selected")
 			}
 		} else if useFC {
 			initiators = fcInitiators
-			log.Infof("FC Protocol is requested")
+			log.WithContext(ctx).WithFields(log.Fields{
+				log.FieldComponent: "node",
+				log.FieldOperation: "Init",
+				log.FieldProtocol:  "FC",
+				log.FieldArrayID:   arr.GlobalID,
+			}).Info("protocol selected")
 		} else {
 			initiators = iscsiInitiators
-			log.Infof("iSCSI Protocol is requested")
+			log.WithContext(ctx).WithFields(log.Fields{
+				log.FieldComponent: "node",
+				log.FieldOperation: "Init",
+				log.FieldProtocol:  "iSCSI",
+				log.FieldArrayID:   arr.GlobalID,
+			}).Info("protocol selected")
 		}
 
 		// store the values in the array list for later use
 		s.useNVME[arr.GlobalID] = useNVME
 		s.useFC[arr.GlobalID] = useFC
 
+		log.WithContext(ctx).WithFields(log.Fields{
+			log.FieldComponent: "node",
+			log.FieldOperation: "Init",
+			log.FieldArrayID:   arr.Endpoint,
+			"global_id":        arr.GetGlobalID(),
+			"use_nvme":         useNVME,
+			"use_fc":           useFC,
+		}).Info("registering host on array")
 		err = s.setupHost(initiators, arr.GetClient(), arr.GetIP(), arr.GetGlobalID())
 		if err != nil {
-			log.Errorf("can't setup host on %s: %s", arr.Endpoint, err.Error())
+			log.WithContext(ctx).WithFields(log.Fields{
+				log.FieldComponent: "node",
+				log.FieldOperation: "Init",
+				log.FieldArrayID:   arr.Endpoint,
+				log.FieldError:     err.Error(),
+			}).Error("failed to setup host on array")
+		} else {
+			log.WithContext(ctx).WithFields(log.Fields{
+				log.FieldComponent: "node",
+				log.FieldOperation: "Init",
+				log.FieldArrayID:   arr.Endpoint,
+			}).Info("host registered successfully")
 		}
 	}
 
@@ -232,6 +307,10 @@ func (s *Service) Init() error {
 
 	initSpaceReclamation(ctx, s, k8sutils.Kubeclient.Clientset)
 
+	log.WithContext(ctx).WithFields(log.Fields{
+		log.FieldComponent: "node",
+		log.FieldOperation: "Init",
+	}).Info("node service initialization completed")
 	go s.startAPIService(ctx)
 	return nil
 }
@@ -303,8 +382,7 @@ func (s *Service) checkForDuplicateUUIDs() {
 
 // NodeStageVolume prepares volume to be consumed by node publish by connecting volume to the node
 func (s *Service) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
-	log := log.WithContext(ctx)
-	logFields := csmlog.ExtractFieldsFromContext(ctx)
+	logFields := log.ExtractFieldsFromContext(ctx)
 	if req.GetVolumeCapability() == nil {
 		return nil, status.Error(codes.InvalidArgument, "volume capability is required")
 	}
@@ -329,6 +407,15 @@ func (s *Service) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeR
 	remoteVolumeID := volumeHandle.RemoteUUID
 	remoteArrayID := volumeHandle.RemoteArrayGlobalID
 	_, stagingPath := getStagingPath(ctx, req.GetStagingTargetPath(), id)
+
+	log.WithContext(ctx).WithFields(log.Fields{
+		log.FieldComponent:   "node",
+		log.FieldOperation:   "NodeStageVolume",
+		log.FieldVolumeID:    id,
+		log.FieldProtocol:    protocol,
+		log.FieldArrayID:     arrayID,
+		log.FieldStagingPath: stagingPath,
+	}).Info("staging volume")
 
 	arr, ok := s.Arrays()[arrayID]
 	if !ok {
@@ -357,19 +444,33 @@ func (s *Service) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeR
 
 		isMetroFractured = metroSession.IsFractured
 		if isMetroFractured {
-			log.Warnf("[METRO] metro volume %s is in a fractured state", req.GetVolumeId())
+			log.WithContext(ctx).Warnf("[METRO] metro volume %s is in a fractured state", req.GetVolumeId())
 		}
 		if localVolumeDemoted {
-			log.Warnf("[METRO] metro volume %s has been demoted", req.GetVolumeId())
+			log.WithContext(ctx).Warnf("[METRO] metro volume %s has been demoted", req.GetVolumeId())
 		}
 	}
 
 	var stager VolumeStager
 	if protocol == "nfs" {
+		log.WithContext(ctx).WithFields(log.Fields{
+			log.FieldComponent: "node",
+			log.FieldOperation: "NodeStageVolume",
+			log.FieldVolumeID:  id,
+			log.FieldProtocol:  "nfs",
+		}).Info("using NFS stager")
 		stager = &NFSStager{
 			array: arr,
 		}
 	} else {
+		log.WithContext(ctx).WithFields(log.Fields{
+			log.FieldComponent: "node",
+			log.FieldOperation: "NodeStageVolume",
+			log.FieldVolumeID:  id,
+			log.FieldProtocol:  "scsi",
+			"use_fc":           s.useFC[arr.GlobalID],
+			"use_nvme":         s.useNVME[arr.GlobalID],
+		}).Info("using SCSI stager")
 		stager = &SCSIStager{
 			useFC:          s.useFC[arr.GlobalID],
 			useNVME:        s.useNVME[arr.GlobalID],
@@ -401,47 +502,52 @@ func (s *Service) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeR
 		if err != nil {
 			if isMetroFractured && localVolumeDemoted {
 				// expected failure if Metro is Fractured and local array is down
-				log.Infof("[METRO] Could not stage volume %s  on node %s for array %s due to Metro Session Fracture", id, s.opts.KubeNodeName, arr.Endpoint)
+				log.WithContext(ctx).Infof("[METRO] Could not stage volume %s  on node %s for array %s due to Metro Session Fracture", id, s.opts.KubeNodeName, arr.Endpoint)
 			} else {
-				log.Errorf("Failed to stage volume %s  for array %s: %s", id, arr.Endpoint, err)
+				log.WithContext(ctx).Errorf("Failed to stage volume %s  for array %s: %s", id, arr.Endpoint, err)
 				return nil, err
 			}
 		} else {
-			log.Infof("Staged volume %s for array %s", id, arr.Endpoint)
+			log.WithContext(ctx).Infof("Staged volume %s for array %s", id, arr.Endpoint)
 			localStaged = true
 			response = resp
 		}
 	} else {
-		log.Warnf("local volume %s has no connectivity to node %s. skipping staging.", id, s.opts.KubeNodeName)
+		log.WithContext(ctx).Warnf("local volume %s has no connectivity to node %s. skipping staging.", id, s.opts.KubeNodeName)
 	}
 
 	nodeConnectedToRemoteArray := false
 	if volumeHandle.IsMetro() { // For Remote Metro volume
 		nodeConnectedToRemoteArray = isNodeConnectedToArrayFunc(ctx, s.nodeID, remoteArray)
 		if nodeConnectedToRemoteArray {
-			log.Infof("Staging remote metro volume %s for volume %s", remoteVolumeID, id)
+			log.WithContext(ctx).Infof("Staging remote metro volume %s for volume %s", remoteVolumeID, id)
 			resp, err := stager.Stage(ctx, req, stagingPath, s.nodeID, logFields, s.Fs, remoteVolumeID, true, remoteArray.GetClient())
 			if err != nil {
 				if isMetroFractured && !localVolumeDemoted {
 					// expected failure if Metro is Fractured and remote array is down
-					log.Infof("[METRO] Could not stage volume %s on node %s for array %s due to Metro Session Fracture", id, s.opts.KubeNodeName, remoteArray.Endpoint)
+					log.WithContext(ctx).Infof("[METRO] Could not stage volume %s on node %s for array %s due to Metro Session Fracture", id, s.opts.KubeNodeName, remoteArray.Endpoint)
 				} else {
-					log.Errorf("Failed to stage volume %s  for array %s: %s", id, remoteArray.Endpoint, err)
+					log.WithContext(ctx).Errorf("Failed to stage volume %s  for array %s: %s", id, remoteArray.Endpoint, err)
 					return nil, err
 				}
 			} else {
-				log.Infof("Remote volume %s staged", remoteVolumeID)
+				log.WithContext(ctx).Infof("Remote volume %s staged", remoteVolumeID)
 				remoteStaged = true
 				response = resp
 			}
 		} else {
-			log.Debugf("skipping staging remote metro %s, node has not been registered with the remote array %s", remoteVolumeID, remoteArrayID)
+			log.WithContext(ctx).Debugf("skipping staging remote metro %s, node has not been registered with the remote array %s", remoteVolumeID, remoteArrayID)
 		}
 	}
 
 	// at least one stage should succeed for non-metro, non-uniform metro, and uniform metro
 	// if a staging fails for uniform metro, the failed request will be deferred by adding to the volume journal
 	if !localStaged && !remoteStaged {
+		log.WithContext(ctx).WithFields(log.Fields{
+			log.FieldComponent: "node",
+			log.FieldOperation: "NodeStageVolume",
+			log.FieldVolumeID:  id,
+		}).Error("failed to stage volume on any array")
 		return nil, status.Error(codes.Internal, "failed to stage volume")
 	}
 
@@ -449,7 +555,7 @@ func (s *Service) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeR
 		if (localStaged && !remoteStaged) || (!localStaged && remoteStaged) {
 			deferredRequest, err := proto.Marshal(req)
 			if err != nil {
-				log.Errorf("[METRO] Error marshalling req: %s", err.Error())
+				log.WithContext(ctx).Errorf("[METRO] Error marshalling req: %s", err.Error())
 				return nil, err
 			}
 
@@ -460,11 +566,11 @@ func (s *Service) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeR
 
 			err = createOrUpdateJournalEntryFunc(ctx, metroSession.VolumeName, volumeHandle, deferredArrayID, s.opts.KubeNodeName, "NodeStageVolume", deferredRequest)
 			if err != nil {
-				log.Errorf("Could not create journal entry for operation %s for volume %s node %s array %s", "NodeStageVolume", id, s.opts.KubeNodeName, arrayID)
+				log.WithContext(ctx).Errorf("Could not create journal entry for operation %s for volume %s node %s array %s", "NodeStageVolume", id, s.opts.KubeNodeName, arrayID)
 				return nil, err
 			}
 
-			log.Infof("[METRO] Metro volume %s created journal entry for operation %s for volume %s node %s array %s", id, "NodeStageVolume", id, s.opts.KubeNodeName, arrayID)
+			log.WithContext(ctx).Infof("[METRO] Metro volume %s created journal entry for operation %s for volume %s node %s array %s", id, "NodeStageVolume", id, s.opts.KubeNodeName, arrayID)
 		}
 	}
 
@@ -473,10 +579,9 @@ func (s *Service) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeR
 
 // NodeUnstageVolume reverses steps done in NodeStage by disconnecting volume from the node
 func (s *Service) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest) (*csi.NodeUnstageVolumeResponse, error) {
-	log := log.WithContext(ctx)
 	var err error
 	var reqID string
-	logFields := csmlog.ExtractFieldsFromContext(ctx)
+	logFields := log.ExtractFieldsFromContext(ctx)
 	headers, ok := metadata.FromIncomingContext(ctx)
 	if ok {
 		if req, ok := headers["csi.requestid"]; ok && len(req) > 0 && req[0] != "" {
@@ -507,6 +612,14 @@ func (s *Service) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVol
 	protocol := volumeHandle.Protocol
 	remoteVolumeID := volumeHandle.RemoteUUID
 
+	log.WithContext(ctx).WithFields(log.Fields{
+		log.FieldComponent: "node",
+		log.FieldOperation: "NodeUnstageVolume",
+		log.FieldVolumeID:  id,
+		log.FieldProtocol:  protocol,
+		log.FieldArrayID:   arrayID,
+	}).Info("unstaging volume")
+
 	arr, ok := s.Arrays()[arrayID]
 	if !ok {
 		return nil, status.Errorf(codes.Internal, "can't find array with ID %s", arrayID)
@@ -524,19 +637,19 @@ func (s *Service) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVol
 			}
 
 			// Not found due to potentially deleted volume through UI. Still need to unstage.
-			log.Infof("Volume with ID %s not found", id)
+			log.WithContext(ctx).Infof("Volume with ID %s not found", id)
 		}
 	}
 
-	device, err := unstageVolume(ctx, stagingPath, id, logFields, err, s.Fs)
+	device, err := unstageVolume(ctx, stagingPath, id, logFields, s.Fs)
 	if err != nil {
 		return nil, err
 	}
 	if remoteVolumeID != "" { // For Remote Metro volume
-		log.Info("Unstaging remote metro volume")
+		log.WithContext(ctx).Info("Unstaging remote metro volume")
 		_, remoteStagingPath := getStagingPath(ctx, req.GetStagingTargetPath(), remoteVolumeID)
 
-		_, err = unstageVolume(ctx, remoteStagingPath, remoteVolumeID, logFields, err, s.Fs)
+		_, err = unstageVolume(ctx, remoteStagingPath, remoteVolumeID, logFields, s.Fs)
 		if err != nil {
 			return nil, err
 		}
@@ -549,24 +662,24 @@ func (s *Service) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVol
 	if device != "" {
 		err := createMapping(id, device, s.opts.TmpDir, s.Fs)
 		if err != nil {
-			log.Warnf("failed to create vol to device mapping : %s", err.Error())
+			log.WithContext(ctx).Warnf("failed to create vol to device mapping : %s", err.Error())
 		}
 	} else {
 		device, err = getMapping(id, s.opts.TmpDir, s.Fs)
 		if err != nil {
-			log.Info("no device found. skip device removal")
+			log.WithContext(ctx).Info("no device found. skip device removal")
 			return &csi.NodeUnstageVolumeResponse{}, nil
 		}
 	}
 
-	f := csmlog.Fields{"Device": device}
+	f := log.Fields{"Device": device}
 
-	connectorCtx := csmlog.SetLogFields(context.Background(), logFields)
+	connectorCtx := context.Background()
 
 	if s.useNVME[arr.GlobalID] {
 		err = s.nvmeConnector.DisconnectVolumeByDeviceName(connectorCtx, device)
 	} else if s.useFC[arr.GlobalID] {
-		log.Infof("WWN of Volume for unstaging: %s", vol.Wwn)
+		log.WithContext(ctx).Infof("WWN of Volume for unstaging: %s", vol.Wwn)
 
 		volumeWWN := vol.Wwn
 		err = s.disconnectFCVolume(ctx, reqID, id, arrayID, device, strings.Split(volumeWWN, ".")[1], logFields)
@@ -574,44 +687,53 @@ func (s *Service) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVol
 		err = s.iscsiConnector.DisconnectVolumeByDeviceName(connectorCtx, device)
 	}
 	if err != nil {
-		log.WithFields(logFields).Errorf("failed to disconnect volume: %s", err.Error())
+		log.WithContext(ctx).WithFields(logFields).Errorf("failed to disconnect volume: %s", err.Error())
 		return nil, err
 	}
 
-	log.WithFields(logFields).WithFields(f).Infof("block device %s removal completed :", device)
+	log.WithContext(ctx).WithFields(logFields).WithFields(f).WithOperation("NodeUnstageVolume").Infof("block device %s removal completed", device)
+	log.WithContext(ctx).WithFields(log.Fields{
+		log.FieldComponent:  "node",
+		log.FieldOperation:  "NodeUnstageVolume",
+		log.FieldVolumeID:   id,
+		log.FieldDevicePath: device,
+	}).Info("device cleanup completed")
 
 	err = deleteMapping(id, s.opts.TmpDir, s.Fs)
 	if err != nil {
-		log.WithFields(logFields).Warnf("failed to delete vol to device mapping : %s", err.Error())
+		log.WithContext(ctx).WithFields(logFields).Warnf("failed to delete vol to device mapping : %s", err.Error())
 	}
 
+	log.WithContext(ctx).WithFields(log.Fields{
+		log.FieldComponent: "node",
+		log.FieldOperation: "NodeUnstageVolume",
+		log.FieldVolumeID:  id,
+	}).Info("unstage completed")
 	return &csi.NodeUnstageVolumeResponse{}, nil
 }
 
 // New method implementing FC volume disconnection with retry logic similar to PowerMax
-func (s *Service) disconnectFCVolume(ctx context.Context, reqID, volumeID, arrayID, device, volumeWWN string, logFields map[string]interface{}) error {
-	log := log.WithContext(ctx)
+func (s *Service) disconnectFCVolume(ctx context.Context, reqID, volumeID, arrayID, device, volumeWWN string, _ map[string]interface{}) error {
 	var err error
 	maxDisconnectRetries := identifiers.GetVolumeDisconnectMaxRetries()
 	timeout := identifiers.GetVolumeDisconnectTimeout()
 	retryInterval := identifiers.GetVolumeDisconnectRetryInterval()
 
-	f := csmlog.Fields{
+	f := log.Fields{
 		"CSIRequestID": reqID,
 		"VolumeID":     volumeID,
 		"ArrayID":      arrayID,
 		"Device":       device,
 		"WWN":          volumeWWN,
 	}
-	log.Infof("WWN of Volume for disconnectingFCVolume: %s", volumeWWN)
+	log.WithContext(ctx).Infof("WWN of Volume for disconnectingFCVolume: %s", volumeWWN)
 
 	for i := 1; i <= maxDisconnectRetries; i++ {
 		f["Retry"] = i
-		log.WithFields(f).Info("NodeUnstageVolume disconnect volume FC")
+		log.WithContext(ctx).WithFields(f).Info("NodeUnstageVolume disconnect volume FC")
 
 		// Create context with timeout for disconnection
 		disconnectCtx, cancel := context.WithTimeout(ctx, timeout)
-		disconnectCtx = csmlog.SetLogFields(disconnectCtx, logFields)
 
 		if volumeWWN != "" {
 			// Preferred: Use WWN-based disconnection (more reliable)
@@ -624,23 +746,23 @@ func (s *Service) disconnectFCVolume(ctx context.Context, reqID, volumeID, array
 		cancel()
 
 		if err == nil {
-			log.WithFields(f).Debug("FC disconnect volume complete")
+			log.WithContext(ctx).WithFields(f).Debug("FC disconnect volume complete")
 
 			// Clean up symlink if WWN was available
 			if volumeWWN != "" {
 				symlinkPath, _, err := gofsutil.WWNToDevicePathX(ctx, volumeWWN)
 				if err != nil {
-					log.WithFields(f).Warnf("failed to resolve symlink path for WWN %s: %s", volumeWWN, err)
+					log.WithContext(ctx).WithFields(f).Warnf("failed to resolve symlink path for WWN %s: %s", volumeWWN, err)
 				} else if symlinkPath != "" {
 					if removeErr := os.Remove(symlinkPath); removeErr != nil && !os.IsNotExist(removeErr) {
-						log.WithFields(f).Warnf("failed to remove symlink at path %s: %s", symlinkPath, removeErr.Error())
+						log.WithContext(ctx).WithFields(f).Warnf("failed to remove symlink at path %s: %s", symlinkPath, removeErr.Error())
 					}
 				}
 			}
 			return nil
 		}
 
-		log.WithFields(f).Errorf("error disconnecting volume for retry %d: %s", i, err.Error())
+		log.WithContext(ctx).WithFields(f).Errorf("error disconnecting volume for retry %d: %s", i, err.Error())
 
 		if i < maxDisconnectRetries {
 			time.Sleep(retryInterval)
@@ -649,11 +771,11 @@ func (s *Service) disconnectFCVolume(ctx context.Context, reqID, volumeID, array
 			if volumeWWN != "" {
 				devPath, err := gofsutil.WWNToDevicePath(ctx, volumeWWN)
 				if err != nil {
-					log.WithFields(f).Warnf("failed to resolve device path for WWN %s: %v", volumeWWN, err)
+					log.WithContext(ctx).WithFields(f).Warnf("failed to resolve device path for WWN %s: %v", volumeWWN, err)
 					return nil
 				}
 				if devPath == "" {
-					log.WithFields(f).Info("device no longer exists, considering disconnect successful")
+					log.WithContext(ctx).WithFields(f).Info("device no longer exists, considering disconnect successful")
 					return nil
 				}
 			}
@@ -665,13 +787,11 @@ func (s *Service) disconnectFCVolume(ctx context.Context, reqID, volumeID, array
 		maxDisconnectRetries, volumeID, device, volumeWWN)
 }
 
-func unstageVolume(ctx context.Context, stagingPath, id string, logFields csmlog.Fields, err error, fs fs.Interface) (string, error) {
+func unstageVolume(ctx context.Context, stagingPath, id string, logFields log.Fields, fs fs.Interface) (string, error) {
 	logFields["ID"] = id
 	logFields["StagingPath"] = stagingPath
-	ctx = csmlog.SetLogFields(ctx, logFields)
-	log := log.WithContext(ctx).WithFields(logFields)
 
-	log.Info("calling unstage")
+	log.WithFields(logFields).WithContext(ctx).Info("calling unstage")
 
 	device, err := getStagedDev(ctx, stagingPath, fs)
 	if err != nil {
@@ -681,21 +801,21 @@ func unstageVolume(ctx context.Context, stagingPath, id string, logFields csmlog
 
 	if device != "" {
 		_, device = path.Split(device)
-		log.Info("active mount exist")
+		log.WithFields(logFields).WithContext(ctx).Info("active mount exist")
 		err = fs.GetUtil().Unmount(ctx, stagingPath)
 		if err != nil {
 			return "", status.Errorf(codes.Internal,
 				"could not unmount dev %s: %s", device, err.Error())
 		}
-		log.Info("unmount without error")
+		log.WithFields(logFields).WithContext(ctx).Info("unmount without error")
 	} else {
 		// no mounts
-		log.Info("no active mounts found")
+		log.WithFields(logFields).WithContext(ctx).Info("no active mounts found")
 	}
 
 	err = fs.Remove(stagingPath)
 	if err != nil && fs.IsDeviceOrResourceBusy(err) {
-		log.Warnf("failed to delete mount path : %s", err)
+		log.WithFields(logFields).WithContext(ctx).Warnf("failed to delete mount path : %s", err)
 		var remnantDevice string
 		remnantDevice, err = removeRemnantMounts(ctx, stagingPath, fs, logFields)
 		if device == "" {
@@ -706,13 +826,12 @@ func unstageVolume(ctx context.Context, stagingPath, id string, logFields csmlog
 		return "", status.Errorf(codes.Internal, "failed to delete mount path %s: %s", stagingPath, err.Error())
 	}
 
-	log.Info("target mount file deleted")
+	log.WithFields(logFields).WithContext(ctx).Info("target mount file deleted")
 	return device, nil
 }
 
-func removeRemnantMounts(ctx context.Context, stagingPath string, fs fs.Interface, logFields csmlog.Fields) (string, error) {
-	log := log.WithContext(ctx).WithFields(logFields)
-	log.Info("finding remnant mount")
+func removeRemnantMounts(ctx context.Context, stagingPath string, fs fs.Interface, logFields log.Fields) (string, error) {
+	log.WithContext(ctx).WithFields(logFields).Info("finding remnant mount")
 	mounts, found, err := getRemnantTargetMounts(ctx, stagingPath, fs)
 	if err != nil {
 		return "", fmt.Errorf("could not reliably determine remnant mounts for path %s: %s", stagingPath, err.Error())
@@ -721,7 +840,7 @@ func removeRemnantMounts(ctx context.Context, stagingPath string, fs fs.Interfac
 		return "", fmt.Errorf("no remnant mounts for %s", stagingPath)
 	}
 
-	log.Infof("%d remnant mount exist", len(mounts))
+	log.WithContext(ctx).WithFields(logFields).Infof("%d remnant mount exist", len(mounts))
 	for _, mount := range mounts {
 		delete(logFields, "StagingPath")
 		logFields["RemnantPath"] = mount.Path
@@ -729,7 +848,7 @@ func removeRemnantMounts(ctx context.Context, stagingPath string, fs fs.Interfac
 		if err != nil {
 			return "", fmt.Errorf("could not unmount dev %s: %s", mount.Path, err.Error())
 		}
-		log.Info("unmount without error")
+		log.WithContext(ctx).WithFields(logFields).Info("unmount without error")
 	}
 
 	delete(logFields, "RemnantPath")
@@ -742,8 +861,7 @@ func removeRemnantMounts(ctx context.Context, stagingPath string, fs fs.Interfac
 
 // NodePublishVolume publishes volume to the node by mounting it to the target path
 func (s *Service) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
-	log := log.WithContext(ctx)
-	logFields := csmlog.ExtractFieldsFromContext(ctx)
+	logFields := log.ExtractFieldsFromContext(ctx)
 	var ephemeralVolume bool
 
 	ephemeral, ok := req.VolumeContext["csi.storage.k8s.io/ephemeral"]
@@ -776,6 +894,7 @@ func (s *Service) NodePublishVolume(ctx context.Context, req *csi.NodePublishVol
 	volumeHandle, _ := array.ParseVolumeID(ctx, id, s.DefaultArray(), req.VolumeCapability)
 	id = volumeHandle.LocalUUID
 	protocol := volumeHandle.Protocol
+	arrayID := volumeHandle.LocalArrayGlobalID
 
 	id, stagingPath := getStagingPath(ctx, req.GetStagingTargetPath(), id)
 
@@ -786,9 +905,32 @@ func (s *Service) NodePublishVolume(ctx context.Context, req *csi.NodePublishVol
 	logFields["TargetPath"] = targetPath
 	logFields["StagingPath"] = stagingPath
 	logFields["ReadOnly"] = req.GetReadonly()
-	ctx = csmlog.SetLogFields(ctx, logFields)
 
-	log.WithFields(logFields).Info("calling node publish volume")
+	log.WithContext(ctx).WithFields(log.Fields{
+		log.FieldComponent:   "node",
+		log.FieldOperation:   "NodePublishVolume",
+		log.FieldVolumeID:    id,
+		log.FieldProtocol:    protocol,
+		log.FieldArrayID:     arrayID,
+		log.FieldTargetPath:  targetPath,
+		log.FieldStagingPath: stagingPath,
+		"read_only":          isRO,
+	}).Info("publishing volume")
+	if mountCap := volumeCapability.GetMount(); mountCap != nil {
+		log.WithContext(ctx).WithFields(log.Fields{
+			log.FieldComponent: "node",
+			log.FieldOperation: "NodePublishVolume",
+			log.FieldVolumeID:  id,
+			"fs_type":          mountCap.GetFsType(),
+			"mount_flags":      mountCap.GetMountFlags(),
+		}).Info("mount capability details")
+	} else if volumeCapability.GetBlock() != nil {
+		log.WithContext(ctx).WithFields(log.Fields{
+			log.FieldComponent: "node",
+			log.FieldOperation: "NodePublishVolume",
+			log.FieldVolumeID:  id,
+		}).Info("raw block volume")
+	}
 
 	var publisher VolumePublisher
 
@@ -806,24 +948,43 @@ func (s *Service) NodePublishVolume(ctx context.Context, req *csi.NodePublishVol
 		}
 	}
 
-	return publisher.Publish(ctx, logFields, s.Fs, volumeCapability, isRO, targetPath, stagingPath)
+	resp, err := publisher.Publish(ctx, logFields, s.Fs, volumeCapability, isRO, targetPath, stagingPath)
+	if err != nil {
+		log.WithContext(ctx).WithFields(log.Fields{
+			log.FieldComponent: "node",
+			log.FieldOperation: "NodePublishVolume",
+			log.FieldVolumeID:  id,
+			log.FieldError:     err.Error(),
+		}).Error("failed to publish volume")
+		return nil, err
+	}
+	log.WithContext(ctx).WithFields(log.Fields{
+		log.FieldComponent:  "node",
+		log.FieldOperation:  "NodePublishVolume",
+		log.FieldVolumeID:   id,
+		log.FieldTargetPath: targetPath,
+	}).Info("volume published successfully")
+	return resp, nil
 }
 
 // NodeUnpublishVolume unpublishes volume from the node by unmounting it from the target path
 func (s *Service) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) {
-	logFields := csmlog.ExtractFieldsFromContext(ctx)
-	log := log.WithFields(logFields)
+	logFields := log.ExtractFieldsFromContext(ctx)
 	var err error
 
 	targetPath := req.GetTargetPath()
 	if targetPath == "" {
-		log.Error("target path required")
+		log.WithFields(logFields).Error("target path required")
 		return nil, status.Error(codes.InvalidArgument, "target path required")
 	}
 	volID := req.GetVolumeId()
 	if volID == "" {
 		return nil, status.Error(codes.InvalidArgument, "volume ID is required")
 	}
+
+	volumeHandle, _ := array.ParseVolumeID(ctx, volID, s.DefaultArray(), nil)
+	protocol := volumeHandle.Protocol
+	arrayID := volumeHandle.LocalArrayGlobalID
 
 	var ephemeralVolume bool
 	lockFile := ephemeralStagingMountPath + volID + "/id"
@@ -833,8 +994,14 @@ func (s *Service) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublis
 	}
 	logFields["ID"] = volID
 	logFields["TargetPath"] = targetPath
-	ctx = csmlog.SetLogFields(ctx, logFields)
-	log.Info("calling unpublish")
+	log.WithContext(ctx).WithFields(log.Fields{
+		log.FieldComponent:  "node",
+		log.FieldOperation:  "NodeUnpublishVolume",
+		log.FieldVolumeID:   volID,
+		log.FieldProtocol:   protocol,
+		log.FieldArrayID:    arrayID,
+		log.FieldTargetPath: targetPath,
+	}).Info("unpublishing volume")
 
 	_, found, err := getTargetMount(ctx, targetPath, s.Fs)
 	if err != nil {
@@ -845,11 +1012,16 @@ func (s *Service) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublis
 
 	if !found {
 		// no mounts
-		log.Info("no mounts found")
+		log.WithFields(logFields).Info("no mounts found")
 		return &csi.NodeUnpublishVolumeResponse{}, nil
 	}
 
-	log.Info("active mount exist")
+	log.WithFields(logFields).WithFields(log.Fields{
+		log.FieldComponent:  "node",
+		log.FieldOperation:  "NodeUnpublishVolume",
+		log.FieldVolumeID:   volID,
+		log.FieldTargetPath: targetPath,
+	}).Info("active mount found, unmounting")
 	err = s.Fs.GetUtil().Unmount(ctx, targetPath)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal,
@@ -858,16 +1030,27 @@ func (s *Service) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublis
 	}
 
 	// remove target path
+	log.WithFields(logFields).WithFields(log.Fields{
+		log.FieldComponent:  "node",
+		log.FieldOperation:  "NodeUnpublishVolume",
+		log.FieldVolumeID:   volID,
+		log.FieldTargetPath: targetPath,
+	}).Info("removing target path")
 	err = s.Fs.Remove(targetPath)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Failed to remove target path: %s as part of NodeUnpublish: %s", targetPath, err.Error())
 	}
 
-	log.Info("unpublish complete")
-	log.Debug("Checking for ephemeral after node unpublish")
+	log.WithFields(logFields).WithFields(log.Fields{
+		log.FieldComponent:  "node",
+		log.FieldOperation:  "NodeUnpublishVolume",
+		log.FieldVolumeID:   volID,
+		log.FieldTargetPath: targetPath,
+	}).Info("unpublish completed, target path cleaned up")
+	log.WithFields(logFields).Debug("Checking for ephemeral after node unpublish")
 
 	if ephemeralVolume {
-		log.Info("Detected ephemeral")
+		log.WithFields(logFields).Info("Detected ephemeral")
 		err = s.ephemeralNodeUnpublish(ctx, req)
 		if err != nil {
 			return nil, err
@@ -1127,7 +1310,7 @@ func (s *Service) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolume
 
 // NodeExpandVolume expands the volume by re-scanning and resizes filesystem if needed
 func (s *Service) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
-	log := log.WithContext(ctx)
+	startTime := time.Now()
 	var reqID string
 	var err error
 	headers, ok := metadata.FromIncomingContext(ctx)
@@ -1152,13 +1335,22 @@ func (s *Service) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolum
 		return nil, status.Error(codes.InvalidArgument, "targetPath is required")
 	}
 
-	if volumeHandle.Protocol == "nfs" {
+	id := volumeHandle.LocalUUID
+	arrayID := volumeHandle.LocalArrayGlobalID
+	protocol := volumeHandle.Protocol
+
+	log.WithContext(ctx).WithFields(log.Fields{
+		log.FieldComponent: "node",
+		log.FieldOperation: "NodeExpandVolume",
+		log.FieldVolumeID:  id,
+		log.FieldProtocol:  protocol,
+		log.FieldArrayID:   arrayID,
+	}).Info("starting node volume expansion")
+
+	if protocol == "nfs" {
 		// workaround for https://github.com/kubernetes/kubernetes/issues/131419
 		return &csi.NodeExpandVolumeResponse{}, nil
 	}
-
-	id := volumeHandle.LocalUUID
-	arrayID := volumeHandle.LocalArrayGlobalID
 
 	arr, ok := s.Arrays()[arrayID]
 	if !ok {
@@ -1182,7 +1374,7 @@ func (s *Service) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolum
 		}
 	}
 
-	log.Debugf("Volume name: %s", vol.Name)
+	log.WithContext(ctx).Debugf("Volume name: %s", vol.Name)
 
 	volumeWWN := vol.Wwn
 
@@ -1194,14 +1386,12 @@ func (s *Service) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolum
 		if isBlock {
 			return s.nodeExpandRawBlockVolume(ctx, volumeWWN)
 		}
-		log.Infof("Failed to find mount info for (%s) with error (%s)", vol.Name, err.Error())
-		log.Info("Probably offline volume expansion. Will try to perform a temporary mount.")
-		var disklocation string
-
-		disklocation = fmt.Sprintf("%s/%s", targetPath, vol.ID)
-		log.Infof("DisklLocation: %s", disklocation)
+		log.WithContext(ctx).Infof("Failed to find mount info for (%s) with error (%s)", vol.Name, err.Error())
+		log.WithContext(ctx).Info("Probably offline volume expansion. Will try to perform a temporary mount.")
+		disklocation := fmt.Sprintf("%s/%s", targetPath, vol.ID)
+		log.WithContext(ctx).Infof("DisklLocation: %s", disklocation)
 		targetmount = fmt.Sprintf("tmp/%s/%s", vol.ID, vol.Name)
-		log.Infof("TargetMount: %s", targetmount)
+		log.WithContext(ctx).Infof("TargetMount: %s", targetmount)
 		err = s.Fs.MkdirAll(targetmount, 0o750)
 		if err != nil {
 			return nil, status.Error(codes.Internal,
@@ -1217,14 +1407,14 @@ func (s *Service) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolum
 
 		defer func() {
 			if targetmount != "" {
-				log.Infof("Clearing down temporary mount points in: %s", targetmount)
+				log.WithContext(ctx).Infof("Clearing down temporary mount points in: %s", targetmount)
 				err := s.Fs.GetUtil().Unmount(ctx, targetmount)
 				if err != nil {
-					log.Error("Failed to remove temporary mount points")
+					log.WithContext(ctx).Error("Failed to remove temporary mount points")
 				}
 				err = s.Fs.RemoveAll(targetmount)
 				if err != nil {
-					log.Error("Failed to remove temporary mount points")
+					log.WithContext(ctx).Error("Failed to remove temporary mount points")
 				}
 			}
 		}()
@@ -1237,25 +1427,25 @@ func (s *Service) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolum
 
 	}
 
-	log.Infof("Mount info for volume %s: %+v", vol.Name, devMnt)
+	log.WithContext(ctx).Infof("Mount info for volume %s: %+v", vol.Name, devMnt)
 
 	size := req.GetCapacityRange().GetRequiredBytes()
 
-	f := csmlog.Fields{
+	f := log.Fields{
 		"CSIRequestID": reqID,
 		"VolumeName":   vol.Name,
 		"VolumePath":   targetPath,
 		"Size":         size,
 		"VolumeWWN":    volumeWWN,
 	}
-	log.WithFields(f).Info("Calling resize the file system")
+	log.WithContext(ctx).WithFields(f).WithOperation("NodeExpandVolume").Info("Calling resize the file system")
 	if !s.useNVME[arr.GlobalID] {
 		// Rescan the device for the volume expanded on the array
 		for _, device := range devMnt.DeviceNames {
 			devicePath := sysBlock + device
 			err = s.Fs.GetUtil().DeviceRescan(context.Background(), devicePath)
 			if err != nil {
-				log.Errorf("Failed to rescan device (%s) with error (%s)", devicePath, err.Error())
+				log.WithContext(ctx).Errorf("Failed to rescan device (%s) with error (%s)", devicePath, err.Error())
 				return nil, status.Error(codes.Internal, err.Error())
 			}
 		}
@@ -1264,7 +1454,7 @@ func (s *Service) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolum
 	if devMnt.MPathName != "" {
 		err = s.Fs.GetUtil().ResizeMultipath(context.Background(), devMnt.MPathName)
 		if err != nil {
-			log.Errorf("Failed to resize filesystem: device  (%s) with error (%s)", devMnt.MountPoint, err.Error())
+			log.WithContext(ctx).Errorf("Failed to resize filesystem: device  (%s) with error (%s)", devMnt.MountPoint, err.Error())
 
 			return nil, status.Error(codes.Internal, err.Error())
 		}
@@ -1282,10 +1472,10 @@ func (s *Service) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolum
 	}
 	fsType, err := s.Fs.GetUtil().FindFSType(context.Background(), devMnt.MountPoint)
 	if err != nil {
-		log.Errorf("Failed to fetch filesystem for volume  (%s) with error (%s)", devMnt.MountPoint, err.Error())
+		log.WithContext(ctx).Errorf("Failed to fetch filesystem for volume  (%s) with error (%s)", devMnt.MountPoint, err.Error())
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	log.Infof("Found %s filesystem mounted on volume %s", fsType, devMnt.MountPoint)
+	log.WithContext(ctx).Infof("Found %s filesystem mounted on volume %s", fsType, devMnt.MountPoint)
 	// Resize the filesystem
 	var xfsNew bool
 	checkVersCmd := "xfs_growfs -V"
@@ -1317,7 +1507,7 @@ func (s *Service) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolum
 		// Passing empty string for ppathDevice since we don't need the powerpath device
 		err = s.Fs.GetUtil().ResizeFS(context.Background(), devMnt.MountPoint, devicePath, "", "", fsType)
 		if err != nil {
-			log.Errorf("Failed to resize filesystem: mountpoint (%s) device (%s) with error (%s)",
+			log.WithContext(ctx).Errorf("Failed to resize filesystem: mountpoint (%s) device (%s) with error (%s)",
 				devMnt.MountPoint, devicePath, err.Error())
 			return nil, status.Error(codes.Internal, err.Error())
 		}
@@ -1325,22 +1515,29 @@ func (s *Service) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolum
 		// Passing empty string for ppathDevice since we don't need the powerpath device
 		err = s.Fs.GetUtil().ResizeFS(context.Background(), devMnt.MountPoint, devicePath, "", devMnt.MPathName, fsType)
 		if err != nil {
-			log.Errorf("Failed to resize filesystem: mountpoint (%s) device (%s) with error (%s)",
+			log.WithContext(ctx).Errorf("Failed to resize filesystem: mountpoint (%s) device (%s) with error (%s)",
 				devMnt.MountPoint, devicePath, err.Error())
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 	}
 
+	log.WithContext(ctx).WithFields(log.Fields{
+		log.FieldComponent:  "node",
+		log.FieldOperation:  "NodeExpandVolume",
+		log.FieldVolumeID:   id,
+		log.FieldProtocol:   protocol,
+		log.FieldArrayID:    arrayID,
+		log.FieldDurationMs: time.Since(startTime).Milliseconds(),
+	}).Info("node volume expansion completed")
 	return &csi.NodeExpandVolumeResponse{}, nil
 }
 
 func (s *Service) nodeExpandRawBlockVolume(ctx context.Context, volumeWWN string) (*csi.NodeExpandVolumeResponse, error) {
-	log := log.WithContext(ctx)
-	log.Info(" Block volume expansion. Will try to perform a rescan...")
+	log.WithContext(ctx).Info(" Block volume expansion. Will try to perform a rescan...")
 	wwnNum := strings.Replace(volumeWWN, "naa.", "", 1)
 	deviceNames, err := s.Fs.GetUtil().GetSysBlockDevicesForVolumeWWN(context.Background(), wwnNum)
 	if err != nil {
-		log.Errorf("Failed to get block devices with error (%s)", err.Error())
+		log.WithContext(ctx).Errorf("Failed to get block devices with error (%s)", err.Error())
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	if len(deviceNames) > 0 {
@@ -1349,24 +1546,24 @@ func (s *Service) nodeExpandRawBlockVolume(ctx context.Context, volumeWWN string
 			if strings.HasPrefix(deviceName, "nvme") {
 				nvmeControllerDevice, err := s.Fs.GetUtil().GetNVMeController(deviceName)
 				if err != nil {
-					log.Errorf("Failed to rescan device (%s) with error (%s)", deviceName, err.Error())
+					log.WithContext(ctx).Errorf("Failed to rescan device (%s) with error (%s)", deviceName, err.Error())
 					return nil, status.Error(codes.Internal, err.Error())
 				}
 				if nvmeControllerDevice != "" {
 					devicePath := dev + nvmeControllerDevice
-					log.Infof("Rescanning unmounted (raw block) device %s to expand size", devicePath)
+					log.WithContext(ctx).Infof("Rescanning unmounted (raw block) device %s to expand size", devicePath)
 					err = s.nvmeLib.DeviceRescan(devicePath)
 					if err != nil {
-						log.Errorf("Failed to rescan device (%s) with error (%s)", devicePath, err.Error())
+						log.WithContext(ctx).Errorf("Failed to rescan device (%s) with error (%s)", devicePath, err.Error())
 						return nil, status.Error(codes.Internal, err.Error())
 					}
 				}
 			} else {
 				devicePath := sysBlock + deviceName
-				log.Infof("Rescanning unmounted (raw block) device %s to expand size", deviceName)
+				log.WithContext(ctx).Infof("Rescanning unmounted (raw block) device %s to expand size", deviceName)
 				err = s.Fs.GetUtil().DeviceRescan(context.Background(), devicePath)
 				if err != nil {
-					log.Errorf("Failed to rescan device (%s) with error (%s)", devicePath, err.Error())
+					log.WithContext(ctx).Errorf("Failed to rescan device (%s) with error (%s)", devicePath, err.Error())
 					return nil, status.Error(codes.Internal, err.Error())
 				}
 			}
@@ -1376,21 +1573,21 @@ func (s *Service) nodeExpandRawBlockVolume(ctx context.Context, volumeWWN string
 		mpathDev, err := s.Fs.GetUtil().GetMpathNameFromDevice(ctx, devName)
 		fmt.Println("mpathDev: " + mpathDev)
 		if err != nil {
-			log.Errorf("Failed to get mpath name for device (%s) with error (%s)", devName, err.Error())
+			log.WithContext(ctx).Errorf("Failed to get mpath name for device (%s) with error (%s)", devName, err.Error())
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 		if mpathDev != "" {
 			err = s.Fs.GetUtil().ResizeMultipath(context.Background(), mpathDev)
 			if err != nil {
-				log.Errorf("Failed to resize multipath of block device (%s) with error (%s)", mpathDev, err.Error())
+				log.WithContext(ctx).Errorf("Failed to resize multipath of block device (%s) with error (%s)", mpathDev, err.Error())
 				return nil, status.Error(codes.Internal, err.Error())
 			}
 		}
 
-		log.Info("Block volume successfuly rescaned.")
+		log.WithContext(ctx).Info("Block volume successfuly rescaned.")
 		return &csi.NodeExpandVolumeResponse{}, nil
 	}
-	log.Error("No raw block devices found")
+	log.WithContext(ctx).Error("No raw block devices found")
 	return nil, status.Error(codes.NotFound, "No raw block devices found")
 }
 
@@ -1432,7 +1629,6 @@ func (s *Service) NodeGetCapabilities(_ context.Context, _ *csi.NodeGetCapabilit
 func (s *Service) NodeGetInfo(ctx context.Context, _ *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
 	// Create the topology keys
 	// <driver name>/<endpoint>-<protocol>: true
-	log := log.WithContext(ctx)
 	resp := &csi.NodeGetInfoResponse{
 		NodeId: s.nodeID,
 		AccessibleTopology: &csi.Topology{
@@ -1442,21 +1638,32 @@ func (s *Service) NodeGetInfo(ctx context.Context, _ *csi.NodeGetInfoRequest) (*
 
 	nodeLabels, err := k8sutils.Kubeclient.GetNodeLabels(ctx, s.opts.KubeNodeName)
 	if err != nil {
-		log.Warnf("failed to get Node Labels with error: %s", err.Error())
+		log.WithContext(ctx).Warnf("failed to get Node Labels with error: %s", err.Error())
 	}
 
 	for _, arr := range s.Arrays() {
 		if isNFSEnabled, err := identifiers.IsNFSServiceEnabled(ctx, arr.GetClient()); err != nil {
-			log.Errorf("failed to validate NFS service for the array: %s", err.Error())
+			log.WithContext(ctx).WithFields(log.Fields{
+				log.FieldComponent: "node",
+				log.FieldOperation: "NodeGetInfo",
+				log.FieldProtocol:  "NFS",
+				log.FieldArrayID:   arr.GetGlobalID(),
+				log.FieldError:     err.Error(),
+			}).Error("failed to validate NFS service for the array")
 		} else if isNFSEnabled {
-			log.Infof("NFS service is enabled on the array %s ", arr.GetGlobalID())
+			log.WithContext(ctx).WithFields(log.Fields{
+				log.FieldComponent: "node",
+				log.FieldOperation: "NodeGetInfo",
+				log.FieldProtocol:  "NFS",
+				log.FieldArrayID:   arr.GetGlobalID(),
+			}).Info("NFS service is enabled on the array")
 			// we will chop off port from the host if present.
-			port, err := ExtractPort(arr.Endpoint)
-			_, err = getOutboundIP(arr.GetIP(), port, s.Fs)
+			port, _ := ExtractPort(arr.Endpoint)
+			_, err := getOutboundIP(arr.GetIP(), port, s.Fs)
 			if err == nil {
 				resp.AccessibleTopology.Segments[identifiers.Name+"/"+arr.GetIP()+"-nfs"] = "true"
 			} else {
-				log.Errorf("Error: failed to get ip details: %s\n", err.Error())
+				log.WithContext(ctx).Errorf("Error: failed to get ip details: %s\n", err.Error())
 			}
 		}
 		if arr.BlockProtocol != identifiers.NoneTransport {
@@ -1464,22 +1671,35 @@ func (s *Service) NodeGetInfo(ctx context.Context, _ *csi.NodeGetInfoRequest) (*
 				if s.useFC[arr.GlobalID] {
 					nvmefcInfo, err := identifiers.GetNVMEFCTargetInfoFromStorage(arr.GetClient(), "")
 					if err != nil {
-						log.Errorf("couldn't get targets from the array: %s", err.Error())
+						log.WithContext(ctx).Errorf("couldn't get targets from the array: %s", err.Error())
 						continue
 					}
 
-					log.Infof("Discovering NVMeFC targets")
+					log.WithContext(ctx).WithFields(log.Fields{
+						log.FieldComponent: "node",
+						log.FieldOperation: "NodeGetInfo",
+						log.FieldProtocol:  "NVMeFC",
+						log.FieldArrayID:   arr.GetGlobalID(),
+					}).Info("discovering NVMeFC targets")
 					nvmefcConnectCount := 0
 					for _, info := range nvmefcInfo {
 						NVMeFCTargets, err := s.nvmeLib.DiscoverNVMeFCTargets(info.Portal, false)
 						if err != nil {
-							log.Errorf("couldn't discover NVMeFC targets")
+							log.WithContext(ctx).WithFields(log.Fields{
+								log.FieldComponent: "node",
+								log.FieldOperation: "NodeGetInfo",
+								log.FieldProtocol:  "NVMeFC",
+							}).Error("couldn't discover NVMeFC targets")
 							continue
 						}
 						for _, target := range NVMeFCTargets {
 							err = s.nvmeLib.NVMeFCConnect(target, false)
 							if err != nil {
-								log.Errorf("couldn't connect to NVMeFC target")
+								log.WithContext(ctx).WithFields(log.Fields{
+									log.FieldComponent: "node",
+									log.FieldOperation: "NodeGetInfo",
+									log.FieldProtocol:  "NVMeFC",
+								}).Error("couldn't connect to NVMeFC target")
 							} else {
 								nvmefcConnectCount = nvmefcConnectCount + 1
 								otherTargets := s.nvmeTargets[arr.GlobalID]
@@ -1494,7 +1714,7 @@ func (s *Service) NodeGetInfo(ctx context.Context, _ *csi.NodeGetInfoRequest) (*
 					// useNVME/TCP
 					infoList, err := identifiers.GetNVMETCPTargetsInfoFromStorage(arr.GetClient(), "")
 					if err != nil {
-						log.Errorf("couldn't get targets from array: %s", err.Error())
+						log.WithContext(ctx).Errorf("couldn't get targets from array: %s", err.Error())
 						continue
 					}
 
@@ -1510,10 +1730,22 @@ func (s *Service) NodeGetInfo(ctx context.Context, _ *csi.NodeGetInfoRequest) (*
 						// discover the target
 						// doesn't matter how many portals are present, discovering from any one will list out all targets
 						nvmeIP := strings.Split(address.Portal, ":")[0]
-						log.Infof("Trying to discover NVMe targets from portal %s on network %s", nvmeIP, address.NetworkID)
+						log.WithContext(ctx).WithFields(log.Fields{
+							log.FieldComponent: "node",
+							log.FieldOperation: "NodeGetInfo",
+							log.FieldProtocol:  "NVMeTCP",
+							"portal":           nvmeIP,
+							"network_id":       address.NetworkID,
+						}).Info("discovering NVMeTCP targets from portal")
 						discoveredTargets, err := s.nvmeLib.DiscoverNVMeTCPTargets(nvmeIP, false)
 						if err != nil {
-							log.Errorf("discovering portal: %s: %v", nvmeIP, err)
+							log.WithContext(ctx).WithFields(log.Fields{
+								log.FieldComponent: "node",
+								log.FieldOperation: "NodeGetInfo",
+								log.FieldProtocol:  "NVMeTCP",
+								"portal":           nvmeIP,
+								log.FieldError:     err.Error(),
+							}).Error("error discovering portal")
 							continue
 						}
 
@@ -1525,10 +1757,19 @@ func (s *Service) NodeGetInfo(ctx context.Context, _ *csi.NodeGetInfoRequest) (*
 					}
 					loginToAtleastOneTarget := false
 					for _, target := range nvmeTargets {
-						log.Infof("Logging to NVMe target %v", target)
+						log.WithContext(ctx).WithFields(log.Fields{
+							log.FieldComponent: "node",
+							log.FieldOperation: "NodeGetInfo",
+							log.FieldProtocol:  "NVMeTCP",
+							"target":           fmt.Sprintf("%v", target),
+						}).Info("logging in to NVMeTCP target")
 						err = s.nvmeLib.NVMeTCPConnect(target, false)
 						if err != nil {
-							log.Errorf("couldn't connect to the nvme target")
+							log.WithContext(ctx).WithFields(log.Fields{
+								log.FieldComponent: "node",
+								log.FieldOperation: "NodeGetInfo",
+								log.FieldProtocol:  "NVMeTCP",
+							}).Error("couldn't connect to NVMeTCP target")
 							continue
 						}
 						otherTargets := s.nvmeTargets[arr.GlobalID]
@@ -1545,15 +1786,15 @@ func (s *Service) NodeGetInfo(ctx context.Context, _ *csi.NodeGetInfoRequest) (*
 				// Check node initiators connection to array
 				host, err := arr.GetClient().GetHostByName(ctx, s.nodeID)
 				if err != nil {
-					log.WithFields(csmlog.Fields{
+					log.WithContext(ctx).WithFields(log.Fields{
 						"hostName": s.nodeID,
 						"error":    err,
-					}).Error("could not find host on PowerStore array")
+					}).WithOperation("GetNodeInfo").Error("could not find host on PowerStore array")
 					continue
 				}
 
 				if len(host.Initiators) == 0 {
-					log.Error("host initiators array is empty")
+					log.WithContext(ctx).Error("host initiators array is empty")
 					continue
 				}
 
@@ -1561,7 +1802,7 @@ func (s *Service) NodeGetInfo(ctx context.Context, _ *csi.NodeGetInfoRequest) (*
 				if fcInitiatorsWithActiveSessionCount > 0 {
 					resp.AccessibleTopology.Segments[identifiers.Name+"/"+arr.GetIP()+"-fc"] = "true"
 				} else {
-					log.WithFields(csmlog.Fields{
+					log.WithContext(ctx).WithFields(log.Fields{
 						"hostName":  host.Name,
 						"initiator": host.Initiators[0].PortName,
 					}).Error("there is no active FC sessions")
@@ -1570,7 +1811,7 @@ func (s *Service) NodeGetInfo(ctx context.Context, _ *csi.NodeGetInfoRequest) (*
 			} else {
 				infoList, err := identifiers.GetISCSITargetsInfoFromStorage(arr.GetClient(), "")
 				if err != nil {
-					log.Errorf("couldn't get targets from array: %s", err.Error())
+					log.WithContext(ctx).Errorf("couldn't get targets from array: %s", err.Error())
 					continue
 				}
 				var ipAddress string
@@ -1588,16 +1829,21 @@ func (s *Service) NodeGetInfo(ctx context.Context, _ *csi.NodeGetInfoRequest) (*
 						ipAddressList := splitIPAddress(address.Portal)
 						ipAddress = ipAddressList[0]
 						// doesn't matter how many portals are present, discovering from any one will list out all targets
-						log.Infof("Trying to discover iSCSI target from portal %s", ipAddress)
+						log.WithContext(ctx).WithFields(log.Fields{
+							log.FieldComponent: "node",
+							log.FieldOperation: "NodeGetInfo",
+							log.FieldProtocol:  "iSCSI",
+							"portal":           ipAddress,
+						}).Info("discovering iSCSI target from portal")
 
 						ipInterface, err := s.iscsiLib.GetInterfaceForTargetIP(ipAddress)
 						if err != nil {
-							log.Errorf("couldn't get interface: %s", err.Error())
+							log.WithContext(ctx).Errorf("couldn't get interface: %s", err.Error())
 							continue
 						}
 						discoveredTargets, err := s.iscsiLib.DiscoverTargetsWithInterface(address.Portal, ipInterface[ipAddress], false)
 						if err != nil {
-							log.Errorf("couldn't discover targets: %s", err.Error())
+							log.WithContext(ctx).Errorf("couldn't discover targets: %s", err.Error())
 							continue
 						}
 
@@ -1607,7 +1853,7 @@ func (s *Service) NodeGetInfo(ctx context.Context, _ *csi.NodeGetInfoRequest) (*
 						// since it will return all the same target information already seen
 						networkIDs[address.NetworkID] = struct{}{}
 					}
-					log.Debugf("Portal is not rechable from the node")
+					log.WithContext(ctx).Debugf("Portal is not rechable from the node")
 				}
 				// login is also performed as a part of ConnectVolume by using dynamically created chap credentials, In case if it fails here
 				if len(iscsiTargets) > 0 {
@@ -1616,24 +1862,37 @@ func (s *Service) NodeGetInfo(ctx context.Context, _ *csi.NodeGetInfoRequest) (*
 				loginToAtleastOneTarget := false
 				for _, target := range iscsiTargets {
 					if ReachableEndPoint(target.Portal) {
-						log.Infof("Logging to Iscsi target %v", target)
+						log.WithContext(ctx).WithFields(log.Fields{
+							log.FieldComponent: "node",
+							log.FieldOperation: "NodeGetInfo",
+							log.FieldProtocol:  "iSCSI",
+							"target":           fmt.Sprintf("%v", target),
+						}).Info("logging in to iSCSI target")
 						if s.opts.EnableCHAP {
-							log.Debug("Setting CHAP Credentials before login")
+							log.WithContext(ctx).Debug("Setting CHAP Credentials before login")
 							err = s.iscsiLib.SetCHAPCredentials(target, s.opts.CHAPUsername, s.opts.CHAPPassword)
 							if err != nil {
-								log.Errorf("couldn't connect to the iscsi target")
+								log.WithContext(ctx).WithFields(log.Fields{
+									log.FieldComponent: "node",
+									log.FieldOperation: "NodeGetInfo",
+									log.FieldProtocol:  "iSCSI",
+								}).Error("couldn't set CHAP credentials for iSCSI target")
 							}
 						}
 						err = s.iscsiLib.PerformLogin(target)
 						if err != nil {
-							log.Errorf("couldn't connect to the iscsi target")
+							log.WithContext(ctx).WithFields(log.Fields{
+								log.FieldComponent: "node",
+								log.FieldOperation: "NodeGetInfo",
+								log.FieldProtocol:  "iSCSI",
+							}).Error("couldn't connect to iSCSI target")
 							continue
 						}
 						otherTargets := s.iscsiTargets[arr.GlobalID]
 						s.iscsiTargets[arr.GlobalID] = append(otherTargets, target.Target)
 						loginToAtleastOneTarget = true
 					} else {
-						log.Debugf("Target's Portal %s is not rechable from the node ", target.Portal)
+						log.WithContext(ctx).Debugf("Target's Portal %s is not rechable from the node ", target.Portal)
 					}
 				}
 
@@ -1658,10 +1917,10 @@ func (s *Service) NodeGetInfo(ctx context.Context, _ *csi.NodeGetInfoRequest) (*
 		if val, ok := nodeLabels[maxPowerstoreVolumesPerNodeLabel]; ok {
 			maxVols, err := strconv.ParseInt(val, 10, 64)
 			if err != nil {
-				log.Warnf("invalid value '%s' specified for 'max-powerstore-volumes-per-node' node label", val)
+				log.WithContext(ctx).Warnf("invalid value '%s' specified for 'max-powerstore-volumes-per-node' node label", val)
 			} else if maxVols > 0 {
 				maxVolumesPerNode = maxVols
-				log.Infof("node label 'max-powerstore-volumes-per-node' is available and is set to value '%d'", maxVolumesPerNode)
+				log.WithContext(ctx).Infof("node label 'max-powerstore-volumes-per-node' is available and is set to value '%d'", maxVolumesPerNode)
 			}
 
 		}
@@ -1669,7 +1928,7 @@ func (s *Service) NodeGetInfo(ctx context.Context, _ *csi.NodeGetInfoRequest) (*
 
 	if maxVolumesPerNode >= 0 {
 		resp.MaxVolumesPerNode = maxVolumesPerNode
-		log.Infof("Setting MaxVolumesPerNode to '%d'", maxVolumesPerNode)
+		log.WithContext(ctx).Infof("Setting MaxVolumesPerNode to '%d'", maxVolumesPerNode)
 	}
 
 	return resp, nil
@@ -1690,7 +1949,7 @@ func (s *Service) updateNodeID() error {
 	if s.nodeID == "" {
 		hostID, err := s.Fs.ReadFile(s.opts.NodeIDFilePath)
 		if err != nil {
-			log.WithFields(csmlog.Fields{
+			log.WithFields(log.Fields{
 				"path":  s.opts.NodeIDFilePath,
 				"error": err,
 			}).Error("Could not read Node ID file")
@@ -1703,7 +1962,7 @@ func (s *Service) updateNodeID() error {
 			return status.Errorf(codes.FailedPrecondition, "Could not fetch default PowerStore array")
 		}
 		// we will chop off port from the host if present.
-		port, err := ExtractPort(defaultArray.Endpoint)
+		port, _ := ExtractPort(defaultArray.Endpoint)
 		ip, err := getOutboundIP(defaultArray.GetIP(), port, s.Fs)
 		log.Debugf("Outbound IP address: %s", ip.String())
 
@@ -1718,7 +1977,7 @@ func (s *Service) updateNodeID() error {
 
 		log.Debugf("Outbound IP address after check: %s", ip.String())
 		if err != nil {
-			log.WithFields(csmlog.Fields{
+			log.WithFields(log.Fields{
 				"endpoint": s.DefaultArray().GetIP(),
 				"error":    err,
 			}).Error("Could not connect to PowerStore array")
@@ -1731,7 +1990,7 @@ func (s *Service) updateNodeID() error {
 
 		if len(nodeID) > powerStoreMaxNodeNameLength {
 			err := errors.New("node name prefix is too long")
-			log.WithFields(csmlog.Fields{
+			log.WithFields(log.Fields{
 				"value": s.opts.NodeNamePrefix,
 				"error": err,
 			}).Error("Invalid Node ID")
@@ -1750,37 +2009,77 @@ func (s *Service) getInitiators() ([]string, []string, []string, error) {
 
 	iscsiInitiators, err := s.iscsiConnector.GetInitiatorName(ctx)
 	if err != nil {
-		log.Error("nodeStartup could not GetInitiatorIQNs")
+		log.WithFields(log.Fields{
+			log.FieldComponent: "node",
+			log.FieldOperation: "getInitiators",
+			log.FieldProtocol:  "iSCSI",
+		}).Error("could not get initiator IQNs")
 	} else if len(iscsiInitiators) == 0 {
-		log.Error("iscsi initiators not found on node")
+		log.WithFields(log.Fields{
+			log.FieldComponent: "node",
+			log.FieldOperation: "getInitiators",
+			log.FieldProtocol:  "iSCSI",
+		}).Error("initiators not found on node")
 	} else {
-		log.Debug("iscsi initiators found on node")
+		log.WithFields(log.Fields{
+			log.FieldComponent: "node",
+			log.FieldOperation: "getInitiators",
+			log.FieldProtocol:  "iSCSI",
+		}).Debug("initiators found on node")
 		iscsiAvailable = true
 	}
 
 	fcInitiators, err := s.getNodeFCPorts(ctx)
 	if err != nil {
-		log.Error("nodeStartup could not FC initiators for node")
+		log.WithFields(log.Fields{
+			log.FieldComponent: "node",
+			log.FieldOperation: "getInitiators",
+			log.FieldProtocol:  "FC",
+		}).Error("could not get FC initiators for node")
 	} else if len(fcInitiators) == 0 {
-		log.Error("FC was not found or filtered with FCPortsFilterFile")
+		log.WithFields(log.Fields{
+			log.FieldComponent: "node",
+			log.FieldOperation: "getInitiators",
+			log.FieldProtocol:  "FC",
+		}).Error("FC was not found or filtered with FCPortsFilterFile")
 	} else {
-		log.Debug("FC initiators found on node")
+		log.WithFields(log.Fields{
+			log.FieldComponent: "node",
+			log.FieldOperation: "getInitiators",
+			log.FieldProtocol:  "FC",
+		}).Debug("initiators found on node")
 		fcAvailable = true
 	}
 
 	nvmeInitiators, err := s.nvmeConnector.GetInitiatorName(ctx)
 	if err != nil {
-		log.Error("nodeStartup could not get Initiator NQNs")
+		log.WithFields(log.Fields{
+			log.FieldComponent: "node",
+			log.FieldOperation: "getInitiators",
+			log.FieldProtocol:  "NVMe",
+		}).Error("could not get initiator NQNs")
 	} else if len(nvmeInitiators) == 0 {
-		log.Error("NVMe initiators not found on node")
+		log.WithFields(log.Fields{
+			log.FieldComponent: "node",
+			log.FieldOperation: "getInitiators",
+			log.FieldProtocol:  "NVMe",
+		}).Error("initiators not found on node")
 	} else {
-		log.Debug("NVMe initiators found on node")
+		log.WithFields(log.Fields{
+			log.FieldComponent: "node",
+			log.FieldOperation: "getInitiators",
+			log.FieldProtocol:  "NVMe",
+		}).Debug("initiators found on node")
 		nvmeAvailable = true
 	}
 
 	if !iscsiAvailable && !fcAvailable && !nvmeAvailable {
 		// If we haven't found any initiators we still can use NFS
-		log.Info("FC, iSCSI and NVMe initiators not found on node")
+		log.WithFields(log.Fields{
+			log.FieldComponent: "node",
+			log.FieldOperation: "getInitiators",
+			log.FieldProtocol:  "NFS",
+		}).Info("FC, iSCSI and NVMe initiators not found on node, NFS only")
 	}
 
 	return iscsiInitiators, fcInitiators, nvmeInitiators, nil
@@ -1789,16 +2088,24 @@ func (s *Service) getInitiators() ([]string, []string, []string, error) {
 func (s *Service) getNodeFCPorts(ctx context.Context) ([]string, error) {
 	var err error
 	var initiators []string
-	log := log.WithContext(ctx)
 
 	defer func() {
 		initiators := initiators
-		log.Infof("FC initiators found: %s", initiators)
+		log.WithContext(ctx).WithFields(log.Fields{
+			log.FieldComponent: "node",
+			log.FieldOperation: "getNodeFCPorts",
+			log.FieldProtocol:  "FC",
+			"initiators":       initiators,
+		}).Info("FC initiators found")
 	}()
 
 	rawInitiatorsData, err := s.fcConnector.GetInitiatorPorts(ctx)
 	if err != nil {
-		log.Error("failed FC initiators list from node")
+		log.WithContext(ctx).WithFields(log.Fields{
+			log.FieldComponent: "node",
+			log.FieldOperation: "getNodeFCPorts",
+			log.FieldProtocol:  "FC",
+		}).Error("failed to get FC initiators list from node")
 		return nil, err
 	}
 
@@ -1822,7 +2129,12 @@ func (s *Service) getNodeFCPorts(ctx context.Context) ([]string, error) {
 			if initiator != filterValue {
 				continue
 			}
-			log.Infof("FC initiator port %s match filter", initiator)
+			log.WithContext(ctx).WithFields(log.Fields{
+				log.FieldComponent: "node",
+				log.FieldOperation: "getNodeFCPorts",
+				log.FieldProtocol:  "FC",
+				"initiator":        initiator,
+			}).Info("FC initiator port matches filter")
 			filteredInitiators = append(filteredInitiators, initiator)
 		}
 	}
@@ -1869,12 +2181,39 @@ func (s *Service) setupHost(initiators []string, client gopowerstore.Client, arr
 		s.checkForDuplicateUUIDs()
 	}
 
+	// Retry configuration for array connectivity during host setup
+	const maxRetries = 10
+	const retrySleepTime = 1 * time.Second
+
+	// Helper function to execute array API call with retry
+	executeWithRetry := func(fn func() error) error {
+		var lastErr error
+		for i := 0; i < maxRetries; i++ {
+			lastErr = fn()
+			if lastErr == nil {
+				return nil
+			}
+			// Retry on all errors up to maxRetries
+			if i < maxRetries-1 {
+				log.Debugf("Array %s API call failed, retry %d/%d: %s", arrayID, i+1, maxRetries, lastErr.Error())
+				time.Sleep(retrySleepTime)
+				continue
+			}
+		}
+		return lastErr
+	}
+
 	reqInitiators := s.buildInitiatorsArray(initiators, arrayID)
 	var existingHost *gopowerstore.Host
 
-	hosts, err := client.GetHosts(context.Background())
+	var hosts []gopowerstore.Host
+	err := executeWithRetry(func() error {
+		var err error
+		hosts, err = client.GetHosts(context.Background())
+		return err
+	})
 	if err != nil {
-		return fmt.Errorf("failed getting hosts on %s", arrayIP)
+		return fmt.Errorf("failed getting hosts on %s: %w", arrayIP, err)
 	}
 
 	for i := range hosts {
@@ -1896,21 +2235,28 @@ func (s *Service) setupHost(initiators []string, client gopowerstore.Client, arr
 
 	if existingHost == nil {
 		log.Infof("Creating host %s on array %s", s.nodeID, arrayID)
-		_, err := s.createHost(context.Background(), initiators)
+		err := executeWithRetry(func() error {
+			_, err := s.createHost(context.Background(), initiators)
+			return err
+		})
 		if err != nil {
 			return err
 		}
 	} else {
 		log.Infof("Host with initiator already exists. Updating metadata or CHAP if needed.")
 		if s.opts.EnableCHAP {
-			err := s.modifyHostInitiators(context.Background(), existingHost.ID, client, nil, nil, initiators, arrayID, &existingHost.HostConnectivity)
+			err := executeWithRetry(func() error {
+				return s.modifyHostInitiators(context.Background(), existingHost.ID, client, nil, nil, initiators, arrayID, &existingHost.HostConnectivity)
+			})
 			if err != nil {
 				return fmt.Errorf("failed to update CHAP: %v", err)
 			}
 		}
 
 		if s.nodeID != existingHost.ID {
-			err := s.modifyHostName(context.Background(), client, s.nodeID, existingHost.ID)
+			err := executeWithRetry(func() error {
+				return s.modifyHostName(context.Background(), client, s.nodeID, existingHost.ID)
+			})
 			if err != nil {
 				return fmt.Errorf("failed to update host name: %v", err)
 			}
@@ -1922,14 +2268,13 @@ func (s *Service) setupHost(initiators []string, client gopowerstore.Client, arr
 }
 
 func (s *Service) modifyHostName(ctx context.Context, client gopowerstore.Client, nodeID string, hostID string) error {
-	log := log.WithContext(ctx)
 	modifyParams := gopowerstore.HostModify{}
 	modifyParams.Name = &nodeID
 	_, err := client.ModifyHost(ctx, &modifyParams, hostID)
 	if err != nil {
 		return err
 	}
-	log.Infof("Updated nodeID %s", nodeID)
+	log.WithContext(ctx).Infof("Updated nodeID %s", nodeID)
 	return nil
 }
 
@@ -1994,7 +2339,7 @@ func (s *Service) createHost(ctx context.Context, initiators []string) (string, 
 	hostConnectivity := false
 	metroTopology := false
 	for _, arr := range getArrayfn(s) {
-		if arr.MetroTopology != "" {
+		if arr.MetroTopology != "" { //nolint:staticcheck // SA1019: MetroTopology used for backward compatibility
 			if hostConnectivity {
 				return "", fmt.Errorf("host connectivity and metro topology cannot be set at the same time")
 			}
@@ -2015,7 +2360,6 @@ func (s *Service) createHost(ctx context.Context, initiators []string) (string, 
 
 // register host
 func (s *Service) createHostHostConnectivity(ctx context.Context, initiators []string) (string, error) {
-	log := log.WithContext(ctx)
 	node, err := k8sutils.Kubeclient.GetNode(context.Background(), s.opts.KubeNodeName)
 	if err != nil {
 		return "", fmt.Errorf("[createHost] Failed to get node %s: %v", s.opts.KubeNodeName, err)
@@ -2024,24 +2368,24 @@ func (s *Service) createHostHostConnectivity(ctx context.Context, initiators []s
 
 	for _, arr := range getArrayfn(s) {
 		var conn gopowerstore.HostConnectivityEnum
-		log.Infof("[createHost] Processing array %s (%s)", arr.GlobalID, arr.IP)
+		log.WithContext(ctx).Infof("[createHost] Processing array %s (%s)", arr.GlobalID, arr.IP)
 		// 1) Skip if already registered
 		if getIsHostAlreadyRegistered(s, ctx, arr.GetClient(), initiators) {
-			log.Infof("[createHost] Already registered on %s, skipping", arr.GlobalID)
+			log.WithContext(ctx).Infof("[createHost] Already registered on %s, skipping", arr.GlobalID)
 			if primaryArrayID == "" {
 				primaryArrayID = arr.GlobalID
 			}
 			continue
 		}
 		// 2) Metro vs Non‑Metro
-		log.Debugf("[createHost] Processing array %s (%d)(%v)", arr.GlobalID, arr.HostConnectivity.Local.Size(), &arr.HostConnectivity.Metro)
+		log.WithContext(ctx).Debugf("[createHost] Processing array %s (%d)(%v)", arr.GlobalID, arr.HostConnectivity.Local.Size(), &arr.HostConnectivity.Metro)
 		if arr.HostConnectivity.Local.Size() > 0 {
 			match, err := nodeMatchSelector(node, &arr.HostConnectivity.Local, conn)
 			if err != nil {
 				return "", fmt.Errorf("[createHost] Error matching host connectivity selector for array %s: %v", arr.GlobalID, err)
 			}
 			if match {
-				log.Infof("[createHost] Zone match on %s, registering host locally", arr.GlobalID)
+				log.WithContext(ctx).Infof("[createHost] Zone match on %s, registering host locally", arr.GlobalID)
 				conn = gopowerstore.HostConnectivityEnumLocalOnly
 			}
 		}
@@ -2052,7 +2396,7 @@ func (s *Service) createHostHostConnectivity(ctx context.Context, initiators []s
 			return "", fmt.Errorf("[createHost] Error matching host connectivity selector for array %s: %v", arr.GlobalID, err)
 		}
 		if match {
-			log.Infof("[createHost] Metro & label match on %s, registering as ColocatedLocal", arr.GlobalID)
+			log.WithContext(ctx).Infof("[createHost] Metro & label match on %s, registering as ColocatedLocal", arr.GlobalID)
 			conn = gopowerstore.HostConnectivityEnumMetroOptimizeLocal
 		}
 
@@ -2061,7 +2405,7 @@ func (s *Service) createHostHostConnectivity(ctx context.Context, initiators []s
 			return "", fmt.Errorf("[createHost] Error matching host connectivity selector for array %s: %v", arr.GlobalID, err)
 		}
 		if match {
-			log.Infof("[createHost] Metro & label match on %s, registering as ColocatedRemote", arr.GlobalID)
+			log.WithContext(ctx).Infof("[createHost] Metro & label match on %s, registering as ColocatedRemote", arr.GlobalID)
 			conn = gopowerstore.HostConnectivityEnumMetroOptimizeRemote
 		}
 
@@ -2070,11 +2414,11 @@ func (s *Service) createHostHostConnectivity(ctx context.Context, initiators []s
 			return "", fmt.Errorf("[createHost] Error matching host connectivity selector for array %s: %v", arr.GlobalID, err)
 		}
 		if match {
-			log.Infof("[createHost] Metro & label match on %s, registering as ColocatedBoth", arr.GlobalID)
+			log.WithContext(ctx).Infof("[createHost] Metro & label match on %s, registering as ColocatedBoth", arr.GlobalID)
 			conn = gopowerstore.HostConnectivityEnumMetroOptimizeBoth
 		}
 		if conn == "" {
-			log.Infof("[createHost] Metro & label mismatch on %s, skip registration for this host", arr.GlobalID)
+			log.WithContext(ctx).Infof("[createHost] Metro & label mismatch on %s, skip registration for this host", arr.GlobalID)
 			continue
 		}
 		if err := registerHostFunc(s, ctx, arr.GetClient(), arr.GlobalID, initiators, conn); err != nil {
@@ -2086,7 +2430,7 @@ func (s *Service) createHostHostConnectivity(ctx context.Context, initiators []s
 	}
 
 	if primaryArrayID != "" {
-		log.Infof("[createHost] Success. Primary array: %s", primaryArrayID)
+		log.WithContext(ctx).Infof("[createHost] Success. Primary array: %s", primaryArrayID)
 		return primaryArrayID, nil
 	}
 	return "", fmt.Errorf("[createHost] Failed to register host on any array")
@@ -2112,7 +2456,6 @@ func (s *Service) createHostMetroTopologyAndLocal(
 	ctx context.Context,
 	initiators []string,
 ) (string, error) {
-	log := log.WithContext(ctx)
 	nodeLabels, err := k8sutils.Kubeclient.GetNodeLabels(context.Background(), s.opts.KubeNodeName)
 	if err != nil {
 		return "", fmt.Errorf("failed to get node labels for node %s: %v", s.opts.KubeNodeName, err)
@@ -2122,7 +2465,7 @@ func (s *Service) createHostMetroTopologyAndLocal(
 	// Step 1: Check if this node matches at least one labeled Metro array
 	anyLabelMatch := false
 	for _, arr := range getArrayfn(s) {
-		if strings.ToLower(arr.MetroTopology) == "uniform" && len(arr.Labels) == 1 {
+		if strings.ToLower(arr.MetroTopology) == "uniform" && len(arr.Labels) == 1 { //nolint:staticcheck // SA1019: MetroTopology used for backward compatibility
 			if labelsMatch(arr.Labels, nodeLabels) {
 				anyLabelMatch = true
 				break
@@ -2131,10 +2474,10 @@ func (s *Service) createHostMetroTopologyAndLocal(
 	}
 
 	for _, arr := range getArrayfn(s) {
-		log.Infof("[createHost] Processing array %s (%s)", arr.GlobalID, arr.IP)
+		log.WithContext(ctx).Infof("[createHost] Processing array %s (%s)", arr.GlobalID, arr.IP)
 		// 1) Skip if already registered
 		if getIsHostAlreadyRegistered(s, ctx, arr.GetClient(), initiators) {
-			log.Infof("[createHost] Already registered on %s, skipping", arr.GlobalID)
+			log.WithContext(ctx).Infof("[createHost] Already registered on %s, skipping", arr.GlobalID)
 			if primaryArrayID == "" {
 				primaryArrayID = arr.GlobalID
 			}
@@ -2142,8 +2485,8 @@ func (s *Service) createHostMetroTopologyAndLocal(
 		}
 
 		// 2) Metro vs Non‑Metro
-		if strings.ToLower(arr.MetroTopology) != "uniform" {
-			log.Infof("[createHost] Non‑Metro array %s → registering LocalOnly", arr.GlobalID)
+		if strings.ToLower(arr.MetroTopology) != "uniform" { //nolint:staticcheck // SA1019: MetroTopology used for backward compatibility
+			log.WithContext(ctx).Infof("[createHost] Non‑Metro array %s → registering LocalOnly", arr.GlobalID)
 			if err := s.registerHost(
 				ctx, arr.GetClient(), arr.GlobalID, initiators,
 				gopowerstore.HostConnectivityEnumLocalOnly,
@@ -2157,13 +2500,13 @@ func (s *Service) createHostMetroTopologyAndLocal(
 		}
 
 		if len(arr.Labels) > 1 {
-			log.Warnf("[createHost] Skipping Metro array %s: more than one label", arr.GlobalID)
+			log.WithContext(ctx).Warnf("[createHost] Skipping Metro array %s: more than one label", arr.GlobalID)
 			continue
 		}
 
 		// 4) Skip Metro arrays if this node doesn’t match any Metro array label
 		if !anyLabelMatch {
-			log.Warnf("[createHost] Node does not match any Metro array labels — skipping Metro registration for %s", arr.GlobalID)
+			log.WithContext(ctx).Warnf("[createHost] Node does not match any Metro array labels — skipping Metro registration for %s", arr.GlobalID)
 			continue
 		}
 
@@ -2172,7 +2515,7 @@ func (s *Service) createHostMetroTopologyAndLocal(
 
 		if labelsMatch(arr.Labels, nodeLabels) {
 			// 4a) Labels match
-			log.Infof("[createHost] Metro & label match on %s", arr.GlobalID)
+			log.WithContext(ctx).Infof("[createHost] Metro & label match on %s", arr.GlobalID)
 			coLocated, err := s.handleLabelMatchRegistration(ctx, arr, initiators, nodeLabels, arrayAddedList)
 			if err != nil {
 				return "", err
@@ -2181,7 +2524,7 @@ func (s *Service) createHostMetroTopologyAndLocal(
 			if coLocated {
 				conn = gopowerstore.HostConnectivityEnumMetroOptimizeBoth
 			}
-			log.Infof("[createHost] Registering %s as %s", arr.GlobalID, conn)
+			log.WithContext(ctx).Infof("[createHost] Registering %s as %s", arr.GlobalID, conn)
 			if err := registerHostFunc(s, ctx, arr.GetClient(), arr.GlobalID, initiators, conn); err != nil {
 				return "", fmt.Errorf("failed on %s: %v", arr.GlobalID, err)
 			}
@@ -2190,7 +2533,7 @@ func (s *Service) createHostMetroTopologyAndLocal(
 			}
 		} else {
 			// 4b) Labels don’t match
-			log.Infof("[createHost] Metro & no label match on %s", arr.GlobalID)
+			log.WithContext(ctx).Infof("[createHost] Metro & no label match on %s", arr.GlobalID)
 			coLocated, err := s.handleNoLabelMatchRegistration(
 				ctx, arr, initiators, nodeLabels, arrayAddedList,
 			)
@@ -2202,7 +2545,7 @@ func (s *Service) createHostMetroTopologyAndLocal(
 				conn = gopowerstore.HostConnectivityEnumMetroOptimizeBoth
 			}
 
-			log.Infof("[createHost] Registering %s as %s", arr.GlobalID, conn)
+			log.WithContext(ctx).Infof("[createHost] Registering %s as %s", arr.GlobalID, conn)
 			if err := s.registerHost(
 				ctx, arr.GetClient(), arr.GlobalID, initiators, conn,
 			); err != nil {
@@ -2215,7 +2558,7 @@ func (s *Service) createHostMetroTopologyAndLocal(
 	}
 
 	if primaryArrayID != "" {
-		log.Infof("[createHost] Success. Primary array: %s", primaryArrayID)
+		log.WithContext(ctx).Infof("[createHost] Success. Primary array: %s", primaryArrayID)
 		return primaryArrayID, nil
 	}
 	return "", fmt.Errorf("[createHost] Failed to register host on any array")
@@ -2223,7 +2566,6 @@ func (s *Service) createHostMetroTopologyAndLocal(
 
 func (s *Service) handleLabelMatchRegistration(ctx context.Context, arr *array.PowerStoreArray, initiators []string, nodeLabels map[string]string, arrayAddedList map[string]bool,
 ) (bool, error) {
-	log := log.WithContext(ctx)
 	// Early exit if no array labels match the node labels
 	anyLabelMatch := false
 	for _, configuredArr := range getArrayfn(s) {
@@ -2233,13 +2575,13 @@ func (s *Service) handleLabelMatchRegistration(ctx context.Context, arr *array.P
 		}
 	}
 	if !anyLabelMatch {
-		log.Infof("[handleLabelMatch] No arrays match node labels — skipping registration")
+		log.WithContext(ctx).Infof("[handleLabelMatch] No arrays match node labels — skipping registration")
 		return false, nil
 	}
 
 	remoteSystems, err := getAllRemoteSystemsFunc(arr, ctx)
 	if err != nil {
-		log.Warnf("[handleLabelMatch] failed to get remotes for %s: %v", arr.GlobalID, err)
+		log.WithContext(ctx).Warnf("[handleLabelMatch] failed to get remotes for %s: %v", arr.GlobalID, err)
 		return false, err
 	}
 
@@ -2268,7 +2610,7 @@ func (s *Service) handleLabelMatchRegistration(ctx context.Context, arr *array.P
 
 			// 2) Mutual-remote check
 			if !getIsRemoteToOtherArray(s, ctx, arr, remoteArr) {
-				log.Infof("[handleLabelMatch] skipping %s↔%s: not mutually remote",
+				log.WithContext(ctx).Infof("[handleLabelMatch] skipping %s↔%s: not mutually remote",
 					arr.GlobalID, remoteArr.GlobalID)
 				continue
 			}
@@ -2280,7 +2622,7 @@ func (s *Service) handleLabelMatchRegistration(ctx context.Context, arr *array.P
 			}
 
 			if !labelsMatch(remoteArr.Labels, arr.Labels) && labelsMatch(remoteArr.Labels, nodeLabels) && labelsMatch(arr.Labels, nodeLabels) {
-				log.Info("skipping registration as the node is having all the array labels")
+				log.WithContext(ctx).Info("skipping registration as the node is having all the array labels")
 				return false, fmt.Errorf("skipping registration as the node matching all the array labels node label: %s, arr label: %s, remote label: %s", nodeLabels, arr.Labels, remoteArr.Labels)
 			}
 
@@ -2296,16 +2638,16 @@ func (s *Service) handleLabelMatchRegistration(ctx context.Context, arr *array.P
 
 			// 4) Guard: skip if both would end up with the same non‑Both connectivity
 			if arrayConn == remoteConn && remoteConn != gopowerstore.HostConnectivityEnumMetroOptimizeBoth {
-				log.Infof("[handleLabelMatch] skipping %s: both arrays would be %s",
+				log.WithContext(ctx).Infof("[handleLabelMatch] skipping %s: both arrays would be %s",
 					arr.GlobalID, arrayConn)
 				continue
 			}
 
 			// 5) Register
 			if remoteConn == gopowerstore.HostConnectivityEnumMetroOptimizeBoth {
-				log.Infof("[handleLabelMatch] Full match → MetroOptimizeBoth on %s", remoteArr.GlobalID)
+				log.WithContext(ctx).Infof("[handleLabelMatch] Full match → MetroOptimizeBoth on %s", remoteArr.GlobalID)
 			} else {
-				log.Infof("[handleLabelMatch] Partial match → MetroOptimizeRemote on %s", remoteArr.GlobalID)
+				log.WithContext(ctx).Infof("[handleLabelMatch] Partial match → MetroOptimizeRemote on %s", remoteArr.GlobalID)
 			}
 			if err := registerHostFunc(s, ctx, clientB, remoteArr.GlobalID, initiators, remoteConn); err != nil {
 				return false, err
@@ -2327,7 +2669,6 @@ func (s *Service) handleNoLabelMatchRegistration(
 	nodeLabels map[string]string,
 	arrayAddedList map[string]bool,
 ) (bool, error) {
-	log := log.WithContext(ctx)
 	// Early exit if no array labels match the node labels
 	anyLabelMatch := false
 	for _, configuredArr := range getArrayfn(s) {
@@ -2337,13 +2678,13 @@ func (s *Service) handleNoLabelMatchRegistration(
 		}
 	}
 	if !anyLabelMatch {
-		log.Infof("[handleNoLabelMatch] No arrays match node labels — skipping registration for %s", arr.GlobalID)
+		log.WithContext(ctx).Infof("[handleNoLabelMatch] No arrays match node labels — skipping registration for %s", arr.GlobalID)
 		return false, nil
 	}
 
 	remoteSystems, err := getAllRemoteSystemsFunc(arr, ctx)
 	if err != nil {
-		log.Warnf("[handleNoLabelMatch] failed to get remotes for %s: %v", arr.GlobalID, err)
+		log.WithContext(ctx).Warnf("[handleNoLabelMatch] failed to get remotes for %s: %v", arr.GlobalID, err)
 		return false, err
 	}
 
@@ -2367,7 +2708,7 @@ func (s *Service) handleNoLabelMatchRegistration(
 			}
 			// Mutual remote check
 			if !getIsRemoteToOtherArray(s, ctx, arr, remoteArr) {
-				log.Infof("[handleNoLabelMatch] skipping %s↔%s: not mutually remote",
+				log.WithContext(ctx).Infof("[handleNoLabelMatch] skipping %s↔%s: not mutually remote",
 					arr.GlobalID, remoteArr.GlobalID)
 				continue
 			}
@@ -2379,7 +2720,7 @@ func (s *Service) handleNoLabelMatchRegistration(
 			}
 
 			if !labelsMatch(remoteArr.Labels, arr.Labels) && labelsMatch(remoteArr.Labels, nodeLabels) && labelsMatch(arr.Labels, nodeLabels) {
-				log.Info("skipping registration as the node is having all the array labels")
+				log.WithContext(ctx).Info("skipping registration as the node is having all the array labels")
 				return false, fmt.Errorf("skipping registration as the node matching all the array labels node label: %s, arr label: %s, remote label: %s", nodeLabels, arr.Labels, remoteArr.Labels)
 			}
 
@@ -2395,16 +2736,16 @@ func (s *Service) handleNoLabelMatchRegistration(
 
 			// Guard: skip if both would end up with the same non-Both connectivity
 			if arrayConn == remoteConn && remoteConn != gopowerstore.HostConnectivityEnumMetroOptimizeBoth {
-				log.Infof("[handleNoLabelMatch] skipping %s: both arrays would be %s",
+				log.WithContext(ctx).Infof("[handleNoLabelMatch] skipping %s: both arrays would be %s",
 					arr.GlobalID, arrayConn)
 				continue
 			}
 
 			// Register
 			if remoteConn == gopowerstore.HostConnectivityEnumMetroOptimizeBoth {
-				log.Infof("[handleNoLabelMatch] Full match → MetroOptimizeBoth on %s", remoteArr.GlobalID)
+				log.WithContext(ctx).Infof("[handleNoLabelMatch] Full match → MetroOptimizeBoth on %s", remoteArr.GlobalID)
 			} else {
-				log.Infof("[handleNoLabelMatch] Partial match → MetroOptimizeRemote on %s", remoteArr.GlobalID)
+				log.WithContext(ctx).Infof("[handleNoLabelMatch] Partial match → MetroOptimizeRemote on %s", remoteArr.GlobalID)
 			}
 			if err := registerHostFunc(s, ctx, clientB, remoteArr.GlobalID, initiators, remoteConn); err != nil {
 				return false, err
@@ -2424,17 +2765,16 @@ func (s *Service) isRemoteToOtherArray(
 	ctx context.Context,
 	arrA, arrB *array.PowerStoreArray,
 ) bool {
-	log := log.WithContext(ctx)
 	// fetch arrA’s remotes
 	remotesA, err := getAllRemoteSystemsFunc(arrA, ctx)
 	if err != nil {
-		log.Warnf("[isRemoteToOtherArray] failed to get remotes for %s: %v", arrA.GlobalID, err)
+		log.WithContext(ctx).Warnf("[isRemoteToOtherArray] failed to get remotes for %s: %v", arrA.GlobalID, err)
 		return false
 	}
 	// fetch arrB’s remotes
 	remotesB, err := getAllRemoteSystemsFunc(arrB, ctx)
 	if err != nil {
-		log.Warnf("[isRemoteToOtherArray] failed to get remotes for %s: %v", arrB.GlobalID, err)
+		log.WithContext(ctx).Warnf("[isRemoteToOtherArray] failed to get remotes for %s: %v", arrB.GlobalID, err)
 		return false
 	}
 
@@ -2459,10 +2799,9 @@ func (s *Service) isRemoteToOtherArray(
 
 // Checks if host with given initiators already exists
 func (s *Service) isHostAlreadyRegistered(ctx context.Context, client gopowerstore.Client, initiators []string) bool {
-	log := log.WithContext(ctx)
 	existingHosts, err := client.GetHosts(ctx)
 	if err != nil {
-		log.Warnf("[isHostAlreadyRegistered] Failed to get hosts: %v", err)
+		log.WithContext(ctx).Warnf("[isHostAlreadyRegistered] Failed to get hosts: %v", err)
 		return false
 	}
 
@@ -2470,7 +2809,7 @@ func (s *Service) isHostAlreadyRegistered(ctx context.Context, client gopowersto
 		for _, hInit := range host.Initiators {
 			for _, i := range initiators {
 				if hInit.PortName == i {
-					log.Infof("[isHostAlreadyRegistered] Found existing host with initiator %s", i)
+					log.WithContext(ctx).Infof("[isHostAlreadyRegistered] Found existing host with initiator %s", i)
 					return true
 				}
 			}
@@ -2486,7 +2825,6 @@ func (s *Service) registerHost(
 	initiators []string,
 	connType gopowerstore.HostConnectivityEnum,
 ) error {
-	log := log.WithContext(ctx)
 	description := fmt.Sprintf("k8s node: %s", s.opts.KubeNodeName)
 	reqInitiators := s.buildInitiatorsArray(initiators, arrayID)
 	osType := gopowerstore.OSTypeEnumLinux
@@ -2511,20 +2849,20 @@ func (s *Service) registerHost(
 		client.SetCustomHTTPHeaders(headers)
 	}
 
-	log.Infof("[registerHost] Creating host on array %s with connectivity: %s", arrayID, connType)
+	log.WithContext(ctx).Infof("[registerHost] Creating host on array %s with connectivity: %s", arrayID, connType)
 	resp, err := client.CreateHost(ctx, &createParams)
 	client.SetCustomHTTPHeaders(nil)
 
 	if err != nil {
 		if connType == gopowerstore.HostConnectivityEnumMetroOptimizeRemote &&
 			strings.Contains(err.Error(), "already registered with another host") {
-			log.Warnf("[registerHost] Skipping array %s due to duplicate initiator error (remote host): %v", arrayID, err)
+			log.WithContext(ctx).Warnf("[registerHost] Skipping array %s due to duplicate initiator error (remote host): %v", arrayID, err)
 			return nil
 		}
-		log.Errorf("[registerHost] Failed to create host on array %s: %v", arrayID, err)
+		log.WithContext(ctx).Errorf("[registerHost] Failed to create host on array %s: %v", arrayID, err)
 		return err
 	}
-	log.Infof("[registerHost] Host successfully registered on array %s with ID: %s", arrayID, resp.ID)
+	log.WithContext(ctx).Infof("[registerHost] Host successfully registered on array %s with ID: %s", arrayID, resp.ID)
 	return nil
 }
 
@@ -2541,7 +2879,6 @@ func labelsMatch(arrayLabels, nodeLabels map[string]string) bool {
 func (s *Service) modifyHostInitiators(ctx context.Context, hostID string, client gopowerstore.Client,
 	initiatorsToAdd []string, initiatorsToDelete []string, initiatorsToModify []string, arrayID string, connectivity *gopowerstore.HostConnectivityEnum,
 ) error {
-	log := log.WithContext(ctx)
 	if len(initiatorsToDelete) > 0 {
 		modifyParams := gopowerstore.HostModify{RemoveInitiators: &initiatorsToDelete}
 		_, err := client.ModifyHost(ctx, &modifyParams, hostID)
@@ -2558,7 +2895,7 @@ func (s *Service) modifyHostInitiators(ctx context.Context, hostID string, clien
 		_, err := client.ModifyHost(ctx, &modifyParams, hostID)
 		if err != nil {
 			if strings.Contains(err.Error(), "already registered with another host") {
-				log.Warnf("Skipping duplicate initiator registration: %v", err)
+				log.WithContext(ctx).Warnf("Skipping duplicate initiator registration: %v", err)
 			} else {
 				return fmt.Errorf("failed to add initiators: %w", err)
 			}
@@ -2636,18 +2973,17 @@ func (s *Service) buildInitiatorsArrayModify(initiators []string, arrayID string
 
 func (s *Service) fileExists(filename string) bool {
 	_, err := s.Fs.Stat(filename)
-	logFields := csmlog.Fields{
+	logFields := log.Fields{
 		"filename": filename,
 		"error":    err,
 	}
-	log := log.WithFields(logFields)
 	if err == nil {
 		return true
 	}
 	if os.IsNotExist(err) {
-		log.Error("File does not exist")
+		log.WithFields(logFields).Error("File does not exist")
 	} else {
-		log.Error("Error while checking stat of the file")
+		log.WithFields(logFields).Error("Error while checking stat of the file")
 	}
 	return false
 }

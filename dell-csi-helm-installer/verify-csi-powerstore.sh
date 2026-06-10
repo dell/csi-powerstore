@@ -19,7 +19,7 @@ function verify-csi-powerstore() {
   verify_iscsi_installation
   verify_nvmetcp_installation
   verify_nvmefc_installation
-  verify_helm_3
+  verify_helm
   verify_authorization_proxy_server
 }
 
