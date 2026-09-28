@@ -1,13 +1,13 @@
 # Copyright © 2026 Dell Inc. or its subsidiaries. All Rights Reserved.
 #
 # Dell Technologies, Dell and other trademarks are trademarks of Dell Inc.
-# or its subsidiaries. Other trademarks may be trademarks of their respective 
+# or its subsidiaries. Other trademarks may be trademarks of their respective
 # owners.
 
 include overrides.mk
 include helper.mk
 
-images: download-csm-common generate vendor
+images: copy-csm-common vendor generate
 	$(eval include csm-common.mk)
 	@echo "Base Images is set to: $(BASEIMAGE)"
 	@echo "Building: $(IMAGE_REGISTRY)/$(IMAGE_NAME):$(IMAGE_TAG)"

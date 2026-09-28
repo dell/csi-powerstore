@@ -32,7 +32,7 @@ import (
 	"time"
 
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers"
-	"github.com/dell/csmlog"
+	log "github.com/dell/csmlog"
 	"github.com/dell/gofsutil"
 	"github.com/robfig/cron/v3"
 	corev1 "k8s.io/api/core/v1"
@@ -148,7 +148,6 @@ func getEnvInt(key string, defaultVal int) int {
 
 // ReadSpaceReclamationConfig reads configuration from environment variables.
 func ReadSpaceReclamationConfig() SpaceReclamationConfig {
-	log := csmlog.GetLogger()
 	cfg := SpaceReclamationConfig{
 		Enabled:              getEnvBool(identifiers.EnvSpaceReclamationEnabled, false),
 		Schedule:             getEnvString(identifiers.EnvSpaceReclamationSchedule, "0 2 * * 0"),
@@ -326,7 +325,10 @@ func findDeviceByMajorMinor(major, minor uint64) (string, error) {
 
 func getMapperName(dmDevice string) string {
 	// Read /sys/block/dm-*/dm/name to get the mapper name
-	namePath := fmt.Sprintf("/sys/block/%s/dm/name", dmDevice)
+	namePath := filepath.Clean(filepath.Join("/sys/block", dmDevice, "dm/name"))
+	if !strings.HasPrefix(namePath, "/sys/block/") {
+		return dmDevice
+	}
 	if data, err := os.ReadFile(namePath); err == nil {
 		return strings.TrimSpace(string(data))
 	}
@@ -500,7 +502,6 @@ func NewSpaceReclamationManager(
 	k8sClient kubernetes.Interface,
 	nodeName string,
 ) (*SpaceReclamationManager, error) {
-	log := csmlog.GetLogger()
 	// Validate the cron expression by attempting to parse it
 	parser := cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
 	schedule, err := parser.Parse(config.Schedule)
@@ -554,7 +555,6 @@ func (m *SpaceReclamationManager) Start() error {
 }
 
 func (m *SpaceReclamationManager) RunOnce() {
-	log := csmlog.GetLogger()
 	log.Info("SpaceReclamation: starting RunOnce cycle")
 
 	if !m.running.CompareAndSwap(false, true) {
@@ -767,7 +767,6 @@ func (m *SpaceReclamationManager) handleUnsupported(
 	vol *VolumeInfo,
 	reason string,
 ) {
-	log := csmlog.GetLogger()
 	log.Infof(
 		"SpaceReclamation: volume %s does not support discard (device: %s, reason: %s)",
 		vol.VolumeID, vol.DevicePath, reason,
@@ -790,8 +789,6 @@ func (m *SpaceReclamationManager) handleUnsupported(
 
 // reclaimVolume performs space reclamation on a single volume.
 func (m *SpaceReclamationManager) reclaimVolume(ctx context.Context, vol *VolumeInfo) {
-	log := csmlog.GetLogger()
-
 	// Acquire semaphore for concurrency control
 	log.Infof("SpaceReclamation: Volume %s (ID: %s) attempting to acquire semaphore", vol.PVName, vol.VolumeID)
 	select {
@@ -875,6 +872,17 @@ func (m *SpaceReclamationManager) reclaimVolume(ctx context.Context, vol *Volume
 		}
 	}
 
+	// Log with duration using TrackDuration helper
+	log.WithFields(log.Fields{
+		"volume_id":       vol.VolumeID,
+		"pvc_namespace":   vol.PVCNamespace,
+		"pvc_name":        vol.PVCName,
+		"pv_name":         vol.PVName,
+		"status":          result.Status,
+		"bytes_reclaimed": result.BytesReclaimed,
+		"node_name":       m.config.NodeName,
+	}).TrackDuration(start).Info("Space reclamation completed")
+
 	// Annotate the PVC with results
 	// Use a fresh context with a short timeout to ensure annotations are written
 	// even if the reclamation operation context has timed out
@@ -907,7 +915,6 @@ func (m *SpaceReclamationManager) reclaimVolume(ctx context.Context, vol *Volume
 // initSpaceReclamation reads env and initializes the space reclamation manager.
 // This is called from BeforeServe when in node mode.
 func initSpaceReclamation(ctx context.Context, s *Service, k8sClient kubernetes.Interface) {
-	log := csmlog.GetLogger()
 	cfg := ReadSpaceReclamationConfig()
 	mgr, err := NewSpaceReclamationManager(ctx, cfg, k8sClient, cfg.NodeName)
 	if err != nil {

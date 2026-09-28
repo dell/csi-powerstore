@@ -36,7 +36,7 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
-	"github.com/dell/csmlog"
+	log "github.com/dell/csmlog"
 	csictx "github.com/dell/gocsi/context"
 	mwtypes "github.com/dell/gocsi/middleware/serialvolume/lockprovider"
 
@@ -44,9 +44,6 @@ import (
 	"github.com/kubernetes-csi/csi-lib-utils/connection"
 	"github.com/kubernetes-csi/csi-lib-utils/metrics"
 )
-
-// Instantial csmlog on a package level
-var log = csmlog.GetLogger()
 
 type rewriteRequestIDInterceptor struct{}
 
@@ -61,7 +58,7 @@ func (r *rewriteRequestIDInterceptor) handleServer(ctx context.Context, req inte
 		ID, IDOK := md[csictx.RequestIDKey]
 		if IDOK {
 			newIDValue := fmt.Sprintf("%s-%s", csictx.RequestIDKey, ID[0])
-			ctx = context.WithValue(ctx, interface{}(csictx.RequestIDKey), newIDValue)
+			ctx = context.WithValue(ctx, interface{}(csictx.RequestIDKey), newIDValue) //nolint:staticcheck // SA1029: key type from external gocsi library
 		}
 	}
 
@@ -147,24 +144,23 @@ func NewCustomSerialLock(mode string) grpc.UnaryServerInterceptor {
 }
 
 func (i *interceptor) createMetadataRetrieverClient(ctx context.Context) {
-	log := log.WithContext(ctx)
 	metricsManager := metrics.NewCSIMetricsManagerWithOptions("csi-metadata-retriever",
 		metrics.WithProcessStartTime(false),
 		metrics.WithSubsystem(metrics.SubsystemSidecar))
 	if retrieverAddress, ok := csictx.LookupEnv(ctx, identifiers.EnvMetadataRetrieverEndpoint); ok {
 		rpcConn, err := connection.Connect(retrieverAddress, metricsManager, connection.OnConnectionLoss(connection.ExitOnConnectionLoss()))
 		if err != nil {
-			log.Error(err.Error())
+			log.WithContext(ctx).Error(err.Error())
 		}
 
 		retrieverClient := retriever.NewMetadataRetrieverClient(rpcConn, 100*time.Second)
 		if retrieverClient == nil {
-			log.Error("Cannot get csi-metadata-retriever client")
+			log.WithContext(ctx).Error("Cannot get csi-metadata-retriever client")
 		}
 
 		i.opts.MetadataSidecarClient = retrieverClient
 	} else {
-		log.Warnf("env var not found: %s", identifiers.EnvMetadataRetrieverEndpoint)
+		log.WithContext(ctx).Warnf("env var not found: %s", identifiers.EnvMetadataRetrieverEndpoint)
 	}
 }
 
@@ -179,7 +175,7 @@ func (i *interceptor) nodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	}
 
 	if closer, ok := lock.(io.Closer); ok {
-		defer closer.Close() // #nosec G307
+		defer func() { _ = closer.Close() }() // #nosec G307
 	}
 
 	if !lock.TryLock(i.opts.timeout) {
@@ -198,7 +194,7 @@ func (i *interceptor) nodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 		return nil, err
 	}
 	if closer, ok := lock.(io.Closer); ok {
-		defer closer.Close() // #nosec G307
+		defer func() { _ = closer.Close() }() // #nosec G307
 	}
 	if !lock.TryLock(i.opts.timeout) {
 		return nil, status.Error(codes.Aborted, pending)
@@ -211,14 +207,13 @@ func (i *interceptor) nodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 func (i *interceptor) createVolume(ctx context.Context, req *csi.CreateVolumeRequest,
 	_ *grpc.UnaryServerInfo, handler grpc.UnaryHandler,
 ) (res interface{}, resErr error) {
-	log := log.WithContext(ctx)
 	lock, err := i.opts.locker.GetLockWithID(ctx, req.Name)
 	if err != nil {
 		return nil, err
 	}
 
 	if closer, ok := lock.(io.Closer); ok {
-		defer closer.Close() // #nosec G307
+		defer func() { _ = closer.Close() }() // #nosec G307
 	}
 
 	if !lock.TryLock(i.opts.timeout) {
@@ -234,7 +229,7 @@ func (i *interceptor) createVolume(ctx context.Context, req *csi.CreateVolumeReq
 	if i.opts.MetadataSidecarClient != nil {
 		metadataRes, err := i.opts.MetadataSidecarClient.GetPVCLabels(ctx, metadataReq)
 		if err != nil {
-			log.Errorf("Cannot retrieve labels for PVC %s in namespace: %s, error: %v",
+			log.WithContext(ctx).Errorf("Cannot retrieve labels for PVC %s in namespace: %s, error: %v",
 				controller.KeyCSIPVCName,
 				controller.KeyCSIPVCNamespace,
 				err.Error())
@@ -245,7 +240,7 @@ func (i *interceptor) createVolume(ctx context.Context, req *csi.CreateVolumeReq
 				req.Parameters[k] = v
 			}
 		} else {
-			log.Warnf("Metadata retrieved is nil for PVC %s in namespace: %s",
+			log.WithContext(ctx).Warnf("Metadata retrieved is nil for PVC %s in namespace: %s",
 				controller.KeyCSIPVCName,
 				controller.KeyCSIPVCNamespace)
 		}

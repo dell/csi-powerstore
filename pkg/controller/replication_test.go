@@ -18,7 +18,9 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/dell/csi-powerstore/v2/pkg/array"
 	csiext "github.com/dell/dell-csi-extensions/replication"
@@ -40,7 +42,8 @@ var _ = ginkgo.Describe("Replication", func() {
 		ginkgo.When("getting storage protection group status and state is ok", func() {
 			ginkgo.It("should return synchronized status", func() {
 				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, mock.Anything).Return(
-					gopowerstore.ReplicationSession{State: gopowerstore.RsStateOk}, nil)
+					gopowerstore.ReplicationSession{State: gopowerstore.RsStateOk}, nil,
+				)
 
 				req := new(csiext.GetStorageProtectionGroupStatusRequest)
 				params := make(map[string]string)
@@ -58,7 +61,8 @@ var _ = ginkgo.Describe("Replication", func() {
 		ginkgo.When("getting storage protection group status and state is failed over", func() {
 			ginkgo.It("should return failed over status", func() {
 				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, mock.Anything).Return(
-					gopowerstore.ReplicationSession{State: gopowerstore.RsStateFailedOver}, nil)
+					gopowerstore.ReplicationSession{State: gopowerstore.RsStateFailedOver}, nil,
+				)
 
 				req := new(csiext.GetStorageProtectionGroupStatusRequest)
 				params := make(map[string]string)
@@ -76,7 +80,8 @@ var _ = ginkgo.Describe("Replication", func() {
 		ginkgo.When("getting storage protection group status and state is paused (for several reasons)", func() {
 			ginkgo.It("should return suspended status (if paused)", func() {
 				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, mock.Anything).Return(
-					gopowerstore.ReplicationSession{State: gopowerstore.RsStatePaused}, nil)
+					gopowerstore.ReplicationSession{State: gopowerstore.RsStatePaused}, nil,
+				)
 
 				req := new(csiext.GetStorageProtectionGroupStatusRequest)
 				params := make(map[string]string)
@@ -91,7 +96,8 @@ var _ = ginkgo.Describe("Replication", func() {
 			})
 			ginkgo.It("should return suspended status (if paused for migration)", func() {
 				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, mock.Anything).Return(
-					gopowerstore.ReplicationSession{State: gopowerstore.RsStatePausedForMigration}, nil)
+					gopowerstore.ReplicationSession{State: gopowerstore.RsStatePausedForMigration}, nil,
+				)
 
 				req := new(csiext.GetStorageProtectionGroupStatusRequest)
 				params := make(map[string]string)
@@ -106,7 +112,8 @@ var _ = ginkgo.Describe("Replication", func() {
 			})
 			ginkgo.It("should return suspended status (if paused for NDU)", func() {
 				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, mock.Anything).Return(
-					gopowerstore.ReplicationSession{State: gopowerstore.RsStatePausedForNdu}, nil)
+					gopowerstore.ReplicationSession{State: gopowerstore.RsStatePausedForNdu}, nil,
+				)
 
 				req := new(csiext.GetStorageProtectionGroupStatusRequest)
 				params := make(map[string]string)
@@ -121,7 +128,8 @@ var _ = ginkgo.Describe("Replication", func() {
 			})
 			ginkgo.It("should return suspended status (if system paused)", func() {
 				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, mock.Anything).Return(
-					gopowerstore.ReplicationSession{State: gopowerstore.RsStateSystemPaused}, nil)
+					gopowerstore.ReplicationSession{State: gopowerstore.RsStateSystemPaused}, nil,
+				)
 
 				req := new(csiext.GetStorageProtectionGroupStatusRequest)
 				params := make(map[string]string)
@@ -139,7 +147,8 @@ var _ = ginkgo.Describe("Replication", func() {
 		ginkgo.When("getting storage protection group status and state is updating (in progress)", func() {
 			ginkgo.It("should return 'sync in progress' status (if failing over)", func() {
 				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, mock.Anything).Return(
-					gopowerstore.ReplicationSession{State: gopowerstore.RsStateFailingOver}, nil)
+					gopowerstore.ReplicationSession{State: gopowerstore.RsStateFailingOver}, nil,
+				)
 
 				req := new(csiext.GetStorageProtectionGroupStatusRequest)
 				params := make(map[string]string)
@@ -154,7 +163,8 @@ var _ = ginkgo.Describe("Replication", func() {
 			})
 			ginkgo.It("should return 'sync in progress' status (if failing over for DR)", func() {
 				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, mock.Anything).Return(
-					gopowerstore.ReplicationSession{State: gopowerstore.RsStateFailingOverForDR}, nil)
+					gopowerstore.ReplicationSession{State: gopowerstore.RsStateFailingOverForDR}, nil,
+				)
 
 				req := new(csiext.GetStorageProtectionGroupStatusRequest)
 				params := make(map[string]string)
@@ -169,7 +179,8 @@ var _ = ginkgo.Describe("Replication", func() {
 			})
 			ginkgo.It("should return 'sync in progress' status (if resuming)", func() {
 				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, mock.Anything).Return(
-					gopowerstore.ReplicationSession{State: gopowerstore.RsStateResuming}, nil)
+					gopowerstore.ReplicationSession{State: gopowerstore.RsStateResuming}, nil,
+				)
 
 				req := new(csiext.GetStorageProtectionGroupStatusRequest)
 				params := make(map[string]string)
@@ -184,7 +195,8 @@ var _ = ginkgo.Describe("Replication", func() {
 			})
 			ginkgo.It("should return 'sync in progress' status (if reprotecting)", func() {
 				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, mock.Anything).Return(
-					gopowerstore.ReplicationSession{State: gopowerstore.RsStateReprotecting}, nil)
+					gopowerstore.ReplicationSession{State: gopowerstore.RsStateReprotecting}, nil,
+				)
 
 				req := new(csiext.GetStorageProtectionGroupStatusRequest)
 				params := make(map[string]string)
@@ -199,7 +211,8 @@ var _ = ginkgo.Describe("Replication", func() {
 			})
 			ginkgo.It("should return 'sync in progress' status (if cutover for migration)", func() {
 				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, mock.Anything).Return(
-					gopowerstore.ReplicationSession{State: gopowerstore.RsStatePartialCutoverForMigration}, nil)
+					gopowerstore.ReplicationSession{State: gopowerstore.RsStatePartialCutoverForMigration}, nil,
+				)
 
 				req := new(csiext.GetStorageProtectionGroupStatusRequest)
 				params := make(map[string]string)
@@ -214,7 +227,8 @@ var _ = ginkgo.Describe("Replication", func() {
 			})
 			ginkgo.It("should return 'sync in progress' status (if synchronizing)", func() {
 				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, mock.Anything).Return(
-					gopowerstore.ReplicationSession{State: gopowerstore.RsStateSynchronizing}, nil)
+					gopowerstore.ReplicationSession{State: gopowerstore.RsStateSynchronizing}, nil,
+				)
 
 				req := new(csiext.GetStorageProtectionGroupStatusRequest)
 				params := make(map[string]string)
@@ -229,7 +243,8 @@ var _ = ginkgo.Describe("Replication", func() {
 			})
 			ginkgo.It("should return 'sync in progress' status (if initializing)", func() {
 				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, mock.Anything).Return(
-					gopowerstore.ReplicationSession{State: gopowerstore.RsStateInitializing}, nil)
+					gopowerstore.ReplicationSession{State: gopowerstore.RsStateInitializing}, nil,
+				)
 
 				req := new(csiext.GetStorageProtectionGroupStatusRequest)
 				params := make(map[string]string)
@@ -247,7 +262,8 @@ var _ = ginkgo.Describe("Replication", func() {
 		ginkgo.When("getting storage protection group status and state is error", func() {
 			ginkgo.It("should return invalid status", func() {
 				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, mock.Anything).Return(
-					gopowerstore.ReplicationSession{State: gopowerstore.RsStateError}, nil)
+					gopowerstore.ReplicationSession{State: gopowerstore.RsStateError}, nil,
+				)
 
 				req := new(csiext.GetStorageProtectionGroupStatusRequest)
 				params := make(map[string]string)
@@ -265,7 +281,8 @@ var _ = ginkgo.Describe("Replication", func() {
 		ginkgo.When("getting storage protection group status and state does not match with known protection group states", func() {
 			ginkgo.It("should return unknown status", func() {
 				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, mock.Anything).Return(
-					gopowerstore.ReplicationSession{}, nil)
+					gopowerstore.ReplicationSession{}, nil,
+				)
 
 				req := new(csiext.GetStorageProtectionGroupStatusRequest)
 				params := make(map[string]string)
@@ -312,7 +329,8 @@ var _ = ginkgo.Describe("Replication", func() {
 		ginkgo.When("Invalid client response", func() {
 			ginkgo.It("should fail", func() {
 				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, mock.Anything).Return(
-					gopowerstore.ReplicationSession{}, status.Errorf(codes.InvalidArgument, "Invalid client response"))
+					gopowerstore.ReplicationSession{}, status.Errorf(codes.InvalidArgument, "Invalid client response"),
+				)
 
 				req := new(csiext.GetStorageProtectionGroupStatusRequest)
 				params := make(map[string]string)
@@ -325,6 +343,187 @@ var _ = ginkgo.Describe("Replication", func() {
 				gomega.Expect(err.Error()).To(
 					gomega.ContainSubstring("Invalid client response"),
 				)
+			})
+		})
+		ginkgo.When("replication session has valid lag and bandwidth data", func() {
+			ginkgo.It("should return status with lag and bandwidth populated", func() {
+				syncTime := time.Now().Add(-30 * time.Second).UTC().Format(time.RFC3339Nano)
+				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, mock.Anything).Return(
+					gopowerstore.ReplicationSession{
+						State:             gopowerstore.RsStateOk,
+						ResourceType:      "Volume",
+						LastSyncTimestamp: syncTime,
+						StorageElementPairs: []gopowerstore.StorageElementPair{
+							{LocalStorageElementID: "vol-001"},
+						},
+					}, nil,
+				)
+				clientMock.On("VolumeMirrorTransferRate", mock.Anything, "vol-001").Return(
+					[]gopowerstore.VolumeMirrorTransferRateResponse{
+						{MirrorBandwidth: 1048576.0},
+					}, nil,
+				)
+
+				req := new(csiext.GetStorageProtectionGroupStatusRequest)
+				params := make(map[string]string)
+				params["globalID"] = "globalvolid1"
+				req.ProtectionGroupAttributes = params
+				res, err := ctrlSvc.GetStorageProtectionGroupStatus(context.Background(), req)
+
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res.Status.State).To(gomega.Equal(
+					csiext.StorageProtectionGroupStatus_SYNCHRONIZED,
+				))
+				gomega.Expect(res.Status.LagSeconds).To(gomega.BeNumerically(">=", int64(29)))
+				gomega.Expect(res.Status.BandwidthBytesPerSec).To(gomega.Equal(int64(1048576)))
+				gomega.Expect(res.Status.LastSyncTimestamp).To(gomega.BeNumerically(">", int64(0)))
+			})
+		})
+
+		ginkgo.When("mirror transfer rate API returns error", func() {
+			ginkgo.It("should return status with zero bandwidth (graceful fallback)", func() {
+				syncTime := time.Now().Add(-10 * time.Second).UTC().Format(time.RFC3339Nano)
+				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, mock.Anything).Return(
+					gopowerstore.ReplicationSession{
+						State:             gopowerstore.RsStateOk,
+						ResourceType:      "Volume",
+						LastSyncTimestamp: syncTime,
+						StorageElementPairs: []gopowerstore.StorageElementPair{
+							{LocalStorageElementID: "vol-002"},
+						},
+					}, nil,
+				)
+				clientMock.On("VolumeMirrorTransferRate", mock.Anything, "vol-002").Return(
+					[]gopowerstore.VolumeMirrorTransferRateResponse(nil),
+					fmt.Errorf("internal API error"),
+				)
+
+				req := new(csiext.GetStorageProtectionGroupStatusRequest)
+				params := make(map[string]string)
+				params["globalID"] = "globalvolid1"
+				req.ProtectionGroupAttributes = params
+				res, err := ctrlSvc.GetStorageProtectionGroupStatus(context.Background(), req)
+
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res.Status.State).To(gomega.Equal(
+					csiext.StorageProtectionGroupStatus_SYNCHRONIZED,
+				))
+				gomega.Expect(res.Status.LagSeconds).To(gomega.BeNumerically(">=", int64(9)))
+				gomega.Expect(res.Status.BandwidthBytesPerSec).To(gomega.Equal(int64(0)))
+			})
+		})
+
+		ginkgo.When("replication session has no storage element pairs", func() {
+			ginkgo.It("should return status with zero bandwidth", func() {
+				syncTime := time.Now().Add(-5 * time.Second).UTC().Format(time.RFC3339Nano)
+				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, mock.Anything).Return(
+					gopowerstore.ReplicationSession{
+						State:             gopowerstore.RsStateOk,
+						LastSyncTimestamp: syncTime,
+					}, nil,
+				)
+
+				req := new(csiext.GetStorageProtectionGroupStatusRequest)
+				params := make(map[string]string)
+				params["globalID"] = "globalvolid1"
+				req.ProtectionGroupAttributes = params
+				res, err := ctrlSvc.GetStorageProtectionGroupStatus(context.Background(), req)
+
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res.Status.BandwidthBytesPerSec).To(gomega.Equal(int64(0)))
+				gomega.Expect(res.Status.LagSeconds).To(gomega.BeNumerically(">=", int64(4)))
+			})
+		})
+
+		ginkgo.When("replication session has empty last_sync_timestamp", func() {
+			ginkgo.It("should return status with zero lag", func() {
+				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, mock.Anything).Return(
+					gopowerstore.ReplicationSession{
+						State:        gopowerstore.RsStateOk,
+						ResourceType: "Volume",
+						StorageElementPairs: []gopowerstore.StorageElementPair{
+							{LocalStorageElementID: "vol-003"},
+						},
+					}, nil,
+				)
+				clientMock.On("VolumeMirrorTransferRate", mock.Anything, "vol-003").Return(
+					[]gopowerstore.VolumeMirrorTransferRateResponse{
+						{MirrorBandwidth: 524288.0},
+					}, nil,
+				)
+
+				req := new(csiext.GetStorageProtectionGroupStatusRequest)
+				params := make(map[string]string)
+				params["globalID"] = "globalvolid1"
+				req.ProtectionGroupAttributes = params
+				res, err := ctrlSvc.GetStorageProtectionGroupStatus(context.Background(), req)
+
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res.Status.LagSeconds).To(gomega.Equal(int64(0)))
+				gomega.Expect(res.Status.LastSyncTimestamp).To(gomega.Equal(int64(0)))
+				gomega.Expect(res.Status.BandwidthBytesPerSec).To(gomega.Equal(int64(524288)))
+			})
+		})
+
+		ginkgo.When("replication session is for a file system", func() {
+			ginkgo.It("should use FileSystemMirrorTransferRate API", func() {
+				syncTime := time.Now().Add(-15 * time.Second).UTC().Format(time.RFC3339Nano)
+				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, mock.Anything).Return(
+					gopowerstore.ReplicationSession{
+						State:             gopowerstore.RsStateOk,
+						ResourceType:      "File_System",
+						LastSyncTimestamp: syncTime,
+						StorageElementPairs: []gopowerstore.StorageElementPair{
+							{LocalStorageElementID: "fs-001"},
+						},
+					}, nil,
+				)
+				clientMock.On("FileSystemMirrorTransferRate", mock.Anything, "fs-001").Return(
+					[]gopowerstore.VolumeMirrorTransferRateResponse{
+						{MirrorBandwidth: 2097152.0},
+					}, nil,
+				)
+
+				req := new(csiext.GetStorageProtectionGroupStatusRequest)
+				params := make(map[string]string)
+				params["globalID"] = "globalvolid1"
+				req.ProtectionGroupAttributes = params
+				res, err := ctrlSvc.GetStorageProtectionGroupStatus(context.Background(), req)
+
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res.Status.State).To(gomega.Equal(
+					csiext.StorageProtectionGroupStatus_SYNCHRONIZED,
+				))
+				gomega.Expect(res.Status.LagSeconds).To(gomega.BeNumerically(">=", int64(14)))
+				gomega.Expect(res.Status.BandwidthBytesPerSec).To(gomega.Equal(int64(2097152)))
+			})
+		})
+
+		ginkgo.When("mirror transfer rate returns zero bandwidth", func() {
+			ginkgo.It("should return zero bandwidth", func() {
+				clientMock.On("GetReplicationSessionByLocalResourceID", mock.Anything, mock.Anything).Return(
+					gopowerstore.ReplicationSession{
+						State:        gopowerstore.RsStateOk,
+						ResourceType: "Volume",
+						StorageElementPairs: []gopowerstore.StorageElementPair{
+							{LocalStorageElementID: "vol-004"},
+						},
+					}, nil,
+				)
+				clientMock.On("VolumeMirrorTransferRate", mock.Anything, "vol-004").Return(
+					[]gopowerstore.VolumeMirrorTransferRateResponse{
+						{MirrorBandwidth: 0},
+					}, nil,
+				)
+
+				req := new(csiext.GetStorageProtectionGroupStatusRequest)
+				params := make(map[string]string)
+				params["globalID"] = "globalvolid1"
+				req.ProtectionGroupAttributes = params
+				res, err := ctrlSvc.GetStorageProtectionGroupStatus(context.Background(), req)
+
+				gomega.Expect(err).To(gomega.BeNil())
+				gomega.Expect(res.Status.BandwidthBytesPerSec).To(gomega.Equal(int64(0)))
 			})
 		})
 	})
@@ -375,7 +574,8 @@ var _ = ginkgo.Describe("Replication", func() {
 
 				gomega.Expect(err).ToNot(gomega.BeNil())
 				gomega.Expect(err.Error()).To(
-					gomega.ContainSubstring("Execute action: RS (test) is still executing previous action"))
+					gomega.ContainSubstring("Execute action: RS (test) is still executing previous action"),
+				)
 			})
 		})
 
@@ -400,7 +600,8 @@ var _ = ginkgo.Describe("Replication", func() {
 					gomega.Expect(res).To(gomega.BeNil())
 					gomega.Expect(err).ToNot(gomega.BeNil())
 					gomega.Expect(err.Error()).To(
-						gomega.ContainSubstring("can't delete volume of improper handle format"))
+						gomega.ContainSubstring("can't delete volume of improper handle format"),
+					)
 				})
 			})
 			ginkgo.When("Array with specified globalID couldn't be found", func() {
@@ -413,7 +614,8 @@ var _ = ginkgo.Describe("Replication", func() {
 					gomega.Expect(res).To(gomega.BeNil())
 					gomega.Expect(err).ToNot(gomega.BeNil())
 					gomega.Expect(err.Error()).To(
-						gomega.ContainSubstring("can't find array with global ID"))
+						gomega.ContainSubstring("can't find array with global ID"),
+					)
 				})
 			})
 			ginkgo.When("the volume cannot be found on the powerstore array", func() {
@@ -561,7 +763,8 @@ var _ = ginkgo.Describe("Replication", func() {
 					gomega.Expect(res).To(gomega.BeNil())
 					gomega.Expect(err).ToNot(gomega.BeNil())
 					gomega.Expect(err.Error()).To(
-						gomega.ContainSubstring("missing globalID in protection group attributes"))
+						gomega.ContainSubstring("missing globalID in protection group attributes"),
+					)
 				})
 			})
 			ginkgo.When("Array with specified globalID couldn't be found", func() {
@@ -575,14 +778,16 @@ var _ = ginkgo.Describe("Replication", func() {
 					gomega.Expect(res).To(gomega.BeNil())
 					gomega.Expect(err).ToNot(gomega.BeNil())
 					gomega.Expect(err.Error()).To(
-						gomega.ContainSubstring("can't find array with global id"))
+						gomega.ContainSubstring("can't find array with global id"),
+					)
 				})
 			})
 			ginkgo.When("can't get volume group", func() {
 				ginkgo.It("should fail", func() {
 					clientMock.On("GetVolumeGroup", mock.Anything, mock.Anything).Return(
 
-						gopowerstore.VolumeGroup{}, gopowerstore.APIError{ErrorMsg: &api.ErrorMsg{StatusCode: http.StatusBadRequest}})
+						gopowerstore.VolumeGroup{}, gopowerstore.APIError{ErrorMsg: &api.ErrorMsg{StatusCode: http.StatusBadRequest}},
+					)
 					req := new(csiext.DeleteStorageProtectionGroupRequest)
 					params := make(map[string]string)
 
@@ -595,13 +800,15 @@ var _ = ginkgo.Describe("Replication", func() {
 					gomega.Expect(res).To(gomega.BeNil())
 					gomega.Expect(err).ToNot(gomega.BeNil())
 					gomega.Expect(err.Error()).To(
-						gomega.ContainSubstring("Error: Unable to get Volume Group"))
+						gomega.ContainSubstring("Error: Unable to get Volume Group"),
+					)
 				})
 			})
 			ginkgo.When("can't get volume group name", func() {
 				ginkgo.It("should fail", func() {
 					clientMock.On("GetVolumeGroup", mock.Anything, mock.Anything).Return(
-						gopowerstore.VolumeGroup{}, gopowerstore.APIError{ErrorMsg: &api.ErrorMsg{StatusCode: http.StatusNotFound}})
+						gopowerstore.VolumeGroup{}, gopowerstore.APIError{ErrorMsg: &api.ErrorMsg{StatusCode: http.StatusNotFound}},
+					)
 					req := new(csiext.DeleteStorageProtectionGroupRequest)
 					params := make(map[string]string)
 
@@ -614,7 +821,8 @@ var _ = ginkgo.Describe("Replication", func() {
 					gomega.Expect(res).To(gomega.BeNil())
 					gomega.Expect(err).ToNot(gomega.BeNil())
 					gomega.Expect(err.Error()).To(
-						gomega.ContainSubstring("Error: Unable to get volume group name"))
+						gomega.ContainSubstring("Error: Unable to get volume group name"),
+					)
 				})
 			})
 			ginkgo.When("Can't unassign the protection policy from volume group", func() {
@@ -623,9 +831,11 @@ var _ = ginkgo.Describe("Replication", func() {
 					vg.ProtectionPolicyID = validPolicyID
 					vg.ID = validGroupID
 					clientMock.On("GetVolumeGroup", mock.Anything, mock.Anything).Return(
-						vg, gopowerstore.APIError{ErrorMsg: &api.ErrorMsg{StatusCode: http.StatusNotFound}})
+						vg, gopowerstore.APIError{ErrorMsg: &api.ErrorMsg{StatusCode: http.StatusNotFound}},
+					)
 					clientMock.On("ModifyVolumeGroup", mock.Anything, mock.Anything, mock.Anything).Return(
-						gopowerstore.EmptyResponse(""), gopowerstore.APIError{ErrorMsg: &api.ErrorMsg{StatusCode: http.StatusBadRequest}})
+						gopowerstore.EmptyResponse(""), gopowerstore.APIError{ErrorMsg: &api.ErrorMsg{StatusCode: http.StatusBadRequest}},
+					)
 
 					req := new(csiext.DeleteStorageProtectionGroupRequest)
 					params := make(map[string]string)
@@ -639,7 +849,8 @@ var _ = ginkgo.Describe("Replication", func() {
 					gomega.Expect(res).To(gomega.BeNil())
 					gomega.Expect(err).ToNot(gomega.BeNil())
 					gomega.Expect(err.Error()).To(
-						gomega.ContainSubstring("Error: Unable to un-assign PP from Volume Group"))
+						gomega.ContainSubstring("Error: Unable to un-assign PP from Volume Group"),
+					)
 				})
 			})
 			ginkgo.When("Can't delete volume group", func() {
@@ -648,9 +859,11 @@ var _ = ginkgo.Describe("Replication", func() {
 					vg.ProtectionPolicyID = ""
 					vg.ID = validGroupID
 					clientMock.On("GetVolumeGroup", mock.Anything, mock.Anything).Return(
-						vg, gopowerstore.APIError{ErrorMsg: &api.ErrorMsg{StatusCode: http.StatusNotFound}})
+						vg, gopowerstore.APIError{ErrorMsg: &api.ErrorMsg{StatusCode: http.StatusNotFound}},
+					)
 					clientMock.On("DeleteVolumeGroup", mock.Anything, mock.Anything).Return(
-						gopowerstore.EmptyResponse(""), gopowerstore.APIError{ErrorMsg: &api.ErrorMsg{StatusCode: http.StatusBadRequest}})
+						gopowerstore.EmptyResponse(""), gopowerstore.APIError{ErrorMsg: &api.ErrorMsg{StatusCode: http.StatusBadRequest}},
+					)
 
 					req := new(csiext.DeleteStorageProtectionGroupRequest)
 					params := make(map[string]string)
@@ -663,7 +876,8 @@ var _ = ginkgo.Describe("Replication", func() {
 					gomega.Expect(res).To(gomega.BeNil())
 					gomega.Expect(err).ToNot(gomega.BeNil())
 					gomega.Expect(err.Error()).To(
-						gomega.ContainSubstring("Error: Unable to delete Volume Group"))
+						gomega.ContainSubstring("Error: Unable to delete Volume Group"),
+					)
 				})
 			})
 			ginkgo.When("Can't get the protection policy", func() {
@@ -676,15 +890,20 @@ var _ = ginkgo.Describe("Replication", func() {
 					pp.Name = validPolicyName
 
 					clientMock.On("GetVolumeGroup", mock.Anything, mock.Anything).Return(
-						vg, gopowerstore.APIError{ErrorMsg: &api.ErrorMsg{StatusCode: http.StatusNotFound}})
+						vg, gopowerstore.APIError{ErrorMsg: &api.ErrorMsg{StatusCode: http.StatusNotFound}},
+					)
 					clientMock.On("GetProtectionPolicyByName", mock.Anything, mock.Anything).Return(
-						gopowerstore.ProtectionPolicy{}, gopowerstore.APIError{ErrorMsg: &api.ErrorMsg{StatusCode: http.StatusBadRequest}})
+						gopowerstore.ProtectionPolicy{}, gopowerstore.APIError{ErrorMsg: &api.ErrorMsg{StatusCode: http.StatusBadRequest}},
+					)
 					clientMock.On("ModifyVolumeGroup", mock.Anything, mock.Anything, mock.Anything).Return(
-						gopowerstore.EmptyResponse(""), gopowerstore.APIError{ErrorMsg: &api.ErrorMsg{StatusCode: http.StatusNotFound}})
+						gopowerstore.EmptyResponse(""), gopowerstore.APIError{ErrorMsg: &api.ErrorMsg{StatusCode: http.StatusNotFound}},
+					)
 					clientMock.On("DeleteVolumeGroup", mock.Anything, mock.Anything).Return(
-						gopowerstore.EmptyResponse(""), gopowerstore.APIError{ErrorMsg: &api.ErrorMsg{StatusCode: http.StatusNotFound}})
+						gopowerstore.EmptyResponse(""), gopowerstore.APIError{ErrorMsg: &api.ErrorMsg{StatusCode: http.StatusNotFound}},
+					)
 					clientMock.On("GetReplicationRuleByName", mock.Anything, mock.Anything).Return(
-						gopowerstore.ReplicationRule{}, gopowerstore.APIError{ErrorMsg: &api.ErrorMsg{StatusCode: http.StatusNotFound}})
+						gopowerstore.ReplicationRule{}, gopowerstore.APIError{ErrorMsg: &api.ErrorMsg{StatusCode: http.StatusNotFound}},
+					)
 
 					req := new(csiext.DeleteStorageProtectionGroupRequest)
 					params := make(map[string]string)
@@ -698,7 +917,8 @@ var _ = ginkgo.Describe("Replication", func() {
 					gomega.Expect(res).To(gomega.BeNil())
 					gomega.Expect(err).ToNot(gomega.BeNil())
 					gomega.Expect(err.Error()).To(
-						gomega.ContainSubstring("Error: Unable to get protection policy"))
+						gomega.ContainSubstring("Error: Unable to get protection policy"),
+					)
 				})
 			})
 
@@ -714,15 +934,20 @@ var _ = ginkgo.Describe("Replication", func() {
 					rr.Name = validRuleName
 
 					clientMock.On("GetVolumeGroup", mock.Anything, mock.Anything).Return(
-						vg, gopowerstore.APIError{ErrorMsg: &api.ErrorMsg{StatusCode: http.StatusNotFound}})
+						vg, gopowerstore.APIError{ErrorMsg: &api.ErrorMsg{StatusCode: http.StatusNotFound}},
+					)
 					clientMock.On("GetProtectionPolicyByName", mock.Anything, mock.Anything).Return(
-						gopowerstore.ProtectionPolicy{}, gopowerstore.APIError{ErrorMsg: &api.ErrorMsg{StatusCode: http.StatusNotFound}})
+						gopowerstore.ProtectionPolicy{}, gopowerstore.APIError{ErrorMsg: &api.ErrorMsg{StatusCode: http.StatusNotFound}},
+					)
 					clientMock.On("ModifyVolumeGroup", mock.Anything, mock.Anything, mock.Anything).Return(
-						gopowerstore.EmptyResponse(""), gopowerstore.APIError{ErrorMsg: &api.ErrorMsg{StatusCode: http.StatusNotFound}})
+						gopowerstore.EmptyResponse(""), gopowerstore.APIError{ErrorMsg: &api.ErrorMsg{StatusCode: http.StatusNotFound}},
+					)
 					clientMock.On("DeleteVolumeGroup", mock.Anything, mock.Anything).Return(
-						gopowerstore.EmptyResponse(""), gopowerstore.APIError{ErrorMsg: &api.ErrorMsg{StatusCode: http.StatusNotFound}})
+						gopowerstore.EmptyResponse(""), gopowerstore.APIError{ErrorMsg: &api.ErrorMsg{StatusCode: http.StatusNotFound}},
+					)
 					clientMock.On("GetReplicationRuleByName", mock.Anything, mock.Anything).Return(
-						rr, gopowerstore.APIError{ErrorMsg: &api.ErrorMsg{StatusCode: http.StatusBadRequest}})
+						rr, gopowerstore.APIError{ErrorMsg: &api.ErrorMsg{StatusCode: http.StatusBadRequest}},
+					)
 
 					req := new(csiext.DeleteStorageProtectionGroupRequest)
 					params := make(map[string]string)
@@ -736,7 +961,8 @@ var _ = ginkgo.Describe("Replication", func() {
 					gomega.Expect(res).To(gomega.BeNil())
 					gomega.Expect(err).ToNot(gomega.BeNil())
 					gomega.Expect(err.Error()).To(
-						gomega.ContainSubstring("Error: Unable to get replication rule"))
+						gomega.ContainSubstring("Error: Unable to get replication rule"),
+					)
 				})
 			})
 			ginkgo.When("The replication rule can't be deleted", func() {
@@ -752,17 +978,23 @@ var _ = ginkgo.Describe("Replication", func() {
 					rr.ID = validRuleID
 
 					clientMock.On("GetVolumeGroup", mock.Anything, mock.Anything).Return(
-						vg, gopowerstore.APIError{ErrorMsg: &api.ErrorMsg{StatusCode: http.StatusNotFound}})
+						vg, gopowerstore.APIError{ErrorMsg: &api.ErrorMsg{StatusCode: http.StatusNotFound}},
+					)
 					clientMock.On("GetProtectionPolicyByName", mock.Anything, mock.Anything).Return(
-						gopowerstore.ProtectionPolicy{}, gopowerstore.APIError{ErrorMsg: &api.ErrorMsg{StatusCode: http.StatusNotFound}})
+						gopowerstore.ProtectionPolicy{}, gopowerstore.APIError{ErrorMsg: &api.ErrorMsg{StatusCode: http.StatusNotFound}},
+					)
 					clientMock.On("ModifyVolumeGroup", mock.Anything, mock.Anything, mock.Anything).Return(
-						gopowerstore.EmptyResponse(""), gopowerstore.APIError{ErrorMsg: &api.ErrorMsg{StatusCode: http.StatusNotFound}})
+						gopowerstore.EmptyResponse(""), gopowerstore.APIError{ErrorMsg: &api.ErrorMsg{StatusCode: http.StatusNotFound}},
+					)
 					clientMock.On("DeleteVolumeGroup", mock.Anything, mock.Anything).Return(
-						gopowerstore.EmptyResponse(""), gopowerstore.APIError{ErrorMsg: &api.ErrorMsg{StatusCode: http.StatusNotFound}})
+						gopowerstore.EmptyResponse(""), gopowerstore.APIError{ErrorMsg: &api.ErrorMsg{StatusCode: http.StatusNotFound}},
+					)
 					clientMock.On("GetReplicationRuleByName", mock.Anything, mock.Anything).Return(
-						rr, gopowerstore.APIError{ErrorMsg: &api.ErrorMsg{StatusCode: http.StatusNotFound}})
+						rr, gopowerstore.APIError{ErrorMsg: &api.ErrorMsg{StatusCode: http.StatusNotFound}},
+					)
 					clientMock.On("DeleteReplicationRule", mock.Anything, mock.Anything).Return(
-						gopowerstore.EmptyResponse(""), gopowerstore.APIError{ErrorMsg: &api.ErrorMsg{StatusCode: http.StatusBadRequest}})
+						gopowerstore.EmptyResponse(""), gopowerstore.APIError{ErrorMsg: &api.ErrorMsg{StatusCode: http.StatusBadRequest}},
+					)
 
 					req := new(csiext.DeleteStorageProtectionGroupRequest)
 					params := make(map[string]string)
@@ -777,7 +1009,8 @@ var _ = ginkgo.Describe("Replication", func() {
 					gomega.Expect(res).To(gomega.BeNil())
 					gomega.Expect(err).ToNot(gomega.BeNil())
 					gomega.Expect(err.Error()).To(
-						gomega.ContainSubstring("Error: Unable to delete replication rule"))
+						gomega.ContainSubstring("Error: Unable to delete replication rule"),
+					)
 				})
 			})
 			ginkgo.When("NFS context is detected via NasServerID", func() {
@@ -918,7 +1151,8 @@ var _ = ginkgo.Describe("Replication", func() {
 
 					gomega.Expect(err).NotTo(gomega.BeNil())
 					gomega.Expect(err.Error()).To(
-						gomega.ContainSubstring("can't find array with global id "))
+						gomega.ContainSubstring("can't find array with global id "),
+					)
 				})
 			})
 			ginkgo.When("the action is not supported", func() {
@@ -943,7 +1177,8 @@ var _ = ginkgo.Describe("Replication", func() {
 					_, err := ctrlSvc.ExecuteAction(context.Background(), req)
 					gomega.Expect(err).NotTo(gomega.BeNil())
 					gomega.Expect(err.Error()).To(
-						gomega.ContainSubstring("The requested action does not match with supported actions"))
+						gomega.ContainSubstring("The requested action does not match with supported actions"),
+					)
 				})
 			})
 
@@ -972,7 +1207,8 @@ var _ = ginkgo.Describe("Replication", func() {
 
 					gomega.Expect(err).NotTo(gomega.BeNil())
 					gomega.Expect(err.Error()).To(
-						gomega.ContainSubstring("Execute action: RS (test) is still executing previous action"))
+						gomega.ContainSubstring("Execute action: RS (test) is still executing previous action"),
+					)
 				})
 			})
 			ginkgo.When("the action type is suspend", func() {
@@ -1026,7 +1262,8 @@ var _ = ginkgo.Describe("Replication", func() {
 
 					gomega.Expect(err).NotTo(gomega.BeNil())
 					gomega.Expect(err.Error()).To(
-						gomega.ContainSubstring("Execute action: RS (test) is still executing previous action"))
+						gomega.ContainSubstring("Execute action: RS (test) is still executing previous action"),
+					)
 				})
 			})
 			ginkgo.When("the replication session can't be modified due to sync action type.", func() {
@@ -1054,7 +1291,8 @@ var _ = ginkgo.Describe("Replication", func() {
 
 					gomega.Expect(err).NotTo(gomega.BeNil())
 					gomega.Expect(err.Error()).To(
-						gomega.ContainSubstring("Execute action: Failed to modify RS (test) - Error ()"))
+						gomega.ContainSubstring("Execute action: Failed to modify RS (test) - Error (HTTP 400: )"),
+					)
 				})
 			})
 			ginkgo.When("the action type is resume", func() {

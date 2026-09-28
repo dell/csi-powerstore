@@ -22,6 +22,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"net/http/httptest"
 	"sync"
 	"testing"
 	"time"
@@ -44,7 +45,8 @@ func TestApiRouter2(t *testing.T) {
 	// Give it a moment to attempt to start and fail
 	time.Sleep(100 * time.Millisecond)
 
-	resp, err := http.Get("http://localhost:8083/node-status")
+	client := &http.Client{Timeout: 2 * time.Second}
+	resp, err := client.Get("http://localhost:8083/node-status")
 	if err == nil || resp != nil {
 		t.Errorf("Error while probing node status")
 	}
@@ -369,4 +371,47 @@ func TestGetNodeOptions_AdditionalCoverage(_ *testing.T) {
 	// Call with various scenarios
 	opts := getNodeOptions()
 	_ = opts
+}
+
+// TestPodmonAuthMiddleware manipulates the package-level identifiers.PodmonAPIToken; it must not run in parallel.
+func TestPodmonAuthMiddleware(t *testing.T) {
+	next := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	tests := []struct {
+		name       string
+		token      string
+		authHeader string
+		wantStatus int
+	}{
+		{"no token configured", "", "", http.StatusOK},
+		{"valid bearer token", "test-token", "Bearer test-token", http.StatusOK},
+		{"valid bearer token with extra whitespace", "test-token", "Bearer test-token   ", http.StatusOK},
+		{"valid lowercase bearer token (RFC 6750)", "test-token", "bearer test-token", http.StatusOK},
+		{"valid mixed case bearer token (RFC 6750)", "test-token", "BEARER test-token", http.StatusOK},
+		{"missing authorization header", "test-token", "", http.StatusUnauthorized},
+		{"invalid bearer token", "test-token", "Bearer wrong-token", http.StatusUnauthorized},
+		{"malformed authorization header", "test-token", "test-token", http.StatusUnauthorized},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			old := identifiers.PodmonAPIToken
+			identifiers.PodmonAPIToken = tt.token
+			defer func() { identifiers.PodmonAPIToken = old }()
+
+			req := httptest.NewRequest(http.MethodGet, "/array-status", nil)
+			if tt.authHeader != "" {
+				req.Header.Set("Authorization", tt.authHeader)
+			}
+			rec := httptest.NewRecorder()
+
+			podmonAuthMiddleware(next).ServeHTTP(rec, req)
+
+			if rec.Code != tt.wantStatus {
+				t.Errorf("got status %d, want %d", rec.Code, tt.wantStatus)
+			}
+		})
+	}
 }

@@ -63,45 +63,46 @@ var _ = ginkgo.Describe("CSIIdentityService", func() {
 		ginkgo.It("should return correct capabilities", func() {
 			res, err := idntySvc.GetPluginCapabilities(context.Background(), &csi.GetPluginCapabilitiesRequest{})
 			gomega.Expect(err).To(gomega.BeNil())
-			gomega.Expect(res).To(gomega.Equal(&csi.GetPluginCapabilitiesResponse{
-				Capabilities: []*csi.PluginCapability{
-					{
-						Type: &csi.PluginCapability_Service_{
-							Service: &csi.PluginCapability_Service{
-								Type: csi.PluginCapability_Service_CONTROLLER_SERVICE,
+			gomega.Expect(res).To(gomega.Equal(
+				&csi.GetPluginCapabilitiesResponse{
+					Capabilities: []*csi.PluginCapability{
+						{
+							Type: &csi.PluginCapability_Service_{
+								Service: &csi.PluginCapability_Service{
+									Type: csi.PluginCapability_Service_CONTROLLER_SERVICE,
+								},
 							},
 						},
-					},
-					{
-						Type: &csi.PluginCapability_VolumeExpansion_{
-							VolumeExpansion: &csi.PluginCapability_VolumeExpansion{
-								Type: csi.PluginCapability_VolumeExpansion_ONLINE,
+						{
+							Type: &csi.PluginCapability_VolumeExpansion_{
+								VolumeExpansion: &csi.PluginCapability_VolumeExpansion{
+									Type: csi.PluginCapability_VolumeExpansion_ONLINE,
+								},
 							},
 						},
-					},
-					{
-						Type: &csi.PluginCapability_VolumeExpansion_{
-							VolumeExpansion: &csi.PluginCapability_VolumeExpansion{
-								Type: csi.PluginCapability_VolumeExpansion_OFFLINE,
+						{
+							Type: &csi.PluginCapability_VolumeExpansion_{
+								VolumeExpansion: &csi.PluginCapability_VolumeExpansion{
+									Type: csi.PluginCapability_VolumeExpansion_OFFLINE,
+								},
 							},
 						},
-					},
-					{
-						Type: &csi.PluginCapability_Service_{
-							Service: &csi.PluginCapability_Service{
-								Type: csi.PluginCapability_Service_VOLUME_ACCESSIBILITY_CONSTRAINTS,
+						{
+							Type: &csi.PluginCapability_Service_{
+								Service: &csi.PluginCapability_Service{
+									Type: csi.PluginCapability_Service_VOLUME_ACCESSIBILITY_CONSTRAINTS,
+								},
 							},
 						},
-					},
-					{
-						Type: &csi.PluginCapability_Service_{
-							Service: &csi.PluginCapability_Service{
-								Type: csi.PluginCapability_Service_GROUP_CONTROLLER_SERVICE,
+						{
+							Type: &csi.PluginCapability_Service_{
+								Service: &csi.PluginCapability_Service{
+									Type: csi.PluginCapability_Service_GROUP_CONTROLLER_SERVICE,
+								},
 							},
 						},
 					},
 				},
-			},
 			))
 		})
 	})

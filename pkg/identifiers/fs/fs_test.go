@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2021-2024 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2021-2026 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -158,20 +158,37 @@ func (suite *FsTestSuite) TestParseProcMounts() {
 func (suite *FsTestSuite) TestNetDial() {
 	conn, err := suite.fs.NetDial("localhost")
 	suite.Assert().NoError(err)
-	conn.Close()
+	_ = conn.Close()
 }
 
 func (suite *FsTestSuite) TestNetDialWithPort() {
 	conn, err := suite.fs.NetDial("localhost:9400")
 	suite.Assert().NoError(err)
 	suite.Assert().NotNil(conn)
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 }
 
 func (suite *FsTestSuite) TestNetDialWithHttpsPort() {
 	conn, err := suite.fs.NetDial("https://localhost:9400")
 	suite.Assert().Error(err)
 	suite.Assert().Nil(conn)
+}
+
+// FR-6.2: IPv6 endpoints must produce a valid dial address.
+func (suite *FsTestSuite) TestNetDialIPv6Bare() {
+	// bare IPv6 — NetDial should append ":80" as "[::1]:80"
+	conn, err := suite.fs.NetDial("::1")
+	suite.Assert().NoError(err)
+	suite.Assert().NotNil(conn)
+	_ = conn.Close()
+}
+
+func (suite *FsTestSuite) TestNetDialIPv6WithPort() {
+	// bracketed IPv6 with port — should pass through unchanged
+	conn, err := suite.fs.NetDial("[::1]:9400")
+	suite.Assert().NoError(err)
+	suite.Assert().NotNil(conn)
+	defer func() { _ = conn.Close() }()
 }
 
 func (suite *FsTestSuite) TestGetUtil() {

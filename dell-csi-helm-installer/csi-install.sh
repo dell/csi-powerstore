@@ -16,7 +16,7 @@ PROG="${0}"
 NODE_VERIFY=1
 VERIFY=1
 MODE="install"
-DEFAULT_VERSION="v2.17.0"
+DEFAULT_VERSION="v2.18.0"
 WATCHLIST=""
 
 # export the name of the debug log, so child processes will see it
@@ -28,6 +28,9 @@ source "$SCRIPTDIR"/common.sh
 if [ -f "${DEBUGLOG}" ]; then
   rm -f "${DEBUGLOG}"
 fi
+
+detect_helm_version
+validate_helm_version "${HELM_MAJOR_VERSION}"
 
 #
 # usage will print command execution help and then exit
@@ -45,10 +48,12 @@ function usage() {
   decho "  --release[=]<helm release>               Name to register with helm, default value will match the driver name"
   decho "  --upgrade                                Perform an upgrade of the specified driver, default is false"
   decho "  --version                                Use this version for CSI Driver Image"
-  decho "  --helm-charts-version                    Pass the helm chart version "
+  decho "  --helm-charts-version                    Helm chart version (format: full git tag for local e.g. csi-powerstore-2.18.0; version number for OCI Registry e.g. 2.18.0)"
   decho "  --node-verify-user[=]<username>          Username to SSH to worker nodes as, used to validate node requirements. Default is root"
   decho "  --skip-verify                            Skip the kubernetes configuration verification to use the CSI driver, default will run verification"
   decho "  --skip-verify-node                       Skip worker node verification checks"
+  decho "  --oci-chart[=]<oci-uri>                  OCI registry URI for Helm chart (e.g., oci://registry.example.com/charts/csi-powerstore)"
+  decho "  --registry-auth-secret[=]<secret-name>   Kubernetes secret containing registry credentials (username/password keys)"
   decho "  -h                                       Help"
   decho
 
@@ -122,6 +127,26 @@ function validate_params() {
     usage
     exit 1
   fi
+
+  # OCI chart validation
+  if [ -n "${OCI_CHART}" ]; then
+    if [[ ! "${OCI_CHART}" =~ ^oci:// ]]; then
+      decho "OCI chart URI must start with oci://"
+      usage
+      exit 1
+    fi
+    if [ -z "${REGISTRY_AUTH_SECRET}" ]; then
+      decho "Warning: --registry-auth-secret not specified. Registry login will be skipped."
+      decho "This is only acceptable if the OCI registry does not require authentication."
+    fi
+  fi
+
+  # Registry auth secret requires OCI chart
+  if [ -n "${REGISTRY_AUTH_SECRET}" ] && [ -z "${OCI_CHART}" ]; then
+    decho "--registry-auth-secret can only be used with --oci-chart"
+    usage
+    exit 1
+  fi
 }
 
 #
@@ -139,24 +164,77 @@ function install_driver() {
     source "${SCRIPTDIR}/${SCRIPTNAME}"
   fi
 
+  # Handle OCI registry authentication if needed
+  if [ -n "${OCI_CHART}" ] && [ -n "${REGISTRY_AUTH_SECRET}" ]; then
+    log section "Authenticating to OCI Registry"
+    if ! extract_registry_credentials_from_secret "${REGISTRY_AUTH_SECRET}" "${NS}"; then
+      log error "Failed to extract registry credentials from secret ${REGISTRY_AUTH_SECRET}"
+      return 1
+    fi
+
+    local registry_domain
+    registry_domain=$(echo "${OCI_CHART}" | sed -E 's|^oci://([^/]+).*|\1|')
+
+    local use_plain_http="false"
+    if [[ "${registry_domain}" == localhost* ]] || [[ "${registry_domain}" == 127.0.0.1* ]]; then
+      use_plain_http="true"
+    fi
+
+    if ! helm_registry_login "${registry_domain}" "${REGISTRY_USERNAME}" "${REGISTRY_PASSWORD}" "${use_plain_http}"; then
+      log error "Failed to authenticate to OCI registry ${registry_domain}"
+      return 1
+    fi
+    log step_success
+  fi
+
+  # Determine chart source: OCI URI or local filesystem
+  local CHART_SOURCE
+  local HELM_EXTRA_FLAGS=""
+  if [ -n "${OCI_CHART}" ]; then
+    CHART_SOURCE="${OCI_CHART}"
+    log step "Using OCI chart: ${CHART_SOURCE}"
+
+    # Add --version flag if HELMCHARTVERSION is specified
+    if [ -n "${HELMCHARTVERSION}" ]; then
+      HELM_EXTRA_FLAGS="${HELM_EXTRA_FLAGS} --version ${HELMCHARTVERSION}"
+    fi
+
+    # Add --plain-http flag for localhost registries
+    local registry_domain
+    registry_domain=$(echo "${OCI_CHART}" | sed -E 's|^oci://([^/]+).*|\1|')
+    if [[ "${registry_domain}" == localhost* ]] || [[ "${registry_domain}" == 127.0.0.1* ]]; then
+      HELM_EXTRA_FLAGS="${HELM_EXTRA_FLAGS} --plain-http"
+    fi
+  else
+    CHART_SOURCE="${DRIVERDIR}/${DRIVER}"
+    log step "Using local chart: ${CHART_SOURCE}"
+  fi
+
   HELMOUTPUT="/tmp/csi-install.$$.out"
 
-  # install all of the helm dependencies
-  log step "Installing helm dependencies"
-  run_command helm dependency build "${DRIVERDIR}/${DRIVER}" >>"${HELMOUTPUT}" 2>&1
-  if [ $? -ne 0 ]; then
-      cat "${HELMOUTPUT}"
-      log error "Failed to install ${DRIVER} helm dependencies"
+  # install all of the helm dependencies (only for local charts)
+  if [ -z "${OCI_CHART}" ]; then
+    log step "Installing helm dependencies"
+    run_command helm dependency build "${CHART_SOURCE}" >>"${HELMOUTPUT}" 2>&1
+    HELM_RC=$?
+    # Note: HELM_RC is a global variable that persists after this function returns. Do not refactor install_driver to run in a subshell without updating the calling code.
+    if [ $HELM_RC -ne 0 ]; then
+        cat "${HELMOUTPUT}"
+        log error "Failed to install ${DRIVER} helm dependencies"
+        return 1
+    fi
   fi
 
   # install the driver
-  run_command helm ${1} \
-    --set openshift=${OPENSHIFT} \
+  run_command helm "${1}" \
+    --set openshift="${OPENSHIFT}" \
     --values "${VALUES}" \
-    --namespace ${NS} "${RELEASE}" \
-    "${DRIVERDIR}/${DRIVER}" >>"${HELMOUTPUT}" 2>&1
+    --namespace "${NS}" "${RELEASE}" \
+    "${CHART_SOURCE}" "${HELM_EXTRA_FLAGS}" >>"${HELMOUTPUT}" 2>&1
+  HELM_RC=$?
+  # Note: HELM_RC is a global variable that persists after this function returns. Do not refactor install_driver to run in a subshell without updating the calling code.
 
-  if [ $? -ne 0 ]; then
+  if [ $HELM_RC -ne 0 ]; then
     cat "${HELMOUTPUT}"
     log error "Helm operation failed, output can be found in ${HELMOUTPUT}. The failure should be examined, before proceeding. Additionally, running csi-uninstall.sh may be needed to clean up partial deployments."
   fi
@@ -264,6 +342,49 @@ function kubectl_safe() {
   fi
 }
 
+# extract_registry_credentials_from_secret
+# Extracts username and password from a Kubernetes secret for OCI registry authentication
+# Arguments: $1=secret_name, $2=namespace
+# Returns: 0 on success, 1 on failure
+# Sets REGISTRY_USERNAME and REGISTRY_PASSWORD global variables on success
+function extract_registry_credentials_from_secret() {
+  local secret_name="${1}"
+  local namespace="${2}"
+
+  if [ -z "${secret_name}" ] || [ -z "${namespace}" ]; then
+    log error "Secret name and namespace are required for credential extraction"
+    return 1
+  fi
+
+  log step "Extracting registry credentials from secret ${secret_name}"
+
+  local username_b64
+  local password_b64
+
+  username_b64=$(kubectl get secret "${secret_name}" -n "${namespace}" -o jsonpath='{.data.username}' 2>/dev/null)
+  if [ -z "${username_b64}" ]; then
+    log error "Failed to extract username from secret ${secret_name} in namespace ${namespace}"
+    return 1
+  fi
+
+  password_b64=$(kubectl get secret "${secret_name}" -n "${namespace}" -o jsonpath='{.data.password}' 2>/dev/null)
+  if [ -z "${password_b64}" ]; then
+    log error "Failed to extract password from secret ${secret_name} in namespace ${namespace}"
+    return 1
+  fi
+
+  REGISTRY_USERNAME=$(echo "${username_b64}" | base64 -d)
+  REGISTRY_PASSWORD=$(echo "${password_b64}" | base64 -d)
+
+  if [ -z "${REGISTRY_USERNAME}" ] || [ -z "${REGISTRY_PASSWORD}" ]; then
+    log error "Decoded credentials are empty from secret ${secret_name}"
+    return 1
+  fi
+
+  log step_success
+  return 0
+}
+
 #
 # verify_kubernetes
 # will run a driver specific function to verify environmental requirements
@@ -358,6 +479,20 @@ while getopts ":h-:" optchar; do
     node-verify-user=*)
       HODEUSER=${OPTARG#*=}
       ;;
+    oci-chart)
+      OCI_CHART="${!OPTIND}"
+      OPTIND=$((OPTIND + 1))
+      ;;
+    oci-chart=*)
+      OCI_CHART=${OPTARG#*=}
+      ;;
+    registry-auth-secret)
+      REGISTRY_AUTH_SECRET="${!OPTIND}"
+      OPTIND=$((OPTIND + 1))
+      ;;
+    registry-auth-secret=*)
+      REGISTRY_AUTH_SECRET=${OPTARG#*=}
+      ;;
     *)
       decho "Unknown option --${OPTARG}"
       decho "For help, run $PROG -h"
@@ -384,18 +519,21 @@ if [ -n "$HELMCHARTVERSION" ]; then
   DRIVERVERSION=$HELMCHARTVERSION
 fi
 
-if [ ! -d "$DRIVERDIR/helm-charts" ]; then
+# Skip git clone when using OCI charts (charts pulled from registry, not local files)
+if [ -z "${OCI_CHART}" ]; then
+  if [ ! -d "$DRIVERDIR/helm-charts" ]; then
 
-  if  [ ! -d "$SCRIPTDIR/helm-charts" ]; then
-    git clone --quiet -c advice.detachedHead=false -b $DRIVERVERSION https://github.com/dell/helm-charts
-  fi
-  mv helm-charts $DRIVERDIR
-else
+    if  [ ! -d "$SCRIPTDIR/helm-charts" ]; then
+      git clone --quiet -c advice.detachedHead=false -b $DRIVERVERSION https://github.com/dell/helm-charts
+    fi
+    mv helm-charts $DRIVERDIR
+  else
   if [  -d "$SCRIPTDIR/helm-charts" ]; then
     rm -rf $SCRIPTDIR/helm-charts
   fi
+  fi
+  DRIVERDIR="${SCRIPTDIR}/../helm-charts/charts"
 fi
-DRIVERDIR="${SCRIPTDIR}/../helm-charts/charts"
 
 RELEASE=$(get_release_name "${DRIVER}")
 # by default, NODEUSER is root
@@ -431,6 +569,13 @@ check_for_driver "${MODE}"
 verify_kubernetes
 
 # all good, keep processing
+record_helm_telemetry "${MODE}" "${DRIVER}" "pending"
 install_driver "${MODE}"
+if [[ ${HELM_RC:-0} -ne 0 ]]; then
+  detect_ssa_conflict_in_output "${HELMOUTPUT}"
+  record_helm_telemetry "${MODE}" "${DRIVER}" "failure"
+else
+  record_helm_telemetry "${MODE}" "${DRIVER}" "success"
+fi
 
 summary

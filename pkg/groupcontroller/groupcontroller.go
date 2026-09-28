@@ -17,7 +17,7 @@ import (
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers"
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers/fs"
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers/k8sutils"
-	"github.com/dell/csmlog"
+	log "github.com/dell/csmlog"
 	csictx "github.com/dell/gocsi/context"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc/codes"
@@ -43,9 +43,6 @@ type Service struct {
 	isAutoRoundOffFsSizeEnabled bool
 	groupSnapshotManager        *VolumeGroupSnapshotManager
 }
-
-// Instantiate csmlog at package level
-var log = csmlog.GetLogger()
 
 // Init is a method that initializes internal variables of group controller service
 func (s *Service) Init() error {

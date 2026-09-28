@@ -527,30 +527,28 @@ func TestDeleteVolumeGroupSnapshot_EdgeCases(t *testing.T) {
 	manager := NewVolumeGroupSnapshotManager()
 	ctx := context.Background()
 
-	t.Run("malformed CSI ID - too few parts", func(t *testing.T) {
+	t.Run("malformed CSI ID - too few parts - returns OK for idempotency", func(t *testing.T) {
 		req := &csi.DeleteVolumeGroupSnapshotRequest{
 			GroupSnapshotId: "invalid-format",
 		}
 
 		resp, err := manager.DeleteVolumeGroupSnapshot(ctx, req)
 
-		assert.Error(t, err)
-		assert.Nil(t, resp)
-		assert.Equal(t, codes.InvalidArgument, status.Code(err))
-		assert.Contains(t, err.Error(), "invalid group snapshot ID format")
+		// CSI spec v1.12: DeleteVolumeGroupSnapshot MUST be idempotent - invalid ID returns OK
+		assert.NoError(t, err)
+		assert.NotNil(t, resp)
 	})
 
-	t.Run("malformed CSI ID - too many parts", func(t *testing.T) {
+	t.Run("malformed CSI ID - too many parts - returns OK for idempotency", func(t *testing.T) {
 		req := &csi.DeleteVolumeGroupSnapshotRequest{
 			GroupSnapshotId: "snap-123/array-1/scsi/extra/part",
 		}
 
 		resp, err := manager.DeleteVolumeGroupSnapshot(ctx, req)
 
-		assert.Error(t, err)
-		assert.Nil(t, resp)
-		assert.Equal(t, codes.InvalidArgument, status.Code(err))
-		assert.Contains(t, err.Error(), "invalid group snapshot ID format")
+		// CSI spec v1.12: DeleteVolumeGroupSnapshot MUST be idempotent - invalid ID returns OK
+		assert.NoError(t, err)
+		assert.NotNil(t, resp)
 	})
 
 	t.Run("malformed CSI ID - empty parts", func(t *testing.T) {
@@ -584,30 +582,32 @@ func TestGetVolumeGroupSnapshot_EdgeCases(t *testing.T) {
 	manager := NewVolumeGroupSnapshotManager()
 	ctx := context.Background()
 
-	t.Run("malformed CSI ID - too few parts", func(t *testing.T) {
+	t.Run("malformed CSI ID - too few parts - returns NotFound", func(t *testing.T) {
 		req := &csi.GetVolumeGroupSnapshotRequest{
 			GroupSnapshotId: "invalid-format",
 		}
 
 		resp, err := manager.GetVolumeGroupSnapshot(ctx, req)
 
+		// CSI spec v1.12: GetVolumeGroupSnapshot with non-existent ID MUST return NotFound
 		assert.Error(t, err)
 		assert.Nil(t, resp)
-		assert.Equal(t, codes.InvalidArgument, status.Code(err))
-		assert.Contains(t, err.Error(), "invalid group snapshot ID format")
+		assert.Equal(t, codes.NotFound, status.Code(err))
+		assert.Contains(t, err.Error(), "group snapshot invalid-format not found")
 	})
 
-	t.Run("malformed CSI ID - too many parts", func(t *testing.T) {
+	t.Run("malformed CSI ID - too many parts - returns NotFound", func(t *testing.T) {
 		req := &csi.GetVolumeGroupSnapshotRequest{
 			GroupSnapshotId: "snap-123/array-1/scsi/extra/part",
 		}
 
 		resp, err := manager.GetVolumeGroupSnapshot(ctx, req)
 
+		// CSI spec v1.12: GetVolumeGroupSnapshot with non-existent ID MUST return NotFound
 		assert.Error(t, err)
 		assert.Nil(t, resp)
-		assert.Equal(t, codes.InvalidArgument, status.Code(err))
-		assert.Contains(t, err.Error(), "invalid group snapshot ID format")
+		assert.Equal(t, codes.NotFound, status.Code(err))
+		assert.Contains(t, err.Error(), "group snapshot snap-123/array-1/scsi/extra/part not found")
 	})
 
 	t.Run("array not found", func(t *testing.T) {

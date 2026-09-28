@@ -22,7 +22,7 @@ import (
 	context "context"
 
 	fs "github.com/dell/csi-powerstore/v2/pkg/identifiers/fs"
-	"github.com/dell/csmlog"
+	log "github.com/dell/csmlog"
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 
 	mock "github.com/stretchr/testify/mock"
@@ -34,11 +34,11 @@ type NodeVolumePublisher struct {
 }
 
 // Publish provides a mock function with given fields: ctx, logFields, _a2, cap, isRO, targetPath, stagingPath
-func (_m *NodeVolumePublisher) Publish(ctx context.Context, logFields csmlog.Fields, _a2 fs.Interface, cap *csi.VolumeCapability, isRO bool, targetPath string, stagingPath string) (*csi.NodePublishVolumeResponse, error) {
+func (_m *NodeVolumePublisher) Publish(ctx context.Context, logFields log.Fields, _a2 fs.Interface, cap *csi.VolumeCapability, isRO bool, targetPath string, stagingPath string) (*csi.NodePublishVolumeResponse, error) {
 	ret := _m.Called(ctx, logFields, _a2, cap, isRO, targetPath, stagingPath)
 
 	var r0 *csi.NodePublishVolumeResponse
-	if rf, ok := ret.Get(0).(func(context.Context, csmlog.Fields, fs.Interface, *csi.VolumeCapability, bool, string, string) *csi.NodePublishVolumeResponse); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, log.Fields, fs.Interface, *csi.VolumeCapability, bool, string, string) *csi.NodePublishVolumeResponse); ok {
 		r0 = rf(ctx, logFields, _a2, cap, isRO, targetPath, stagingPath)
 	} else {
 		if ret.Get(0) != nil {
@@ -47,7 +47,7 @@ func (_m *NodeVolumePublisher) Publish(ctx context.Context, logFields csmlog.Fie
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, csmlog.Fields, fs.Interface, *csi.VolumeCapability, bool, string, string) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, log.Fields, fs.Interface, *csi.VolumeCapability, bool, string, string) error); ok {
 		r1 = rf(ctx, logFields, _a2, cap, isRO, targetPath, stagingPath)
 	} else {
 		r1 = ret.Error(1)

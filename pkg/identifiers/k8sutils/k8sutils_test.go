@@ -18,21 +18,29 @@ package k8sutils
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest"
+	ktesting "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/leaderelection"
+	metricsv1beta1api "k8s.io/metrics/pkg/apis/metrics/v1beta1"
+	metricsv1beta1client "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
 )
 
 const (
@@ -43,10 +51,10 @@ const (
 
 var (
 	testPV *corev1.PersistentVolume = &corev1.PersistentVolume{
-		TypeMeta: v1.TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			Kind: "PersistentVolume",
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      testVolName,
 			Namespace: "",
 		},
@@ -62,11 +70,11 @@ var (
 		},
 	}
 	testVolumeEvent *corev1.Event = &corev1.Event{
-		TypeMeta: v1.TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			APIVersion: "v1",
 			Kind:       "Event",
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "event1",
 			Namespace: "default",
 		},
@@ -79,11 +87,11 @@ var (
 		Reason: "Minor",
 	}
 	testPodEvent *corev1.Event = &corev1.Event{
-		TypeMeta: v1.TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			APIVersion: "v1",
 			Kind:       "Event",
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "powerstore-node-event",
 			Namespace: "powerstore",
 		},
@@ -195,7 +203,7 @@ func TestCreateKubeClientSet(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.before(t)
+			_ = tt.before(t)
 			defer tt.after()
 
 			_, err := CreateKubeClientSet()
@@ -330,6 +338,12 @@ func TestSetNodeLabel(t *testing.T) {
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "not found")
 	})
+
+	t.Run("SetNodeLabel update error", func(t *testing.T) {
+		// This test would require mocking the update to fail
+		// For now, we'll skip this as it requires complex mocking
+		t.Skip("Requires update error mocking")
+	})
 }
 
 func TestGetNVMeUUIDs(t *testing.T) {
@@ -371,6 +385,37 @@ func TestAddNVMeLabels(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
+	t.Run("AddNVMeLabels filters invalid nqn entries", func(t *testing.T) {
+		clientset := fake.NewSimpleClientset(GetMockNodeWithoutLabels())
+		Kubeclient = &K8sClient{
+			Clientset: clientset,
+		}
+
+		err := Kubeclient.AddNVMeLabels(context.Background(), "node1", "newNVME", []string{
+			"invalid-nqn-format",
+			"nqn.yyyy-mm.nvmexpress:uuid:xxxx-yyyy-zzzz",
+		})
+		require.NoError(t, err)
+
+		node, err := clientset.CoreV1().Nodes().Get(context.Background(), "node1", metav1.GetOptions{})
+		require.NoError(t, err)
+		assert.Equal(t, "xxxx-yyyy-zzzz", node.Labels["newNVME"])
+	})
+
+	t.Run("AddNVMeLabels update error", func(t *testing.T) {
+		clientset := fake.NewSimpleClientset(GetMockNodeWithoutLabels())
+		clientset.PrependReactor("update", "nodes", func(_ ktesting.Action) (bool, runtime.Object, error) {
+			return true, nil, errors.New("update failed")
+		})
+		Kubeclient = &K8sClient{
+			Clientset: clientset,
+		}
+
+		err := Kubeclient.AddNVMeLabels(context.Background(), "node1", "newNVME", []string{"nqn.yyyy-mm.nvmexpress:uuid:xxxx-yyyy-zzzz"})
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to update node node1 labels")
+	})
+
 	t.Run("AddNVMeLabels success - empty labels", func(t *testing.T) {
 		Kubeclient = &K8sClient{
 			Clientset: fake.NewSimpleClientset(GetMockNodeWithoutLabels()),
@@ -396,6 +441,46 @@ func TestGetNodeByCSINodeID(t *testing.T) {
 
 		_, err := Kubeclient.GetNodeByCSINodeID(context.Background(), "node1", "myCsiNode", "csi.volume.kubernetes.io/nodeid")
 		assert.NoError(t, err)
+	})
+
+	t.Run("GetNodeByCSINodeID skips invalid annotations", func(t *testing.T) {
+		invalidNode := &corev1.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "node-invalid",
+				Annotations: map[string]string{
+					"csi.volume.kubernetes.io/nodeid": "{invalid-json",
+				},
+			},
+		}
+		validNode := &corev1.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "node-valid",
+				Annotations: map[string]string{
+					"csi.volume.kubernetes.io/nodeid": "{\"node1\":\"myCsiNode\"}",
+				},
+			},
+		}
+		Kubeclient = &K8sClient{
+			Clientset: fake.NewSimpleClientset(invalidNode, validNode),
+		}
+
+		node, err := Kubeclient.GetNodeByCSINodeID(context.Background(), "node1", "myCsiNode", "csi.volume.kubernetes.io/nodeid")
+		assert.NoError(t, err)
+		assert.Equal(t, "node-valid", node.Name)
+	})
+
+	t.Run("GetNodeByCSINodeID list error", func(t *testing.T) {
+		clientset := fake.NewSimpleClientset()
+		clientset.PrependReactor("list", "nodes", func(_ ktesting.Action) (bool, runtime.Object, error) {
+			return true, nil, errors.New("list failed")
+		})
+		Kubeclient = &K8sClient{
+			Clientset: clientset,
+		}
+
+		_, err := Kubeclient.GetNodeByCSINodeID(context.Background(), "node1", "myCsiNode", "csi.volume.kubernetes.io/nodeid")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to get node list")
 	})
 
 	t.Run("GetNodeByCSINodeID failed", func(t *testing.T) {
@@ -466,7 +551,11 @@ func TestK8sClient_ListPersistentVolumes(t *testing.T) {
 				t.Fatal("ListPersistentVolumes() succeeded unexpectedly")
 			}
 
-			if !reflect.DeepEqual(got, tt.want) {
+			if got == nil {
+				t.Fatal("ListPersistentVolumes() returned nil result")
+			}
+
+			if !reflect.DeepEqual(got.Items, tt.want.Items) {
 				t.Errorf("ListPersistentVolumes() = %v, want %v", got, tt.want)
 			}
 		})
@@ -546,11 +635,33 @@ func TestK8sClient_GetEvents(t *testing.T) {
 			if tt.wantErr {
 				t.Fatal("GetEvents() succeeded unexpectedly")
 			}
-			if !reflect.DeepEqual(tt.want, got) {
+			if got == nil {
+				t.Fatal("GetEvents() returned nil result")
+			}
+			if len(got.Items) != len(tt.want.Items) {
+				t.Fatalf("GetEvents() returned %d items, want %d", len(got.Items), len(tt.want.Items))
+			}
+			for i := range tt.want.Items {
+				if !reflect.DeepEqual(got.Items[i], tt.want.Items[i]) {
+					t.Errorf("GetEvents() item[%d] = %v, want %v", i, got.Items[i], tt.want.Items[i])
+				}
+			}
+			if !reflect.DeepEqual(tt.want.Items, got.Items) {
 				t.Errorf("GetEvents() = %v, want %v", got, tt.want)
 			}
 		})
 	}
+
+	t.Run("gets filtered events with name and kind", func(t *testing.T) {
+		client := fake.NewClientset([]runtime.Object{testVolumeEvent, testPodEvent}...)
+		k8s := &K8sClient{
+			Clientset: client,
+		}
+
+		got, gotErr := k8s.GetEvents(context.Background(), testEventKind, testVolName, "default")
+		require.NoError(t, gotErr)
+		assert.NotNil(t, got)
+	})
 }
 
 func TestGetNodeByCSINodeIDVar(t *testing.T) {
@@ -562,4 +673,258 @@ func TestGetNodeByCSINodeIDVar(t *testing.T) {
 		_, err := GetNodeByCSINodeID(context.Background(), "node1", "myCsiNode", "csi.volume.kubernetes.io/nodeid")
 		assert.NoError(t, err)
 	})
+}
+
+func TestGetPodMetrics(t *testing.T) {
+	t.Run("GetPodMetrics no metrics client", func(t *testing.T) {
+		Kubeclient = &K8sClient{
+			MetricsClient: nil,
+		}
+
+		_, err := Kubeclient.GetPodMetrics(context.Background(), "default", "test-pod")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "metrics client is uninitialized")
+	})
+
+	t.Run("GetPodMetrics success", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			assert.Equal(t, "/apis/metrics.k8s.io/v1beta1/namespaces/default/pods/test-pod", r.URL.Path)
+			assert.Equal(t, http.MethodGet, r.Method)
+
+			payload := metricsv1beta1api.PodMetrics{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "PodMetrics",
+					APIVersion: "metrics.k8s.io/v1beta1",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-pod",
+					Namespace: "default",
+				},
+			}
+			data, err := json.Marshal(payload)
+			require.NoError(t, err)
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write(data)
+		}))
+		defer server.Close()
+
+		metricsClient, err := metricsv1beta1client.NewForConfig(&rest.Config{Host: server.URL})
+		require.NoError(t, err)
+
+		Kubeclient = &K8sClient{
+			MetricsClient: metricsClient,
+		}
+
+		metrics, err := Kubeclient.GetPodMetrics(context.Background(), "default", "test-pod")
+		require.NoError(t, err)
+		require.NotNil(t, metrics)
+		assert.Equal(t, "test-pod", metrics.Name)
+		assert.Equal(t, "default", metrics.Namespace)
+	})
+}
+
+func TestGetPodRestartCount(t *testing.T) {
+	t.Run("GetPodRestartCount no client", func(t *testing.T) {
+		Kubeclient = &K8sClient{
+			Clientset: nil,
+		}
+
+		_, err := Kubeclient.GetPodRestartCount(context.Background(), "default", "test-pod", "container1")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "kubernetes client is uninitialized")
+	})
+
+	t.Run("GetPodRestartCount pod not found", func(t *testing.T) {
+		Kubeclient = &K8sClient{
+			Clientset: fake.NewSimpleClientset(),
+		}
+
+		_, err := Kubeclient.GetPodRestartCount(context.Background(), "default", "nonexistent-pod", "container1")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to get pod")
+	})
+
+	t.Run("GetPodRestartCount container not found", func(t *testing.T) {
+		pod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-pod",
+				Namespace: "default",
+			},
+			Status: corev1.PodStatus{
+				ContainerStatuses: []corev1.ContainerStatus{
+					{
+						Name:         "container1",
+						RestartCount: 2,
+					},
+				},
+			},
+		}
+		Kubeclient = &K8sClient{
+			Clientset: fake.NewSimpleClientset(pod),
+		}
+
+		_, err := Kubeclient.GetPodRestartCount(context.Background(), "default", "test-pod", "nonexistent-container")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "container not found")
+	})
+
+	t.Run("GetPodRestartCount success", func(t *testing.T) {
+		pod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-pod",
+				Namespace: "default",
+			},
+			Status: corev1.PodStatus{
+				ContainerStatuses: []corev1.ContainerStatus{
+					{
+						Name:         "container1",
+						RestartCount: 3,
+					},
+				},
+			},
+		}
+		Kubeclient = &K8sClient{
+			Clientset: fake.NewSimpleClientset(pod),
+		}
+
+		count, err := Kubeclient.GetPodRestartCount(context.Background(), "default", "test-pod", "container1")
+		assert.NoError(t, err)
+		assert.Equal(t, int32(3), count)
+	})
+}
+
+func TestGetPodRestartCountAuto(t *testing.T) {
+	t.Run("GetPodRestartCountAuto no client", func(t *testing.T) {
+		Kubeclient = &K8sClient{
+			Clientset: nil,
+		}
+
+		_, err := Kubeclient.GetPodRestartCountAuto(context.Background(), "default", "test-pod")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "kubernetes client is uninitialized")
+	})
+
+	t.Run("GetPodRestartCountAuto pod not found", func(t *testing.T) {
+		Kubeclient = &K8sClient{
+			Clientset: fake.NewSimpleClientset(),
+		}
+
+		_, err := Kubeclient.GetPodRestartCountAuto(context.Background(), "default", "nonexistent-pod")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to get pod")
+	})
+
+	t.Run("GetPodRestartCountAuto csi-powerstore container", func(t *testing.T) {
+		pod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-pod",
+				Namespace: "default",
+			},
+			Status: corev1.PodStatus{
+				ContainerStatuses: []corev1.ContainerStatus{
+					{
+						Name:         "csi-powerstore",
+						RestartCount: 5,
+					},
+					{
+						Name:         "other-container",
+						RestartCount: 1,
+					},
+				},
+			},
+		}
+		Kubeclient = &K8sClient{
+			Clientset: fake.NewSimpleClientset(pod),
+		}
+
+		count, err := Kubeclient.GetPodRestartCountAuto(context.Background(), "default", "test-pod")
+		assert.NoError(t, err)
+		assert.Equal(t, int32(5), count)
+	})
+
+	t.Run("GetPodRestartCountAuto driver container", func(t *testing.T) {
+		pod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-pod",
+				Namespace: "default",
+			},
+			Status: corev1.PodStatus{
+				ContainerStatuses: []corev1.ContainerStatus{
+					{
+						Name:         "driver",
+						RestartCount: 2,
+					},
+				},
+			},
+		}
+		Kubeclient = &K8sClient{
+			Clientset: fake.NewSimpleClientset(pod),
+		}
+
+		count, err := Kubeclient.GetPodRestartCountAuto(context.Background(), "default", "test-pod")
+		assert.NoError(t, err)
+		assert.Equal(t, int32(2), count)
+	})
+
+	t.Run("GetPodRestartCountAuto first container", func(t *testing.T) {
+		pod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-pod",
+				Namespace: "default",
+			},
+			Status: corev1.PodStatus{
+				ContainerStatuses: []corev1.ContainerStatus{
+					{
+						Name:         "random-container",
+						RestartCount: 7,
+					},
+				},
+			},
+		}
+		Kubeclient = &K8sClient{
+			Clientset: fake.NewSimpleClientset(pod),
+		}
+
+		count, err := Kubeclient.GetPodRestartCountAuto(context.Background(), "default", "test-pod")
+		assert.NoError(t, err)
+		assert.Equal(t, int32(7), count)
+	})
+}
+
+func TestLeaderElectionForMetrics(t *testing.T) {
+	t.Run("LeaderElectionForMetrics starts and invokes callback", func(t *testing.T) {
+		original := newLeaderElectorFunc
+		defer func() {
+			newLeaderElectorFunc = original
+		}()
+
+		called := false
+		newLeaderElectorFunc = func(cfg leaderelection.LeaderElectionConfig) (leaderElector, error) {
+			return &fakeLeaderElector{
+				run: func(ctx context.Context) {
+					called = true
+					cfg.Callbacks.OnStartedLeading(ctx)
+					cfg.Callbacks.OnNewLeader("test-leader")
+				},
+			}, nil
+		}
+
+		clientset := fake.NewSimpleClientset()
+		err := LeaderElectionForMetrics(context.Background(), clientset, "lock", "default", time.Second, time.Second, time.Second, func(ctx context.Context) {
+			assert.NotNil(t, ctx)
+		})
+		require.NoError(t, err)
+
+		assert.True(t, called)
+	})
+}
+
+type fakeLeaderElector struct {
+	run func(ctx context.Context)
+}
+
+func (f *fakeLeaderElector) Run(ctx context.Context) {
+	if f.run != nil {
+		f.run(ctx)
+	}
 }

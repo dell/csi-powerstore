@@ -34,6 +34,9 @@ clean:
 build: generate vendor
 	GOOS=linux CGO_ENABLED=0 go build -mod=vendor -ldflags $(LDFLAGS) ./cmd/csi-powerstore
 
+build-binary:
+	GOOS=linux CGO_ENABLED=0 go build -mod=vendor -ldflags $(LDFLAGS) ./cmd/csi-powerstore
+
 mocks:
 	mockery
 

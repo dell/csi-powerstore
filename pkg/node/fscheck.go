@@ -31,7 +31,7 @@ import (
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers"
 	fs "github.com/dell/csi-powerstore/v2/pkg/identifiers/fs"
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers/k8sutils"
-	"github.com/dell/csmlog"
+	log "github.com/dell/csmlog"
 	"github.com/dell/gofsutil"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc/codes"
@@ -63,7 +63,7 @@ type FsCheckRunner struct {
 	eventRecorder     record.EventRecorder
 	fsDevice          string
 	fsType            string
-	log               *csmlog.CsmLog
+	logFields         log.Fields
 }
 
 // fsCheckPVCObserver bridges gofsutil.FSCheckObserver events to structured logs and Kubernetes PVC events.
@@ -71,20 +71,20 @@ type fsCheckPVCObserver struct {
 	pvcName       string
 	pvcNamespace  string
 	eventRecorder record.EventRecorder
-	logger        *csmlog.CsmLog
+	logFields     log.Fields
 	timedOut      bool
 }
 
 // OnEvent is called by gofsutil.FSChecker during check/repair lifecycle.
 func (o *fsCheckPVCObserver) OnEvent(message string) {
-	o.logger.Infof("FS check event: %s", message)
+	log.WithFields(o.logFields).Infof("FS check event: %s", message)
 
 	if o.eventRecorder == nil || o.pvcName == "" {
 		eRecorderStr := ""
 		if o.eventRecorder == nil {
 			eRecorderStr = "eventRecorder is nil"
 		}
-		o.logger.Warnf("FS check event: %s pvcName (%s) %s", eRecorderStr, o.pvcName, message)
+		log.WithFields(o.logFields).Warnf("FS check event: %s pvcName (%s) %s", eRecorderStr, o.pvcName, message)
 		return
 	}
 
@@ -105,7 +105,7 @@ func (o *fsCheckPVCObserver) OnEvent(message string) {
 		eventType = corev1.EventTypeWarning
 		reason = "FSCheckTimedOut"
 		o.timedOut = true
-		o.logger.Errorf("FS Check timed out on pvc:%s", o.pvcName)
+		log.WithFields(o.logFields).Errorf("FS Check timed out on pvc:%s", o.pvcName)
 	case gofsutil.FSRepairFailedEvent:
 		eventType = corev1.EventTypeWarning
 		reason = "FSRepairFailed"
@@ -180,7 +180,7 @@ func (fsck *FsCheckRunner) CheckFileSystem(
 		return fmt.Errorf("failed to validate preconditions: %v", err)
 	}
 	if skipReason != "" {
-		fsck.log.Infof("Skipping FS check: %s", skipReason)
+		log.WithFields(fsck.logFields).WithContext(ctx).Infof("Skipping FS check: %s", skipReason)
 		return nil
 	}
 
@@ -208,7 +208,7 @@ func (fsck *FsCheckRunner) run(ctx context.Context) error {
 		pvcName:       fsck.pvcName,
 		pvcNamespace:  fsck.pvcNamespace,
 		eventRecorder: fsck.eventRecorder,
-		logger:        fsck.log,
+		logFields:     fsck.logFields,
 	}
 
 	fsDev := fsck.fsDevice
@@ -219,7 +219,7 @@ func (fsck *FsCheckRunner) run(ctx context.Context) error {
 		return fmt.Errorf("failed to create FSChecker for device %s (fs: %s): %v", fsDev, fsType, err)
 	}
 
-	fsck.log.Infof("Running FS check on %s (fs: %s, doRepair: %v)", fsDev, fsType, doRepair)
+	log.WithFields(fsck.logFields).WithContext(ctx).Infof("Running FS check on %s (fs: %s, doRepair: %v)", fsDev, fsType, doRepair)
 
 	err = checker.Check(ctx, doRepair)
 	if err != nil {
@@ -232,7 +232,7 @@ func (fsck *FsCheckRunner) run(ctx context.Context) error {
 		errMsg := fmt.Sprintf("File system check failed on device %s (volume ID: %s, fs: %s): %v. "+
 			"Manual intervention required. Do not attempt to mount this volume until the file system has been repaired.",
 			fsDev, fsck.fullVolumeID, fsType, err)
-		fsck.log.Error(errMsg)
+		log.WithFields(fsck.logFields).WithContext(ctx).Error(errMsg)
 
 		if fsck.pvcName != "" && fsck.pvcNamespace != "" {
 			pvcRef := &corev1.ObjectReference{
@@ -249,7 +249,7 @@ func (fsck *FsCheckRunner) run(ctx context.Context) error {
 		return status.Error(codes.Internal, errMsg)
 	}
 
-	fsck.log.Infof("FS check completed successfully on %s (fs: %s)", fsDev, fsType)
+	log.WithFields(fsck.logFields).WithContext(ctx).Infof("FS check completed successfully on %s (fs: %s)", fsDev, fsType)
 	return nil
 }
 
@@ -284,7 +284,6 @@ func NewFSCheckRunner(opts *Opts, volumeContext map[string]string, fullVolumeID 
 		fullVolumeID:      fullVolumeID,
 		metadataRetriever: initFsCheckMetadataRetriever(),
 		eventRecorder:     initFsCheckEventRecorder(opts.KubeConfigPath),
-		log:               log, // default is the package level logger
 	}
 
 	return fsck
@@ -323,9 +322,9 @@ func initFsCheckEventRecorder(kubeConfigPath string) record.EventRecorder {
 	return cachedEventRecorder
 }
 
-// SetLogger sets the logger for the FsCheckRunner instance.
-func (fsck *FsCheckRunner) SetLogger(logger *csmlog.CsmLog) {
-	fsck.log = logger
+// SetLogFields sets the structured log fields for the FsCheckRunner instance.
+func (fsck *FsCheckRunner) SetLogFields(fields log.Fields) {
+	fsck.logFields = fields
 }
 
 var pvNameFromPathRegex = regexp.MustCompile(`/.*/pods/[^/]+/volumes/kubernetes\.io~csi/([^/]+)/mount`)
@@ -345,7 +344,7 @@ func (fsck *FsCheckRunner) ResolvePVNameFromTargetPath(targetPath string) {
 	}
 	if fsck.pvName == "" {
 		// Metadata retriever will be fall back to the slowest method - listing all PVs in the cluster
-		fsck.log.Warnf("Could not parse PV name from target path %s, will iterate over all PVs", targetPath)
+		log.WithFields(fsck.logFields).Warnf("Could not parse PV name from target path %s, will iterate over all PVs", targetPath)
 	}
 }
 
@@ -374,7 +373,7 @@ func (fsck *FsCheckRunner) resolveEffectiveSettings(ctx context.Context) error {
 		if val == "true" || val == "false" {
 			fsck.enabled = (val == "true")
 		} else {
-			fsck.log.Warnf("Invalid PVC label value %q for %s, using global FS check setting.", val, identifiers.PvcLabelFsCheckEnabled)
+			log.WithFields(fsck.logFields).WithContext(ctx).Warnf("Invalid PVC label value %q for %s, using global FS check setting.", val, identifiers.PvcLabelFsCheckEnabled)
 		}
 	}
 
@@ -386,7 +385,7 @@ func (fsck *FsCheckRunner) resolveEffectiveSettings(ctx context.Context) error {
 			if val == fsCheckModeCheckOnly || val == fsCheckModeCheckAndRepair {
 				fsck.mode = val
 			} else {
-				fsck.log.Warnf("Invalid PVC label value %q for %s, using global FS check setting", val, identifiers.PvcLabelFsCheckMode)
+				log.WithFields(fsck.logFields).WithContext(ctx).Warnf("Invalid PVC label value %q for %s, using global FS check setting", val, identifiers.PvcLabelFsCheckMode)
 			}
 		}
 	}

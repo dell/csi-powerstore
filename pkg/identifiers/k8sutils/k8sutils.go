@@ -21,22 +21,30 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
+	"time"
 
-	"github.com/dell/csmlog"
+	log "github.com/dell/csmlog"
 	k8score "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/tools/leaderelection"
+	"k8s.io/client-go/tools/leaderelection/resourcelock"
+	metricsv1beta1api "k8s.io/metrics/pkg/apis/metrics/v1beta1"
+	metricsv1beta1 "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
 )
 
 type K8sClient struct {
-	Clientset kubernetes.Interface
+	Clientset     kubernetes.Interface
+	MetricsClient *metricsv1beta1.MetricsV1beta1Client
 }
 
-// Instantiate csmlog on a package level
-var log = csmlog.GetLogger()
+type leaderElector interface {
+	Run(ctx context.Context)
+}
 
 // Kube Kubeclient
 var Kubeclient *K8sClient
@@ -49,6 +57,14 @@ var InClusterConfigFunc = func() (*rest.Config, error) {
 
 var NewForConfigFunc = func(config *rest.Config) (kubernetes.Interface, error) {
 	return kubernetes.NewForConfig(config)
+}
+
+var NewMetricsForConfigFunc = func(config *rest.Config) (*metricsv1beta1.MetricsV1beta1Client, error) {
+	return metricsv1beta1.NewForConfig(config)
+}
+
+var newLeaderElectorFunc = func(cfg leaderelection.LeaderElectionConfig) (leaderElector, error) {
+	return leaderelection.NewLeaderElector(cfg)
 }
 
 // CreateKubeClientSet creates kubeclient set if not created already
@@ -70,6 +86,12 @@ func CreateKubeClientSet(kubeconfig ...string) (*K8sClient, error) {
 	Kubeclient.Clientset, err = NewForConfigFunc(config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Kubernetes clientset: %s", err.Error())
+	}
+
+	// Initialize metrics client
+	Kubeclient.MetricsClient, err = NewMetricsForConfigFunc(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create metrics client: %s", err.Error())
 	}
 
 	return Kubeclient, nil
@@ -240,6 +262,123 @@ func (k8s *K8sClient) GetEvents(ctx context.Context, kind, name, namespace strin
 	})
 }
 
+// GetPodMetrics retrieves metrics for the current pod
+func (k8s *K8sClient) GetPodMetrics(ctx context.Context, namespace, podName string) (*metricsv1beta1api.PodMetrics, error) {
+	if k8s.MetricsClient == nil {
+		return nil, errors.New("metrics client is uninitialized")
+	}
+
+	return k8s.MetricsClient.PodMetricses(namespace).Get(ctx, podName, v1.GetOptions{})
+}
+
+// GetPodRestartCount retrieves the restart count for a specific container in a pod
+func (k8s *K8sClient) GetPodRestartCount(ctx context.Context, namespace, podName, containerName string) (int32, error) {
+	if k8s.Clientset == nil {
+		return 0, errors.New("kubernetes client is uninitialized")
+	}
+
+	pod, err := k8s.Clientset.CoreV1().Pods(namespace).Get(ctx, podName, v1.GetOptions{})
+	if err != nil {
+		return 0, fmt.Errorf("failed to get pod %s in namespace %s: %w", podName, namespace, err)
+	}
+
+	// Find the specified container and return its restart count
+	for _, containerStatus := range pod.Status.ContainerStatuses {
+		if containerStatus.Name == containerName {
+			return containerStatus.RestartCount, nil
+		}
+	}
+
+	return 0, fmt.Errorf("container %s not found in pod %s", containerName, podName)
+}
+
+// GetPodRestartCountAuto retrieves the restart count for the CSI driver container by auto-detecting the container name
+func (k8s *K8sClient) GetPodRestartCountAuto(ctx context.Context, namespace, podName string) (int32, error) {
+	if k8s.Clientset == nil {
+		return 0, errors.New("kubernetes client is uninitialized")
+	}
+
+	pod, err := k8s.Clientset.CoreV1().Pods(namespace).Get(ctx, podName, v1.GetOptions{})
+	if err != nil {
+		return 0, fmt.Errorf("failed to get pod %s in namespace %s: %w", podName, namespace, err)
+	}
+
+	// Auto-detect the CSI driver container by looking for common CSI driver container names
+	// Priority: "csi-powerstore", "driver", or the first container
+	containerNames := []string{"csi-powerstore", "driver"}
+
+	// First try known container names
+	for _, containerStatus := range pod.Status.ContainerStatuses {
+		for _, knownName := range containerNames {
+			if containerStatus.Name == knownName {
+				return containerStatus.RestartCount, nil
+			}
+		}
+	}
+
+	// Fallback to first container if known names not found
+	if len(pod.Status.ContainerStatuses) > 0 {
+		return pod.Status.ContainerStatuses[0].RestartCount, nil
+	}
+
+	return 0, fmt.Errorf("no containers found in pod %s", podName)
+}
+
 var GetNodeByCSINodeID = func(ctx context.Context, driverKey string, csiNodeID string, keyNodeID string) (*k8score.Node, error) {
 	return Kubeclient.GetNodeByCSINodeID(ctx, driverKey, csiNodeID, keyNodeID)
+}
+
+// LeaderElectionForMetrics - Initialize leader election for metrics collection
+// This uses the k8s.io/client-go/tools/leaderelection library
+func LeaderElectionForMetrics(ctx context.Context, clientset kubernetes.Interface, lockName string, namespace string,
+	leaderElectionRenewDeadline, leaderElectionLeaseDuration, leaderElectionRetryPeriod time.Duration, runFunc func(ctx context.Context),
+) error {
+	// Use pod name as unique identity; fall back to hostname so each replica is distinct
+	identity := os.Getenv("POD_NAME")
+	if identity == "" {
+		var err error
+		identity, err = os.Hostname()
+		if err != nil {
+			identity = lockName
+		}
+	}
+
+	// Create resource lock for leader election
+	rl, err := resourcelock.New(resourcelock.LeasesResourceLock, namespace, lockName, clientset.CoreV1(), clientset.CoordinationV1(), resourcelock.ResourceLockConfig{
+		Identity: identity,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create resource lock: %w", err)
+	}
+
+	// Configure leader election
+	leConfig := leaderelection.LeaderElectionConfig{
+		Lock:            rl,
+		LeaseDuration:   leaderElectionLeaseDuration,
+		RenewDeadline:   leaderElectionRenewDeadline,
+		RetryPeriod:     leaderElectionRetryPeriod,
+		ReleaseOnCancel: true,
+		Callbacks: leaderelection.LeaderCallbacks{
+			OnStartedLeading: func(ctx context.Context) {
+				log.Info("Started leading")
+				runFunc(ctx)
+			},
+			OnStoppedLeading: func() {
+				log.Info("Stopped leading")
+			},
+			OnNewLeader: func(identity string) {
+				log.Infof("New leader elected: %s", identity)
+			},
+		},
+	}
+
+	// Start leader election
+	le, err := newLeaderElectorFunc(leConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create leader elector: %w", err)
+	}
+
+	log.Infof("Starting leader election for %s in namespace %s with identity %s", lockName, namespace, identity)
+	le.Run(ctx)
+	return nil
 }

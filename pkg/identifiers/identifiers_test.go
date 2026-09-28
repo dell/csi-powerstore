@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2021-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2021-2026 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"reflect"
 	"testing"
@@ -102,6 +103,62 @@ func TestGetISCSITargetsInfoFromStorage(t *testing.T) {
 		assert.NotNil(t, iscsiTargetsInfo)
 		assert.NoError(t, err)
 	})
+
+	// FR-1.2: IPv6 address must be passed as bare address (no brackets, no port).
+	// goiscsi.validateIPAddress uses net.ParseIP which accepts bare IPv6 but rejects
+	// "[IPv6]:port". gobrick skips port-append when ":" is present; iscsiadm uses
+	// default port 3260. See DEPENDENCIES.md §goiscsi.
+	t.Run("IPv6 address produces bare iSCSI portal", func(t *testing.T) {
+		clientMock := new(gopowerstoremock.Client)
+		clientMock.On("GetStorageISCSITargetAddresses", context.Background()).
+			Return([]gopowerstore.IPPoolAddress{
+				{
+					Address: "2001:db8::1",
+					IPPort:  gopowerstore.IPPortInstance{TargetIqn: "iqn.ipv6.example"},
+				},
+			}, nil)
+		targets, err := identifiers.GetISCSITargetsInfoFromStorage(clientMock, "")
+		assert.NoError(t, err)
+		assert.Len(t, targets, 1)
+		assert.Equal(t, "2001:db8::1", targets[0].Portal, "IPv6 iSCSI portal must be bare address (gobrick appends port for IPv4, skips for IPv6)")
+	})
+
+	// FR-1.2 regression: IPv4 portal must be bare address; gobrick appends ":3260".
+	t.Run("IPv4 address iSCSI portal is bare address", func(t *testing.T) {
+		clientMock := new(gopowerstoremock.Client)
+		clientMock.On("GetStorageISCSITargetAddresses", context.Background()).
+			Return([]gopowerstore.IPPoolAddress{
+				{
+					Address: "10.0.0.1",
+					IPPort:  gopowerstore.IPPortInstance{TargetIqn: "iqn.ipv4.example"},
+				},
+			}, nil)
+		targets, err := identifiers.GetISCSITargetsInfoFromStorage(clientMock, "")
+		assert.NoError(t, err)
+		assert.Len(t, targets, 1)
+		assert.Equal(t, "10.0.0.1", targets[0].Portal, "IPv4 iSCSI portal is bare address; gobrick appends :3260 before passing to goiscsi")
+	})
+
+	// FR-1.4: dual-purpose address (Storage_Iscsi_Target + Storage_NVMe_TCP_Port) — iSCSI path.
+	// Same bare-address convention applies.
+	t.Run("dual-purpose IPv6 address produces bare iSCSI portal", func(t *testing.T) {
+		clientMock := new(gopowerstoremock.Client)
+		clientMock.On("GetStorageISCSITargetAddresses", context.Background()).
+			Return([]gopowerstore.IPPoolAddress{
+				{
+					Address: "2001:db8::2",
+					IPPort:  gopowerstore.IPPortInstance{TargetIqn: "iqn.dual.example"},
+					Purposes: []gopowerstore.IPPurposeTypeEnum{
+						gopowerstore.IPPurposeTypeEnumStorageIscsiTarget,
+						gopowerstore.IPPurposeTypeEnumStorageNVMETCPPort,
+					},
+				},
+			}, nil)
+		targets, err := identifiers.GetISCSITargetsInfoFromStorage(clientMock, "")
+		assert.NoError(t, err)
+		assert.Len(t, targets, 1)
+		assert.Equal(t, "2001:db8::2", targets[0].Portal, "dual-purpose IPv6 iSCSI portal must be bare address")
+	})
 }
 
 func TestGetNVMETCPTargetsInfoFromStorage(t *testing.T) {
@@ -127,6 +184,57 @@ func TestGetNVMETCPTargetsInfoFromStorage(t *testing.T) {
 		nvmetcpTargetInfo, err := identifiers.GetNVMETCPTargetsInfoFromStorage(clientMock, "")
 		assert.NotNil(t, nvmetcpTargetInfo)
 		assert.NoError(t, err)
+	})
+
+	// FR-1.3: IPv6 address must be passed as bare address. gonvme passes
+	// "-a <portal> -s 4420" as separate args; bracketed form is unnecessary.
+	// gobrick skips port-append when ":" is present. See DEPENDENCIES.md §gonvme.
+	t.Run("IPv6 address produces bare NVMe portal", func(t *testing.T) {
+		clientMock := new(gopowerstoremock.Client)
+		clientMock.On("GetCluster", context.Background()).Return(gopowerstore.Cluster{NVMeNQN: "nqn.ipv6.example"}, nil)
+		clientMock.On("GetStorageNVMETCPTargetAddresses", mock.Anything).
+			Return([]gopowerstore.IPPoolAddress{
+				{Address: "2001:db8::1"},
+			}, nil)
+		targets, err := identifiers.GetNVMETCPTargetsInfoFromStorage(clientMock, "")
+		assert.NoError(t, err)
+		assert.Len(t, targets, 1)
+		assert.Equal(t, "2001:db8::1", targets[0].Portal, "IPv6 NVMe portal must be bare address (gobrick appends port for IPv4, skips for IPv6)")
+	})
+
+	// FR-1.3 regression: IPv4 portal is bare address; gobrick appends ":4420".
+	t.Run("IPv4 address NVMe portal is bare address", func(t *testing.T) {
+		clientMock := new(gopowerstoremock.Client)
+		clientMock.On("GetCluster", context.Background()).Return(gopowerstore.Cluster{NVMeNQN: "nqn.ipv4.example"}, nil)
+		clientMock.On("GetStorageNVMETCPTargetAddresses", mock.Anything).
+			Return([]gopowerstore.IPPoolAddress{
+				{Address: "10.0.0.1"},
+			}, nil)
+		targets, err := identifiers.GetNVMETCPTargetsInfoFromStorage(clientMock, "")
+		assert.NoError(t, err)
+		assert.Len(t, targets, 1)
+		assert.Equal(t, "10.0.0.1", targets[0].Portal, "IPv4 NVMe portal is bare address; gobrick appends :4420 before passing to gonvme")
+	})
+
+	// FR-1.4: dual-purpose address (Storage_Iscsi_Target + Storage_NVMe_TCP_Port) — NVMe path.
+	// Same bare-address convention applies.
+	t.Run("dual-purpose IPv6 address produces bare NVMe portal", func(t *testing.T) {
+		clientMock := new(gopowerstoremock.Client)
+		clientMock.On("GetCluster", context.Background()).Return(gopowerstore.Cluster{NVMeNQN: "nqn.dual.example"}, nil)
+		clientMock.On("GetStorageNVMETCPTargetAddresses", mock.Anything).
+			Return([]gopowerstore.IPPoolAddress{
+				{
+					Address: "2001:db8::2",
+					Purposes: []gopowerstore.IPPurposeTypeEnum{
+						gopowerstore.IPPurposeTypeEnumStorageIscsiTarget,
+						gopowerstore.IPPurposeTypeEnumStorageNVMETCPPort,
+					},
+				},
+			}, nil)
+		targets, err := identifiers.GetNVMETCPTargetsInfoFromStorage(clientMock, "")
+		assert.NoError(t, err)
+		assert.Len(t, targets, 1)
+		assert.Equal(t, "2001:db8::2", targets[0].Portal, "dual-purpose IPv6 NVMe portal must be bare address")
 	})
 }
 
@@ -201,6 +309,9 @@ func TestGetNVMEFCTargetInfoFromStorage(t *testing.T) {
 func TestHasRequiredTopology(t *testing.T) {
 	nfsTopology := &csi.Topology{Segments: map[string]string{"csi-powerstore.dellemc.com/10.0.0.0-nfs": "true"}}
 	iscsiTopology := &csi.Topology{Segments: map[string]string{"csi-powerstore.dellemc.com/10.0.0.0-iscsi": "true"}}
+	// FR-4.1: IPv6 topology key uses colon-encoded form "2001-db8--1"
+	nfsTopologyIPv6 := &csi.Topology{Segments: map[string]string{"csi-powerstore.dellemc.com/2001-db8--1-nfs": "true"}}
+	nfsTopologyLinkLocal := &csi.Topology{Segments: map[string]string{"csi-powerstore.dellemc.com/fe80--1-eth0-nfs": "true"}}
 
 	type args struct {
 		topologies       []*csi.Topology
@@ -227,6 +338,24 @@ func TestHasRequiredTopology(t *testing.T) {
 			args: args{topologies: []*csi.Topology{iscsiTopology}, arrIP: "10.0.0.0", requiredTopology: "nfs"},
 			want: false,
 		},
+		// FR-4.1: IPv6 arrIP must be colon-encoded in the topology key lookup
+		{
+			name: "IPv6 arrIP matches encoded topology key",
+			args: args{topologies: []*csi.Topology{nfsTopologyIPv6}, arrIP: "2001:db8::1", requiredTopology: "nfs"},
+			want: true,
+		},
+		{
+			name: "IPv6 arrIP does not match raw-colon topology key",
+			args: args{topologies: []*csi.Topology{
+				{Segments: map[string]string{"csi-powerstore.dellemc.com/2001:db8::1-nfs": "true"}},
+			}, arrIP: "2001:db8::1", requiredTopology: "nfs"},
+			want: false,
+		},
+		{
+			name: "link-local arrIP matches encoded zone topology key",
+			args: args{topologies: []*csi.Topology{nfsTopologyLinkLocal}, arrIP: "fe80::1%eth0", requiredTopology: "nfs"},
+			want: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -244,6 +373,12 @@ func TestGetNfsTopology(t *testing.T) {
 	t.Run("nfs topology should not be false", func(t *testing.T) {
 		topology := identifiers.GetNfsTopology("10.0.0.0")
 		assert.NotEqual(t, topology, []*csi.Topology{{Segments: map[string]string{"csi-powerstore.dellemc.com/10.0.0.0-nfs": "false"}}})
+	})
+
+	// FR-4.1: IPv6 arrIP must produce encoded key (no raw colons in label keys)
+	t.Run("IPv6 arrIP produces encoded topology key", func(t *testing.T) {
+		topology := identifiers.GetNfsTopology("2001:db8::1")
+		assert.Equal(t, topology, []*csi.Topology{{Segments: map[string]string{"csi-powerstore.dellemc.com/2001-db8--1-nfs": "true"}}})
 	})
 }
 
@@ -310,6 +445,9 @@ func TestParseCIDR(t *testing.T) {
 		{"Valid IP with net mask", args{externalAccessCIDR: "10.232.58.2/16"}, "10.232.0.0/255.255.0.0", false},
 		{"Valid IP without net mask", args{externalAccessCIDR: "10.232.58.2"}, "10.232.58.2/255.255.255.255", false},
 		{"InValid IP without net mask", args{externalAccessCIDR: "10.232.58"}, "", true},
+		// FR-7.2: bare IPv6 gets /128; IPv6 CIDR passes through
+		{"IPv6 with prefix length", args{externalAccessCIDR: "fd12:3456::/64"}, "fd12:3456::/64", false},
+		{"IPv6 bare address gets /128", args{externalAccessCIDR: "2001:db8::1"}, "2001:db8::1/128", false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -340,14 +478,14 @@ func TestSetPollingFrequency(t *testing.T) {
 	for i, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if i == 0 {
-				os.Setenv("X_CSI_PODMON_ARRAY_CONNECTIVITY_POLL_RATE", "100")
+				_ = os.Setenv("X_CSI_PODMON_ARRAY_CONNECTIVITY_POLL_RATE", "100")
 			}
 			// need to import this function because the package name in this file is not common
 			// @TO-DO rename package name to common
 			if got := identifiers.SetPollingFrequency(tt.args.ctx); got != tt.want {
 				t.Errorf("SetPollingFrequency() = %v, want %v", got, tt.want)
 			}
-			os.Unsetenv("X_CSI_PODMON_ARRAY_CONNECTIVITY_POLL_RATE")
+			_ = os.Unsetenv("X_CSI_PODMON_ARRAY_CONNECTIVITY_POLL_RATE")
 		})
 	}
 }
@@ -367,12 +505,12 @@ func Test_setAPIPort(t *testing.T) {
 	for i, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if i == 0 {
-				os.Setenv("X_CSI_PODMON_API_PORT", "8090")
+				_ = os.Setenv("X_CSI_PODMON_API_PORT", "8090")
 				identifiers.SetAPIPort(tt.args.ctx)
 				if identifiers.APIPort != ":8090" {
 					t.Errorf("setAPIPort() error, want 8090 port found %v", identifiers.APIPort)
 				}
-				os.Unsetenv("X_CSI_PODMON_API_PORT")
+				_ = os.Unsetenv("X_CSI_PODMON_API_PORT")
 			}
 			identifiers.SetAPIPort(tt.args.ctx)
 			if identifiers.APIPort != ":8083" {
@@ -420,6 +558,9 @@ func TestGetIPListWithMaskFromString(t *testing.T) {
 		{"Invalid IP with Invalid subnet mask, Test 6", args{input: "10.255.1.2/24/25"}, "", true},
 		{"Invalid IP with Invalid subnet mask, Test 7", args{input: "10.255.1.2/38"}, "", true},
 		{"Invalid IP with Invalid subnet mask, Test 8", args{input: "10.255.1.2/x"}, "", true},
+		// FR-7.1: IPv6 prefix lengths > 32 must not be rejected
+		{"Valid IPv6 with /64 prefix length", args{input: "fd12:3456::/64"}, "fd12:3456::/64", false},
+		{"Valid IPv6 with /128 prefix length", args{input: "2001:db8::1/128"}, "2001:db8::1/128", false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -435,12 +576,71 @@ func TestGetIPListWithMaskFromString(t *testing.T) {
 	}
 }
 
+func TestFormatNFSHostEntry(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		want    string
+		wantErr bool
+	}{
+		{name: "IPv4", input: "10.0.0.35", want: "10.0.0.35/255.255.255.255"},
+		{name: "IPv6", input: "2607:f2b1:f1d0:770::35", want: "2607:f2b1:f1d0:770::35/128"},
+		{name: "bracketed IPv6", input: "[2607:f2b1:f1d0:770::35]", want: "2607:f2b1:f1d0:770::35/128"},
+		{name: "invalid address", input: "not-an-ip", wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := identifiers.FormatNFSHostEntry(tt.input)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("FormatNFSHostEntry() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestHostEntryMatchesIPWithCIDRTarget(t *testing.T) {
+	assert.True(t, identifiers.HostEntryMatchesIP("[2001:db8::10]/64", "2001:db8::10/128"))
+}
+
+func TestHostAlreadyPresentInNFSExportIPv6(t *testing.T) {
+	export := gopowerstore.NFSExport{RWRootHosts: []string{"2607:f2b1:f1d0:770::35/128"}}
+	assert.True(t, identifiers.HostAlreadyPresentInNFSExport(export, "2607:f2b1:f1d0:770::35"))
+	assert.False(t, identifiers.HostAlreadyPresentInNFSExport(export, "2607:f2b1:f1d0:770::36"))
+}
+
+func TestParseNFSExportPath(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		want    string
+		wantErr bool
+	}{
+		{name: "IPv4", input: "10.0.0.10:/export", want: "10.0.0.10"},
+		{name: "bracketed IPv6", input: "[2607:f2b1:f1d0:770::16]:/export", want: "2607:f2b1:f1d0:770::16"},
+		{name: "missing path separator", input: "[2607:f2b1:f1d0:770::16]/export", wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := identifiers.ParseNFSExportPath(tt.input)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("ParseNFSExportPath() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestEncodeIPForKubernetes(t *testing.T) {
+	assert.Equal(t, "fe80--1-eth0", identifiers.EncodeIPForKubernetes("fe80::1%eth0"))
+	assert.Equal(t, "2001-db8--1", identifiers.EncodeIPForKubernetes("2001:db8::1"))
+}
+
 func TestGetIPListFromString(t *testing.T) {
 	type args struct {
 		input string
 	}
-	x := []string{}
-	x = nil
+	var x []string
 	tests := []struct {
 		name string
 		args args
@@ -453,6 +653,12 @@ func TestGetIPListFromString(t *testing.T) {
 		{"Valid CSI NodeID", args{input: "csi-node-b61220be1acc441abdd8b00e34542e5d-1.1.1.1"}, []string{"1.1.1.1"}},
 		{"Valid CSI NodeID", args{input: "csi-node-tar2222.infralab.ptec-2.2.2.2"}, []string{"2.2.2.2"}},
 		{"Valid Multi-Segment Domain", args{input: "https://abc.example.com/page"}, []string{"abc.example.com"}},
+		// FR-2.1: IPv6 support
+		{"IPv6 in HTTPS URL (bracketed)", args{input: "https://[2001:db8::1]/api/rest"}, []string{"2001:db8::1"}},
+		{"IPv6 in CSI NodeID suffix", args{input: "csi-node-hostname-2001:db8::1"}, []string{"2001:db8::1"}},
+		{"IPv4-mapped IPv6 URL", args{input: "https://[::ffff:192.0.2.1]/api/rest"}, []string{"::ffff:192.0.2.1"}},
+		// FR-3.1: Dash-encoded IPv6 in CSI NodeID (colons replaced with dashes)
+		{"Dash-encoded IPv6 with full address", args{input: "csi-node-6e42639baa1b452c88e0cb7e60ca1839-2607-f2b1-f1d0-770--36"}, []string{"2607:f2b1:f1d0:770::36"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -464,6 +670,13 @@ func TestGetIPListFromString(t *testing.T) {
 }
 
 func TestReachableEndPoint(t *testing.T) {
+	// Spin up a local listener to verify reachable cases
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	assert.NoError(t, err)
+	defer func() { _ = l.Close() }()
+	_, port, err := net.SplitHostPort(l.Addr().String())
+	assert.NoError(t, err)
+
 	type args struct {
 		endpoint string
 	}
@@ -472,7 +685,13 @@ func TestReachableEndPoint(t *testing.T) {
 		args args
 		want bool
 	}{
-		{"Unreachable IP, ", args{endpoint: "10.255.1.2:100"}, false},
+		{"Unreachable IP with custom port", args{endpoint: "10.255.1.2:100"}, false},
+		{"Unreachable bare IPv4", args{endpoint: "10.255.1.2"}, false},
+		{"Unreachable bare IPv6", args{endpoint: "2001:db8::1"}, false},
+		{"Unreachable bracketed IPv6 with port", args{endpoint: "[2001:db8::1]:3260"}, false},
+		{"Unreachable IPv4 with portal group tag", args{endpoint: "10.255.1.2:3260,1"}, false},
+		{"Reachable local listener", args{endpoint: fmt.Sprintf("127.0.0.1:%s", port)}, true},
+		{"Reachable local listener with portal group tag", args{endpoint: fmt.Sprintf("127.0.0.1:%s,1", port)}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -577,14 +796,14 @@ func TestGetPowerStoreAPITimeout(t *testing.T) {
 		{
 			name:         "env variable is set to valid value",
 			expected:     10 * time.Second,
-			setupFunc:    func() { os.Setenv("X_CSI_POWERSTORE_API_TIMEOUT", "10s") },
-			teardownFunc: func() { os.Unsetenv("X_CSI_POWERSTORE_API_TIMEOUT") },
+			setupFunc:    func() { _ = os.Setenv("X_CSI_POWERSTORE_API_TIMEOUT", "10s") },
+			teardownFunc: func() { _ = os.Unsetenv("X_CSI_POWERSTORE_API_TIMEOUT") },
 		},
 		{
 			name:         "env variable is set to invalid value",
 			expected:     120 * time.Second,
-			setupFunc:    func() { os.Setenv("X_CSI_POWERSTORE_API_TIMEOUT", "abc") },
-			teardownFunc: func() { os.Unsetenv("X_CSI_POWERSTORE_API_TIMEOUT") },
+			setupFunc:    func() { _ = os.Setenv("X_CSI_POWERSTORE_API_TIMEOUT", "abc") },
+			teardownFunc: func() { _ = os.Unsetenv("X_CSI_POWERSTORE_API_TIMEOUT") },
 		},
 	}
 
@@ -616,14 +835,14 @@ func TestGetPodmonArrayConnectivityTimeout(t *testing.T) {
 		{
 			name:         "env variable is set to valid value",
 			expected:     25 * time.Second,
-			setupFunc:    func() { os.Setenv("X_CSI_PODMON_ARRAY_CONNECTIVITY_TIMEOUT", "25s") },
-			teardownFunc: func() { os.Unsetenv("X_CSI_PODMON_ARRAY_CONNECTIVITY_TIMEOUT") },
+			setupFunc:    func() { _ = os.Setenv("X_CSI_PODMON_ARRAY_CONNECTIVITY_TIMEOUT", "25s") },
+			teardownFunc: func() { _ = os.Unsetenv("X_CSI_PODMON_ARRAY_CONNECTIVITY_TIMEOUT") },
 		},
 		{
 			name:         "env variable is set to invalid value",
 			expected:     10 * time.Second,
-			setupFunc:    func() { os.Setenv("X_CSI_PODMON_ARRAY_CONNECTIVITY_TIMEOUT", "abc") },
-			teardownFunc: func() { os.Unsetenv("X_CSI_PODMON_ARRAY_CONNECTIVITY_TIMEOUT") },
+			setupFunc:    func() { _ = os.Setenv("X_CSI_PODMON_ARRAY_CONNECTIVITY_TIMEOUT", "abc") },
+			teardownFunc: func() { _ = os.Unsetenv("X_CSI_PODMON_ARRAY_CONNECTIVITY_TIMEOUT") },
 		},
 	}
 
@@ -656,14 +875,14 @@ func TestGetVolumeDisconnectTimeout(t *testing.T) {
 		{
 			name:         "env variable is set to valid value",
 			expected:     45 * time.Second,
-			setupFunc:    func() { os.Setenv("X_CSI_VOLUME_DISCONNECT_TIMEOUT_SECONDS", "45s") },
-			teardownFunc: func() { os.Unsetenv("X_CSI_VOLUME_DISCONNECT_TIMEOUT_SECONDS") },
+			setupFunc:    func() { _ = os.Setenv("X_CSI_VOLUME_DISCONNECT_TIMEOUT_SECONDS", "45s") },
+			teardownFunc: func() { _ = os.Unsetenv("X_CSI_VOLUME_DISCONNECT_TIMEOUT_SECONDS") },
 		},
 		{
 			name:         "env variable is set to invalid value",
 			expected:     120 * time.Second,
-			setupFunc:    func() { os.Setenv("X_CSI_VOLUME_DISCONNECT_TIMEOUT_SECONDS", "invalid") },
-			teardownFunc: func() { os.Unsetenv("X_CSI_VOLUME_DISCONNECT_TIMEOUT_SECONDS") },
+			setupFunc:    func() { _ = os.Setenv("X_CSI_VOLUME_DISCONNECT_TIMEOUT_SECONDS", "invalid") },
+			teardownFunc: func() { _ = os.Unsetenv("X_CSI_VOLUME_DISCONNECT_TIMEOUT_SECONDS") },
 		},
 	}
 
@@ -696,14 +915,14 @@ func TestGetVolumeDisconnectRetryInterval(t *testing.T) {
 		{
 			name:         "env variable is set to valid value",
 			expected:     15 * time.Second,
-			setupFunc:    func() { os.Setenv("X_CSI_VOLUME_DISCONNECT_RETRY_INTERVAL", "15s") },
-			teardownFunc: func() { os.Unsetenv("X_CSI_VOLUME_DISCONNECT_RETRY_INTERVAL") },
+			setupFunc:    func() { _ = os.Setenv("X_CSI_VOLUME_DISCONNECT_RETRY_INTERVAL", "15s") },
+			teardownFunc: func() { _ = os.Unsetenv("X_CSI_VOLUME_DISCONNECT_RETRY_INTERVAL") },
 		},
 		{
 			name:         "env variable is set to invalid value",
 			expected:     5 * time.Second,
-			setupFunc:    func() { os.Setenv("X_CSI_VOLUME_DISCONNECT_RETRY_INTERVAL", "invalid") },
-			teardownFunc: func() { os.Unsetenv("X_CSI_VOLUME_DISCONNECT_RETRY_INTERVAL") },
+			setupFunc:    func() { _ = os.Setenv("X_CSI_VOLUME_DISCONNECT_RETRY_INTERVAL", "invalid") },
+			teardownFunc: func() { _ = os.Unsetenv("X_CSI_VOLUME_DISCONNECT_RETRY_INTERVAL") },
 		},
 	}
 
@@ -736,14 +955,14 @@ func TestGetVolumeDisconnectMaxRetries(t *testing.T) {
 		{
 			name:         "env variable is set to valid value",
 			expected:     7,
-			setupFunc:    func() { os.Setenv("X_CSI_VOLUME_DISCONNECT_MAX_RETRIES", "7") },
-			teardownFunc: func() { os.Unsetenv("X_CSI_VOLUME_DISCONNECT_MAX_RETRIES") },
+			setupFunc:    func() { _ = os.Setenv("X_CSI_VOLUME_DISCONNECT_MAX_RETRIES", "7") },
+			teardownFunc: func() { _ = os.Unsetenv("X_CSI_VOLUME_DISCONNECT_MAX_RETRIES") },
 		},
 		{
 			name:         "env variable is set to invalid value",
 			expected:     5,
-			setupFunc:    func() { os.Setenv("X_CSI_VOLUME_DISCONNECT_MAX_RETRIES", "invalid") },
-			teardownFunc: func() { os.Unsetenv("X_CSI_VOLUME_DISCONNECT_MAX_RETRIES") },
+			setupFunc:    func() { _ = os.Setenv("X_CSI_VOLUME_DISCONNECT_MAX_RETRIES", "invalid") },
+			teardownFunc: func() { _ = os.Unsetenv("X_CSI_VOLUME_DISCONNECT_MAX_RETRIES") },
 		},
 	}
 
@@ -827,4 +1046,265 @@ func TestHostAlreadyPresentInNFSExport(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGetEligibleNfsAccessibleTopologies(t *testing.T) {
+	driverPrefix := identifiers.Name
+	arrIP := "10.0.0.1"
+	nfsKey := driverPrefix + "/" + arrIP + "-nfs"
+
+	t.Run("Preferred has NFS entries - uses Preferred", func(t *testing.T) {
+		preferred := []*csi.Topology{
+			{Segments: map[string]string{
+				nfsKey:                        "true",
+				"topology.kubernetes.io/zone": "zone-a",
+				"custom-label":                "custom-value",
+			}},
+		}
+		requisite := []*csi.Topology{
+			{Segments: map[string]string{
+				nfsKey:                        "true",
+				"topology.kubernetes.io/zone": "zone-b",
+			}},
+		}
+		result := identifiers.GetEligibleNfsAccessibleTopologies(preferred, requisite, arrIP)
+		assert.Len(t, result, 1)
+		assert.Equal(t, "zone-a", result[0].Segments["topology.kubernetes.io/zone"])
+		assert.Equal(t, "custom-value", result[0].Segments["custom-label"])
+		assert.Equal(t, "true", result[0].Segments[nfsKey])
+	})
+
+	t.Run("Preferred empty, Requisite has NFS - uses Requisite", func(t *testing.T) {
+		preferred := []*csi.Topology{}
+		requisite := []*csi.Topology{
+			{Segments: map[string]string{
+				nfsKey:                        "true",
+				"topology.kubernetes.io/zone": "zone-a",
+			}},
+		}
+		result := identifiers.GetEligibleNfsAccessibleTopologies(preferred, requisite, arrIP)
+		assert.Len(t, result, 1)
+		assert.Equal(t, "zone-a", result[0].Segments["topology.kubernetes.io/zone"])
+		assert.Equal(t, "true", result[0].Segments[nfsKey])
+	})
+
+	t.Run("Both Preferred and Requisite have NFS - uses Preferred", func(t *testing.T) {
+		preferred := []*csi.Topology{
+			{Segments: map[string]string{
+				nfsKey:                        "true",
+				"topology.kubernetes.io/zone": "zone-a",
+			}},
+		}
+		requisite := []*csi.Topology{
+			{Segments: map[string]string{
+				nfsKey:                        "true",
+				"topology.kubernetes.io/zone": "zone-b",
+			}},
+		}
+		result := identifiers.GetEligibleNfsAccessibleTopologies(preferred, requisite, arrIP)
+		assert.Len(t, result, 1)
+		assert.Equal(t, "zone-a", result[0].Segments["topology.kubernetes.io/zone"])
+	})
+
+	t.Run("Custom-only entries are dropped", func(t *testing.T) {
+		preferred := []*csi.Topology{
+			{Segments: map[string]string{
+				"topology.kubernetes.io/zone": "zone-a",
+			}},
+		}
+		requisite := []*csi.Topology{
+			{Segments: map[string]string{
+				nfsKey:                        "true",
+				"topology.kubernetes.io/zone": "zone-a",
+			}},
+		}
+		result := identifiers.GetEligibleNfsAccessibleTopologies(preferred, requisite, arrIP)
+		assert.Len(t, result, 1)
+		assert.Equal(t, "true", result[0].Segments[nfsKey])
+		assert.Equal(t, "zone-a", result[0].Segments["topology.kubernetes.io/zone"])
+	})
+
+	t.Run("Block protocol keys are stripped", func(t *testing.T) {
+		preferred := []*csi.Topology{
+			{Segments: map[string]string{
+				nfsKey:                                "true",
+				driverPrefix + "/" + arrIP + "-fc":    "true",
+				driverPrefix + "/" + arrIP + "-iscsi": "true",
+				"topology.kubernetes.io/zone":         "zone-a",
+			}},
+		}
+		result := identifiers.GetEligibleNfsAccessibleTopologies(preferred, nil, arrIP)
+		assert.Len(t, result, 1)
+		assert.NotContains(t, result[0].Segments, driverPrefix+"/"+arrIP+"-fc")
+		assert.NotContains(t, result[0].Segments, driverPrefix+"/"+arrIP+"-iscsi")
+		assert.Contains(t, result[0].Segments, nfsKey)
+		assert.Contains(t, result[0].Segments, "topology.kubernetes.io/zone")
+	})
+
+	t.Run("Fallback to legacy NFS topology when no eligible entries", func(t *testing.T) {
+		preferred := []*csi.Topology{
+			{Segments: map[string]string{
+				"topology.kubernetes.io/zone": "zone-a",
+			}},
+		}
+		requisite := []*csi.Topology{
+			{Segments: map[string]string{
+				"topology.kubernetes.io/zone": "zone-b",
+			}},
+		}
+		result := identifiers.GetEligibleNfsAccessibleTopologies(preferred, requisite, arrIP)
+		assert.Len(t, result, 1)
+		assert.Equal(t, "true", result[0].Segments[nfsKey])
+		assert.Len(t, result[0].Segments, 1) // Only NFS key
+	})
+
+	t.Run("Deduplicates identical entries", func(t *testing.T) {
+		preferred := []*csi.Topology{
+			{Segments: map[string]string{
+				nfsKey:                        "true",
+				"topology.kubernetes.io/zone": "zone-a",
+			}},
+			{Segments: map[string]string{
+				nfsKey:                        "true",
+				"topology.kubernetes.io/zone": "zone-a",
+			}},
+		}
+		result := identifiers.GetEligibleNfsAccessibleTopologies(preferred, nil, arrIP)
+		assert.Len(t, result, 1) // Deduplicated
+		assert.Equal(t, "zone-a", result[0].Segments["topology.kubernetes.io/zone"])
+	})
+
+	t.Run("Mixed valid and invalid entries", func(t *testing.T) {
+		preferred := []*csi.Topology{
+			{Segments: map[string]string{
+				nfsKey:                        "true",
+				"topology.kubernetes.io/zone": "zone-a",
+			}},
+			{Segments: map[string]string{
+				"topology.kubernetes.io/zone": "zone-b", // No NFS key
+			}},
+			{Segments: map[string]string{
+				nfsKey:                             "true",
+				driverPrefix + "/" + arrIP + "-fc": "true",
+				"topology.kubernetes.io/zone":      "zone-c",
+			}},
+		}
+		result := identifiers.GetEligibleNfsAccessibleTopologies(preferred, nil, arrIP)
+		assert.Len(t, result, 2)
+		// Both should have NFS key and zone, but no FC
+		for _, topo := range result {
+			assert.Contains(t, topo.Segments, nfsKey)
+			assert.NotContains(t, topo.Segments, driverPrefix+"/"+arrIP+"-fc")
+		}
+	})
+
+	t.Run("Nil Preferred and Requisite - fallback to legacy", func(t *testing.T) {
+		result := identifiers.GetEligibleNfsAccessibleTopologies(nil, nil, arrIP)
+		assert.Len(t, result, 1)
+		assert.Equal(t, "true", result[0].Segments[nfsKey])
+		assert.Len(t, result[0].Segments, 1) // Only NFS key
+	})
+}
+
+func TestGetEligibleNfsAccessibleTopologies_ReviewerScenarios(t *testing.T) {
+	driverPrefix := identifiers.Name
+	arrIP := "10.0.0.1"
+	nfsKey := driverPrefix + "/" + arrIP + "-nfs"
+
+	t.Run("custom-only Preferred plus NFS-containing Requisite", func(t *testing.T) {
+		preferred := []*csi.Topology{
+			{Segments: map[string]string{
+				"topology.kubernetes.io/zone": "zone-a", // No NFS key
+			}},
+		}
+		requisite := []*csi.Topology{
+			{Segments: map[string]string{
+				nfsKey:                        "true",
+				"topology.kubernetes.io/zone": "zone-a",
+			}},
+		}
+		result := identifiers.GetEligibleNfsAccessibleTopologies(preferred, requisite, arrIP)
+		assert.Len(t, result, 1)
+		assert.Equal(t, "true", result[0].Segments[nfsKey])
+		assert.Equal(t, "zone-a", result[0].Segments["topology.kubernetes.io/zone"])
+	})
+
+	t.Run("mixed-case NFS values remain eligible and preserve custom labels", func(t *testing.T) {
+		tests := []struct {
+			name         string
+			preferred    []*csi.Topology
+			requisite    []*csi.Topology
+			expectedZone string
+		}{
+			{
+				name: "mixed-case Preferred value",
+				preferred: []*csi.Topology{{Segments: map[string]string{
+					nfsKey:                        "TRUE",
+					"topology.kubernetes.io/zone": "zone-a",
+				}}},
+				expectedZone: "zone-a",
+			},
+			{
+				name: "mixed-case Requisite value",
+				preferred: []*csi.Topology{{Segments: map[string]string{
+					"topology.kubernetes.io/zone": "zone-a",
+				}}},
+				requisite: []*csi.Topology{{Segments: map[string]string{
+					nfsKey:                        "TrUe",
+					"topology.kubernetes.io/zone": "zone-b",
+				}}},
+				expectedZone: "zone-b",
+			},
+		}
+
+		for _, test := range tests {
+			t.Run(test.name, func(t *testing.T) {
+				result := identifiers.GetEligibleNfsAccessibleTopologies(test.preferred, test.requisite, arrIP)
+				assert.Len(t, result, 1)
+				assert.Equal(t, "true", result[0].Segments[nfsKey])
+				assert.Equal(t, test.expectedZone, result[0].Segments["topology.kubernetes.io/zone"])
+			})
+		}
+	})
+
+	t.Run("mixed valid NFS and custom-only Preferred entries", func(t *testing.T) {
+		preferred := []*csi.Topology{
+			{Segments: map[string]string{
+				nfsKey:                        "true",
+				"topology.kubernetes.io/zone": "zone-a",
+			}},
+			{Segments: map[string]string{
+				"topology.kubernetes.io/zone": "zone-b", // No NFS key
+			}},
+		}
+		requisite := []*csi.Topology{
+			{Segments: map[string]string{
+				nfsKey:                        "true",
+				"topology.kubernetes.io/zone": "zone-c",
+			}},
+		}
+		result := identifiers.GetEligibleNfsAccessibleTopologies(preferred, requisite, arrIP)
+		assert.Len(t, result, 1)
+		assert.Equal(t, "true", result[0].Segments[nfsKey])
+		assert.Equal(t, "zone-a", result[0].Segments["topology.kubernetes.io/zone"])
+	})
+
+	t.Run("assertion that every returned AccessibleTopology entry contains the selected-array NFS key", func(t *testing.T) {
+		preferred := []*csi.Topology{
+			{Segments: map[string]string{
+				nfsKey:                        "true",
+				"topology.kubernetes.io/zone": "zone-a",
+			}},
+			{Segments: map[string]string{
+				nfsKey:                        "true",
+				"topology.kubernetes.io/zone": "zone-b",
+			}},
+		}
+		result := identifiers.GetEligibleNfsAccessibleTopologies(preferred, nil, arrIP)
+		assert.Len(t, result, 2)
+		// Assert EVERY returned entry contains the NFS key
+		for _, topo := range result {
+			assert.Contains(t, topo.Segments, nfsKey, "Every returned entry must contain the selected-array NFS key")
+		}
+	})
 }

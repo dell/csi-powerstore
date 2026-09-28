@@ -1,0 +1,6 @@
+# This file contains mutable parameters for CSI volume modification tests
+# These parameters will be used to test the ControllerModifyVolume RPC
+# You can update the parameters as needed
+
+Description: "sanity test description"
+PerformancePolicyID: "valid-performance-policy-id"

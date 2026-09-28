@@ -1743,11 +1743,11 @@ func TestEmitEventEmitter_AdditionalTests(_ *testing.T) {
 
 func TestAnnotate_AdditionalCases(_ *testing.T) {
 	fakeClient := fake.NewSimpleClientset()
-	annotator := NewPVCAnnotator(fakeClient)
+	_ = NewPVCAnnotator(fakeClient)
 
 	pvc := makePVC("test-pvc", "default")
 	fakeClient = fake.NewSimpleClientset(pvc)
-	annotator = NewPVCAnnotator(fakeClient)
+	annotator := NewPVCAnnotator(fakeClient)
 
 	result := &ReclamationResult{
 		Status:         "in_progress",

@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright © 2020-2025 Dell Inc., or its subsidiaries. All Rights Reserved.
+# Copyright © 2020-2026 Dell Inc. or its subsidiaries. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -160,27 +160,150 @@ copy_files() {
   done
 }
 
+# strip_quotes_and_trim
+# removes leading/trailing whitespace and optional surrounding quotes from a string
+strip_quotes_and_trim() {
+  local v="$1"
+  v="${v#"${v%%[![:space:]]*}"}"
+  v="${v%"${v##*[![:space:]]}"}"
+  v="${v#\"}"
+  v="${v%\"}"
+  v="${v#\'}"
+  v="${v%\'}"
+  # re-trim in case quotes enclosed whitespace
+  v="${v#"${v%%[![:space:]]*}"}"
+  v="${v%"${v##*[![:space:]]}"}"
+  printf '%s' "$v"
+}
+
+# collect_helm_dependencies
+# parses Chart.yaml dependencies with local file:// repositories and records
+# their source directories so they can be included in the offline bundle.
+collect_helm_dependencies() {
+  if [ "${MODE}" != "helm" ]; then
+    return
+  fi
+  if [ ! -f "${CHARTFILE}" ]; then
+    return
+  fi
+
+  local charts_root
+  charts_root=$(cd "${HELMDIR}/.." >/dev/null 2>&1 && pwd) || {
+    echo "WARNING: unable to determine parent charts directory for ${HELMDIR}"
+    return
+  }
+
+  HELM_DEPS=()
+  while IFS= read -r repo; do
+    repo=$(strip_quotes_and_trim "${repo}")
+    case "${repo}" in
+      file://*)
+        local rel_path
+        rel_path=$(strip_quotes_and_trim "${repo#file://}")
+        local dep_dir
+        dep_dir=$(cd "${HELMDIR}" >/dev/null 2>&1 && cd "${rel_path}" >/dev/null 2>&1 && pwd)
+        if [ -d "${dep_dir}" ]; then
+          case "${dep_dir}" in
+            "${charts_root}/"*)
+              echo "   Found local Helm chart dependency: $(basename "${dep_dir}")"
+              DIRS_FOR_IMAGE_NAMES+=("${dep_dir}")
+              HELM_DEPS+=("${dep_dir}")
+              ;;
+            *)
+              echo "WARNING: local chart dependency ${rel_path} resolves outside ${charts_root}; skipping"
+              ;;
+          esac
+        else
+          echo "WARNING: local chart dependency ${rel_path} not found at ${dep_dir}; skipping"
+        fi
+        ;;
+    esac
+  done < <(awk '/^dependencies:/{in_deps=1;next} /^[A-Za-z]/{if(in_deps) in_deps=0} in_deps && /^[[:space:]]*repository:/ {sub(/^[[:space:]]*repository:[[:space:]]*/, ""); print}' "${CHARTFILE}")
+}
+
+# copy_helm_dependencies
+# copies the local chart dependencies discovered by collect_helm_dependencies
+# into the bundle so helm dependency build works in air-gapped environments.
+copy_helm_dependencies() {
+  if [ "${#HELM_DEPS[@]}" -eq 0 ]; then
+    return
+  fi
+
+  status "Copying local Helm chart dependencies"
+  mkdir -p "${DISTDIR}/helm-charts/charts"
+  for dep_dir in "${HELM_DEPS[@]}"; do
+    local dep_name
+    dep_name=$(basename "${dep_dir}")
+    echo "   ${dep_name}"
+    if ! cp -R "${dep_dir}" "${DISTDIR}/helm-charts/charts/"; then
+      echo "Unable to copy ${dep_dir} to the distribution directory"
+      exit 1
+    fi
+  done
+}
+
+# sed_escape_search
+# escapes characters that are special in a sed BRE search pattern
+# (^ $ . * [ ] \ and the current sed delimiter |). It deliberately does
+# NOT escape ?, +, (, ), {, } because those are not metacharacters in BRE.
+sed_escape_search() {
+  printf '%s' "$1" | sed -e 's/[][\\^$.\\*|]/\\&/g'
+}
+
+# sed_escape_replace
+# escapes characters that are special in a sed replacement string
+sed_escape_replace() {
+  printf '%s' "$1" | sed -e 's/[\\&]/\\&/g' -e 's/|/\\|/g'
+}
+
 # fix any references in the helm charts or operator configuration
 fixup_files() {
 
   local ROOTDIR="${HELMDIR}"
+  local -a SEARCH_DIRS=("${HELMDIR}")
 
   if [ "${MODE}" == "operator" ]; then
     ROOTDIR="${REPODIR}"
+    SEARCH_DIRS=("${REPODIR}")
+  fi
+
+  if [ "${MODE}" == "helm" ]; then
+    # Include sibling local chart dependencies (e.g. csm-disaster-recovery)
+    # so any images they reference are also retagged for the target registry.
+    ROOTDIR=$(dirname "${HELMDIR}")
+    SEARCH_DIRS=("${HELMDIR}")
+    if [ "${#HELM_DEPS[@]}" -gt 0 ]; then
+      SEARCH_DIRS+=("${HELM_DEPS[@]}")
+    fi
   fi
 
   status "Preparing ${MODE} files within ${ROOTDIR}"
 
   # for each image in the manifest, replace the old name with the new
-  while read line; do
-      local NEWNAME="${REGISTRY}${line##*/}"
-      echo "   changing: $line -> ${NEWNAME}"
-      find "${ROOTDIR}" -type f -not -path "${SCRIPTDIR}/*" -exec sed -i "s|$line|$NEWNAME|g" {} \;
+  while IFS= read -r line; do
+    local NEWNAME="${REGISTRY}${line##*/}"
+    echo "   changing: $line -> ${NEWNAME}"
+    local search_escaped
+    local replace_escaped
+    search_escaped=$(sed_escape_search "${line}")
+    replace_escaped=$(sed_escape_replace "${NEWNAME}")
+    if ! find "${SEARCH_DIRS[@]}" -type f -not -path "${SCRIPTDIR}/*" -exec sed -i "s|${search_escaped}|${replace_escaped}|g" {} \; ; then
+      echo "ERROR: failed to replace image reference ${line}"
+      exit 1
+    fi
   done < "${IMAGEMANIFEST}"
 
   # Replacing values file with local registry
-  sed -i "s|driverRepository:.*|driverRepository: ${REGISTRY}|" ${VALUESFILE}
-  sed -i 's/\/$//' ${VALUESFILE}
+  local reg_escaped
+  reg_escaped=$(sed_escape_replace "${REGISTRY}")
+  sed -i "s|driverRepository:.*|driverRepository: ${reg_escaped}|" "${VALUESFILE}" || {
+    echo "ERROR: failed to update driverRepository in ${VALUESFILE}"
+    exit 1
+  }
+  sed -i 's/\/$//' "${VALUESFILE}" || {
+    echo "ERROR: failed to trim trailing slash in ${VALUESFILE}"
+    exit 1
+  }
 }
 
 # compress the whole bundle
@@ -234,7 +357,7 @@ PREPARE="false"
 REGISTRY=""
 NIGHTLY="false"
 DRIVER="csi-powerstore"
-DEFAULT_VERSION="v2.17.0"
+DEFAULT_VERSION="v2.18.0"
 
 while getopts "cprnv:h" opt; do
   case $opt in
@@ -357,6 +480,9 @@ else
   )
 fi
 
+# discover any local file:// Helm chart dependencies
+collect_helm_dependencies
+
 # make sure exatly one option for create/prepare was specified
 if [ "${CREATE}" == "${PREPARE}" ]; then
   usage
@@ -396,6 +522,7 @@ if [ "${CREATE}" == "true" ]; then
   build_image_manifest
   archive_images
   copy_files
+  copy_helm_dependencies
   compress_bundle
 
   status "Complete"

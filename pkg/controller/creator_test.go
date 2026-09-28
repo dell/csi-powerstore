@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2021-2023 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2021-2026 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/dell/csi-powerstore/v2/pkg/identifiers"
 	"github.com/dell/gopowerstore"
 	"github.com/dell/gopowerstore/mocks"
 	"github.com/container-storage-interface/spec/lib/go/csi"
@@ -109,7 +110,7 @@ func TestVolumeCreator_CheckIfAlreadyExists(t *testing.T) {
 	})
 
 	t.Run("volume already exists [nfs]", func(t *testing.T) {
-		nc := &NfsCreator{}
+		nc := &NfsCreator{nfsAutoSelect: false}
 		name := "test"
 		sizeInBytes := int64(1610612736)
 		validNodeID = strings.Join([]string{validHostName, "127.0.0.1"}, "-")
@@ -117,10 +118,39 @@ func TestVolumeCreator_CheckIfAlreadyExists(t *testing.T) {
 		clientMock.On("GetFSByName", context.Background(), name).
 			Return(gopowerstore.FileSystem{SizeTotal: 3221225472}, nil)
 
-		clientMock.On("GetNAS", context.Background(), mock.Anything).Return(gopowerstore.NAS{CurrentNodeID: validNodeID}, nil)
+		clientMock.On("GetNAS", context.Background(), mock.Anything).Return(gopowerstore.NAS{
+			CurrentNodeID:                   validNodeID,
+			CurrentPreferredIPv4InterfaceID: "intf-1",
+		}, nil)
 		vol, err := nc.CheckIfAlreadyExists(context.Background(), name, sizeInBytes, clientMock)
 		assert.NoError(t, err)
 		assert.Equal(t, sizeInBytes, vol.CapacityBytes)
+		// When auto-select is disabled, GetFileInterface should NOT be called
+		clientMock.AssertNotCalled(t, "GetFileInterface", mock.Anything, mock.Anything)
+		assert.Empty(t, nc.nasInterfaceIP)
+	})
+	t.Run("volume already exists [nfs] with auto-select resolves interface IP", func(t *testing.T) {
+		nc := &NfsCreator{nfsAutoSelect: true}
+		name := "test"
+		sizeInBytes := int64(1610612736)
+		validNodeID = strings.Join([]string{validHostName, "127.0.0.1"}, "-")
+		clientMock := new(mocks.Client)
+		clientMock.On("GetFSByName", context.Background(), name).
+			Return(gopowerstore.FileSystem{SizeTotal: 3221225472}, nil)
+
+		clientMock.On("GetNAS", context.Background(), mock.Anything).Return(gopowerstore.NAS{
+			Name:                            "nas-1",
+			CurrentNodeID:                   validNodeID,
+			CurrentPreferredIPv4InterfaceID: "intf-1",
+		}, nil)
+		clientMock.On("GetFileInterface", context.Background(), "intf-1").Return(gopowerstore.FileInterface{
+			IPAddress: "10.20.30.40",
+		}, nil)
+		vol, err := nc.CheckIfAlreadyExists(context.Background(), name, sizeInBytes, clientMock)
+		assert.NoError(t, err)
+		assert.Equal(t, sizeInBytes, vol.CapacityBytes)
+		clientMock.AssertCalled(t, "GetFileInterface", context.Background(), "intf-1")
+		assert.Equal(t, "10.20.30.40", nc.nasInterfaceIP)
 	})
 	t.Run("volume with same name exists, but is wrong size [nfs]", func(t *testing.T) {
 		nc := &NfsCreator{}
@@ -331,5 +361,155 @@ func TestVolumeCreator_CreateFromSnapshot(t *testing.T) {
 			assert.Error(t, err)
 			assert.Contains(t, err.Error(), "can't create fs")
 		})
+	})
+}
+
+func TestCreator_SetAttributes(t *testing.T) {
+	t.Run("setVolumeCreateAttributes", func(t *testing.T) {
+		params := map[string]string{
+			identifiers.KeyApplianceID:         "app-1",
+			identifiers.KeyVolumeDescription:   "my-desc",
+			identifiers.KeyProtectionPolicyID:  "prot-1",
+			identifiers.KeyPerformancePolicyID: "perf-1",
+			identifiers.KeyAppType:             "Oracle",
+			identifiers.KeyAppTypeOther:        "custom-oracle",
+		}
+		vc := &gopowerstore.VolumeCreate{}
+		setVolumeCreateAttributes(params, vc)
+		assert.Equal(t, "app-1", vc.ApplianceID)
+		assert.Equal(t, "my-desc", vc.Description)
+		assert.Equal(t, "prot-1", vc.ProtectionPolicyID)
+		assert.Equal(t, "perf-1", vc.PerformancePolicyID)
+		assert.Equal(t, gopowerstore.AppTypeEnum("Oracle"), vc.AppType)
+		assert.Equal(t, "custom-oracle", vc.AppTypeOther)
+	})
+
+	t.Run("validateHostIOSize", func(t *testing.T) {
+		assert.Equal(t, gopowerstore.VMware8K, validateHostIOSize(gopowerstore.VMware8K))
+		assert.Equal(t, gopowerstore.VMware16K, validateHostIOSize(gopowerstore.VMware16K))
+		assert.Equal(t, gopowerstore.VMware32K, validateHostIOSize(gopowerstore.VMware32K))
+		assert.Equal(t, gopowerstore.VMware64K, validateHostIOSize(gopowerstore.VMware64K))
+		assert.Equal(t, gopowerstore.VMware8K, validateHostIOSize("invalid_size"))
+	})
+
+	t.Run("setFLRAttributes", func(t *testing.T) {
+		params := map[string]string{
+			identifiers.KeyFlrCreateMode:       "Enterprise",
+			identifiers.KeyFlrDefaultRetention: "1d",
+			identifiers.KeyFlrMinRetention:     "1h",
+			identifiers.KeyFlrMaxRetention:     "1y",
+		}
+		fc := &gopowerstore.FsCreate{}
+		setFLRAttributes(params, fc)
+		flr, ok := fc.FlrCreate.(gopowerstore.FLRCreate)
+		assert.True(t, ok)
+		assert.Equal(t, "Enterprise", flr.Mode)
+		assert.Equal(t, "1d", flr.DefaultRetention)
+		assert.Equal(t, "1h", flr.MinimumRetention)
+		assert.Equal(t, "1y", flr.MaximumRetention)
+	})
+
+	t.Run("setNFSCreateAttributes", func(t *testing.T) {
+		params := map[string]string{
+			identifiers.KeyVolumeDescription:        "nfs-desc",
+			identifiers.KeyConfigType:               "General",
+			identifiers.KeyAccessPolicy:             "Native",
+			identifiers.KeyLockingPolicy:            "Mandatory",
+			identifiers.KeyFolderRenamePolicy:       "AllAllowed",
+			identifiers.KeyIsAsyncMtimeEnabled:      "true",
+			identifiers.KeyProtectionPolicyID:       "prot-nfs",
+			identifiers.KeyPerformancePolicyID:      "perf-nfs",
+			identifiers.KeyFileEventsPublishingMode: "None",
+			identifiers.KeyHostIoSize:               gopowerstore.VMware32K,
+		}
+		fc := &gopowerstore.FsCreate{}
+		setNFSCreateAttributes(params, fc)
+		assert.Equal(t, "nfs-desc", fc.Description)
+		assert.Equal(t, "General", fc.ConfigType)
+		assert.Equal(t, "Native", fc.AccessPolicy)
+		assert.Equal(t, "Mandatory", fc.LockingPolicy)
+		assert.Equal(t, "AllAllowed", fc.FolderRenamePolicy)
+		assert.True(t, fc.IsAsyncMTimeEnabled)
+		assert.Equal(t, "prot-nfs", fc.ProtectionPolicyID)
+		assert.Equal(t, "perf-nfs", fc.PerformancePolicyID)
+		assert.Equal(t, "None", fc.FileEventsPublishingMode)
+		assert.Equal(t, gopowerstore.VMware32K, fc.HostIOSize)
+	})
+}
+
+func TestNfsCreator_Create(t *testing.T) {
+	t.Run("create with auto-select disabled does not call GetFileInterface", func(t *testing.T) {
+		nc := &NfsCreator{
+			nasName:       "nas-1",
+			nfsAutoSelect: false,
+		}
+		clientMock := new(mocks.Client)
+		clientMock.On("GetNASByName", context.Background(), "nas-1").Return(gopowerstore.NAS{
+			ID:                              "nas-id-1",
+			Name:                            "nas-1",
+			CurrentPreferredIPv4InterfaceID: "intf-1",
+		}, nil)
+		clientMock.On("CreateFS", context.Background(), mock.Anything).Return(gopowerstore.CreateResponse{ID: "fs-1"}, nil)
+
+		req := &csi.CreateVolumeRequest{
+			Name:       "vol-1",
+			Parameters: map[string]string{},
+		}
+		resp, err := nc.Create(context.Background(), req, 1073741824, clientMock)
+		assert.NoError(t, err)
+		assert.Equal(t, "fs-1", resp.ID)
+		clientMock.AssertNotCalled(t, "GetFileInterface", mock.Anything, mock.Anything)
+		assert.Empty(t, nc.nasInterfaceIP)
+	})
+
+	t.Run("create with auto-select enabled resolves NAS interface IP", func(t *testing.T) {
+		nc := &NfsCreator{
+			nasName:       "nas-1",
+			nfsAutoSelect: true,
+		}
+		clientMock := new(mocks.Client)
+		clientMock.On("GetNASByName", context.Background(), "nas-1").Return(gopowerstore.NAS{
+			ID:                              "nas-id-1",
+			Name:                            "nas-1",
+			CurrentPreferredIPv4InterfaceID: "intf-1",
+		}, nil)
+		clientMock.On("GetFileInterface", context.Background(), "intf-1").Return(gopowerstore.FileInterface{
+			IPAddress: "10.20.30.40",
+		}, nil)
+		clientMock.On("CreateFS", context.Background(), mock.Anything).Return(gopowerstore.CreateResponse{ID: "fs-1"}, nil)
+
+		req := &csi.CreateVolumeRequest{
+			Name:       "vol-1",
+			Parameters: map[string]string{},
+		}
+		resp, err := nc.Create(context.Background(), req, 1073741824, clientMock)
+		assert.NoError(t, err)
+		assert.Equal(t, "fs-1", resp.ID)
+		clientMock.AssertCalled(t, "GetFileInterface", context.Background(), "intf-1")
+		assert.Equal(t, "10.20.30.40", nc.nasInterfaceIP)
+	})
+
+	t.Run("create with auto-select enabled handles GetFileInterface failure gracefully", func(t *testing.T) {
+		nc := &NfsCreator{
+			nasName:       "nas-1",
+			nfsAutoSelect: true,
+		}
+		clientMock := new(mocks.Client)
+		clientMock.On("GetNASByName", context.Background(), "nas-1").Return(gopowerstore.NAS{
+			ID:                              "nas-id-1",
+			Name:                            "nas-1",
+			CurrentPreferredIPv4InterfaceID: "intf-1",
+		}, nil)
+		clientMock.On("GetFileInterface", context.Background(), "intf-1").Return(gopowerstore.FileInterface{}, errors.New("network error"))
+		clientMock.On("CreateFS", context.Background(), mock.Anything).Return(gopowerstore.CreateResponse{ID: "fs-1"}, nil)
+
+		req := &csi.CreateVolumeRequest{
+			Name:       "vol-1",
+			Parameters: map[string]string{},
+		}
+		resp, err := nc.Create(context.Background(), req, 1073741824, clientMock)
+		assert.NoError(t, err)
+		assert.Equal(t, "fs-1", resp.ID)
+		assert.Empty(t, nc.nasInterfaceIP)
 	})
 }

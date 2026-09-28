@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/dell/csi-powerstore/v2/pkg/array"
+	log "github.com/dell/csmlog"
 	"github.com/dell/gopowerstore"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc/codes"
@@ -74,8 +75,7 @@ func (m *VolumeGroupSnapshotManager) SetArrays(arrays map[string]*array.PowerSto
 // Implements CSI CreateVolumeGroupSnapshot RPC with validation, volume grouping, and snapshot creation.
 // Volume groups are persistent with immutable membership and stable naming based on volume IDs.
 func (m *VolumeGroupSnapshotManager) CreateVolumeGroupSnapshot(ctx context.Context, req *csi.CreateVolumeGroupSnapshotRequest, defaultArray *array.PowerStoreArray) (*csi.CreateVolumeGroupSnapshotResponse, error) {
-	log := log.WithContext(ctx)
-	log.Infof("CreateVolumeGroupSnapshot called with name: %s, source volumes: %v", req.GetName(), req.GetSourceVolumeIds())
+	log.WithContext(ctx).Infof("CreateVolumeGroupSnapshot called with name: %s, source volumes: %v", req.GetName(), req.GetSourceVolumeIds())
 
 	sourceVols, err := m.validateCreateRequest(ctx, req, defaultArray)
 	if err != nil {
@@ -96,17 +96,17 @@ func (m *VolumeGroupSnapshotManager) CreateVolumeGroupSnapshot(ctx context.Conte
 	}
 
 	if err := m.ensureVolumesInGroup(ctx, sourceVols, volumeGroup, arr); err != nil {
-		log.Warnf("Failed to add volumes to group %s: %s", volumeGroup.ID, err.Error())
+		log.WithContext(ctx).Warnf("Failed to add volumes to group %s: %s", volumeGroup.ID, err.Error())
 		return nil, err
 	}
 
 	groupSnapshot, err := m.createVolumeGroupSnapshot(ctx, req.GetName(), volumeGroup.ID, arr, sourceVols)
 	if err != nil {
-		log.Warnf("Failed to create volume group snapshot: %s", err.Error())
+		log.WithContext(ctx).Warnf("Failed to create volume group snapshot: %s", err.Error())
 		return nil, err
 	}
 
-	log.Infof("Successfully created group snapshot %s with %d member snapshots", groupSnapshot.GroupSnapshotId, len(groupSnapshot.Snapshots))
+	log.WithContext(ctx).Infof("Successfully created group snapshot %s with %d member snapshots", groupSnapshot.GroupSnapshotId, len(groupSnapshot.Snapshots))
 
 	return &csi.CreateVolumeGroupSnapshotResponse{
 		GroupSnapshot: groupSnapshot,
@@ -121,8 +121,7 @@ func (m *VolumeGroupSnapshotManager) CreateVolumeGroupSnapshot(ctx context.Conte
 // Implements CSI DeleteVolumeGroupSnapshot RPC with validation and PowerStore snapshot deletion.
 // Volume group snapshots are deleted atomically; volume groups are cleaned up on best-effort basis.
 func (m *VolumeGroupSnapshotManager) DeleteVolumeGroupSnapshot(ctx context.Context, req *csi.DeleteVolumeGroupSnapshotRequest) (*csi.DeleteVolumeGroupSnapshotResponse, error) {
-	log := log.WithContext(ctx)
-	log.Infof("DeleteVolumeGroupSnapshot called with group_snapshot_id: %s", req.GetGroupSnapshotId())
+	log.WithContext(ctx).Infof("DeleteVolumeGroupSnapshot called with group_snapshot_id: %s", req.GetGroupSnapshotId())
 
 	if req.GetGroupSnapshotId() == "" {
 		return nil, status.Error(codes.InvalidArgument, "group snapshot ID cannot be empty")
@@ -131,10 +130,13 @@ func (m *VolumeGroupSnapshotManager) DeleteVolumeGroupSnapshot(ctx context.Conte
 	csiGroupSnapshotID := req.GetGroupSnapshotId()
 	nativeSnapshotID, arrayID, _, parseErr := m.parseGroupSnapshotID(csiGroupSnapshotID)
 	if parseErr != nil {
-		return nil, parseErr
+		// CSI spec v1.12: DeleteVolumeGroupSnapshot MUST be idempotent
+		// Invalid or non-existent ID MUST return OK
+		log.Infof("DeleteVolumeGroupSnapshot: invalid ID format %s, returning OK for idempotency", csiGroupSnapshotID)
+		return &csi.DeleteVolumeGroupSnapshotResponse{}, nil
 	}
 
-	log.Infof("Deleting group snapshot %s (native ID: %s) using array %s", csiGroupSnapshotID, nativeSnapshotID, arrayID)
+	log.WithContext(ctx).Infof("Deleting group snapshot %s (native ID: %s) using array %s", csiGroupSnapshotID, nativeSnapshotID, arrayID)
 
 	if _, exists := m.arrays[arrayID]; !exists {
 		return nil, status.Errorf(codes.NotFound, "array %s not found for group snapshot %s", arrayID, csiGroupSnapshotID)
@@ -145,13 +147,13 @@ func (m *VolumeGroupSnapshotManager) DeleteVolumeGroupSnapshot(ctx context.Conte
 	_, err = arr.GetClient().DeleteVolumeGroup(ctx, nativeSnapshotID)
 	if err != nil {
 		if apiError, ok := err.(gopowerstore.APIError); ok && apiError.NotFound() {
-			log.Infof("Volume group snapshot %s not found, assuming already deleted", csiGroupSnapshotID)
+			log.WithContext(ctx).Infof("Volume group snapshot %s not found, assuming already deleted", csiGroupSnapshotID)
 			return &csi.DeleteVolumeGroupSnapshotResponse{}, nil
 		}
 		return nil, status.Errorf(codes.Internal, "failed to delete volume group snapshot %s: %s", csiGroupSnapshotID, err.Error())
 	}
 
-	log.Infof("Successfully deleted volume group snapshot %s", csiGroupSnapshotID)
+	log.WithContext(ctx).Infof("Successfully deleted volume group snapshot %s", csiGroupSnapshotID)
 
 	return &csi.DeleteVolumeGroupSnapshotResponse{}, nil
 }
@@ -164,8 +166,7 @@ func (m *VolumeGroupSnapshotManager) DeleteVolumeGroupSnapshot(ctx context.Conte
 // Implements CSI GetVolumeGroupSnapshot RPC with validation and PowerStore snapshot retrieval.
 // Returns current state with individual volume snapshot details for CSI compliance.
 func (m *VolumeGroupSnapshotManager) GetVolumeGroupSnapshot(ctx context.Context, req *csi.GetVolumeGroupSnapshotRequest) (*csi.GetVolumeGroupSnapshotResponse, error) {
-	log := log.WithContext(ctx)
-	log.Infof("GetVolumeGroupSnapshot called with group_snapshot_id: %s", req.GetGroupSnapshotId())
+	log.WithContext(ctx).Infof("GetVolumeGroupSnapshot called with group_snapshot_id: %s", req.GetGroupSnapshotId())
 
 	if req.GetGroupSnapshotId() == "" {
 		return nil, status.Error(codes.InvalidArgument, "group snapshot ID cannot be empty")
@@ -174,10 +175,11 @@ func (m *VolumeGroupSnapshotManager) GetVolumeGroupSnapshot(ctx context.Context,
 	csiGroupSnapshotID := req.GetGroupSnapshotId()
 	nativeSnapshotID, arrayID, protocol, parseErr := m.parseGroupSnapshotID(csiGroupSnapshotID)
 	if parseErr != nil {
-		return nil, parseErr
+		// CSI spec v1.12: GetVolumeGroupSnapshot with non-existent ID MUST return NotFound
+		return nil, status.Errorf(codes.NotFound, "group snapshot %s not found: %s", csiGroupSnapshotID, parseErr.Error())
 	}
 
-	log.Infof("Getting group snapshot %s (native ID: %s) using array %s", csiGroupSnapshotID, nativeSnapshotID, arrayID)
+	log.WithContext(ctx).Infof("Getting group snapshot %s (native ID: %s) using array %s", csiGroupSnapshotID, nativeSnapshotID, arrayID)
 
 	if _, exists := m.arrays[arrayID]; !exists {
 		return nil, status.Errorf(codes.NotFound, "array %s not found for group snapshot %s", arrayID, csiGroupSnapshotID)
@@ -220,8 +222,6 @@ func (m *VolumeGroupSnapshotManager) GetVolumeGroupSnapshot(ctx context.Context,
 
 // validateCreateRequest validates the create volume group snapshot request and returns sanitized CSI volume IDs
 func (m *VolumeGroupSnapshotManager) validateCreateRequest(ctx context.Context, req *csi.CreateVolumeGroupSnapshotRequest, defaultArray *array.PowerStoreArray) ([]string, error) {
-	log := log.WithContext(ctx)
-
 	// Validate snapshot name
 	snapshotName := req.GetName()
 	if snapshotName == "" {
@@ -229,7 +229,7 @@ func (m *VolumeGroupSnapshotManager) validateCreateRequest(ctx context.Context, 
 	}
 
 	if len(snapshotName) > snapLengthMax {
-		log.Warnf("Group snapshot name %q exceeds %d character limit (length: %d)", snapshotName, snapLengthMax, len(snapshotName))
+		log.WithContext(ctx).Warnf("Group snapshot name %q exceeds %d character limit (length: %d)", snapshotName, snapLengthMax, len(snapshotName))
 		return nil, status.Errorf(codes.InvalidArgument, "group snapshot name cannot exceed %d characters (got %d)", snapLengthMax, len(snapshotName))
 	}
 
@@ -272,8 +272,6 @@ func (m *VolumeGroupSnapshotManager) validateCreateRequest(ctx context.Context, 
 // Uses GetVolumesWithFilter to fetch all volumes with their volume group info in a single API call.
 // Returns the array and detected group ID (empty string if no group detected).
 func (m *VolumeGroupSnapshotManager) validateAndGroupVolumes(ctx context.Context, volumeIDs []string) (*array.PowerStoreArray, string, error) {
-	log := log.WithContext(ctx)
-
 	// Early validation: check for empty volume list
 	if len(volumeIDs) == 0 {
 		return nil, "", status.Error(codes.InvalidArgument, "no volumes provided for group snapshot")
@@ -338,7 +336,7 @@ func (m *VolumeGroupSnapshotManager) validateAndGroupVolumes(ctx context.Context
 			groupID := vol.VolumeGroup[0].ID
 			if detectedGroupID == "" {
 				detectedGroupID = groupID
-				log.Infof("Detected volume group %s", groupID)
+				log.WithContext(ctx).Infof("Detected volume group %s", groupID)
 			} else if detectedGroupID != groupID {
 				return nil, "", status.Errorf(codes.FailedPrecondition,
 					"volumes are in different volume groups: %s and %s", detectedGroupID, groupID)
@@ -353,9 +351,9 @@ func (m *VolumeGroupSnapshotManager) validateAndGroupVolumes(ctx context.Context
 	}
 
 	if detectedGroupID != "" {
-		log.Infof("All %d volumes are in volume group %s", len(volumeIDs), detectedGroupID)
+		log.WithContext(ctx).Infof("All %d volumes are in volume group %s", len(volumeIDs), detectedGroupID)
 	} else {
-		log.Infof("All %d volumes are ungrouped", len(volumeIDs))
+		log.WithContext(ctx).Infof("All %d volumes are ungrouped", len(volumeIDs))
 	}
 
 	return arr, detectedGroupID, nil
@@ -392,19 +390,17 @@ func (m *VolumeGroupSnapshotManager) getArrayForVolume(volumeID string) (*array.
 
 // getOrCreateVolumeGroup gets or creates a volume group for snapshots
 func (m *VolumeGroupSnapshotManager) getOrCreateVolumeGroup(ctx context.Context, groupName string, volumeIDs []string, parameters map[string]string, arr *array.PowerStoreArray, detectedGroupID string) (*gopowerstore.VolumeGroup, error) {
-	log := log.WithContext(ctx)
-
 	// Determine which prefix to use: user-specified or default
 	prefix := parameters[volumeGroupPrefixParam]
 	if prefix == "" {
 		prefix = defaultVolumeGroupPrefix
 	} else {
-		log.Infof("Using user-specified volume group prefix: %s", prefix)
+		log.WithContext(ctx).Infof("Using user-specified volume group prefix: %s", prefix)
 	}
 
 	if detectedGroupID != "" {
 		// Use the detected group ID - get actual group by ID
-		log.Infof("Using detected volume group ID: %s", detectedGroupID)
+		log.WithContext(ctx).Infof("Using detected volume group ID: %s", detectedGroupID)
 		volumeGroup, err := arr.GetClient().GetVolumeGroup(ctx, detectedGroupID)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to get detected volume group %s: %s", detectedGroupID, err.Error())
@@ -417,16 +413,16 @@ func (m *VolumeGroupSnapshotManager) getOrCreateVolumeGroup(ctx context.Context,
 				volumeGroup.Name, detectedGroupID, prefix)
 		}
 
-		log.Infof("Successfully retrieved detected volume group %s", detectedGroupID)
+		log.WithContext(ctx).Infof("Successfully retrieved detected volume group %s", detectedGroupID)
 		return &volumeGroup, nil
 	}
 
 	// No existing group detected - determine name and create
 	volumeGroupName := m.generateStableVolumeGroupName(volumeIDs, groupName, prefix)
 	if prefix != defaultVolumeGroupPrefix {
-		log.Infof("Using user-specified volume group prefix %q for snapshot %s", prefix, groupName)
+		log.WithContext(ctx).Infof("Using user-specified volume group prefix %q for snapshot %s", prefix, groupName)
 	} else {
-		log.Infof("No existing volume group detected, creating new group for snapshot %s", groupName)
+		log.WithContext(ctx).Infof("No existing volume group detected, creating new group for snapshot %s", groupName)
 	}
 
 	// Create new volume group (will handle duplicate name errors appropriately)
@@ -435,8 +431,6 @@ func (m *VolumeGroupSnapshotManager) getOrCreateVolumeGroup(ctx context.Context,
 
 // createVolumeGroup creates a new volume group
 func (m *VolumeGroupSnapshotManager) createVolumeGroup(ctx context.Context, groupName string, volumeIDs []string, parameters map[string]string, arr *array.PowerStoreArray) (*gopowerstore.VolumeGroup, error) {
-	log := log.WithContext(ctx)
-
 	// Extract actual volume IDs from CSI volume IDs
 	var sourceVols []string
 	for _, v := range volumeIDs {
@@ -454,11 +448,11 @@ func (m *VolumeGroupSnapshotManager) createVolumeGroup(ctx context.Context, grou
 			isWOC = parsed
 		} else {
 			// For unrecognized values, use default (true) for backward compatibility
-			log.Warnf("Unrecognized boolean value '%s' for %s, using default %v: %s", wocValue, wocParam, isWOC, err.Error())
+			log.WithContext(ctx).Warnf("Unrecognized boolean value '%s' for %s, using default %v: %s", wocValue, wocParam, isWOC, err.Error())
 		}
 	}
 	if !isWOC {
-		log.Info("WOC is disabled")
+		log.WithContext(ctx).Info("WOC is disabled")
 	}
 
 	// Create volume group
@@ -468,13 +462,13 @@ func (m *VolumeGroupSnapshotManager) createVolumeGroup(ctx context.Context, grou
 		IsWriteOrderConsistent: &isWOC,
 	}
 
-	log.Infof("Creating volume group with name=%s, volumes=%v, WOC=%v", groupName, sourceVols, isWOC)
+	log.WithContext(ctx).Infof("Creating volume group with name=%s, volumes=%v, WOC=%v", groupName, sourceVols, isWOC)
 	group, err := arr.GetClient().CreateVolumeGroup(ctx, groupCreate)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to create volume group: %s", err.Error())
 	}
 
-	log.Infof("Volume group created with ID=%s", group.ID)
+	log.WithContext(ctx).Infof("Volume group created with ID=%s", group.ID)
 
 	// Get the created volume group
 	volumeGroup, err := arr.GetClient().GetVolumeGroup(ctx, group.ID)
@@ -482,12 +476,12 @@ func (m *VolumeGroupSnapshotManager) createVolumeGroup(ctx context.Context, grou
 		return nil, status.Errorf(codes.Internal, "failed to get created volume group: %s", err.Error())
 	}
 
-	log.Infof("Retrieved volume group %s has %d volumes", volumeGroup.ID, len(volumeGroup.Volumes))
+	log.WithContext(ctx).Infof("Retrieved volume group %s has %d volumes", volumeGroup.ID, len(volumeGroup.Volumes))
 	for i, vol := range volumeGroup.Volumes {
-		log.Infof("Volume %d: ID=%s", i, vol.ID)
+		log.WithContext(ctx).Infof("Volume %d: ID=%s", i, vol.ID)
 	}
 
-	log.Infof("Successfully created volume group %s with ID %s", groupName, volumeGroup.ID)
+	log.WithContext(ctx).Infof("Successfully created volume group %s with ID %s", groupName, volumeGroup.ID)
 	return &volumeGroup, nil
 }
 
@@ -545,13 +539,11 @@ func (m *VolumeGroupSnapshotManager) parseGroupSnapshotID(csiGroupSnapshotID str
 // This function converts the PowerStore volume group snapshot API response to CSI snapshot format,
 // creating individual snapshot objects for each volume in the group snapshot.
 func (m *VolumeGroupSnapshotManager) createSnapshotsFromVolumeGroupResponse(ctx context.Context, volumeGroup *gopowerstore.VolumeGroup, arr *array.PowerStoreArray, creationTime *timestamppb.Timestamp, protocol string) ([]*csi.Snapshot, error) {
-	log := log.WithContext(ctx)
-
 	var snapshots []*csi.Snapshot
 	arrayID := arr.GetGlobalID()
 
 	for _, vol := range volumeGroup.Volumes {
-		log.Debugf("Volume: ID=%s, State=%s", vol.ID, vol.State)
+		log.WithContext(ctx).Debugf("Volume: ID=%s, State=%s", vol.ID, vol.State)
 
 		// Parse volume ID - may be native UUID or CSI format (volumeUUID/arrayID/protocol)
 		volID := strings.Split(vol.ID, "/")
@@ -566,7 +558,7 @@ func (m *VolumeGroupSnapshotManager) createSnapshotsFromVolumeGroupResponse(ctx 
 		// Handle SourceVolumeId construction with fallback for missing SourceID
 		var sourceVolumeID string
 		if vol.ProtectionData.SourceID == "" {
-			log.Warnf("Volume %s has invalid protection data: missing SourceID. Using volume UUID (%s) as fallback for SourceVolumeId", vol.ID, volumeUUID)
+			log.WithContext(ctx).Warnf("Volume %s has invalid protection data: missing SourceID. Using volume UUID (%s) as fallback for SourceVolumeId", vol.ID, volumeUUID)
 			sourceVolumeID = volumeUUID // Fallback to volume UUID
 		} else {
 			sourceVolumeID = vol.ProtectionData.SourceID
@@ -615,8 +607,6 @@ func (m *VolumeGroupSnapshotManager) extractVolumeIDs(volumeIDs []string) ([]str
 // Once a volume group is created, its membership cannot be changed to ensure
 // data consistency and predictable snapshot behavior.
 func (m *VolumeGroupSnapshotManager) validateExistingGroupMembership(ctx context.Context, actualVolumeIDs []string, volumeGroup *gopowerstore.VolumeGroup, volumeGroupID string) error {
-	log := log.WithContext(ctx)
-
 	// Build map of existing volumes for efficient lookup
 	existingVolumes := make(map[string]bool)
 	for _, vol := range volumeGroup.Volumes {
@@ -632,7 +622,7 @@ func (m *VolumeGroupSnapshotManager) validateExistingGroupMembership(ctx context
 		return m.createMembershipValidationError(missingVolumes, removedVolumes)
 	}
 
-	log.Infof("Volume group membership validated - all %d volumes are already in group %s",
+	log.WithContext(ctx).Infof("Volume group membership validated - all %d volumes are already in group %s",
 		len(actualVolumeIDs), volumeGroupID)
 	return nil
 }
@@ -642,9 +632,7 @@ func (m *VolumeGroupSnapshotManager) validateExistingGroupMembership(ctx context
 // This function handles the first-time population of a volume group with all
 // requested volumes. It's called only when the volume group is empty.
 func (m *VolumeGroupSnapshotManager) addVolumesToNewGroup(ctx context.Context, actualVolumeIDs []string, volumeGroupID string, arr *array.PowerStoreArray) error {
-	log := log.WithContext(ctx)
-
-	log.Infof("Adding %d volumes to newly created volume group %s", len(actualVolumeIDs), volumeGroupID)
+	log.WithContext(ctx).Infof("Adding %d volumes to newly created volume group %s", len(actualVolumeIDs), volumeGroupID)
 
 	volumeMembers := &gopowerstore.VolumeGroupMembers{
 		VolumeIDs: actualVolumeIDs,
@@ -655,7 +643,7 @@ func (m *VolumeGroupSnapshotManager) addVolumesToNewGroup(ctx context.Context, a
 			volumeGroupID, err.Error())
 	}
 
-	log.Infof("Successfully added %d volumes to group %s", len(actualVolumeIDs), volumeGroupID)
+	log.WithContext(ctx).Infof("Successfully added %d volumes to group %s", len(actualVolumeIDs), volumeGroupID)
 	return nil
 }
 
@@ -712,8 +700,6 @@ func (m *VolumeGroupSnapshotManager) createMembershipValidationError(missingVolu
 
 // createVolumeGroupSnapshot creates a volume group snapshot using PowerStore API
 func (m *VolumeGroupSnapshotManager) createVolumeGroupSnapshot(ctx context.Context, snapshotName string, volumeGroupID string, arr *array.PowerStoreArray, sourceVolumeIDs []string) (*csi.VolumeGroupSnapshot, error) {
-	log := log.WithContext(ctx)
-
 	// Create the volume group snapshot
 	snapshotCreate := &gopowerstore.VolumeGroupSnapshotCreate{
 		Name:        snapshotName,
@@ -732,21 +718,21 @@ func (m *VolumeGroupSnapshotManager) createVolumeGroupSnapshot(ctx context.Conte
 		if apiError, ok := err.(gopowerstore.APIError); ok {
 			if apiError.NotFound() {
 				// NotFound error - snapshot likely wasn't created
-				log.Errorf("Created snapshot %s not found during retrieval - assuming creation failed", snapshotResp.ID)
+				log.WithContext(ctx).Errorf("Created snapshot %s not found during retrieval - assuming creation failed", snapshotResp.ID)
 				return nil, status.Errorf(codes.Internal, "failed to get created volume group snapshot: %s", err.Error())
 			}
 			// Other API error - snapshot was created but retrieval failed, attempt cleanup
-			log.Warnf("API error retrieving created snapshot %s, attempting cleanup: %s", snapshotResp.ID, err.Error())
+			log.WithContext(ctx).Warnf("API error retrieving created snapshot %s, attempting cleanup: %s", snapshotResp.ID, err.Error())
 			if cleanupErr := m.cleanupFailedGroupSnapshot(ctx, snapshotResp.ID, arr); cleanupErr != nil {
-				log.Errorf("Failed to cleanup snapshot %s: %s", snapshotResp.ID, cleanupErr.Error())
+				log.WithContext(ctx).Errorf("Failed to cleanup snapshot %s: %s", snapshotResp.ID, cleanupErr.Error())
 			}
 		} else {
 			// For non-API errors (network, communication, etc.), don't attempt cleanup
-			log.Errorf("Communication error retrieving created snapshot %s, not attempting cleanup: %s", snapshotResp.ID, err.Error())
+			log.WithContext(ctx).Errorf("Communication error retrieving created snapshot %s, not attempting cleanup: %s", snapshotResp.ID, err.Error())
 		}
 		return nil, status.Errorf(codes.Internal, "failed to get created volume group snapshot: %s", err.Error())
 	}
-	log.Infof("Created volume group snapshot %s has %d volumes", snapshotResp.ID, len(createdSnapshot.Volumes))
+	log.WithContext(ctx).Infof("Created volume group snapshot %s has %d volumes", snapshotResp.ID, len(createdSnapshot.Volumes))
 	// Get array ID for snapshot ID generation
 	arrayID := arr.GetGlobalID()
 	// Parse creation time
@@ -767,12 +753,12 @@ func (m *VolumeGroupSnapshotManager) createVolumeGroupSnapshot(ctx context.Conte
 	// Create individual volume snapshots from the volume group snapshot
 	var snapsList []*csi.Snapshot
 	for _, vol := range createdSnapshot.Volumes {
-		log.Debugf("Volume: ID=%s, State=%s", vol.ID, vol.State)
+		log.WithContext(ctx).Debugf("Volume: ID=%s, State=%s", vol.ID, vol.State)
 
 		// Handle SourceVolumeId construction with fallback for missing SourceID
 		var sourceVolumeID string
 		if vol.ProtectionData.SourceID == "" {
-			log.Warnf("Volume %s has invalid protection data: missing SourceID. Using volume ID as fallback for SourceVolumeId", vol.ID)
+			log.WithContext(ctx).Warnf("Volume %s has invalid protection data: missing SourceID. Using volume ID as fallback for SourceVolumeId", vol.ID)
 			sourceVolumeID = vol.ID // Fallback to volume ID
 		} else {
 			sourceVolumeID = vol.ProtectionData.SourceID
@@ -788,7 +774,7 @@ func (m *VolumeGroupSnapshotManager) createVolumeGroupSnapshot(ctx context.Conte
 			GroupSnapshotId: csiGroupSnapshotID,
 		}
 
-		log.Debugf("Created individual snapshot: ID=%s, SourceVolumeID=%s, Ready=%v",
+		log.WithContext(ctx).Debugf("Created individual snapshot: ID=%s, SourceVolumeID=%s, Ready=%v",
 			csiSnapshot.SnapshotId, csiSnapshot.SourceVolumeId, csiSnapshot.ReadyToUse)
 
 		snapsList = append(snapsList, csiSnapshot)
@@ -802,35 +788,33 @@ func (m *VolumeGroupSnapshotManager) createVolumeGroupSnapshot(ctx context.Conte
 		CreationTime:    creationTime,
 	}
 
-	log.Infof("Successfully created volume group snapshot %s with CSI ID %s and %d individual snapshots", snapshotName, csiGroupSnapshotID, len(snapsList))
+	log.WithContext(ctx).Infof("Successfully created volume group snapshot %s with CSI ID %s and %d individual snapshots", snapshotName, csiGroupSnapshotID, len(snapsList))
 
 	return groupSnapshot, nil
 }
 
 // cleanupFailedGroupSnapshot cleans up a failed group snapshot creation
 func (m *VolumeGroupSnapshotManager) cleanupFailedGroupSnapshot(ctx context.Context, volumeGroupSnapshotID string, arr *array.PowerStoreArray) error {
-	log := log.WithContext(ctx)
-
 	if arr == nil {
-		log.Error("No array provided for cleanup")
+		log.WithContext(ctx).Error("No array provided for cleanup")
 		return status.Error(codes.Internal, "no array provided")
 	}
 
-	log.Warnf("Cleaning up failed group snapshot creation for volume group %s using array %s", volumeGroupSnapshotID, arr.GetGlobalID())
+	log.WithContext(ctx).Warnf("Cleaning up failed group snapshot creation for volume group %s using array %s", volumeGroupSnapshotID, arr.GetGlobalID())
 
 	// Delete the volume group
 	_, err := arr.GetClient().DeleteVolumeGroup(ctx, volumeGroupSnapshotID)
 	if err != nil {
 		// Check if this is a not found error - if so, treat as success (idempotent)
 		if apiError, ok := err.(gopowerstore.APIError); ok && apiError.NotFound() {
-			log.Infof("Volume group %s not found during cleanup, assuming already deleted", volumeGroupSnapshotID)
+			log.WithContext(ctx).Infof("Volume group %s not found during cleanup, assuming already deleted", volumeGroupSnapshotID)
 			return nil
 		}
-		log.Warnf("Failed to delete volume group %s during cleanup: %s", volumeGroupSnapshotID, err.Error())
+		log.WithContext(ctx).Warnf("Failed to delete volume group %s during cleanup: %s", volumeGroupSnapshotID, err.Error())
 		return err
 	}
 
-	log.Infof("Successfully cleaned up failed group snapshot creation for volume group %s", volumeGroupSnapshotID)
+	log.WithContext(ctx).Infof("Successfully cleaned up failed group snapshot creation for volume group %s", volumeGroupSnapshotID)
 	return nil
 }
 

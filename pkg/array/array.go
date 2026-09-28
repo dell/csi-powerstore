@@ -23,7 +23,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
+	"net/netip"
+	"net/url"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -35,11 +38,13 @@ import (
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers"
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers/fs"
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers/k8sutils"
+	"github.com/dell/csi-powerstore/v2/pkg/metrics"
 	"github.com/dell/csm-dr/pkg/storage"
-	"github.com/dell/csmlog"
+	log "github.com/dell/csmlog"
 	csictx "github.com/dell/gocsi/context"
 	"github.com/dell/gopowerstore"
 	"github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	k8score "k8s.io/api/core/v1"
@@ -53,7 +58,6 @@ var (
 	ipToArrayMux             sync.Mutex
 	defaultMultiNasThreshold = 5
 	defaultMultiNasCooldown  = 5 * time.Minute
-	log                      = csmlog.GetLogger()
 )
 
 // Consumer provides methods for safe management of arrays
@@ -62,7 +66,7 @@ type Consumer interface {
 	SetArrays(map[string]*PowerStoreArray)
 	DefaultArray() *PowerStoreArray
 	SetDefaultArray(*PowerStoreArray)
-	UpdateArrays(string, fs.Interface) error
+	UpdateArrays(string, fs.Interface, ...prometheus.Registerer) error
 }
 
 // Locker provides implementation for safe management of arrays
@@ -144,15 +148,24 @@ func setIPToArray(matcher map[string]string) {
 }
 
 // UpdateArrays updates array info
-func (s *Locker) UpdateArrays(configPath string, fs fs.Interface) error {
+func (s *Locker) UpdateArrays(configPath string, fs fs.Interface, metricsRegistry ...prometheus.Registerer) error {
 	log.Info("updating array info")
-	arrays, matcher, defaultArray, err := GetPowerStoreArrays(fs, configPath)
+	var reg prometheus.Registerer
+	if len(metricsRegistry) > 0 {
+		reg = metricsRegistry[0]
+	}
+	arrays, matcher, defaultArray, err := GetPowerStoreArrays(fs, configPath, reg)
 	if err != nil {
 		return fmt.Errorf("can't get config for arrays: %s", err.Error())
 	}
 	s.SetArrays(arrays)
 	setIPToArray(matcher)
 	s.SetDefaultArray(defaultArray)
+	log.WithFields(log.Fields{
+		log.FieldComponent: "array",
+		log.FieldOperation: "UpdateArrays",
+		"array_count":      len(arrays),
+	}).Info("array configuration updated")
 	return nil
 }
 
@@ -347,10 +360,85 @@ func (psa *PowerStoreArray) GetGlobalID() string {
 	return psa.GlobalID
 }
 
+// NormalizeEndpoint ensures the array endpoint uses bracketed IPv6 host notation.
+// Bare IPv6 addresses (e.g. "https://2001:db8::1/api/rest") are normalized to
+// "https://[2001:db8::1]/api/rest". Zone IDs are preserved. Already-bracketed,
+// IPv4, and FQDN endpoints are returned unchanged.
+// FR-8.1, FR-8.2, FR-10.1
+func NormalizeEndpoint(raw string) (string, error) {
+	schemeEnd := strings.Index(raw, "://")
+	if schemeEnd < 0 {
+		return "", fmt.Errorf("invalid array endpoint %q: missing scheme", raw)
+	}
+	afterScheme := raw[schemeEnd+3:]
+
+	hostPart := afterScheme
+	pathPart := ""
+	if slashIdx := strings.Index(afterScheme, "/"); slashIdx >= 0 {
+		hostPart = afterScheme[:slashIdx]
+		pathPart = afterScheme[slashIdx:]
+	}
+	if hostPart == "" {
+		return "", fmt.Errorf("invalid array endpoint %q: missing host", raw)
+	}
+
+	if strings.HasPrefix(hostPart, "[") {
+		parsed, err := url.Parse(raw)
+		if err != nil {
+			return "", fmt.Errorf("invalid array endpoint %q: %w", raw, err)
+		}
+		host := strings.Replace(parsed.Hostname(), "%25", "%", 1)
+		if addr, err := netip.ParseAddr(host); err != nil || !addr.Is6() {
+			return "", fmt.Errorf("invalid array endpoint %q: invalid IPv6 host", raw)
+		}
+		return raw, nil
+	}
+
+	if !strings.Contains(hostPart, ":") {
+		return raw, nil
+	}
+
+	hostForParse := strings.Replace(hostPart, "%25", "%", 1)
+	addr, err := netip.ParseAddr(hostForParse)
+	if err == nil && addr.Is6() {
+		hostForURL := strings.ReplaceAll(addr.String(), "%", "%25")
+		return raw[:schemeEnd+3] + "[" + hostForURL + "]" + pathPart, nil
+	}
+	if _, _, splitErr := net.SplitHostPort(hostPart); splitErr == nil {
+		return raw, nil
+	}
+	return "", fmt.Errorf("invalid array endpoint %q: invalid IPv6 host", raw)
+}
+
+// checkDualStack returns an error if the supplied IP list spans both IPv4 and
+// IPv6 address families. PowerStore does not support simultaneous IPv4 and IPv6
+// array endpoints (dual-stack), so the driver rejects such a configuration at
+// startup with a clear, actionable error message.
+// FR-9.1
+func checkDualStack(ips []string) error {
+	hasIPv4, hasIPv6 := false, false
+	for _, ip := range ips {
+		addr, err := netip.ParseAddr(ip)
+		if err != nil {
+			continue
+		}
+		if addr.Is4() {
+			hasIPv4 = true
+		} else if addr.Is6() {
+			hasIPv6 = true
+		}
+	}
+	if hasIPv4 && hasIPv6 {
+		return errors.New("dual-stack configuration detected: PowerStore does not support simultaneous IPv4 and IPv6 array endpoints")
+	}
+	return nil
+}
+
 // GetPowerStoreArrays parses config.yaml file, initializes gopowerstore Clients and composes map of arrays for ease of access.
 // It will return array that can be used as default as a second return parameter.
 // If config does not have any array as a default then the first will be returned as a default.
-func GetPowerStoreArrays(fs fs.Interface, filePath string) (map[string]*PowerStoreArray, map[string]string, *PowerStoreArray, error) {
+// metricsRegistry is optional - if provided, array clients will be instrumented for metrics collection.
+func GetPowerStoreArrays(fs fs.Interface, filePath string, metricsRegistry prometheus.Registerer) (map[string]*PowerStoreArray, map[string]string, *PowerStoreArray, error) {
 	type config struct {
 		Arrays []*PowerStoreArray `yaml:"arrays"`
 	}
@@ -375,6 +463,28 @@ func GetPowerStoreArrays(fs fs.Interface, filePath string) (map[string]*PowerSto
 
 	if len(cfg.Arrays) == 0 {
 		return arrayMap, mapper, defaultArray, nil
+	}
+
+	// FR-8.1, FR-9.1: Pre-validate all endpoints before creating any clients.
+	// Normalize bare IPv6 hosts and reject dual-stack configurations early so
+	// the error is immediate and clear rather than buried in a TLS handshake.
+	var preIPs []string
+	for _, arr := range cfg.Arrays {
+		if arr == nil {
+			continue
+		}
+		normalized, normErr := NormalizeEndpoint(arr.Endpoint)
+		if normErr != nil {
+			return nil, nil, nil, fmt.Errorf("array %s: %v", arr.GlobalID, normErr)
+		}
+		arr.Endpoint = normalized
+		// GetIPListFromString strips brackets and returns bare address.
+		if ips := identifiers.GetIPListFromString(arr.Endpoint); len(ips) > 0 {
+			preIPs = append(preIPs, ips[0])
+		}
+	}
+	if err := checkDualStack(preIPs); err != nil {
+		return nil, nil, nil, err
 	}
 
 	// Safeguard if user doesn't set any array as default, we just use first one
@@ -405,17 +515,50 @@ func GetPowerStoreArrays(fs fs.Interface, filePath string) (map[string]*PowerSto
 			}
 		}
 
+		log.WithFields(log.Fields{
+			log.FieldComponent: "array",
+			log.FieldOperation: "GetPowerStoreArrays",
+			log.FieldArrayID:   array.GlobalID,
+			"endpoint":         array.Endpoint,
+		}).Info("establishing connection to PowerStore array")
+
+		metricsEnabled, _ := csictx.LookupEnv(context.Background(), identifiers.EnvMetricsEnabled)
+		if strings.EqualFold(metricsEnabled, "true") && metricsRegistry != nil {
+			if observer, err := metrics.NewPowerStoreAPIObserver(metricsRegistry, array.GlobalID); err != nil {
+				log.Errorf("failed to create PowerStore API observer for array %s: %v", array.GlobalID, err)
+			} else {
+				clientOptions.SetRequestObserver(observer)
+				log.Infof("Metrics enabled for array %s - PowerStore API observer activated", array.GlobalID)
+			}
+		}
+
 		c, err := gopowerstore.NewClientWithArgs(
-			array.Endpoint, array.Username, array.Password, clientOptions)
+			array.Endpoint, array.Username, array.Password, clientOptions,
+		)
 		if err != nil {
+			log.WithFields(log.Fields{
+				log.FieldComponent: "array",
+				log.FieldOperation: "GetPowerStoreArrays",
+				log.FieldArrayID:   array.GlobalID,
+				log.FieldError:     err.Error(),
+			}).Error("failed to create client for array")
 			return nil, nil, nil, status.Errorf(codes.FailedPrecondition,
 				"unable to create PowerStore client: %s", err.Error())
 		}
+		log.WithFields(log.Fields{
+			log.FieldComponent: "array",
+			log.FieldOperation: "GetPowerStoreArrays",
+			log.FieldArrayID:   array.GlobalID,
+			"endpoint":         array.Endpoint,
+			"user":             array.Username,
+			"insecure":         array.Insecure,
+		}).Info("successfully authenticated to PowerStore array")
 		c.SetCustomHTTPHeaders(http.Header{
 			"Application-Type": {fmt.Sprintf("%s/%s", identifiers.VerboseName, identifiers.ManifestSemver)},
 		})
 
 		c.SetLogger(&identifiers.CustomLogger{})
+
 		array.Client = c
 
 		if array.BlockProtocol == "" {
@@ -471,6 +614,13 @@ func GetPowerStoreArrays(fs fs.Interface, filePath string) (map[string]*PowerSto
 		array.NASCooldownTracker = NewNASCooldown(cooldownPeriod, failureThreshold)
 	}
 
+	log.WithFields(log.Fields{
+		log.FieldComponent: "array",
+		log.FieldOperation: "GetPowerStoreArrays",
+		"array_count":      len(arrayMap),
+		"default_array":    defaultArray.GlobalID,
+	}).Info("array initialization completed")
+
 	return arrayMap, mapper, defaultArray, nil
 }
 
@@ -523,8 +673,7 @@ func ParseVolumeID(ctx context.Context, volumeHandleRaw string,
 	defaultArray *PowerStoreArray, /*legacy support*/
 	vc *csi.VolumeCapability, /*legacy support*/
 ) (volumeHandle VolumeHandle, err error) {
-	log := log.WithContext(ctx)
-	log.Debugf("ParseVolumeID: parsing volume handle %s", volumeHandleRaw)
+	log.WithContext(ctx).Debugf("ParseVolumeID: parsing volume handle %s", volumeHandleRaw)
 
 	if volumeHandleRaw == "" {
 		return volumeHandle, status.Errorf(codes.FailedPrecondition,
@@ -539,7 +688,7 @@ func ParseVolumeID(ctx context.Context, volumeHandleRaw string,
 	// parse the first (potentially only) volume handle
 	localVolumeHandle := strings.Split(volumeHandles[0], "/")
 	volumeHandle.LocalUUID = localVolumeHandle[0]
-	log.Debugf("ParseVolumeID: local volume handle: %s", localVolumeHandle)
+	log.WithContext(ctx).Debugf("ParseVolumeID: local volume handle: %s", localVolumeHandle)
 
 	if len(localVolumeHandle) == 1 {
 		// Legacy support where the volume name consists of only the volume ID.
@@ -587,13 +736,13 @@ func ParseVolumeID(ctx context.Context, volumeHandleRaw string,
 	// Parse the second portion of a metro volume handle
 	if len(volumeHandles) > 1 {
 		remoteVolumeHandle := strings.Split(volumeHandles[1], "/")
-		log.Debugf("ParseVolumeID: remote volume handle: %s", remoteVolumeHandle)
+		log.WithContext(ctx).Debugf("ParseVolumeID: remote volume handle: %s", remoteVolumeHandle)
 
 		volumeHandle.RemoteUUID = remoteVolumeHandle[0]
 		volumeHandle.RemoteArrayGlobalID = remoteVolumeHandle[1]
 	}
 
-	log.Debugf(
+	log.WithContext(ctx).Debugf(
 		"ParseVolumeID: volumeID: %s, arrayID: %s, protocol: %s, remoteVolumeID: %s, remoteArrayID: %s",
 		volumeHandle.LocalUUID, volumeHandle.LocalArrayGlobalID, volumeHandle.Protocol, volumeHandle.RemoteUUID, volumeHandle.RemoteArrayGlobalID,
 	)
@@ -630,10 +779,9 @@ func GetVolumeUUIDPrefix(volumeID string) (prefix string) {
 
 // GetLeastUsedActiveNAS finds the active NAS with the least FS count
 func GetLeastUsedActiveNAS(ctx context.Context, arr *PowerStoreArray, nasServers []string) (string, error) {
-	log := log.WithContext(ctx)
 	nasList, err := arr.Client.GetNASServers(ctx)
 	if err != nil {
-		log.Errorf("Failed to fetch NAS servers: %v", err)
+		log.WithContext(ctx).Errorf("Failed to fetch NAS servers: %v", err)
 		return "", err
 	}
 
@@ -643,10 +791,10 @@ func GetLeastUsedActiveNAS(ctx context.Context, arr *PowerStoreArray, nasServers
 	if leastUsedNAS == nil {
 		nasInCooldown := GetNASInCooldown(arr, nasServers)
 		if len(nasInCooldown) != 0 {
-			log.Debugf("some NAS servers are in cooldown, moving to fallback retry")
+			log.WithContext(ctx).Debugf("some NAS servers are in cooldown, moving to fallback retry")
 			return arr.NASCooldownTracker.FallbackRetry(nasInCooldown), nil
 		}
-		log.Warnf("all NAS servers are inactive")
+		log.WithContext(ctx).Warnf("all NAS servers are inactive")
 		return "", fmt.Errorf("no suitable NAS server found, please ensure the NAS is running")
 	}
 

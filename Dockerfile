@@ -13,7 +13,7 @@
 # some arguments that must be supplied
 ARG GOIMAGE
 ARG BASEIMAGE
-ARG VERSION="2.17.0"
+ARG VERSION="2.18.0"
 
 # Stage to build the driver
 FROM $GOIMAGE as builder
@@ -23,7 +23,7 @@ RUN mkdir -p /go/src/csi-powerstore
 COPY ./ /go/src/csi-powerstore
 
 WORKDIR /go/src/csi-powerstore
-RUN make build IMAGE_VERSION=$VERSION && \
+RUN make build-binary IMAGE_VERSION=$VERSION && \
     rm -rf /go/src/csi-powerstore/vendor
 
 # Stage to build the driver image
@@ -35,7 +35,7 @@ LABEL vendor="Dell Technologies" \
       name="csi-powerstore" \
       summary="CSI Driver for Dell EMC PowerStore" \
       description="CSI Driver for provisioning persistent storage from Dell EMC PowerStore" \
-      release="1.17.0" \
+      release="1.18.0" \
       version=$VERSION \
       license="Apache-2.0"
 COPY licenses /licenses

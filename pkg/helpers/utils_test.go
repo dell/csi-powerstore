@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2021-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2021-2026 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -114,6 +114,62 @@ func TestGetNodeIP_AllCases(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		// FR-5.2: IPv6-only node — return first non-loopback, non-link-local IPv6
+		{
+			name: "IPv6-only node returns global unicast IPv6",
+			ifProvider: mockInterfaceProvider{
+				interfaces: []net.Interface{
+					{Name: "eth0", Flags: net.FlagUp},
+				},
+			},
+			addrProvider: mockAddrProvider{
+				addrMap: map[string][]net.Addr{
+					"eth0": {
+						&net.IPNet{IP: net.ParseIP("2001:db8::1")},
+					},
+				},
+			},
+			wantErr:    false,
+			expectedIP: "2001:db8::1",
+		},
+		// FR-10.1/FR-10.2: link-local is now accepted as a last-resort fallback.
+		// Single-interface node: no warning.
+		{
+			name: "link-local IPv6 only is accepted as fallback (single interface)",
+			ifProvider: mockInterfaceProvider{
+				interfaces: []net.Interface{
+					{Name: "eth0", Flags: net.FlagUp},
+				},
+			},
+			addrProvider: mockAddrProvider{
+				addrMap: map[string][]net.Addr{
+					"eth0": {
+						&net.IPNet{IP: net.ParseIP("fe80::1")},
+					},
+				},
+			},
+			wantErr:    false,
+			expectedIP: "fe80::1",
+		},
+		// FR-5.2 regression: IPv4 preferred over IPv6 on dual-stack node
+		{
+			name: "dual-stack node returns IPv4 first",
+			ifProvider: mockInterfaceProvider{
+				interfaces: []net.Interface{
+					{Name: "eth0", Flags: net.FlagUp},
+				},
+			},
+			addrProvider: mockAddrProvider{
+				addrMap: map[string][]net.Addr{
+					"eth0": {
+						&net.IPNet{IP: net.ParseIP("2001:db8::1")},
+						&net.IPNet{IP: net.ParseIP("192.168.1.1")},
+					},
+				},
+			},
+			wantErr:    false,
+			expectedIP: "192.168.1.1",
+		},
 		{
 			name: "valid IPv4 address found",
 			ifProvider: mockInterfaceProvider{
@@ -197,4 +253,80 @@ func TestGetNodeIP_Integration(t *testing.T) {
 		assert.NotNil(t, ip)
 		t.Logf("Found IP: %s", ip.String())
 	}
+}
+
+// FR-10.1: link-local IPv6 with zone ID (%eth0) accepted as fallback.
+// FR-10.2: no warning when zone ID is present.
+func TestGetNodeIPWithProvider_LinkLocalWithZone(t *testing.T) {
+	ip, err := GetNodeIPWithProvider(
+		mockInterfaceProvider{
+			interfaces: []net.Interface{
+				{Name: "eth0", Flags: net.FlagUp},
+				{Name: "eth1", Flags: net.FlagUp},
+			},
+		},
+		mockAddrProvider{
+			addrMap: map[string][]net.Addr{
+				"eth0": {
+					// Link-local with zone via IPAddr.Zone
+					&net.IPAddr{IP: net.ParseIP("fe80::1"), Zone: "eth0"},
+				},
+				"eth1": {
+					&net.IPAddr{IP: net.ParseIP("fe80::2"), Zone: "eth1"},
+				},
+			},
+		},
+	)
+	assert.NoError(t, err, "link-local with zone ID must be accepted")
+	assert.NotNil(t, ip)
+	assert.Equal(t, "fe80::1", ip.String())
+}
+
+// FR-10.2: multi-interface node, link-local without zone ID — accepted but warning logged.
+// The test verifies the function succeeds (warning is non-blocking).
+func TestGetNodeIPWithProvider_LinkLocalNoZoneMultiInterface(t *testing.T) {
+	ip, err := GetNodeIPWithProvider(
+		mockInterfaceProvider{
+			interfaces: []net.Interface{
+				{Name: "eth0", Flags: net.FlagUp},
+				{Name: "eth1", Flags: net.FlagUp},
+			},
+		},
+		mockAddrProvider{
+			addrMap: map[string][]net.Addr{
+				"eth0": {
+					// Link-local without zone (IPNet has no Zone field)
+					&net.IPNet{IP: net.ParseIP("fe80::1")},
+				},
+				"eth1": {
+					&net.IPNet{IP: net.ParseIP("fe80::2")},
+				},
+			},
+		},
+	)
+	// Warning is logged (non-blocking); function still returns success
+	assert.NoError(t, err, "link-local without zone on multi-interface should succeed with warning")
+	assert.NotNil(t, ip)
+	assert.Equal(t, "fe80::1", ip.String())
+}
+
+// FR-10.2 regression: global unicast IPv6 preferred over link-local
+func TestGetNodeIPWithProvider_GlobalUnicastPreferredOverLinkLocal(t *testing.T) {
+	ip, err := GetNodeIPWithProvider(
+		mockInterfaceProvider{
+			interfaces: []net.Interface{
+				{Name: "eth0", Flags: net.FlagUp},
+			},
+		},
+		mockAddrProvider{
+			addrMap: map[string][]net.Addr{
+				"eth0": {
+					&net.IPNet{IP: net.ParseIP("fe80::1")},
+					&net.IPNet{IP: net.ParseIP("2001:db8::1")},
+				},
+			},
+		},
+	)
+	assert.NoError(t, err)
+	assert.Equal(t, "2001:db8::1", ip.String(), "global unicast must be preferred over link-local")
 }
