@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2021-2024 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2021-2026 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -72,6 +72,13 @@ const (
 	// If true, node IP is excluded, and only IP/CIDR from externalAccess is used.
 	EnvExclusiveAccess = "X_CSI_POWERSTORE_EXCLUSIVE_ACCESS"
 
+	// EnvNfsAutoSelect enables NFS source IP auto-discovery via kernel routing query.
+	// When enabled, the controller defers per-host /32 export management to the node plugin,
+	// which discovers the storage-network source IP via getOutboundIP(nasIP) and manages
+	// NFS export entries at NodeStage/NodeUnstage time.
+	// Valid values: "true", "false". Default: "false" (disabled).
+	EnvNfsAutoSelect = "X_CSI_POWERSTORE_NFS_AUTO_SELECT"
+
 	// EnvArrayConfigFilePath is filepath to powerstore arrays config file
 	EnvArrayConfigFilePath = "X_CSI_POWERSTORE_CONFIG_PATH"
 
@@ -86,9 +93,6 @@ const (
 
 	// EnvReplicationPrefix is used as a prefix to find out if replication is enabled
 	EnvReplicationPrefix = "X_CSI_REPLICATION_PREFIX" // #nosec G101
-
-	// EnvGOCSIDebug indicates whether to print REQUESTs and RESPONSEs of all CSI method calls(from gocsi)
-	EnvGOCSIDebug = "X_CSI_DEBUG"
 
 	// EnvIsHealthMonitorEnabled specifies if health monitor is enabled.
 	EnvIsHealthMonitorEnabled = "X_CSI_HEALTH_MONITOR_ENABLED"
@@ -111,6 +115,13 @@ const (
 	// EnvPodmonArrayConnectivityPollRate indicates the polling frequency to check array connectivity
 	EnvPodmonArrayConnectivityPollRate = "X_CSI_PODMON_ARRAY_CONNECTIVITY_POLL_RATE"
 
+	// EnvPodmonAPIToken is the shared secret token used to authenticate requests
+	// between the CSI controller and node podmon API endpoints.
+	// When set, both the node HTTP server and the controller HTTP client
+	// will use Bearer token authentication. If unset, authentication is skipped
+	// for backward compatibility.
+	EnvPodmonAPIToken = "X_CSI_PODMON_API_TOKEN" // #nosec G101
+
 	// EnvMultiNASThreshold specifies the failure threshold used to put NAS in cooldown.
 	EnvMultiNASFailureThreshold = "X_CSI_MULTI_NAS_FAILURE_THRESHOLD"
 
@@ -119,6 +130,12 @@ const (
 
 	// EnvDriverNamespace is the namespace where the powerstore driver is deployed
 	EnvDriverNamespace = "X_CSI_DRIVER_NAMESPACE"
+
+	// EnvPodName is the name of the pod where the driver is running
+	EnvPodName = "POD_NAME"
+
+	// EnvCSIMode is the mode of the CSI driver (controller or node)
+	EnvCSIMode = "X_CSI_MODE"
 
 	// EnvPowerstoreAPITimeout specifies the timeout for Powerstore REST API calls
 	EnvPowerstoreAPITimeout = "X_CSI_POWERSTORE_API_TIMEOUT"
@@ -137,6 +154,10 @@ const (
 
 	// EnvCSMDREnabled indicates if CSM-DR is enabled
 	EnvCSMDREnabled = "X_CSM_DR_ENABLED"
+
+	// EnvCSIAddonsReplicationEnabled indicates if CSI-Addons replication is enabled
+	// This enables integration with OpenShift DR (Ramen) and other CSI-Addons compliant DR orchestrators
+	EnvCSIAddonsReplicationEnabled = "X_CSI_CSIADDONS_REPLICATION_ENABLED"
 
 	// EnvFsCheckEnabled enables/disables file system check before mount
 	EnvFsCheckEnabled = "X_CSI_FS_CHECK_ENABLED"
@@ -158,4 +179,52 @@ const (
 
 	// EnvSpaceReclamationTimeout is the timeout for each reclamation operation in seconds
 	EnvSpaceReclamationTimeout = "X_CSI_SPACE_RECLAMATION_TIMEOUT"
+
+	// EnvMonitorEnabled enables/disables the monitor service for PowerStore alerts
+	EnvMonitorEnabled = "X_CSI_ALERT_MONITOR_ENABLED"
+
+	// EnvMonitorPollInterval specifies the polling interval for the monitor service
+	EnvMonitorPollInterval = "X_CSI_ALERT_MONITOR_POLL_INTERVAL"
+
+	// EnvMetricsEnabled enables/disables metrics collection and server
+	EnvMetricsEnabled = "X_CSI_METRICS_ENABLED"
+
+	// EnvMetricsPort specifies the port for the metrics server
+	EnvMetricsPort = "X_CSI_METRICS_PORT"
+
+	// EnvMetricsTLSCertFile specifies the path to the TLS certificate file for metrics server
+	EnvMetricsTLSCertFile = "X_CSI_METRICS_TLS_CERT_FILE"
+
+	// EnvMetricsTLSKeyFile specifies the path to the TLS key file for metrics server
+	EnvMetricsTLSKeyFile = "X_CSI_METRICS_TLS_KEY_FILE"
+
+	// EnvMetricsPollInterval specifies the polling interval for metrics collection
+	EnvMetricsPollInterval = "X_CSI_METRICS_POLL_INTERVAL"
+
+	// EnvMetricsLeaderElectionEnabled enables/disables leader election for metrics collection
+	EnvMetricsLeaderElectionEnabled = "X_CSI_METRICS_LEADER_ELECTION_ENABLED"
+
+	// EnvMetricsLeaderElectionLeaseDuration is the duration that non-leader candidates will wait to acquire the lease
+	EnvMetricsLeaderElectionLeaseDuration = "X_CSI_METRICS_LEADER_ELECTION_LEASE_DURATION"
+
+	// EnvMetricsLeaderElectionRenewDeadline is the duration that the acting leader will retry refreshing leadership before giving up
+	EnvMetricsLeaderElectionRenewDeadline = "X_CSI_METRICS_LEADER_ELECTION_RENEW_DEADLINE"
+
+	// EnvMetricsLeaderElectionRetryPeriod is the duration the LeaderElector clients should wait between tries of actions
+	EnvMetricsLeaderElectionRetryPeriod = "X_CSI_METRICS_LEADER_ELECTION_RETRY_PERIOD"
+
+	// EnvMetricsArrayTimeout specifies the timeout for metrics API calls to PowerStore arrays
+	EnvMetricsArrayTimeout = "X_CSI_METRICS_ARRAY_TIMEOUT"
+
+	// EnvMetricsCollectionCacheTTL specifies the cache TTL for metrics collection results
+	EnvMetricsCollectionCacheTTL = "X_CSI_METRICS_COLLECTION_CACHE_TTL"
+
+	// EnvMetricsArrayRateLimit specifies the rate limit for metrics API calls
+	EnvMetricsArrayRateLimit = "X_CSI_METRICS_ARRAY_RATE_LIMIT"
+
+	// EnvMetricsArrayCBThreshold specifies the circuit breaker failure threshold
+	EnvMetricsArrayCBThreshold = "X_CSI_METRICS_ARRAY_CB_THRESHOLD"
+
+	// EnvMetricsArrayCBResetTimeout specifies the circuit breaker reset timeout
+	EnvMetricsArrayCBResetTimeout = "X_CSI_METRICS_ARRAY_CB_RESET_TIMEOUT"
 )

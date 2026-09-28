@@ -128,7 +128,7 @@ func TestMainFunction(t *testing.T) {
 			if err != nil {
 				t.Error(err)
 			}
-			defer file.Close()
+			defer func() { _ = file.Close() }()
 
 			// Read the file contents
 			contents, err := io.ReadAll(file)
@@ -136,7 +136,7 @@ func TestMainFunction(t *testing.T) {
 				t.Error(err)
 			}
 
-			defer os.Remove(tt.outputFile)
+			defer func() { _ = os.Remove(tt.outputFile) }()
 
 			// make sure file is not empty
 			if tt.expectEmptyFile {

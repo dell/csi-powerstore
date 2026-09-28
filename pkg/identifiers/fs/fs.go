@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2021-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2021-2026 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,16 +30,12 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"syscall"
 	"time"
 
-	"github.com/dell/csmlog"
+	log "github.com/dell/csmlog"
 	"github.com/dell/gofsutil"
 )
-
-// Instantiate csmlog on a package level
-var log = csmlog.GetLogger()
 
 // A FileInfo describes a file and is returned by Stat and Lstat.
 type FileInfo interface {
@@ -203,11 +199,14 @@ func (fs *Fs) ParseProcMounts(
 }
 
 // NetDial is a wrapper for net.Dial func. Uses UDP and 80 port.
+// FR-6.2: use net.SplitHostPort / net.JoinHostPort so IPv6 endpoints are
+// bracketed correctly when a port is appended.
 func (fs *Fs) NetDial(endpoint string) (net.Conn, error) {
-	splittedURL := strings.Split(endpoint, ":")
-	if len(splittedURL) == 1 {
-		// if we are here then its plain driver installation
-		endpoint = fmt.Sprintf("%s:%s", endpoint, "80")
+	if _, _, err := net.SplitHostPort(endpoint); err != nil {
+		// No port present — append port 80.
+		// net.JoinHostPort brackets IPv6 addresses automatically.
+		host := endpoint
+		endpoint = net.JoinHostPort(host, "80")
 	}
 	log.Infof("Using final endpoint %s", endpoint)
 	return net.Dial("udp", endpoint)
@@ -219,7 +218,7 @@ func (fs *Fs) MkFileIdempotent(path string) (bool, error) {
 	if fs.IsNotExist(err) {
 		file, err := fs.OpenFile(path, os.O_CREATE, 0o600)
 		if err != nil {
-			log.WithFields(csmlog.Fields{
+			log.WithFields(log.Fields{
 				"path": path,
 			}).Error("Unable to create file" + err.Error())
 			return false, err
@@ -227,7 +226,7 @@ func (fs *Fs) MkFileIdempotent(path string) (bool, error) {
 		if err = file.Close(); err != nil {
 			return false, fmt.Errorf("could not close file")
 		}
-		log.WithFields(csmlog.Fields{
+		log.WithFields(log.Fields{
 			"path": path,
 		}).Debug("created file")
 

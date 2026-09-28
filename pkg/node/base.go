@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2021-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2021-2026 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,7 +31,7 @@ import (
 
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers"
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers/fs"
-	"github.com/dell/csmlog"
+	log "github.com/dell/csmlog"
 	"github.com/dell/gobrick"
 	csictx "github.com/dell/gocsi/context"
 	"github.com/dell/gofsutil"
@@ -141,7 +141,7 @@ func getNodeOptions() Opts {
 		if v, ok := csictx.LookupEnv(ctx, n); ok {
 			b, err := strconv.ParseBool(v)
 			if err != nil {
-				log.WithFields(csmlog.Fields{n: v}).Debug("invalid boolean value. defaulting to false")
+				log.WithFields(log.Fields{n: v}).Debug("invalid boolean value. defaulting to false")
 				return false
 			}
 			return b
@@ -163,11 +163,11 @@ func getNodeOptions() Opts {
 		case fsCheckModeCheckOnly, fsCheckModeCheckAndRepair:
 			opts.FsCheckMode = strings.ToLower(mode)
 		default:
-			log.WithFields(csmlog.Fields{identifiers.EnvFsCheckMode: mode}).Warn("invalid value for FS check mode, defaulting to " + fsCheckModeCheckOnly)
+			log.WithFields(log.Fields{identifiers.EnvFsCheckMode: mode}).Warn("invalid value for FS check mode, defaulting to " + fsCheckModeCheckOnly)
 			opts.FsCheckMode = fsCheckModeCheckOnly
 		}
 	} else {
-		log.WithFields(csmlog.Fields{identifiers.EnvFsCheckMode: mode}).Warn("FS check mode not set, defaulting to " + fsCheckModeCheckOnly)
+		log.WithFields(log.Fields{identifiers.EnvFsCheckMode: mode}).Warn("FS check mode not set, defaulting to " + fsCheckModeCheckOnly)
 		opts.FsCheckMode = fsCheckModeCheckOnly
 	}
 
@@ -196,13 +196,14 @@ func getOutboundIP(endpoint string, port string, fs fs.Interface) (net.IP, error
 	finalEndpoint := endpoint
 	if port != "" {
 		// this means the port is set in the URL and should be used (In case of Auth v2 enablement)
-		finalEndpoint = endpoint + ":" + port
+		// FR-1.1: use net.JoinHostPort so IPv6 endpoints are bracketed correctly.
+		finalEndpoint = net.JoinHostPort(endpoint, port)
 	}
 	conn, err := fs.NetDial(finalEndpoint)
 	if err != nil {
 		return nil, err
 	}
-	defer conn.Close() // #nosec G307
+	defer func() { _ = conn.Close() }() // #nosec G307
 
 	localAddr := conn.LocalAddr().(*net.UDPAddr)
 
@@ -227,28 +228,26 @@ func getStagedDev(ctx context.Context, stagePath string, fs fs.Interface) (strin
 }
 
 func getStagingPath(ctx context.Context, sp string, volID string) (string, string) {
-	log := log.WithContext(ctx)
 	if sp == "" || volID == "" {
 		return volID, sp
 	}
 	stagingPath := path.Join(sp, volID)
-	log.Infof("staging path is: %s", stagingPath)
+	log.WithContext(ctx).Infof("staging path is: %s", stagingPath)
 	return volID, path.Join(sp, volID)
 }
 
 func getRemnantTargetMounts(ctx context.Context, target string, fs fs.Interface) ([]gofsutil.Info, bool, error) {
-	log := log.WithContext(ctx)
 	var targetMounts []gofsutil.Info
 	var found bool
 	mounts, err := getMounts(ctx, fs)
 	if err != nil {
-		log.Error("could not reliably determine existing mount status")
+		log.WithContext(ctx).Error("could not reliably determine existing mount status")
 		return targetMounts, false, status.Error(codes.Internal, "could not reliably determine existing mount status")
 	}
 	for _, mount := range mounts {
 		if strings.Contains(mount.Path, target) {
 			targetMounts = append(targetMounts, mount)
-			log.Infof("matching remnantTargetMount %s target %s", target, mount.Path)
+			log.WithContext(ctx).Infof("matching remnantTargetMount %s target %s", target, mount.Path)
 			found = true
 		}
 	}
@@ -256,19 +255,18 @@ func getRemnantTargetMounts(ctx context.Context, target string, fs fs.Interface)
 }
 
 func getTargetMount(ctx context.Context, target string, fs fs.Interface) (gofsutil.Info, bool, error) {
-	log := log.WithContext(ctx)
 	var targetMount gofsutil.Info
 	var found bool
 	mounts, err := getMounts(ctx, fs)
 	if err != nil {
-		log.Error("could not reliably determine existing mount status")
+		log.WithContext(ctx).Error("could not reliably determine existing mount status")
 		return targetMount, false, status.Error(codes.Internal,
 			"could not reliably determine existing mount status")
 	}
 	for _, mount := range mounts {
 		if mount.Path == target {
 			targetMount = mount
-			log.Infof("matching targetMount %s target %s",
+			log.WithContext(ctx).Infof("matching targetMount %s target %s",
 				target, mount.Path)
 			found = true
 			break
@@ -300,7 +298,7 @@ func consistentRead(filename string, retry int, fs fs.Interface) ([]byte, error)
 		if err != nil {
 			return nil, err
 		}
-		if bytes.Compare(oldContent, newContent) == 0 {
+		if bytes.Equal(oldContent, newContent) {
 			log.Infof("successfully read mount file snapshot retry count: %d", i)
 			return newContent, nil
 		}
@@ -372,12 +370,11 @@ func getRWModeString(isRO bool) string {
 }
 
 func format(ctx context.Context, source, fsType string, fs fs.Interface, opts ...string) error {
-	f := csmlog.Fields{
+	f := log.Fields{
 		"source":  source,
 		"fsType":  fsType,
 		"options": opts,
 	}
-	log := log.WithContext(ctx).WithFields(f)
 
 	// Use 'ext4' as the default
 	if fsType == "" {
@@ -392,10 +389,10 @@ func format(ctx context.Context, source, fsType string, fs fs.Interface, opts ..
 	}
 	mkfsArgs = append(mkfsArgs, opts...)
 
-	log.Infof("formatting with command: %s %v", mkfsCmd, mkfsArgs)
+	log.WithContext(ctx).WithFields(f).Infof("formatting with command: %s %v", mkfsCmd, mkfsArgs)
 	out, err := fs.ExecCommand(mkfsCmd, mkfsArgs...)
 	if err != nil {
-		log.Errorf("formatting disk failed with error: %s, output: %q", err.Error(), string(out))
+		log.WithContext(ctx).WithFields(f).Errorf("formatting disk failed with error: %s, output: %q", err.Error(), string(out))
 		return errors.New(string(out))
 	}
 

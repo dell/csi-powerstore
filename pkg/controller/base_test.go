@@ -69,14 +69,16 @@ func TestVolumeSize(t *testing.T) {
 			-1,
 			status.Errorf(
 				codes.OutOfRange,
-				"bad capacity: volume size bytes -1 and limit size bytes: -1 must not be negative"),
+				"bad capacity: volume size bytes -1 and limit size bytes: -1 must not be negative",
+			),
 		},
 		{
 			236364574767,
 			235345345,
 			status.Errorf(
 				codes.OutOfRange,
-				"bad capacity: max size bytes 235345345 can't be less than minimum size bytes 236364574767"),
+				"bad capacity: max size bytes 235345345 can't be less than minimum size bytes 236364574767",
+			),
 		},
 		{
 			8192,
@@ -84,7 +86,8 @@ func TestVolumeSize(t *testing.T) {
 			status.Errorf(
 				codes.OutOfRange,
 				"bad capacity: max size bytes %d can't be more than maximum size bytes %d",
-				MaxVolumeSizeBytes+1, MaxVolumeSizeBytes),
+				MaxVolumeSizeBytes+1, MaxVolumeSizeBytes,
+			),
 		},
 		{
 			8192,

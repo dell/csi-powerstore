@@ -11,6 +11,7 @@ import (
 
 	fs "github.com/dell/csi-powerstore/v2/pkg/identifiers/fs"
 
+	prometheus "github.com/prometheus/client_golang/prometheus"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -309,17 +310,22 @@ func (_m *Interface) SetDefaultArray(_a0 *array.PowerStoreArray) {
 	_m.Called(_a0)
 }
 
-// UpdateArrays provides a mock function with given fields: _a0, _a1
-func (_m *Interface) UpdateArrays(_a0 string, _a1 fs.Interface) error {
-	ret := _m.Called(_a0, _a1)
+// UpdateArrays provides a mock function with given fields: _a0, _a1, _a2
+func (_m *Interface) UpdateArrays(_a0 string, _a1 fs.Interface, _a2 ...prometheus.Registerer) error {
+	args := make([]any, 0, 2+len(_a2))
+	args = append(args, _a0, _a1)
+	for _, reg := range _a2 {
+		args = append(args, reg)
+	}
+	ret := _m.Called(args...)
 
 	if len(ret) == 0 {
 		panic("no return value specified for UpdateArrays")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string, fs.Interface) error); ok {
-		r0 = rf(_a0, _a1)
+	if rf, ok := ret.Get(0).(func(string, fs.Interface, ...prometheus.Registerer) error); ok {
+		r0 = rf(_a0, _a1, _a2...)
 	} else {
 		r0 = ret.Error(0)
 	}

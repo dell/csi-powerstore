@@ -21,9 +21,11 @@ package controller
 import (
 	"context"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers"
+	log "github.com/dell/csmlog"
 	"github.com/dell/gopowerstore"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc/codes"
@@ -130,25 +132,62 @@ func getCSISnapshot(snapshotID string, sourceVolumeID string, sizeInBytes int64)
 }
 
 func detachVolumeFromHost(ctx context.Context, hostID string, volumeID string, client gopowerstore.Client) error {
+	log.WithFields(log.Fields{
+		log.FieldComponent: "controller",
+		log.FieldOperation: "DetachVolumeFromHost",
+		log.FieldVolumeID:  volumeID,
+		log.FieldNodeID:    hostID,
+	}).Info("detaching volume from host")
+	detachStart := time.Now()
 	dp := &gopowerstore.HostVolumeDetach{VolumeID: &volumeID}
 	_, err := client.DetachVolumeFromHost(ctx, hostID, dp)
 	if err != nil {
 		apiError, ok := err.(gopowerstore.APIError)
 		if !ok {
+			log.WithFields(log.Fields{
+				log.FieldComponent:  "controller",
+				log.FieldOperation:  "DetachVolumeFromHost",
+				log.FieldVolumeID:   volumeID,
+				log.FieldNodeID:     hostID,
+				log.FieldError:      err.Error(),
+				log.FieldDurationMs: time.Since(detachStart).Milliseconds(),
+			}).Error("DetachVolumeFromHost failed")
 			return status.Errorf(codes.Unknown, "failed to detach volume '%s' from host: %s", volumeID, err.Error())
 		}
 		// In case of resiliency we can have multiple calls simultaneously (from podmon and k8) so to keep it idempotent
 		if strings.Contains(apiError.Message, "Host is not attached to volume") {
+			log.WithFields(log.Fields{
+				log.FieldComponent:  "controller",
+				log.FieldOperation:  "DetachVolumeFromHost",
+				log.FieldVolumeID:   volumeID,
+				log.FieldNodeID:     hostID,
+				log.FieldDurationMs: time.Since(detachStart).Milliseconds(),
+			}).Info("volume already detached from host")
 			return nil
 		}
 		if apiError.HostIsNotExist() {
 			return status.Errorf(codes.NotFound, "host with ID '%s' not found", hostID)
 		}
 		if !apiError.VolumeIsNotAttachedToHost() && !apiError.HostIsNotAttachedToVolume() && !apiError.NotFound() && !apiError.VolumeDetachedFromHost() {
+			log.WithFields(log.Fields{
+				log.FieldComponent:  "controller",
+				log.FieldOperation:  "DetachVolumeFromHost",
+				log.FieldVolumeID:   volumeID,
+				log.FieldNodeID:     hostID,
+				log.FieldError:      err.Error(),
+				log.FieldDurationMs: time.Since(detachStart).Milliseconds(),
+			}).Error("unexpected API error")
 			return status.Errorf(codes.Unknown, "unexpected api error when detaching volume from host:%s", err.Error())
 		}
 
 	}
+	log.WithFields(log.Fields{
+		log.FieldComponent:  "controller",
+		log.FieldOperation:  "DetachVolumeFromHost",
+		log.FieldVolumeID:   volumeID,
+		log.FieldNodeID:     hostID,
+		log.FieldDurationMs: time.Since(detachStart).Milliseconds(),
+	}).Info("DetachVolumeFromHost succeeded")
 	return nil
 }
 

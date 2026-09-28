@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2021-2024 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2021-2026 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,16 +22,24 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
+	"net/http"
+	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/dell/csi-powerstore/v2/mocks"
+	"github.com/dell/csi-powerstore/v2/pkg/array"
+	"github.com/dell/csi-powerstore/v2/pkg/controller"
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers"
-	"github.com/dell/csmlog"
+	log "github.com/dell/csmlog"
 	"github.com/dell/gopowerstore"
+	"github.com/dell/gopowerstore/api"
 	gopowerstoremock "github.com/dell/gopowerstore/mocks"
 	"github.com/container-storage-interface/spec/lib/go/csi"
+	"k8s.io/client-go/tools/record"
 
 	"github.com/dell/gobrick"
 	"github.com/dell/gofsutil"
@@ -263,8 +271,9 @@ func TestSCSIStager_Stage(t *testing.T) {
 			PublishContext:    getValidPublishContext(),
 			StagingTargetPath: nodeStagePrivateDir,
 			VolumeCapability: getCapabilityWithVoltypeAccessFstype(
-				"block", "single-writer", "none"),
-		}, filepath.Join(nodeStagePrivateDir, validBaseVolumeID), "node-1", csmlog.Fields{}, fsMock, validBaseVolumeID, false, clientMock)
+				"block", "single-writer", "none",
+			),
+		}, filepath.Join(nodeStagePrivateDir, validBaseVolumeID), "node-1", log.Fields{}, fsMock, validBaseVolumeID, false, clientMock)
 		assert.Nil(t, err)
 	})
 
@@ -295,8 +304,9 @@ func TestSCSIStager_Stage(t *testing.T) {
 			PublishContext:    getValidPublishContext(),
 			StagingTargetPath: nodeStagePrivateDir,
 			VolumeCapability: getCapabilityWithVoltypeAccessFstype(
-				"block", "single-writer", "none"),
-		}, filepath.Join(nodeStagePrivateDir, validBaseVolumeID), "node-1", csmlog.Fields{}, fsMock, validBaseVolumeID, false, clientMock)
+				"block", "single-writer", "none",
+			),
+		}, filepath.Join(nodeStagePrivateDir, validBaseVolumeID), "node-1", log.Fields{}, fsMock, validBaseVolumeID, false, clientMock)
 
 		assert.Nil(t, err)
 	})
@@ -327,8 +337,9 @@ func TestSCSIStager_Stage(t *testing.T) {
 			PublishContext:    getValidPublishContext(),
 			StagingTargetPath: nodeStagePrivateDir,
 			VolumeCapability: getCapabilityWithVoltypeAccessFstype(
-				"block", "single-writer", "none"),
-		}, filepath.Join(nodeStagePrivateDir, validBaseVolumeID), "node-1", csmlog.Fields{}, fsMock, validBaseVolumeID, false, clientMock)
+				"block", "single-writer", "none",
+			),
+		}, filepath.Join(nodeStagePrivateDir, validBaseVolumeID), "node-1", log.Fields{}, fsMock, validBaseVolumeID, false, clientMock)
 
 		assert.Nil(t, err)
 	})
@@ -371,8 +382,9 @@ func TestSCSIStager_Stage(t *testing.T) {
 			PublishContext:    getValidPublishContext(),
 			StagingTargetPath: nodeStagePrivateDir,
 			VolumeCapability: getCapabilityWithVoltypeAccessFstype(
-				"block", "single-writer", "none"),
-		}, filepath.Join(nodeStagePrivateDir, validBaseVolumeID), "node-1", csmlog.Fields{}, fsMock, validBaseVolumeID, false, client)
+				"block", "single-writer", "none",
+			),
+		}, filepath.Join(nodeStagePrivateDir, validBaseVolumeID), "node-1", log.Fields{}, fsMock, validBaseVolumeID, false, client)
 		assert.NotNil(t, err)
 		assert.Contains(t, err.Error(), "unable to get targets for any protocol")
 	})
@@ -418,8 +430,9 @@ func TestSCSIStager_Stage(t *testing.T) {
 			PublishContext:    getValidPublishContext(),
 			StagingTargetPath: nodeStagePrivateDir,
 			VolumeCapability: getCapabilityWithVoltypeAccessFstype(
-				"block", "single-writer", "none"),
-		}, filepath.Join(nodeStagePrivateDir, validBaseVolumeID), "node-1", csmlog.Fields{}, fsMock, validBaseVolumeID, false, client)
+				"block", "single-writer", "none",
+			),
+		}, filepath.Join(nodeStagePrivateDir, validBaseVolumeID), "node-1", log.Fields{}, fsMock, validBaseVolumeID, false, client)
 		assert.NotNil(t, err)
 		assert.Contains(t, err.Error(), "NVMeFC Targets data must be in publish context")
 	})
@@ -466,8 +479,9 @@ func TestSCSIStager_Stage(t *testing.T) {
 			PublishContext:    getValidPublishContext(),
 			StagingTargetPath: nodeStagePrivateDir,
 			VolumeCapability: getCapabilityWithVoltypeAccessFstype(
-				"block", "single-writer", "none"),
-		}, filepath.Join(nodeStagePrivateDir, validBaseVolumeID), "node-1", csmlog.Fields{}, fsMock, validBaseVolumeID, false, client)
+				"block", "single-writer", "none",
+			),
+		}, filepath.Join(nodeStagePrivateDir, validBaseVolumeID), "node-1", log.Fields{}, fsMock, validBaseVolumeID, false, client)
 		assert.NotNil(t, err)
 		assert.Contains(t, err.Error(), "NVMeTCP Targets data must be in publish context")
 	})
@@ -515,8 +529,9 @@ func TestSCSIStager_Stage(t *testing.T) {
 			PublishContext:    getValidPublishContext(),
 			StagingTargetPath: nodeStagePrivateDir,
 			VolumeCapability: getCapabilityWithVoltypeAccessFstype(
-				"block", "single-writer", "none"),
-		}, filepath.Join(nodeStagePrivateDir, validBaseVolumeID), "node-1", csmlog.Fields{}, fsMock, validBaseVolumeID, false, client)
+				"block", "single-writer", "none",
+			),
+		}, filepath.Join(nodeStagePrivateDir, validBaseVolumeID), "node-1", log.Fields{}, fsMock, validBaseVolumeID, false, client)
 		assert.NotNil(t, err)
 		assert.Contains(t, err.Error(), "iscsiTargets data must be in publish context")
 	})
@@ -562,8 +577,9 @@ func TestSCSIStager_Stage(t *testing.T) {
 			PublishContext:    getValidPublishContext(),
 			StagingTargetPath: nodeStagePrivateDir,
 			VolumeCapability: getCapabilityWithVoltypeAccessFstype(
-				"block", "single-writer", "none"),
-		}, filepath.Join(nodeStagePrivateDir, validBaseVolumeID), "node-1", csmlog.Fields{}, fsMock, validBaseVolumeID, false, client)
+				"block", "single-writer", "none",
+			),
+		}, filepath.Join(nodeStagePrivateDir, validBaseVolumeID), "node-1", log.Fields{}, fsMock, validBaseVolumeID, false, client)
 		assert.NotNil(t, err)
 		assert.Contains(t, err.Error(), "fcTargets data must be in publish context")
 	})
@@ -609,8 +625,9 @@ func TestSCSIStager_Stage(t *testing.T) {
 			PublishContext:    getValidRemoteMetroPublishContext(), // Use remote publish context
 			StagingTargetPath: nodeStagePrivateDir,
 			VolumeCapability: getCapabilityWithVoltypeAccessFstype(
-				"block", "single-writer", "none"),
-		}, filepath.Join(nodeStagePrivateDir, validBaseVolumeID), "node-1", csmlog.Fields{}, fsMock, validBaseVolumeID, true, clientMock) // isRemote=true
+				"block", "single-writer", "none",
+			),
+		}, filepath.Join(nodeStagePrivateDir, validBaseVolumeID), "node-1", log.Fields{}, fsMock, validBaseVolumeID, true, clientMock) // isRemote=true
 
 		assert.Nil(t, err)
 		// Verify that connectDevice was called (this is the key behavior we're testing)
@@ -660,8 +677,9 @@ func TestSCSIStager_Stage(t *testing.T) {
 			PublishContext:    getValidRemoteMetroPublishContext(), // Use remote publish context
 			StagingTargetPath: nodeStagePrivateDir,
 			VolumeCapability: getCapabilityWithVoltypeAccessFstype(
-				"block", "single-writer", "none"),
-		}, filepath.Join(nodeStagePrivateDir, validBaseVolumeID), "node-1", csmlog.Fields{}, fsMock, validBaseVolumeID, true, clientMock) // isRemote=true
+				"block", "single-writer", "none",
+			),
+		}, filepath.Join(nodeStagePrivateDir, validBaseVolumeID), "node-1", log.Fields{}, fsMock, validBaseVolumeID, true, clientMock) // isRemote=true
 
 		// Should now return error when remote device connection fails
 		assert.NotNil(t, err)
@@ -798,12 +816,12 @@ func TestSCSIStager_AddTargetsInfoToMap(t *testing.T) {
 			nvmeNqn:            "testNqn",
 			nvmeTCPTargetsInfo: "test2", // only determines if NVME TCP will be added to mock/error out, value will be nvmeNqn
 			expectedTargetMap: map[string]string{
-				identifiers.TargetMapISCSIPortalsPrefix + "0":   "192.168.1.1:3260",
+				identifiers.TargetMapISCSIPortalsPrefix + "0":   "192.168.1.1",
 				identifiers.TargetMapISCSITargetsPrefix + "0":   "test",
 				identifiers.TargetMapFCWWPNPrefix + "0":         "testWwn",
 				identifiers.TargetMapNVMEFCPortalsPrefix + "0":  "nn-0xtestWwn:pn-0xtestWwn",
 				identifiers.TargetMapNVMEFCTargetsPrefix + "0":  "testNqn",
-				identifiers.TargetMapNVMETCPPortalsPrefix + "0": "192.168.1.1:4420",
+				identifiers.TargetMapNVMETCPPortalsPrefix + "0": "192.168.1.1",
 				identifiers.TargetMapNVMETCPTargetsPrefix + "0": "testNqn",
 			},
 			expectErr: false,
@@ -816,7 +834,7 @@ func TestSCSIStager_AddTargetsInfoToMap(t *testing.T) {
 			fcWwn:             "",
 			nvmeNqn:           "",
 			expectedTargetMap: map[string]string{
-				identifiers.TargetMapISCSIPortalsPrefix + "0": "192.168.1.1:3260",
+				identifiers.TargetMapISCSIPortalsPrefix + "0": "192.168.1.1",
 				identifiers.TargetMapISCSITargetsPrefix + "0": "test",
 			},
 			expectErr: false,
@@ -867,4 +885,1062 @@ func TestSCSIStager_AddTargetsInfoToMap(t *testing.T) {
 			}
 		})
 	}
+}
+
+// --- NFS Auto-Select Tests (Phase 2: NodeStage) ---
+
+// nfsAutoSelectTestHelper creates a standard NFSStager with auto-select enabled,
+// sets up common mock expectations, and returns everything needed for a test.
+func nfsAutoSelectTestHelper(t *testing.T) (
+	*NFSStager, *mocks.FsInterface, *mocks.UtilInterface, *gopowerstoremock.Client,
+) {
+	t.Helper()
+	setVariables()
+
+	testClient := new(gopowerstoremock.Client)
+	testFsMock := new(mocks.FsInterface)
+	testUtilMock := new(mocks.UtilInterface)
+
+	testArr := &array.PowerStoreArray{
+		Endpoint: "https://192.168.0.2/api/rest",
+		GlobalID: secondGlobalID,
+		Client:   testClient,
+		IP:       "192.168.0.2",
+	}
+
+	stager := &NFSStager{
+		array:         testArr,
+		nfsAutoSelect: true,
+		nodeID:        validNodeID,
+		managementIP:  "192.168.0.2",
+	}
+	return stager, testFsMock, testUtilMock, testClient
+}
+
+// nfsStageRequest builds a standard NodeStageVolumeRequest for NFS auto-select tests.
+func nfsStageRequest(publishCtx map[string]string) *csi.NodeStageVolumeRequest {
+	return &csi.NodeStageVolumeRequest{
+		VolumeId:          validNfsVolumeID,
+		PublishContext:    publishCtx,
+		StagingTargetPath: nodeStagePrivateDir,
+		VolumeCapability:  getCapabilityWithVoltypeAccessFstype("mount", "multiple-writer", "nfs"),
+	}
+}
+
+// setupNFSMountMocks sets up standard mock expectations for a successful NFS mount.
+func setupNFSMountMocks(fsMock *mocks.FsInterface, utilMock *mocks.UtilInterface, stagingPath, nfsExportPath string) {
+	fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
+	fsMock.On("ParseProcMounts", mock.Anything, mock.Anything).Return([]gofsutil.Info{}, nil)
+	fsMock.On("MkdirAll", stagingPath, mock.Anything).Return(nil).Once()
+	fsMock.On("MkdirAll", filepath.Join(stagingPath, commonNfsVolumeFolder), mock.Anything).Return(nil).Once()
+	fsMock.On("Chmod", filepath.Join(stagingPath, commonNfsVolumeFolder), os.ModeSticky|os.ModePerm).Return(nil)
+	utilMock.On("Mount", mock.Anything, nfsExportPath, stagingPath, "").Return(nil)
+	fsMock.On("GetUtil").Return(utilMock)
+}
+
+func TestNFSStager_AutoSelect_HappyPath(t *testing.T) {
+	stager, fsMock, utilMock, testClient := nfsAutoSelectTestHelper(t)
+
+	stagingPath := filepath.Join(nodeStagePrivateDir, validBaseVolumeID)
+	nfsExportPath := "10.20.30.40:/test-export"
+
+	// Mock getOutboundIP — NetDial returns a connection with a different IP (storage NIC)
+	conn, _ := net.Dial("udp", "10.20.30.40:80")
+	fsMock.On("NetDial", mock.Anything).Return(conn, nil)
+
+	// Mock GetNFSExport for host-limit check
+	testClient.On("GetNFSExport", mock.Anything, mock.Anything).
+		Return(gopowerstore.NFSExport{
+			ID:          "export-1",
+			RWRootHosts: []string{},
+			RWHosts:     []string{},
+			ROHosts:     []string{},
+			RORootHosts: []string{},
+		}, nil)
+
+	// Mock ModifyNFSExport for adding discovered IP
+	testClient.On("ModifyNFSExport", mock.Anything, mock.Anything, "export-1").
+		Return(gopowerstore.CreateResponse{}, nil)
+
+	// Mock WriteFile for metadata persistence
+	fsMock.On("WriteFile", stagingPath+".nfs-autoselect.json", mock.Anything, mock.Anything).Return(nil)
+
+	setupNFSMountMocks(fsMock, utilMock, stagingPath, nfsExportPath)
+
+	publishCtx := map[string]string{
+		identifiers.KeyNfsAutoSelect: "true",
+		identifiers.KeyNfsExportPath: nfsExportPath,
+		identifiers.KeyExportID:      "export-1",
+		identifiers.KeyAllowRoot:     "true",
+		identifiers.KeyNasName:       validNasName,
+	}
+
+	resp, err := stager.Stage(context.Background(), nfsStageRequest(publishCtx),
+		stagingPath, validNodeID, log.Fields{}, fsMock, validBaseVolumeID, false, testClient)
+
+	assert.Nil(t, err)
+	assert.NotNil(t, resp)
+	// Verify ModifyNFSExport was called with AddRWRootHosts (default when allowRoot != "false")
+	testClient.AssertCalled(t, "ModifyNFSExport", mock.Anything, mock.Anything, "export-1")
+	// Verify metadata file was written
+	fsMock.AssertCalled(t, "WriteFile", stagingPath+".nfs-autoselect.json", mock.Anything, mock.Anything)
+}
+
+func TestNFSStager_AutoSelect_IPv6HostEntry(t *testing.T) {
+	stager, fsMock, utilMock, testClient := nfsAutoSelectTestHelper(t)
+	stagingPath := filepath.Join(nodeStagePrivateDir, validBaseVolumeID)
+	nfsExportPath := "[2001:db8::16]:/test-export"
+
+	conn, err := net.Dial("udp", "[::1]:80")
+	assert.NoError(t, err)
+	defer func() { _ = conn.Close() }()
+	fsMock.On("NetDial", "2001:db8::16").Return(conn, nil)
+	testClient.On("GetNFSExport", mock.Anything, "export-1").Return(gopowerstore.NFSExport{ID: "export-1"}, nil)
+	testClient.On("ModifyNFSExport", mock.Anything, mock.MatchedBy(func(req *gopowerstore.NFSExportModify) bool {
+		return len(req.AddRWRootHosts) == 1 && req.AddRWRootHosts[0] == "::1/128"
+	}), "export-1").Return(gopowerstore.CreateResponse{}, nil)
+	fsMock.On("WriteFile", stagingPath+".nfs-autoselect.json", mock.Anything, mock.Anything).Return(nil)
+	setupNFSMountMocks(fsMock, utilMock, stagingPath, nfsExportPath)
+
+	publishCtx := map[string]string{
+		identifiers.KeyNfsAutoSelect: "true",
+		identifiers.KeyNfsExportPath: nfsExportPath,
+		identifiers.KeyExportID:      "export-1",
+		identifiers.KeyAllowRoot:     "true",
+		identifiers.KeyNasName:       validNasName,
+	}
+	_, err = stager.Stage(context.Background(), nfsStageRequest(publishCtx), stagingPath,
+		validNodeID, log.Fields{}, fsMock, validBaseVolumeID, false, testClient)
+	assert.NoError(t, err)
+}
+
+func TestNFSStager_AutoSelect_AllowRootFalse(t *testing.T) {
+	stager, fsMock, utilMock, testClient := nfsAutoSelectTestHelper(t)
+
+	stagingPath := filepath.Join(nodeStagePrivateDir, validBaseVolumeID)
+	nfsExportPath := "10.20.30.40:/test-export"
+
+	conn, _ := net.Dial("udp", "10.20.30.40:80")
+	fsMock.On("NetDial", mock.Anything).Return(conn, nil)
+
+	testClient.On("GetNFSExport", mock.Anything, mock.Anything).
+		Return(gopowerstore.NFSExport{
+			ID:          "export-1",
+			RWRootHosts: []string{},
+			RWHosts:     []string{},
+			ROHosts:     []string{},
+			RORootHosts: []string{},
+		}, nil)
+
+	testClient.On("ModifyNFSExport", mock.Anything, mock.Anything, "export-1").
+		Return(gopowerstore.CreateResponse{}, nil)
+
+	fsMock.On("WriteFile", stagingPath+".nfs-autoselect.json", mock.Anything, mock.Anything).Return(nil)
+	setupNFSMountMocks(fsMock, utilMock, stagingPath, nfsExportPath)
+
+	publishCtx := map[string]string{
+		identifiers.KeyNfsAutoSelect: "true",
+		identifiers.KeyNfsExportPath: nfsExportPath,
+		identifiers.KeyExportID:      "export-1",
+		identifiers.KeyAllowRoot:     "false",
+		identifiers.KeyNasName:       validNasName,
+	}
+
+	resp, err := stager.Stage(context.Background(), nfsStageRequest(publishCtx),
+		stagingPath, validNodeID, log.Fields{}, fsMock, validBaseVolumeID, false, testClient)
+
+	assert.Nil(t, err)
+	assert.NotNil(t, resp)
+
+	// Verify the FIRST ModifyNFSExport call (auto-select) used AddRWHosts, not AddRWRootHosts
+	foundAutoSelectCall := false
+	for _, call := range testClient.Calls {
+		if call.Method == "ModifyNFSExport" && !foundAutoSelectCall {
+			modifyArg := call.Arguments.Get(1).(*gopowerstore.NFSExportModify)
+			assert.NotEmpty(t, modifyArg.AddRWHosts, "auto-select should add to RWHosts when allowRoot=false")
+			assert.Empty(t, modifyArg.AddRWRootHosts, "auto-select should NOT add to RWRootHosts when allowRoot=false")
+			foundAutoSelectCall = true
+		}
+	}
+	assert.True(t, foundAutoSelectCall, "expected at least one ModifyNFSExport call from auto-select")
+}
+
+func TestNFSStager_AutoSelect_ExclusiveAccessSkipped(t *testing.T) {
+	// When exclusiveAccess=true, the controller does NOT set NfsAutoSelect=true in
+	// publishContext. This test verifies the node skips auto-select when that key is absent.
+	stager, testFsMock, testUtilMock, testClient := nfsAutoSelectTestHelper(t)
+
+	stagingPath := filepath.Join(nodeStagePrivateDir, validBaseVolumeID)
+	nfsExportPath := "10.20.30.40:/test-export"
+
+	setupNFSMountMocks(testFsMock, testUtilMock, stagingPath, nfsExportPath)
+
+	// Note: NfsAutoSelect is NOT in publishContext (controller suppressed it)
+	publishCtx := map[string]string{
+		identifiers.KeyNfsExportPath: nfsExportPath,
+		identifiers.KeyExportID:      "export-1",
+		identifiers.KeyAllowRoot:     "true",
+		identifiers.KeyNasName:       validNasName,
+		identifiers.KeyHostIP:        "127.0.0.1",
+	}
+
+	resp, err := stager.Stage(context.Background(), nfsStageRequest(publishCtx),
+		stagingPath, validNodeID, log.Fields{}, testFsMock, validBaseVolumeID, false, testClient)
+
+	assert.Nil(t, err)
+	assert.NotNil(t, resp)
+	// No auto-select operations should have occurred
+	testClient.AssertNotCalled(t, "ModifyNFSExport", mock.Anything, mock.Anything, mock.Anything)
+	testClient.AssertNotCalled(t, "GetNFSExport", mock.Anything, mock.Anything)
+	testFsMock.AssertNotCalled(t, "NetDial", mock.Anything)
+}
+
+func TestNFSStager_AutoSelect_MissingNfsExportPath(t *testing.T) {
+	stager, fsMock, _, testClient := nfsAutoSelectTestHelper(t)
+
+	stagingPath := filepath.Join(nodeStagePrivateDir, validBaseVolumeID)
+
+	fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
+	fsMock.On("ParseProcMounts", mock.Anything, mock.Anything).Return([]gofsutil.Info{}, nil)
+
+	// Missing NfsExportPath key
+	publishCtx := map[string]string{
+		identifiers.KeyNfsAutoSelect: "true",
+		identifiers.KeyExportID:      "export-1",
+		identifiers.KeyAllowRoot:     "true",
+	}
+
+	_, err := stager.Stage(context.Background(), nfsStageRequest(publishCtx),
+		stagingPath, validNodeID, log.Fields{}, fsMock, validBaseVolumeID, false, testClient)
+
+	assert.NotNil(t, err)
+	assert.Contains(t, err.Error(), "NfsExportPath")
+}
+
+func TestNFSStager_AutoSelect_EmptyIPInExportPath(t *testing.T) {
+	stager, fsMock, _, testClient := nfsAutoSelectTestHelper(t)
+
+	stagingPath := filepath.Join(nodeStagePrivateDir, validBaseVolumeID)
+
+	fsMock.On("ReadFile", "/proc/self/mountinfo").Return([]byte{}, nil).Times(2)
+	fsMock.On("ParseProcMounts", mock.Anything, mock.Anything).Return([]gofsutil.Info{}, nil)
+
+	// NfsExportPath with empty IP component
+	publishCtx := map[string]string{
+		identifiers.KeyNfsAutoSelect: "true",
+		identifiers.KeyNfsExportPath: ":/test-export",
+		identifiers.KeyExportID:      "export-1",
+		identifiers.KeyAllowRoot:     "true",
+	}
+
+	_, err := stager.Stage(context.Background(), nfsStageRequest(publishCtx),
+		stagingPath, validNodeID, log.Fields{}, fsMock, validBaseVolumeID, false, testClient)
+
+	assert.NotNil(t, err)
+	assert.Contains(t, err.Error(), "empty IP")
+}
+
+func TestNFSStager_AutoSelect_HostAlreadyPresent(t *testing.T) {
+	stager, fsMock, utilMock, testClient := nfsAutoSelectTestHelper(t)
+
+	stagingPath := filepath.Join(nodeStagePrivateDir, validBaseVolumeID)
+	nfsExportPath := "10.20.30.40:/test-export"
+
+	conn, _ := net.Dial("udp", "10.20.30.40:80")
+	fsMock.On("NetDial", mock.Anything).Return(conn, nil)
+
+	testClient.On("GetNFSExport", mock.Anything, mock.Anything).
+		Return(gopowerstore.NFSExport{
+			ID:          "export-1",
+			RWRootHosts: []string{},
+			RWHosts:     []string{},
+			ROHosts:     []string{},
+			RORootHosts: []string{},
+		}, nil)
+
+	// ModifyNFSExport returns HostAlreadyPresent error (HTTP 400)
+	testClient.On("ModifyNFSExport", mock.Anything, mock.Anything, "export-1").
+		Return(gopowerstore.CreateResponse{}, gopowerstore.APIError{
+			ErrorMsg: &api.ErrorMsg{StatusCode: http.StatusBadRequest},
+		})
+
+	fsMock.On("WriteFile", stagingPath+".nfs-autoselect.json", mock.Anything, mock.Anything).Return(nil)
+	setupNFSMountMocks(fsMock, utilMock, stagingPath, nfsExportPath)
+
+	publishCtx := map[string]string{
+		identifiers.KeyNfsAutoSelect: "true",
+		identifiers.KeyNfsExportPath: nfsExportPath,
+		identifiers.KeyExportID:      "export-1",
+		identifiers.KeyAllowRoot:     "true",
+		identifiers.KeyNasName:       validNasName,
+	}
+
+	resp, err := stager.Stage(context.Background(), nfsStageRequest(publishCtx),
+		stagingPath, validNodeID, log.Fields{}, fsMock, validBaseVolumeID, false, testClient)
+
+	// HostAlreadyPresent should be treated as success
+	assert.Nil(t, err)
+	assert.NotNil(t, resp)
+	// Metadata should still be written
+	fsMock.AssertCalled(t, "WriteFile", stagingPath+".nfs-autoselect.json", mock.Anything, mock.Anything)
+}
+
+func TestNFSStager_AutoSelect_HardErrorFallback(t *testing.T) {
+	stager, fsMock, utilMock, testClient := nfsAutoSelectTestHelper(t)
+
+	stagingPath := filepath.Join(nodeStagePrivateDir, validBaseVolumeID)
+	nfsExportPath := "10.20.30.40:/test-export"
+
+	// NetDial fails — triggers hard-error fallback to kubeNodeID IP
+	fsMock.On("NetDial", mock.Anything).Return(nil, errors.New("network unreachable"))
+
+	testClient.On("GetNFSExport", mock.Anything, mock.Anything).
+		Return(gopowerstore.NFSExport{
+			ID:          "export-1",
+			RWRootHosts: []string{},
+			RWHosts:     []string{},
+			ROHosts:     []string{},
+			RORootHosts: []string{},
+		}, nil)
+
+	testClient.On("ModifyNFSExport", mock.Anything, mock.Anything, "export-1").
+		Return(gopowerstore.CreateResponse{}, nil)
+
+	fsMock.On("WriteFile", stagingPath+".nfs-autoselect.json", mock.Anything, mock.Anything).Return(nil)
+	setupNFSMountMocks(fsMock, utilMock, stagingPath, nfsExportPath)
+
+	publishCtx := map[string]string{
+		identifiers.KeyNfsAutoSelect: "true",
+		identifiers.KeyNfsExportPath: nfsExportPath,
+		identifiers.KeyExportID:      "export-1",
+		identifiers.KeyAllowRoot:     "true",
+		identifiers.KeyNasName:       validNasName,
+	}
+
+	resp, err := stager.Stage(context.Background(), nfsStageRequest(publishCtx),
+		stagingPath, validNodeID, log.Fields{}, fsMock, validBaseVolumeID, false, testClient)
+
+	// Should succeed via fallback
+	assert.Nil(t, err)
+	assert.NotNil(t, resp)
+	// ModifyNFSExport should still have been called (with fallback IP)
+	testClient.AssertCalled(t, "ModifyNFSExport", mock.Anything, mock.Anything, "export-1")
+}
+
+func TestNFSStager_AutoSelect_ExportHostLimitWarning(t *testing.T) {
+	stager, fsMock, utilMock, testClient := nfsAutoSelectTestHelper(t)
+
+	stagingPath := filepath.Join(nodeStagePrivateDir, validBaseVolumeID)
+	nfsExportPath := "10.20.30.40:/test-export"
+
+	conn, _ := net.Dial("udp", "10.20.30.40:80")
+	fsMock.On("NetDial", mock.Anything).Return(conn, nil)
+
+	// Create an export with >100 host entries to trigger the warning
+	hosts := make([]string, 101)
+	for i := range hosts {
+		hosts[i] = fmt.Sprintf("10.0.0.%d/255.255.255.255", i)
+	}
+
+	testClient.On("GetNFSExport", mock.Anything, mock.Anything).
+		Return(gopowerstore.NFSExport{
+			ID:          "export-1",
+			RWRootHosts: hosts,
+			RWHosts:     []string{},
+			ROHosts:     []string{},
+			RORootHosts: []string{},
+		}, nil)
+
+	testClient.On("ModifyNFSExport", mock.Anything, mock.Anything, "export-1").
+		Return(gopowerstore.CreateResponse{}, nil)
+
+	fsMock.On("WriteFile", stagingPath+".nfs-autoselect.json", mock.Anything, mock.Anything).Return(nil)
+	setupNFSMountMocks(fsMock, utilMock, stagingPath, nfsExportPath)
+
+	publishCtx := map[string]string{
+		identifiers.KeyNfsAutoSelect: "true",
+		identifiers.KeyNfsExportPath: nfsExportPath,
+		identifiers.KeyExportID:      "export-1",
+		identifiers.KeyAllowRoot:     "true",
+		identifiers.KeyNasName:       validNasName,
+	}
+
+	resp, err := stager.Stage(context.Background(), nfsStageRequest(publishCtx),
+		stagingPath, validNodeID, log.Fields{}, fsMock, validBaseVolumeID, false, testClient)
+
+	// Should succeed — warning doesn't block the operation
+	assert.Nil(t, err)
+	assert.NotNil(t, resp)
+	testClient.AssertCalled(t, "ModifyNFSExport", mock.Anything, mock.Anything, "export-1")
+}
+
+func TestNFSStager_AutoSelect_MetadataWriteFailure(t *testing.T) {
+	stager, fsMock, utilMock, testClient := nfsAutoSelectTestHelper(t)
+
+	stagingPath := filepath.Join(nodeStagePrivateDir, validBaseVolumeID)
+	nfsExportPath := "10.20.30.40:/test-export"
+
+	conn, _ := net.Dial("udp", "10.20.30.40:80")
+	fsMock.On("NetDial", mock.Anything).Return(conn, nil)
+
+	testClient.On("GetNFSExport", mock.Anything, mock.Anything).
+		Return(gopowerstore.NFSExport{
+			ID:          "export-1",
+			RWRootHosts: []string{},
+			RWHosts:     []string{},
+			ROHosts:     []string{},
+			RORootHosts: []string{},
+		}, nil)
+
+	testClient.On("ModifyNFSExport", mock.Anything, mock.Anything, "export-1").
+		Return(gopowerstore.CreateResponse{}, nil)
+
+	// WriteFile fails — should log WARN but still proceed with mount
+	fsMock.On("WriteFile", stagingPath+".nfs-autoselect.json", mock.Anything, mock.Anything).
+		Return(errors.New("disk full"))
+	setupNFSMountMocks(fsMock, utilMock, stagingPath, nfsExportPath)
+
+	publishCtx := map[string]string{
+		identifiers.KeyNfsAutoSelect: "true",
+		identifiers.KeyNfsExportPath: nfsExportPath,
+		identifiers.KeyExportID:      "export-1",
+		identifiers.KeyAllowRoot:     "true",
+		identifiers.KeyNasName:       validNasName,
+	}
+
+	resp, err := stager.Stage(context.Background(), nfsStageRequest(publishCtx),
+		stagingPath, validNodeID, log.Fields{}, fsMock, validBaseVolumeID, false, testClient)
+
+	// Should succeed despite metadata write failure
+	assert.Nil(t, err)
+	assert.NotNil(t, resp)
+}
+
+func TestNFSStager_AutoSelect_DisabledMode(t *testing.T) {
+	setVariables()
+
+	testClient := new(gopowerstoremock.Client)
+	testFsMock := new(mocks.FsInterface)
+	testUtilMock := new(mocks.UtilInterface)
+
+	testArr := &array.PowerStoreArray{
+		Endpoint: "https://192.168.0.2/api/rest",
+		GlobalID: secondGlobalID,
+		Client:   testClient,
+		IP:       "192.168.0.2",
+	}
+
+	// nfsAutoSelect is false — disabled mode
+	stager := &NFSStager{
+		array:         testArr,
+		nfsAutoSelect: false,
+		nodeID:        validNodeID,
+		managementIP:  "192.168.0.2",
+	}
+
+	stagingPath := filepath.Join(nodeStagePrivateDir, validBaseVolumeID)
+	nfsExportPath := "10.20.30.40:/test-export"
+
+	setupNFSMountMocks(testFsMock, testUtilMock, stagingPath, nfsExportPath)
+
+	publishCtx := map[string]string{
+		identifiers.KeyNfsExportPath: nfsExportPath,
+		identifiers.KeyExportID:      "export-1",
+		identifiers.KeyAllowRoot:     "true",
+		identifiers.KeyNasName:       validNasName,
+		identifiers.KeyHostIP:        "127.0.0.1",
+	}
+
+	resp, err := stager.Stage(context.Background(), nfsStageRequest(publishCtx),
+		stagingPath, validNodeID, log.Fields{}, testFsMock, validBaseVolumeID, false, testClient)
+
+	assert.Nil(t, err)
+	assert.NotNil(t, resp)
+	// No auto-select operations should have occurred
+	testFsMock.AssertNotCalled(t, "NetDial", mock.Anything)
+	testClient.AssertNotCalled(t, "GetNFSExport", mock.Anything, mock.Anything)
+	testFsMock.AssertNotCalled(t, "WriteFile", mock.Anything, mock.Anything, mock.Anything)
+}
+
+// --- NFS Auto-Select Cleanup Tests (Phase 3: NodeUnstage) ---
+
+func TestNFSAutoSelectCleanup_HappyPath(t *testing.T) {
+	setVariables()
+
+	testClient := new(gopowerstoremock.Client)
+	testFsMock := new(mocks.FsInterface)
+	testArr := &array.PowerStoreArray{
+		Endpoint: "https://192.168.0.2/api/rest",
+		GlobalID: secondGlobalID,
+		Client:   testClient,
+		IP:       "192.168.0.2",
+	}
+
+	stagingPath := filepath.Join(nodeStagePrivateDir, validBaseVolumeID)
+	metadataPath := stagingPath + ".nfs-autoselect.json"
+
+	// Metadata file exists with valid content
+	metadata := `{"nasIP":"10.20.30.40","exportID":"export-1","discoveredNodeIP":"10.247.97.234","nasName":"my-nas-name","hostsListType":"RWRootHosts"}`
+	testFsMock.On("ReadFile", metadataPath).Return([]byte(metadata), nil)
+
+	// ModifyNFSExport to remove the discovered IP
+	testClient.On("ModifyNFSExport", mock.Anything, mock.MatchedBy(func(req *gopowerstore.NFSExportModify) bool {
+		return len(req.RemoveRWRootHosts) == 1 && req.RemoveRWRootHosts[0] == "10.247.97.234/255.255.255.255"
+	}), "export-1").Return(gopowerstore.CreateResponse{}, nil)
+
+	// Remove metadata file
+	testFsMock.On("Remove", metadataPath).Return(nil)
+
+	handleNFSAutoSelectCleanup(context.Background(), stagingPath, testArr, testFsMock, log.Fields{})
+
+	testClient.AssertCalled(t, "ModifyNFSExport", mock.Anything, mock.Anything, "export-1")
+	testFsMock.AssertCalled(t, "Remove", metadataPath)
+}
+
+func TestNFSAutoSelectCleanup_NoMetadataFile(t *testing.T) {
+	setVariables()
+
+	testFsMock := new(mocks.FsInterface)
+	testArr := &array.PowerStoreArray{
+		Endpoint: "https://192.168.0.2/api/rest",
+		GlobalID: secondGlobalID,
+		Client:   new(gopowerstoremock.Client),
+		IP:       "192.168.0.2",
+	}
+
+	stagingPath := filepath.Join(nodeStagePrivateDir, validBaseVolumeID)
+	metadataPath := stagingPath + ".nfs-autoselect.json"
+
+	// Metadata file does not exist
+	testFsMock.On("ReadFile", metadataPath).Return(nil, os.ErrNotExist)
+
+	handleNFSAutoSelectCleanup(context.Background(), stagingPath, testArr, testFsMock, log.Fields{})
+
+	// No export modification should occur
+	testArr.Client.(*gopowerstoremock.Client).AssertNotCalled(t, "ModifyNFSExport", mock.Anything, mock.Anything, mock.Anything)
+}
+
+func TestNFSAutoSelectCleanup_RWHostsListType(t *testing.T) {
+	setVariables()
+
+	testClient := new(gopowerstoremock.Client)
+	testFsMock := new(mocks.FsInterface)
+	testArr := &array.PowerStoreArray{
+		Endpoint: "https://192.168.0.2/api/rest",
+		GlobalID: secondGlobalID,
+		Client:   testClient,
+		IP:       "192.168.0.2",
+	}
+
+	stagingPath := filepath.Join(nodeStagePrivateDir, validBaseVolumeID)
+	metadataPath := stagingPath + ".nfs-autoselect.json"
+
+	// Metadata with RWHosts (root squashing was enabled)
+	metadata := `{"nasIP":"10.20.30.40","exportID":"export-1","discoveredNodeIP":"10.247.97.234","nasName":"my-nas-name","hostsListType":"RWHosts"}`
+	testFsMock.On("ReadFile", metadataPath).Return([]byte(metadata), nil)
+
+	// Verify ModifyNFSExport uses RemoveRWHosts (not RemoveRWRootHosts)
+	testClient.On("ModifyNFSExport", mock.Anything, mock.MatchedBy(func(req *gopowerstore.NFSExportModify) bool {
+		return len(req.RemoveRWHosts) == 1 && req.RemoveRWHosts[0] == "10.247.97.234/255.255.255.255"
+	}), "export-1").Return(gopowerstore.CreateResponse{}, nil)
+
+	testFsMock.On("Remove", metadataPath).Return(nil)
+
+	handleNFSAutoSelectCleanup(context.Background(), stagingPath, testArr, testFsMock, log.Fields{})
+	testClient.AssertCalled(t, "ModifyNFSExport", mock.Anything, mock.Anything, "export-1")
+}
+
+func TestNFSAutoSelectCleanup_ExportModifyFails(t *testing.T) {
+	setVariables()
+
+	testClient := new(gopowerstoremock.Client)
+	testFsMock := new(mocks.FsInterface)
+	testArr := &array.PowerStoreArray{
+		Endpoint: "https://192.168.0.2/api/rest",
+		GlobalID: secondGlobalID,
+		Client:   testClient,
+		IP:       "192.168.0.2",
+	}
+
+	stagingPath := filepath.Join(nodeStagePrivateDir, validBaseVolumeID)
+	metadataPath := stagingPath + ".nfs-autoselect.json"
+
+	metadata := `{"nasIP":"10.20.30.40","exportID":"export-1","discoveredNodeIP":"10.247.97.234","nasName":"my-nas-name","hostsListType":"RWRootHosts"}`
+	testFsMock.On("ReadFile", metadataPath).Return([]byte(metadata), nil)
+
+	// ModifyNFSExport fails with a non-NotFound error
+	testClient.On("ModifyNFSExport", mock.Anything, mock.Anything, "export-1").
+		Return(gopowerstore.CreateResponse{}, errors.New("connection refused"))
+
+	// Metadata file should still be removed on best-effort
+	testFsMock.On("Remove", metadataPath).Return(nil)
+
+	handleNFSAutoSelectCleanup(context.Background(), stagingPath, testArr, testFsMock, log.Fields{})
+	testFsMock.AssertCalled(t, "Remove", metadataPath)
+}
+
+func TestNFSAutoSelectCleanup_ExportNotFound(t *testing.T) {
+	setVariables()
+
+	testClient := new(gopowerstoremock.Client)
+	testFsMock := new(mocks.FsInterface)
+	testArr := &array.PowerStoreArray{
+		Endpoint: "https://192.168.0.2/api/rest",
+		GlobalID: secondGlobalID,
+		Client:   testClient,
+		IP:       "192.168.0.2",
+	}
+
+	stagingPath := filepath.Join(nodeStagePrivateDir, validBaseVolumeID)
+	metadataPath := stagingPath + ".nfs-autoselect.json"
+
+	metadata := `{"nasIP":"10.20.30.40","exportID":"export-1","discoveredNodeIP":"10.247.97.234","nasName":"my-nas-name","hostsListType":"RWRootHosts"}`
+	testFsMock.On("ReadFile", metadataPath).Return([]byte(metadata), nil)
+
+	// Export was already deleted — NotFound error
+	testClient.On("ModifyNFSExport", mock.Anything, mock.Anything, "export-1").
+		Return(gopowerstore.CreateResponse{}, gopowerstore.APIError{
+			ErrorMsg: &api.ErrorMsg{StatusCode: http.StatusNotFound},
+		})
+
+	testFsMock.On("Remove", metadataPath).Return(nil)
+
+	handleNFSAutoSelectCleanup(context.Background(), stagingPath, testArr, testFsMock, log.Fields{})
+	testFsMock.AssertCalled(t, "Remove", metadataPath)
+}
+
+func TestNFSAutoSelectCleanup_MalformedMetadata(t *testing.T) {
+	setVariables()
+
+	testFsMock := new(mocks.FsInterface)
+	testArr := &array.PowerStoreArray{
+		Endpoint: "https://192.168.0.2/api/rest",
+		GlobalID: secondGlobalID,
+		Client:   new(gopowerstoremock.Client),
+		IP:       "192.168.0.2",
+	}
+
+	stagingPath := filepath.Join(nodeStagePrivateDir, validBaseVolumeID)
+	metadataPath := stagingPath + ".nfs-autoselect.json"
+
+	// Malformed JSON
+	testFsMock.On("ReadFile", metadataPath).Return([]byte("{{not json"), nil)
+	testFsMock.On("Remove", metadataPath).Return(nil)
+
+	handleNFSAutoSelectCleanup(context.Background(), stagingPath, testArr, testFsMock, log.Fields{})
+	// Metadata file should still be removed
+	testFsMock.AssertCalled(t, "Remove", metadataPath)
+}
+
+// G-3: Flat-network fallback test
+func TestNFSStager_AutoSelect_FlatNetworkFallback(t *testing.T) {
+	stager, fsMock, utilMock, testClient := nfsAutoSelectTestHelper(t)
+
+	stagingPath := filepath.Join(nodeStagePrivateDir, validBaseVolumeID)
+	nfsExportPath := "10.20.30.40:/test-export"
+	metadataPath := stagingPath + ".nfs-autoselect.json"
+
+	managementIP := "192.168.0.2"
+
+	// Mock NetDial to return management IP (flat network)
+	conn, _ := net.Dial("udp", managementIP+":80")
+	fsMock.On("NetDial", mock.Anything).Return(conn, nil)
+
+	// Mock GetNFSExport for host-limit check
+	testClient.On("GetNFSExport", mock.Anything, "export-1").
+		Return(gopowerstore.NFSExport{
+			ID:          "export-1",
+			RWRootHosts: []string{},
+			RWHosts:     []string{},
+			ROHosts:     []string{},
+			RORootHosts: []string{},
+		}, nil)
+
+	// Mock ModifyNFSExport for adding fallback IP
+	testClient.On("ModifyNFSExport", mock.Anything, mock.Anything, "export-1").
+		Return(gopowerstore.CreateResponse{}, nil)
+
+	// Mock WriteFile for metadata persistence
+	fsMock.On("WriteFile", metadataPath, mock.Anything, mock.Anything).Return(nil)
+
+	setupNFSMountMocks(fsMock, utilMock, stagingPath, nfsExportPath)
+
+	publishCtx := map[string]string{
+		identifiers.KeyNfsAutoSelect: "true",
+		identifiers.KeyNfsExportPath: nfsExportPath,
+		identifiers.KeyExportID:      "export-1",
+		identifiers.KeyAllowRoot:     "true",
+		identifiers.KeyNasName:       validNasName,
+	}
+
+	resp, err := stager.Stage(context.Background(), nfsStageRequest(publishCtx),
+		stagingPath, validNodeID, log.Fields{}, fsMock, validBaseVolumeID, false, testClient)
+
+	assert.Nil(t, err)
+	assert.NotNil(t, resp)
+	// Verify ModifyNFSExport was called with fallback IP
+	testClient.AssertCalled(t, "ModifyNFSExport", mock.Anything, mock.Anything, "export-1")
+	// Verify metadata file was written
+	fsMock.AssertCalled(t, "WriteFile", metadataPath, mock.Anything, mock.Anything)
+}
+
+// G-5: ModifyNFSExport 500 error test
+func TestNFSStager_AutoSelect_ModifyExportFatalError(t *testing.T) {
+	stager, fsMock, utilMock, testClient := nfsAutoSelectTestHelper(t)
+
+	stagingPath := filepath.Join(nodeStagePrivateDir, validBaseVolumeID)
+	nfsExportPath := "10.20.30.40:/test-export"
+	metadataPath := stagingPath + ".nfs-autoselect.json"
+
+	// Mock NetDial to return discovered IP
+	conn, _ := net.Dial("udp", "10.20.30.103:80")
+	fsMock.On("NetDial", mock.Anything).Return(conn, nil)
+
+	// Mock GetNFSExport for host-limit check
+	testClient.On("GetNFSExport", mock.Anything, "export-1").
+		Return(gopowerstore.NFSExport{
+			ID:          "export-1",
+			RWRootHosts: []string{},
+			RWHosts:     []string{},
+			ROHosts:     []string{},
+			RORootHosts: []string{},
+		}, nil)
+
+	// Mock ModifyNFSExport to return 500 error (not HostAlreadyPresent)
+	testClient.On("ModifyNFSExport", mock.Anything, mock.Anything, "export-1").
+		Return(gopowerstore.CreateResponse{}, errors.New("internal server error"))
+
+	setupNFSMountMocks(fsMock, utilMock, stagingPath, nfsExportPath)
+
+	publishCtx := map[string]string{
+		identifiers.KeyNfsAutoSelect: "true",
+		identifiers.KeyNfsExportPath: nfsExportPath,
+		identifiers.KeyExportID:      "export-1",
+		identifiers.KeyAllowRoot:     "true",
+		identifiers.KeyNasName:       validNasName,
+	}
+
+	resp, err := stager.Stage(context.Background(), nfsStageRequest(publishCtx),
+		stagingPath, validNodeID, log.Fields{}, fsMock, validBaseVolumeID, false, testClient)
+
+	// Should return error for fatal ModifyNFSExport failure
+	assert.Error(t, err)
+	assert.Nil(t, resp)
+	assert.Contains(t, err.Error(), "internal server error")
+	// Metadata file should NOT be written on error
+	fsMock.AssertNotCalled(t, "WriteFile", metadataPath, mock.Anything, mock.Anything)
+}
+
+// G-6: GetNFSExport failure test
+func TestNFSStager_AutoSelect_ExportCheckFailure(t *testing.T) {
+	stager, fsMock, utilMock, testClient := nfsAutoSelectTestHelper(t)
+
+	stagingPath := filepath.Join(nodeStagePrivateDir, validBaseVolumeID)
+	nfsExportPath := "10.20.30.40:/test-export"
+	metadataPath := stagingPath + ".nfs-autoselect.json"
+
+	// Mock NetDial to return discovered IP
+	conn, _ := net.Dial("udp", "10.20.30.103:80")
+	fsMock.On("NetDial", mock.Anything).Return(conn, nil)
+
+	// Mock GetNFSExport to fail (host-limit check)
+	testClient.On("GetNFSExport", mock.Anything, "export-1").
+		Return(gopowerstore.NFSExport{}, errors.New("export not found"))
+
+	// Mock ModifyNFSExport should still be called (host-limit check is best-effort)
+	testClient.On("ModifyNFSExport", mock.Anything, mock.Anything, "export-1").
+		Return(gopowerstore.CreateResponse{}, nil)
+
+	// Mock WriteFile for metadata persistence
+	fsMock.On("WriteFile", metadataPath, mock.Anything, mock.Anything).Return(nil)
+
+	setupNFSMountMocks(fsMock, utilMock, stagingPath, nfsExportPath)
+
+	publishCtx := map[string]string{
+		identifiers.KeyNfsAutoSelect: "true",
+		identifiers.KeyNfsExportPath: nfsExportPath,
+		identifiers.KeyExportID:      "export-1",
+		identifiers.KeyAllowRoot:     "true",
+		identifiers.KeyNasName:       validNasName,
+	}
+
+	resp, err := stager.Stage(context.Background(), nfsStageRequest(publishCtx),
+		stagingPath, validNodeID, log.Fields{}, fsMock, validBaseVolumeID, false, testClient)
+
+	// Should succeed despite export check failure (best-effort)
+	assert.Nil(t, err)
+	assert.NotNil(t, resp)
+	// ModifyNFSExport should still be called
+	testClient.AssertCalled(t, "ModifyNFSExport", mock.Anything, mock.Anything, "export-1")
+	// Metadata file should be written
+	fsMock.AssertCalled(t, "WriteFile", metadataPath, mock.Anything, mock.Anything)
+}
+
+// --- NFS Auto-Select K8s Event Emission Tests (FR-6.1) ---
+
+// nfsAutoSelectTestHelperWithRecorder creates a standard NFSStager with a fake event recorder.
+func nfsAutoSelectTestHelperWithRecorder(t *testing.T) (
+	*NFSStager, *mocks.FsInterface, *mocks.UtilInterface, *gopowerstoremock.Client, *record.FakeRecorder,
+) {
+	t.Helper()
+	stager, fsMock, utilMock, testClient := nfsAutoSelectTestHelper(t)
+	fakeRecorder := record.NewFakeRecorder(10)
+	stager.eventRecorder = fakeRecorder
+	return stager, fsMock, utilMock, testClient, fakeRecorder
+}
+
+func TestNFSStager_AutoSelect_EmitsNFSAutoSelectIPEvent(t *testing.T) {
+	stager, fsMock, utilMock, testClient, fakeRecorder := nfsAutoSelectTestHelperWithRecorder(t)
+
+	stagingPath := filepath.Join(nodeStagePrivateDir, validBaseVolumeID)
+	nfsExportPath := "10.20.30.40:/test-export"
+
+	conn, _ := net.Dial("udp", "10.20.30.40:80")
+	fsMock.On("NetDial", mock.Anything).Return(conn, nil)
+
+	testClient.On("GetNFSExport", mock.Anything, mock.Anything).
+		Return(gopowerstore.NFSExport{
+			ID: "export-1", RWRootHosts: []string{}, RWHosts: []string{},
+			ROHosts: []string{}, RORootHosts: []string{},
+		}, nil)
+	testClient.On("ModifyNFSExport", mock.Anything, mock.Anything, "export-1").
+		Return(gopowerstore.CreateResponse{}, nil)
+	fsMock.On("WriteFile", stagingPath+".nfs-autoselect.json", mock.Anything, mock.Anything).Return(nil)
+	setupNFSMountMocks(fsMock, utilMock, stagingPath, nfsExportPath)
+
+	publishCtx := map[string]string{
+		identifiers.KeyNfsAutoSelect:  "true",
+		identifiers.KeyNfsExportPath:  nfsExportPath,
+		identifiers.KeyExportID:       "export-1",
+		identifiers.KeyAllowRoot:      "true",
+		identifiers.KeyNasName:        validNasName,
+		controller.KeyCSIPVCName:      "test-pvc",
+		controller.KeyCSIPVCNamespace: "test-ns",
+	}
+
+	resp, err := stager.Stage(context.Background(), nfsStageRequest(publishCtx),
+		stagingPath, validNodeID, log.Fields{}, fsMock, validBaseVolumeID, false, testClient)
+
+	assert.Nil(t, err)
+	assert.NotNil(t, resp)
+
+	// Verify NFSAutoSelectIP Normal event was emitted
+	select {
+	case event := <-fakeRecorder.Events:
+		assert.Contains(t, event, EventReasonNFSAutoSelectIP)
+		assert.Contains(t, event, "Normal")
+		assert.Contains(t, event, "NAS=")
+	default:
+		t.Error("expected NFSAutoSelectIP event to be emitted")
+	}
+}
+
+func TestNFSStager_AutoSelect_EmitsNFSAutoSelectFallbackOnFlatNetwork(t *testing.T) {
+	stager, fsMock, utilMock, testClient, fakeRecorder := nfsAutoSelectTestHelperWithRecorder(t)
+
+	stagingPath := filepath.Join(nodeStagePrivateDir, validBaseVolumeID)
+	nfsExportPath := "10.20.30.40:/test-export"
+
+	// Determine actual outbound IP — same IP the test host would discover via NetDial.
+	// Set managementIP to that so the flat-network condition triggers reliably.
+	conn, dialErr := net.Dial("udp", "10.20.30.40:80")
+	if dialErr != nil {
+		t.Skipf("cannot dial UDP to determine local IP: %v", dialErr)
+	}
+	localIP := conn.LocalAddr().(*net.UDPAddr).IP.String()
+	stager.managementIP = localIP // flat-network: discovered == management
+	fsMock.On("NetDial", mock.Anything).Return(conn, nil)
+
+	testClient.On("GetNFSExport", mock.Anything, mock.Anything).
+		Return(gopowerstore.NFSExport{
+			ID: "export-1", RWRootHosts: []string{}, RWHosts: []string{},
+			ROHosts: []string{}, RORootHosts: []string{},
+		}, nil)
+	testClient.On("ModifyNFSExport", mock.Anything, mock.Anything, "export-1").
+		Return(gopowerstore.CreateResponse{}, nil)
+	fsMock.On("WriteFile", stagingPath+".nfs-autoselect.json", mock.Anything, mock.Anything).Return(nil)
+	setupNFSMountMocks(fsMock, utilMock, stagingPath, nfsExportPath)
+
+	publishCtx := map[string]string{
+		identifiers.KeyNfsAutoSelect:  "true",
+		identifiers.KeyNfsExportPath:  nfsExportPath,
+		identifiers.KeyExportID:       "export-1",
+		identifiers.KeyAllowRoot:      "true",
+		identifiers.KeyNasName:        validNasName,
+		controller.KeyCSIPVCName:      "test-pvc",
+		controller.KeyCSIPVCNamespace: "test-ns",
+	}
+
+	resp, err := stager.Stage(context.Background(), nfsStageRequest(publishCtx),
+		stagingPath, validNodeID, log.Fields{}, fsMock, validBaseVolumeID, false, testClient)
+
+	assert.Nil(t, err)
+	assert.NotNil(t, resp)
+
+	// Should emit NFSAutoSelectFallback Warning first, then NFSAutoSelectIP Normal
+	foundFallback := false
+	foundAutoSelect := false
+	for i := 0; i < 2; i++ {
+		select {
+		case event := <-fakeRecorder.Events:
+			if assert.NotEmpty(t, event) {
+				if strings.Contains(event, EventReasonNFSAutoSelectFallback) {
+					foundFallback = true
+					assert.Contains(t, event, "Warning")
+				} else if strings.Contains(event, EventReasonNFSAutoSelectIP) {
+					foundAutoSelect = true
+				}
+			}
+		default:
+		}
+	}
+	assert.True(t, foundFallback, "expected NFSAutoSelectFallback event for flat network")
+	assert.True(t, foundAutoSelect, "expected NFSAutoSelectIP event after flat network fallback")
+}
+
+func TestNFSStager_AutoSelect_EmitsNFSAutoSelectFallbackOnHardError(t *testing.T) {
+	stager, fsMock, utilMock, testClient, fakeRecorder := nfsAutoSelectTestHelperWithRecorder(t)
+
+	stagingPath := filepath.Join(nodeStagePrivateDir, validBaseVolumeID)
+	nfsExportPath := "10.20.30.40:/test-export"
+
+	// NetDial fails — triggers hard-error fallback
+	fsMock.On("NetDial", mock.Anything).Return(nil, errors.New("network unreachable"))
+
+	testClient.On("GetNFSExport", mock.Anything, mock.Anything).
+		Return(gopowerstore.NFSExport{
+			ID: "export-1", RWRootHosts: []string{}, RWHosts: []string{},
+			ROHosts: []string{}, RORootHosts: []string{},
+		}, nil)
+	testClient.On("ModifyNFSExport", mock.Anything, mock.Anything, "export-1").
+		Return(gopowerstore.CreateResponse{}, nil)
+	fsMock.On("WriteFile", stagingPath+".nfs-autoselect.json", mock.Anything, mock.Anything).Return(nil)
+	setupNFSMountMocks(fsMock, utilMock, stagingPath, nfsExportPath)
+
+	publishCtx := map[string]string{
+		identifiers.KeyNfsAutoSelect:  "true",
+		identifiers.KeyNfsExportPath:  nfsExportPath,
+		identifiers.KeyExportID:       "export-1",
+		identifiers.KeyAllowRoot:      "true",
+		identifiers.KeyNasName:        validNasName,
+		controller.KeyCSIPVCName:      "test-pvc",
+		controller.KeyCSIPVCNamespace: "test-ns",
+	}
+
+	resp, err := stager.Stage(context.Background(), nfsStageRequest(publishCtx),
+		stagingPath, validNodeID, log.Fields{}, fsMock, validBaseVolumeID, false, testClient)
+
+	assert.Nil(t, err)
+	assert.NotNil(t, resp)
+
+	// Should emit NFSAutoSelectFallback Warning, then NFSAutoSelectIP Normal
+	foundFallback := false
+	for i := 0; i < 2; i++ {
+		select {
+		case event := <-fakeRecorder.Events:
+			if strings.Contains(event, EventReasonNFSAutoSelectFallback) {
+				foundFallback = true
+				assert.Contains(t, event, "Warning")
+				assert.Contains(t, event, "routing query failed")
+			}
+		default:
+		}
+	}
+	assert.True(t, foundFallback, "expected NFSAutoSelectFallback event on hard-error fallback")
+}
+
+func TestNFSStager_AutoSelect_EmitsNFSExportHostLimitEvent(t *testing.T) {
+	stager, fsMock, utilMock, testClient, fakeRecorder := nfsAutoSelectTestHelperWithRecorder(t)
+
+	stagingPath := filepath.Join(nodeStagePrivateDir, validBaseVolumeID)
+	nfsExportPath := "10.20.30.40:/test-export"
+
+	conn, _ := net.Dial("udp", "10.20.30.40:80")
+	fsMock.On("NetDial", mock.Anything).Return(conn, nil)
+
+	// Create an export with >100 host entries to trigger the host-limit event
+	hosts := make([]string, 101)
+	for i := range hosts {
+		hosts[i] = fmt.Sprintf("10.0.0.%d/255.255.255.255", i)
+	}
+
+	testClient.On("GetNFSExport", mock.Anything, mock.Anything).
+		Return(gopowerstore.NFSExport{
+			ID: "export-1", RWRootHosts: hosts, RWHosts: []string{},
+			ROHosts: []string{}, RORootHosts: []string{},
+		}, nil)
+	testClient.On("ModifyNFSExport", mock.Anything, mock.Anything, "export-1").
+		Return(gopowerstore.CreateResponse{}, nil)
+	fsMock.On("WriteFile", stagingPath+".nfs-autoselect.json", mock.Anything, mock.Anything).Return(nil)
+	setupNFSMountMocks(fsMock, utilMock, stagingPath, nfsExportPath)
+
+	publishCtx := map[string]string{
+		identifiers.KeyNfsAutoSelect:  "true",
+		identifiers.KeyNfsExportPath:  nfsExportPath,
+		identifiers.KeyExportID:       "export-1",
+		identifiers.KeyAllowRoot:      "true",
+		identifiers.KeyNasName:        validNasName,
+		controller.KeyCSIPVCName:      "test-pvc",
+		controller.KeyCSIPVCNamespace: "test-ns",
+	}
+
+	resp, err := stager.Stage(context.Background(), nfsStageRequest(publishCtx),
+		stagingPath, validNodeID, log.Fields{}, fsMock, validBaseVolumeID, false, testClient)
+
+	assert.Nil(t, err)
+	assert.NotNil(t, resp)
+
+	// Should emit NFSExportHostLimit Warning and NFSAutoSelectIP Normal
+	foundHostLimit := false
+	for i := 0; i < 3; i++ {
+		select {
+		case event := <-fakeRecorder.Events:
+			if strings.Contains(event, EventReasonNFSExportHostLimit) {
+				foundHostLimit = true
+				assert.Contains(t, event, "Warning")
+				assert.Contains(t, event, "80%")
+			}
+		default:
+		}
+	}
+	assert.True(t, foundHostLimit, "expected NFSExportHostLimit event when export has >100 hosts")
+}
+
+func TestNFSStager_AutoSelect_NoEventWhenRecorderNil(t *testing.T) {
+	// Verify the nil-safe no-op behavior of emitNFSAutoSelectEvent
+	stager, fsMock, utilMock, testClient := nfsAutoSelectTestHelper(t)
+	// eventRecorder is nil by default from helper
+
+	stagingPath := filepath.Join(nodeStagePrivateDir, validBaseVolumeID)
+	nfsExportPath := "10.20.30.40:/test-export"
+
+	conn, _ := net.Dial("udp", "10.20.30.40:80")
+	fsMock.On("NetDial", mock.Anything).Return(conn, nil)
+
+	testClient.On("GetNFSExport", mock.Anything, mock.Anything).
+		Return(gopowerstore.NFSExport{
+			ID: "export-1", RWRootHosts: []string{}, RWHosts: []string{},
+			ROHosts: []string{}, RORootHosts: []string{},
+		}, nil)
+	testClient.On("ModifyNFSExport", mock.Anything, mock.Anything, "export-1").
+		Return(gopowerstore.CreateResponse{}, nil)
+	fsMock.On("WriteFile", stagingPath+".nfs-autoselect.json", mock.Anything, mock.Anything).Return(nil)
+	setupNFSMountMocks(fsMock, utilMock, stagingPath, nfsExportPath)
+
+	publishCtx := map[string]string{
+		identifiers.KeyNfsAutoSelect:  "true",
+		identifiers.KeyNfsExportPath:  nfsExportPath,
+		identifiers.KeyExportID:       "export-1",
+		identifiers.KeyAllowRoot:      "true",
+		identifiers.KeyNasName:        validNasName,
+		controller.KeyCSIPVCName:      "test-pvc",
+		controller.KeyCSIPVCNamespace: "test-ns",
+	}
+
+	resp, err := stager.Stage(context.Background(), nfsStageRequest(publishCtx),
+		stagingPath, validNodeID, log.Fields{}, fsMock, validBaseVolumeID, false, testClient)
+
+	// Should succeed without panicking when eventRecorder is nil
+	assert.Nil(t, err)
+	assert.NotNil(t, resp)
 }

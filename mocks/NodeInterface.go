@@ -32,6 +32,7 @@ import (
 	array "github.com/dell/csi-powerstore/v2/pkg/array"
 	fs "github.com/dell/csi-powerstore/v2/pkg/identifiers/fs"
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
+	prometheus "github.com/prometheus/client_golang/prometheus"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -232,15 +233,22 @@ func (mr *MockInterfaceMockRecorder) SetDefaultArray(arg0 any) *gomock.Call {
 }
 
 // UpdateArrays mocks base method.
-func (m *MockInterface) UpdateArrays(arg0 string, arg1 fs.Interface) error {
+func (m *MockInterface) UpdateArrays(arg0 string, arg1 fs.Interface, arg2 ...prometheus.Registerer) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpdateArrays", arg0, arg1)
+	args := make([]any, 0, 2+len(arg2))
+	args = append(args, arg0, arg1)
+	for _, reg := range arg2 {
+		args = append(args, reg)
+	}
+	ret := m.ctrl.Call(m, "UpdateArrays", args...)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // UpdateArrays indicates an expected call of UpdateArrays.
-func (mr *MockInterfaceMockRecorder) UpdateArrays(arg0, arg1 any) *gomock.Call {
+func (mr *MockInterfaceMockRecorder) UpdateArrays(arg0, arg1 any, arg2 ...any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateArrays", reflect.TypeOf((*MockInterface)(nil).UpdateArrays), arg0, arg1)
+	args := []any{arg0, arg1}
+	args = append(args, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateArrays", reflect.TypeOf((*MockInterface)(nil).UpdateArrays), args...)
 }

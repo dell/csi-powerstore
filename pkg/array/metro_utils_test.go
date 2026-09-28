@@ -60,7 +60,8 @@ func TestIsMetroFractured(t *testing.T) {
 						ID:                        uuid.New().String(),
 						Name:                      "myVolume",
 						MetroReplicationSessionID: "",
-					}, nil)
+					}, nil,
+				)
 			},
 			wantResponse: &MetroFracturedResponse{IsFractured: false, VolumeName: "myVolume", State: ""},
 			wantErr:      nil,
@@ -74,13 +75,15 @@ func TestIsMetroFractured(t *testing.T) {
 						ID:                        uuid.New().String(),
 						Name:                      "myVolume",
 						MetroReplicationSessionID: replicationSessionID,
-					}, nil)
+					}, nil,
+				)
 
 				client.On("GetReplicationSessionByID", mock.Anything, mock.Anything).Return(
 					gopowerstore.ReplicationSession{
 						ID:    replicationSessionID,
 						State: "OK",
-					}, nil)
+					}, nil,
+				)
 			},
 			wantResponse: &MetroFracturedResponse{IsFractured: false, VolumeName: "myVolume", State: ""},
 			wantErr:      nil,
@@ -94,14 +97,16 @@ func TestIsMetroFractured(t *testing.T) {
 						ID:                        uuid.New().String(),
 						Name:                      "myVolume",
 						MetroReplicationSessionID: replicationSessionID,
-					}, nil)
+					}, nil,
+				)
 
 				client.On("GetReplicationSessionByID", mock.Anything, mock.Anything).Return(
 					gopowerstore.ReplicationSession{
 						ID:                 replicationSessionID,
 						State:              "Fractured",
 						LocalResourceState: "Promoted",
-					}, nil)
+					}, nil,
+				)
 			},
 			wantResponse: &MetroFracturedResponse{IsFractured: true, VolumeName: "myVolume", State: "Promoted"},
 			wantErr:      nil,
@@ -111,7 +116,8 @@ func TestIsMetroFractured(t *testing.T) {
 			client: new(gopowerstoremock.Client),
 			before: func(client *gopowerstoremock.Client) {
 				client.On("GetVolume", mock.Anything, mock.Anything).Return(
-					gopowerstore.Volume{}, errors.New("unable to get volume"))
+					gopowerstore.Volume{}, errors.New("unable to get volume"),
+				)
 			},
 			wantResponse: nil,
 			wantErr:      errors.New("unable to get volume"),
@@ -125,10 +131,12 @@ func TestIsMetroFractured(t *testing.T) {
 						ID:                        uuid.New().String(),
 						Name:                      "myVolume",
 						MetroReplicationSessionID: replicationSessionID,
-					}, nil)
+					}, nil,
+				)
 
 				client.On("GetReplicationSessionByID", mock.Anything, mock.Anything).Return(
-					gopowerstore.ReplicationSession{}, errors.New("unable to get replication session by ID"))
+					gopowerstore.ReplicationSession{}, errors.New("unable to get replication session by ID"),
+				)
 			},
 			wantResponse: nil,
 			wantErr:      errors.New("unable to get replication session by ID"),
@@ -609,7 +617,8 @@ func TestSelectMetroArrayForClone(t *testing.T) {
 						LocalResourceID:    "local-vol-id",
 						RemoteResourceID:   "remote-vol-id",
 						LocalResourceState: string(gopowerstore.ReplicationResourceStatePromoted),
-					}, nil)
+					}, nil,
+				)
 			},
 			beforeRemote: func(c *gopowerstoremock.Client) {
 				c.On("GetReplicationSessionByID", mock.Anything, metroSessionID).Return(
@@ -620,7 +629,8 @@ func TestSelectMetroArrayForClone(t *testing.T) {
 						LocalResourceID:    "remote-vol-id",
 						RemoteResourceID:   "local-vol-id",
 						LocalResourceState: string(gopowerstore.ReplicationResourceStatePromoted),
-					}, nil)
+					}, nil,
+				)
 			},
 			wantVolID: "local-vol-id",
 			wantErr:   false,
@@ -635,7 +645,8 @@ func TestSelectMetroArrayForClone(t *testing.T) {
 						State:              gopowerstore.RsStateOk,
 						LocalResourceID:    "local-vol-id",
 						LocalResourceState: string(gopowerstore.ReplicationResourceStatePromoted),
-					}, nil)
+					}, nil,
+				)
 			},
 			beforeRemote: func(c *gopowerstoremock.Client) {
 				c.On("GetReplicationSessionByID", mock.Anything, metroSessionID).Return(
@@ -645,7 +656,8 @@ func TestSelectMetroArrayForClone(t *testing.T) {
 						State:              gopowerstore.RsStateOk,
 						LocalResourceID:    "remote-vol-id",
 						LocalResourceState: string(gopowerstore.ReplicationResourceStatePromoted),
-					}, nil)
+					}, nil,
+				)
 			},
 			wantVolID: "remote-vol-id",
 			wantErr:   false,
@@ -660,7 +672,8 @@ func TestSelectMetroArrayForClone(t *testing.T) {
 						State:              gopowerstore.RsStateFractured,
 						LocalResourceID:    "local-vol-id",
 						LocalResourceState: string(gopowerstore.ReplicationResourceStateDemoted),
-					}, nil)
+					}, nil,
+				)
 			},
 			beforeRemote: func(c *gopowerstoremock.Client) {
 				c.On("GetReplicationSessionByID", mock.Anything, metroSessionID).Return(
@@ -670,7 +683,8 @@ func TestSelectMetroArrayForClone(t *testing.T) {
 						State:              gopowerstore.RsStateFractured,
 						LocalResourceID:    "remote-vol-id",
 						LocalResourceState: string(gopowerstore.ReplicationResourceStatePromoted),
-					}, nil)
+					}, nil,
+				)
 			},
 			wantVolID: "remote-vol-id",
 			wantErr:   false,
@@ -685,7 +699,8 @@ func TestSelectMetroArrayForClone(t *testing.T) {
 						State:              gopowerstore.RsStateFractured,
 						LocalResourceID:    "local-vol-id",
 						LocalResourceState: string(gopowerstore.ReplicationResourceStateDemoted),
-					}, nil)
+					}, nil,
+				)
 			},
 			beforeRemote: func(c *gopowerstoremock.Client) {
 				c.On("GetReplicationSessionByID", mock.Anything, metroSessionID).Return(
@@ -695,7 +710,8 @@ func TestSelectMetroArrayForClone(t *testing.T) {
 						State:              gopowerstore.RsStateFractured,
 						LocalResourceID:    "remote-vol-id",
 						LocalResourceState: string(gopowerstore.ReplicationResourceStateDemoted),
-					}, nil)
+					}, nil,
+				)
 			},
 			wantErr:        true,
 			wantErrContain: "neither local nor remote array has a healthy Metro session",
@@ -704,11 +720,13 @@ func TestSelectMetroArrayForClone(t *testing.T) {
 			name: "Both API calls fail - returns error",
 			beforeLocal: func(c *gopowerstoremock.Client) {
 				c.On("GetReplicationSessionByID", mock.Anything, metroSessionID).Return(
-					gopowerstore.ReplicationSession{}, errors.New("local API error"))
+					gopowerstore.ReplicationSession{}, errors.New("local API error"),
+				)
 			},
 			beforeRemote: func(c *gopowerstoremock.Client) {
 				c.On("GetReplicationSessionByID", mock.Anything, metroSessionID).Return(
-					gopowerstore.ReplicationSession{}, errors.New("remote API error"))
+					gopowerstore.ReplicationSession{}, errors.New("remote API error"),
+				)
 			},
 			wantErr:        true,
 			wantErrContain: "unable to get replication session from either local or remote array",
@@ -724,7 +742,8 @@ func TestSelectMetroArrayForClone(t *testing.T) {
 						State:              gopowerstore.RsStateOk,
 						LocalResourceID:    "remote-vol-id",
 						LocalResourceState: string(gopowerstore.ReplicationResourceStatePromoted),
-					}, nil)
+					}, nil,
+				)
 			},
 			wantVolID: "remote-vol-id",
 			wantErr:   false,
@@ -733,7 +752,8 @@ func TestSelectMetroArrayForClone(t *testing.T) {
 			name: "Local API fails, remote preferred online - selects remote",
 			beforeLocal: func(c *gopowerstoremock.Client) {
 				c.On("GetReplicationSessionByID", mock.Anything, metroSessionID).Return(
-					gopowerstore.ReplicationSession{}, errors.New("local API error"))
+					gopowerstore.ReplicationSession{}, errors.New("local API error"),
+				)
 			},
 			beforeRemote: func(c *gopowerstoremock.Client) {
 				c.On("GetReplicationSessionByID", mock.Anything, metroSessionID).Return(
@@ -743,7 +763,8 @@ func TestSelectMetroArrayForClone(t *testing.T) {
 						State:              gopowerstore.RsStateOk,
 						LocalResourceID:    "remote-vol-id",
 						LocalResourceState: string(gopowerstore.ReplicationResourceStatePromoted),
-					}, nil)
+					}, nil,
+				)
 			},
 			wantVolID: "remote-vol-id",
 			wantErr:   false,
@@ -758,7 +779,8 @@ func TestSelectMetroArrayForClone(t *testing.T) {
 						State:              gopowerstore.RsStateFractured,
 						LocalResourceID:    "local-vol-id",
 						LocalResourceState: string(gopowerstore.ReplicationResourceStatePromoted),
-					}, nil)
+					}, nil,
+				)
 			},
 			beforeRemote: func(c *gopowerstoremock.Client) {
 				c.On("GetReplicationSessionByID", mock.Anything, metroSessionID).Return(
@@ -768,7 +790,8 @@ func TestSelectMetroArrayForClone(t *testing.T) {
 						State:              gopowerstore.RsStateFractured,
 						LocalResourceID:    "remote-vol-id",
 						LocalResourceState: string(gopowerstore.ReplicationResourceStateDemoted),
-					}, nil)
+					}, nil,
+				)
 			},
 			wantVolID: "local-vol-id",
 			wantErr:   false,
@@ -854,7 +877,8 @@ func TestDetermineIfArrayCanClone(t *testing.T) {
 						ID:                 metroSessionID,
 						LocalResourceID:    "local-vol-id",
 						LocalResourceState: string(gopowerstore.ReplicationResourceStatePromoted),
-					}, nil)
+					}, nil,
+				)
 			},
 			wantErr:   false,
 			wantVolID: "local-vol-id",
@@ -867,7 +891,8 @@ func TestDetermineIfArrayCanClone(t *testing.T) {
 						ID:                 metroSessionID,
 						LocalResourceID:    "local-vol-id",
 						LocalResourceState: string(gopowerstore.ReplicationResourceStateSystemPromoted),
-					}, nil)
+					}, nil,
+				)
 			},
 			wantErr:   false,
 			wantVolID: "local-vol-id",
@@ -880,7 +905,8 @@ func TestDetermineIfArrayCanClone(t *testing.T) {
 						ID:                metroSessionID,
 						LocalResourceID:   "local-vol-id",
 						DataTransferState: gopowerstore.RSDataTransferStateActiveActive,
-					}, nil)
+					}, nil,
+				)
 			},
 			wantErr:   false,
 			wantVolID: "local-vol-id",
@@ -893,7 +919,8 @@ func TestDetermineIfArrayCanClone(t *testing.T) {
 						ID:                 metroSessionID,
 						LocalResourceID:    "local-vol-id",
 						LocalResourceState: string(gopowerstore.ReplicationResourceStateDemoted),
-					}, nil)
+					}, nil,
+				)
 			},
 			wantErr:        true,
 			wantErrContain: "array selected for cloning is not in correct state",
@@ -902,7 +929,8 @@ func TestDetermineIfArrayCanClone(t *testing.T) {
 			name: "GetReplicationSessionByID fails - session nil - cannot clone",
 			before: func(c *gopowerstoremock.Client) {
 				c.On("GetReplicationSessionByID", mock.Anything, metroSessionID).Return(
-					gopowerstore.ReplicationSession{}, errors.New("API error"))
+					gopowerstore.ReplicationSession{}, errors.New("API error"),
+				)
 			},
 			wantErr:        true,
 			wantErrContain: "unable to get replication session from array",
@@ -1051,7 +1079,8 @@ func TestSelectMetroArrayForExpansion(t *testing.T) {
 						State:             gopowerstore.RsStateOk,
 						LocalResourceID:   "local-vol-id",
 						DataTransferState: gopowerstore.RSDataTransferStateActiveActive,
-					}, nil)
+					}, nil,
+				)
 			},
 			beforeRemote: func(c *gopowerstoremock.Client) {
 				c.On("GetReplicationSessionByID", mock.Anything, metroSessionID).Return(
@@ -1060,7 +1089,8 @@ func TestSelectMetroArrayForExpansion(t *testing.T) {
 						Role:            "Metro_Non_Preferred",
 						State:           gopowerstore.RsStateOk,
 						LocalResourceID: "remote-vol-id",
-					}, nil)
+					}, nil,
+				)
 			},
 			wantArrayID: "PS-local",
 			wantErr:     false,
@@ -1074,7 +1104,8 @@ func TestSelectMetroArrayForExpansion(t *testing.T) {
 						Role:            "Metro_Non_Preferred",
 						State:           gopowerstore.RsStateOk,
 						LocalResourceID: "local-vol-id",
-					}, nil)
+					}, nil,
+				)
 			},
 			beforeRemote: func(c *gopowerstoremock.Client) {
 				c.On("GetReplicationSessionByID", mock.Anything, metroSessionID).Return(
@@ -1084,7 +1115,8 @@ func TestSelectMetroArrayForExpansion(t *testing.T) {
 						State:              gopowerstore.RsStateOk,
 						LocalResourceID:    "remote-vol-id",
 						LocalResourceState: string(gopowerstore.ReplicationResourceStatePromoted),
-					}, nil)
+					}, nil,
+				)
 			},
 			wantArrayID: "PS-remote",
 			wantErr:     false,
@@ -1099,7 +1131,8 @@ func TestSelectMetroArrayForExpansion(t *testing.T) {
 						State:              gopowerstore.RsStateOk,
 						LocalResourceID:    "local-vol-id",
 						LocalResourceState: string(gopowerstore.ReplicationResourceStatePromoted),
-					}, nil)
+					}, nil,
+				)
 			},
 			beforeRemote: func(c *gopowerstoremock.Client) {
 				c.On("GetReplicationSessionByID", mock.Anything, metroSessionID).Return(
@@ -1107,7 +1140,8 @@ func TestSelectMetroArrayForExpansion(t *testing.T) {
 						ID:              metroSessionID,
 						Role:            "Metro_Non_Preferred",
 						LocalResourceID: "remote-vol-id",
-					}, nil)
+					}, nil,
+				)
 			},
 			wantArrayID: "PS-local",
 			wantErr:     false,
@@ -1120,7 +1154,8 @@ func TestSelectMetroArrayForExpansion(t *testing.T) {
 						ID:              metroSessionID,
 						Role:            "Metro_Non_Preferred",
 						LocalResourceID: "local-vol-id",
-					}, nil)
+					}, nil,
+				)
 			},
 			beforeRemote: func(c *gopowerstoremock.Client) {
 				c.On("GetReplicationSessionByID", mock.Anything, metroSessionID).Return(
@@ -1130,7 +1165,8 @@ func TestSelectMetroArrayForExpansion(t *testing.T) {
 						State:              gopowerstore.RsStateOk,
 						LocalResourceID:    "remote-vol-id",
 						LocalResourceState: string(gopowerstore.ReplicationResourceStateSystemPromoted),
-					}, nil)
+					}, nil,
+				)
 			},
 			wantArrayID: "PS-remote",
 			wantErr:     false,
@@ -1139,7 +1175,8 @@ func TestSelectMetroArrayForExpansion(t *testing.T) {
 			name: "Local API fails, remote preferred online - selects remote",
 			beforeLocal: func(c *gopowerstoremock.Client) {
 				c.On("GetReplicationSessionByID", mock.Anything, metroSessionID).Return(
-					gopowerstore.ReplicationSession{}, errors.New("local API error"))
+					gopowerstore.ReplicationSession{}, errors.New("local API error"),
+				)
 			},
 			beforeRemote: func(c *gopowerstoremock.Client) {
 				c.On("GetReplicationSessionByID", mock.Anything, metroSessionID).Return(
@@ -1149,7 +1186,8 @@ func TestSelectMetroArrayForExpansion(t *testing.T) {
 						State:             gopowerstore.RsStateOk,
 						LocalResourceID:   "remote-vol-id",
 						DataTransferState: gopowerstore.RSDataTransferStateActiveActive,
-					}, nil)
+					}, nil,
+				)
 			},
 			wantArrayID: "PS-remote",
 			wantErr:     false,
@@ -1164,11 +1202,13 @@ func TestSelectMetroArrayForExpansion(t *testing.T) {
 						State:             gopowerstore.RsStateOk,
 						LocalResourceID:   "local-vol-id",
 						DataTransferState: gopowerstore.RSDataTransferStateActiveActive,
-					}, nil)
+					}, nil,
+				)
 			},
 			beforeRemote: func(c *gopowerstoremock.Client) {
 				c.On("GetReplicationSessionByID", mock.Anything, metroSessionID).Return(
-					gopowerstore.ReplicationSession{}, errors.New("remote API error"))
+					gopowerstore.ReplicationSession{}, errors.New("remote API error"),
+				)
 			},
 			wantArrayID: "PS-local",
 			wantErr:     false,
@@ -1177,11 +1217,13 @@ func TestSelectMetroArrayForExpansion(t *testing.T) {
 			name: "Both API calls fail - error both unavailable",
 			beforeLocal: func(c *gopowerstoremock.Client) {
 				c.On("GetReplicationSessionByID", mock.Anything, metroSessionID).Return(
-					gopowerstore.ReplicationSession{}, errors.New("local API error"))
+					gopowerstore.ReplicationSession{}, errors.New("local API error"),
+				)
 			},
 			beforeRemote: func(c *gopowerstoremock.Client) {
 				c.On("GetReplicationSessionByID", mock.Anything, metroSessionID).Return(
-					gopowerstore.ReplicationSession{}, errors.New("remote API error"))
+					gopowerstore.ReplicationSession{}, errors.New("remote API error"),
+				)
 			},
 			wantErr:        true,
 			wantErrContain: "PS-local and PS-remote are unavailable",
@@ -1196,7 +1238,8 @@ func TestSelectMetroArrayForExpansion(t *testing.T) {
 						State:              gopowerstore.RsStateFractured,
 						LocalResourceID:    "local-vol-id",
 						LocalResourceState: string(gopowerstore.ReplicationResourceStateDemoted),
-					}, nil)
+					}, nil,
+				)
 			},
 			beforeRemote: func(c *gopowerstoremock.Client) {
 				c.On("GetReplicationSessionByID", mock.Anything, metroSessionID).Return(
@@ -1206,7 +1249,8 @@ func TestSelectMetroArrayForExpansion(t *testing.T) {
 						State:              gopowerstore.RsStateFractured,
 						LocalResourceID:    "remote-vol-id",
 						LocalResourceState: string(gopowerstore.ReplicationResourceStateDemoted),
-					}, nil)
+					}, nil,
+				)
 			},
 			wantErr:        true,
 			wantErrContain: "unable to find Metro_Preferred site online for volume expansion",
@@ -1221,7 +1265,8 @@ func TestSelectMetroArrayForExpansion(t *testing.T) {
 						State:              gopowerstore.RsStateFractured,
 						LocalResourceID:    "local-vol-id",
 						LocalResourceState: string(gopowerstore.ReplicationResourceStateDemoted),
-					}, nil)
+					}, nil,
+				)
 			},
 			beforeRemote: func(c *gopowerstoremock.Client) {
 				c.On("GetReplicationSessionByID", mock.Anything, metroSessionID).Return(
@@ -1231,7 +1276,8 @@ func TestSelectMetroArrayForExpansion(t *testing.T) {
 						State:              gopowerstore.RsStateFractured,
 						LocalResourceID:    "remote-vol-id",
 						LocalResourceState: string(gopowerstore.ReplicationResourceStatePromoted),
-					}, nil)
+					}, nil,
+				)
 			},
 			wantErr:        true,
 			wantErrContain: "unable to find Metro_Preferred site online for volume expansion",
@@ -1248,7 +1294,8 @@ func TestSelectMetroArrayForExpansion(t *testing.T) {
 						State:              gopowerstore.RsStateOk,
 						LocalResourceID:    "remote-vol-id",
 						LocalResourceState: string(gopowerstore.ReplicationResourceStatePromoted),
-					}, nil)
+					}, nil,
+				)
 			},
 			wantArrayID: "PS-remote",
 			wantErr:     false,
@@ -1264,7 +1311,8 @@ func TestSelectMetroArrayForExpansion(t *testing.T) {
 						State:             gopowerstore.RsStateOk,
 						LocalResourceID:   "local-vol-id",
 						DataTransferState: gopowerstore.RSDataTransferStateActiveActive,
-					}, nil)
+					}, nil,
+				)
 			},
 			beforeRemote: func(_ *gopowerstoremock.Client) {},
 			wantArrayID:  "PS-local",
@@ -1282,7 +1330,8 @@ func TestSelectMetroArrayForExpansion(t *testing.T) {
 						State:              gopowerstore.RsStateOk,
 						LocalResourceID:    "remote-vol-id",
 						LocalResourceState: string(gopowerstore.ReplicationResourceStatePromoted),
-					}, nil)
+					}, nil,
+				)
 			},
 			wantErr:        true,
 			wantErrContain: "unable to verify Preferred site for volume expansion",

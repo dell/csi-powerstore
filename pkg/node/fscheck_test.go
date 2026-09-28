@@ -75,7 +75,7 @@ func TestResolvePVNameFromTargetPath(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			fsck := &FsCheckRunner{log: log}
+			fsck := &FsCheckRunner{}
 			fsck.ResolvePVNameFromTargetPath(tt.targetPath)
 			assert.Equal(t, tt.expected, fsck.pvName)
 		})
@@ -83,7 +83,7 @@ func TestResolvePVNameFromTargetPath(t *testing.T) {
 }
 
 func TestResolvePVNameFromTargetPath_PresetPVName(t *testing.T) {
-	fsck := &FsCheckRunner{pvName: "already-set", log: log}
+	fsck := &FsCheckRunner{pvName: "already-set"}
 	fsck.ResolvePVNameFromTargetPath("/var/lib/kubelet/pods/uid/volumes/kubernetes.io~csi/pv-name/mount")
 	assert.Equal(t, "already-set", fsck.pvName, "should not override pre-set pvName")
 }
@@ -95,7 +95,7 @@ func TestResolveEffectiveSettings_NoPVName(t *testing.T) {
 			Parameters: map[string]string{},
 		}, nil,
 	)
-	fsck := &FsCheckRunner{enabled: true, mode: "checkonly", metadataRetriever: m, log: log}
+	fsck := &FsCheckRunner{enabled: true, mode: "checkonly", metadataRetriever: m}
 	err := fsck.resolveEffectiveSettings(context.Background())
 	assert.NoError(t, err)
 	assert.True(t, fsck.enabled)
@@ -114,7 +114,6 @@ func TestResolveEffectiveSettings_LookupError(t *testing.T) {
 		pvName:            "pv-name",
 		fullVolumeID:      "vol-id",
 		metadataRetriever: m,
-		log:               log,
 	}
 	err := fsck.resolveEffectiveSettings(context.Background())
 	assert.Error(t, err)
@@ -139,7 +138,6 @@ func TestResolveEffectiveSettings_WithValidPVCLabels(t *testing.T) {
 		pvName:            "pv-name",
 		fullVolumeID:      "vol-id",
 		metadataRetriever: m,
-		log:               log,
 	}
 	err := fsck.resolveEffectiveSettings(context.Background())
 	assert.NoError(t, err)
@@ -163,7 +161,6 @@ func TestResolveEffectiveSettings_NoValidPVCLabels(t *testing.T) {
 		pvName:            "pv-name",
 		fullVolumeID:      "vol-id",
 		metadataRetriever: m,
-		log:               log,
 	}
 	err := fsck.resolveEffectiveSettings(context.Background())
 	assert.NoError(t, err)
@@ -269,7 +266,6 @@ func TestResolveEffectiveSettings_PVCLabelOverridesEnabled(t *testing.T) {
 				pvName:            "pv-name",
 				fullVolumeID:      "vol-id",
 				metadataRetriever: m,
-				log:               log,
 			}
 			err := fsck.resolveEffectiveSettings(context.Background())
 			assert.NoError(t, err)
@@ -336,7 +332,6 @@ func TestCheckFileSystem_SkipReasons(t *testing.T) {
 				mode:     "checkonly",
 				fsType:   tt.curFS,
 				fsDevice: "/dev/sda",
-				log:      log,
 			}
 			skipReason, err := fsck.validatePreconditions(context.Background(), tt.accessMode, nil)
 			assert.NoError(t, err, "skip condition should return nil error")
@@ -359,7 +354,6 @@ func TestRun_UnsupportedFS(t *testing.T) {
 		fsDevice:     "/dev/sda",
 		fsType:       "ntfs",
 		fullVolumeID: "vol-123",
-		log:          log,
 	}
 	err := fsck.run(context.Background())
 	assert.Error(t, err, "unsupported FS should now return hard error, not skip")
@@ -382,7 +376,6 @@ func TestRun_Success(t *testing.T) {
 		fsType:       "ext4",
 		fullVolumeID: "vol-123",
 		pvcName:      "my-pvc",
-		log:          log,
 	}
 	err := fsck.run(context.Background())
 	assert.NoError(t, err)
@@ -404,7 +397,6 @@ func TestRun_CheckFails(t *testing.T) {
 		fsType:       "ext4",
 		fullVolumeID: "vol-123",
 		pvcName:      "my-pvc",
-		log:          log,
 	}
 	err := fsck.run(context.Background())
 	assert.Error(t, err)
@@ -413,7 +405,6 @@ func TestRun_CheckFails(t *testing.T) {
 func TestFsCheckPVCObserver_OnEvent(t *testing.T) {
 	observer := &fsCheckPVCObserver{
 		pvcName: "",
-		logger:  log,
 	}
 
 	// Should not panic even with nil event recorder and empty PVC name.
@@ -435,7 +426,6 @@ func TestFsCheckPVCObserver_OnEvent_WithRecorder(t *testing.T) {
 		pvcName:       "my-pvc",
 		pvcNamespace:  "default",
 		eventRecorder: recorder,
-		logger:        log,
 	}
 
 	events := []string{
@@ -471,7 +461,6 @@ func TestCheckFileSystem_GetMountsError(t *testing.T) {
 		mode:     "checkonly",
 		fsType:   "ext4",
 		fsDevice: "/dev/sda",
-		log:      log,
 	}
 	err := fsck.CheckFileSystem(context.Background(),
 		csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER, fsMockLocal)
@@ -491,7 +480,6 @@ func TestCheckFileSystem_AlreadyMounted(t *testing.T) {
 		mode:     "checkonly",
 		fsType:   "ext4",
 		fsDevice: "/dev/sda",
-		log:      log,
 	}
 	err := fsck.CheckFileSystem(context.Background(),
 		csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER, fsMockLocal)
@@ -528,7 +516,6 @@ func TestCheckFileSystem_NoSkipSupportedFS(t *testing.T) {
 				fullVolumeID:      "vol-123",
 				pvName:            "pv-name",
 				metadataRetriever: m,
-				log:               log,
 			}
 			err := fsck.CheckFileSystem(context.Background(),
 				csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER, fsMockLocal)
@@ -566,7 +553,6 @@ func TestCheckFileSystem_FsCheckEnabled_Fails(t *testing.T) {
 		fullVolumeID:      "vol-123",
 		pvName:            "pv-name",
 		metadataRetriever: m,
-		log:               log,
 	}
 	err := fsck.CheckFileSystem(context.Background(),
 		csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER, fsMockLocal)
@@ -595,7 +581,6 @@ func TestCheckFileSystem_FsCheckDisabled(t *testing.T) {
 		fullVolumeID:      "vol-123",
 		pvName:            "pv-name",
 		metadataRetriever: m,
-		log:               log,
 	}
 	err := fsck.CheckFileSystem(context.Background(),
 		csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER, fsMockLocal)
@@ -624,7 +609,6 @@ func TestRun_TimedOut(t *testing.T) {
 		fullVolumeID:  "vol-123",
 		pvcName:       "my-pvc",
 		eventRecorder: recorder,
-		log:           log,
 	}
 	err := fsck.run(context.Background())
 	assert.Error(t, err)
@@ -653,7 +637,6 @@ func TestRun_FailWithEventRecorder(t *testing.T) {
 		fullVolumeID:  "vol-123",
 		pvcName:       "my-pvc",
 		eventRecorder: recorder,
-		log:           log,
 	}
 	err := fsck.run(context.Background())
 	assert.Error(t, err)
@@ -677,7 +660,6 @@ func TestRun_FailWithNilEventRecorder(t *testing.T) {
 		pvcName:       "my-pvc",
 		pvcNamespace:  "default",
 		eventRecorder: nil, // This is the key - nil event recorder
-		log:           log,
 	}
 
 	// This should NOT panic even with nil eventRecorder (tests our fix)
@@ -704,7 +686,6 @@ func TestRun_FailWithFSCheckerError(t *testing.T) {
 		pvcName:       "my-pvc",
 		pvcNamespace:  "default",
 		eventRecorder: nil,
-		log:           log,
 	}
 
 	// This should return a hard error, not silently skip

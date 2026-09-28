@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2021-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2021-2026 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,10 +21,13 @@ package controller
 import (
 	"context"
 	"fmt"
+	"net"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers"
+	log "github.com/dell/csmlog"
 	"github.com/dell/gopowerstore"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc/codes"
@@ -47,7 +50,6 @@ type SCSIPublisher struct{}
 func (s *SCSIPublisher) Publish(ctx context.Context, publishContext map[string]string, req *csi.ControllerPublishVolumeRequest,
 	client gopowerstore.Client, kubeNodeID string, volumeID string, isRemote bool,
 ) (*csi.ControllerPublishVolumeResponse, error) {
-	log := log.WithContext(ctx)
 	volume, err := client.GetVolume(ctx, volumeID)
 	if err != nil {
 		if apiError, ok := err.(gopowerstore.APIError); ok && apiError.NotFound() {
@@ -62,7 +64,7 @@ func (s *SCSIPublisher) Publish(ctx context.Context, publishContext map[string]s
 		if apiError, ok := err.(gopowerstore.APIError); ok && apiError.HostIsNotExist() {
 			// We need additional check here since we can just have host without ip in it
 			ipList := identifiers.GetIPListFromString(kubeNodeID)
-			if ipList == nil || len(ipList) == 0 {
+			if len(ipList) == 0 {
 				return nil, status.Errorf(codes.NotFound, "can't find IP in node ID")
 			}
 			ip := ipList[len(ipList)-1]
@@ -92,7 +94,7 @@ func (s *SCSIPublisher) Publish(ctx context.Context, publishContext map[string]s
 	// Check if the volume is already attached to some host
 	for _, m := range mapping {
 		if m.HostID == node.ID {
-			log.Debug("Volume already mapped")
+			log.WithContext(ctx).Debug("Volume already mapped")
 			s.addLUNIDToPublishContext(publishContext, m, volume, isRemote)
 			return &csi.ControllerPublishVolumeResponse{
 				PublishContext: publishContext,
@@ -106,7 +108,7 @@ func (s *SCSIPublisher) Publish(ctx context.Context, publishContext map[string]s
 			csi.VolumeCapability_AccessMode_SINGLE_NODE_READER_ONLY,
 			csi.VolumeCapability_AccessMode_SINGLE_NODE_SINGLE_WRITER,
 			csi.VolumeCapability_AccessMode_SINGLE_NODE_MULTI_WRITER:
-			log.Error(fmt.Sprintf(
+			log.WithContext(ctx).Error(fmt.Sprintf(
 				"ControllerPublishVolume: Volume present in a different lun mapping - '%s'",
 				mapping[0].HostID))
 			return nil, status.Errorf(
@@ -116,13 +118,34 @@ func (s *SCSIPublisher) Publish(ctx context.Context, publishContext map[string]s
 		}
 	}
 	// Attach volume to host
-	log.Debugf("Attach volume %s to host %s", volume.ID, node.ID)
+	log.WithContext(ctx).WithFields(log.Fields{
+		log.FieldComponent: "controller",
+		log.FieldOperation: "AttachVolumeToHost",
+		log.FieldVolumeID:  volume.ID,
+		log.FieldNodeID:    node.ID,
+	}).Info("attaching volume to host")
+	attachStart := time.Now()
 	params := gopowerstore.HostVolumeAttach{VolumeID: &volume.ID}
 	_, err = client.AttachVolumeToHost(ctx, node.ID, &params)
 	if err != nil {
+		log.WithContext(ctx).WithFields(log.Fields{
+			log.FieldComponent:  "controller",
+			log.FieldOperation:  "AttachVolumeToHost",
+			log.FieldVolumeID:   volume.ID,
+			log.FieldNodeID:     node.ID,
+			log.FieldError:      err.Error(),
+			log.FieldDurationMs: time.Since(attachStart).Milliseconds(),
+		}).Error("AttachVolumeToHost failed")
 		return nil, status.Errorf(codes.Internal,
 			"failed to attach volume with ID '%s' to host with ID '%s': %s", volume.ID, node.ID, err.Error())
 	}
+	log.WithContext(ctx).WithFields(log.Fields{
+		log.FieldComponent:  "controller",
+		log.FieldOperation:  "AttachVolumeToHost",
+		log.FieldVolumeID:   volume.ID,
+		log.FieldNodeID:     node.ID,
+		log.FieldDurationMs: time.Since(attachStart).Milliseconds(),
+	}).Info("AttachVolumeToHost succeeded")
 
 	mapping, err = client.GetHostVolumeMappingByVolumeID(ctx, volume.ID)
 	if err != nil {
@@ -174,13 +197,31 @@ type NfsPublisher struct {
 
 	// ExclusiveAccess indicates whether only externalAccess entries should be added to the NFS export
 	ExclusiveAccess bool
+
+	// NfsAutoSelect enables NFS source IP auto-discovery. When true, the controller
+	// defers per-host /32 export management to the node plugin and enriches publishContext
+	// with NAS metadata and PVC/PV identifiers for node-side discovery.
+	NfsAutoSelect bool
+}
+
+func preferredFileInterfaceID(nas gopowerstore.NAS) string {
+	if nas.CurrentPreferredIPv4InterfaceID != "" {
+		return nas.CurrentPreferredIPv4InterfaceID
+	}
+	return nas.CurrentPreferredIPv6InterfaceID
+}
+
+func formatNFSExportPath(ipAddress, exportName string) string {
+	if net.ParseIP(ipAddress) != nil && strings.Contains(ipAddress, ":") {
+		return fmt.Sprintf("[%s]:/%s", ipAddress, exportName)
+	}
+	return fmt.Sprintf("%s:/%s", ipAddress, exportName)
 }
 
 // Publish publishes FileSystem by adding host (node) to the NFS Export 'hosts' list
 func (n *NfsPublisher) Publish(ctx context.Context, publishContext map[string]string, req *csi.ControllerPublishVolumeRequest, client gopowerstore.Client,
 	kubeNodeID string, volumeID string, _ bool,
 ) (*csi.ControllerPublishVolumeResponse, error) {
-	log := log.WithContext(ctx)
 	fs, err := client.GetFS(ctx, volumeID)
 	if err != nil {
 		if apiError, ok := err.(gopowerstore.APIError); ok && apiError.NotFound() {
@@ -190,7 +231,7 @@ func (n *NfsPublisher) Publish(ctx context.Context, publishContext map[string]st
 	}
 
 	ipList := identifiers.GetIPListFromString(kubeNodeID)
-	if ipList == nil || len(ipList) == 0 {
+	if len(ipList) == 0 {
 		return nil, status.Error(codes.NotFound, "can't find IP in node ID")
 	}
 	ip := ipList[0]
@@ -220,12 +261,19 @@ func (n *NfsPublisher) Publish(ctx context.Context, publishContext map[string]st
 		return nil, status.Errorf(codes.Internal, "failure getting nfs export: %s", err.Error())
 	}
 
+	log.WithContext(ctx).WithFields(log.Fields{
+		log.FieldComponent: "controller",
+		log.FieldOperation: "GetNFSExportByFileSystemID",
+		log.FieldVolumeID:  fs.ID,
+		"export_id":        export.ID,
+	}).Info("GetNFSExportByFileSystemID succeeded")
+
 	// Add host IP to nfs export if not already present
 	if !identifiers.HostAlreadyPresentInNFSExport(export, ip) {
-		log.Debug("IPs have not been added")
+		log.WithContext(ctx).Debug("IPs have not been added")
 
-		if !n.ExclusiveAccess {
-			log.Infof("Exclusive access is disabled, adding nodeIP %s to the nfs export", ip)
+		if !n.ExclusiveAccess && !n.NfsAutoSelect {
+			log.WithContext(ctx).Infof("Exclusive access is disabled, adding nodeIP %s to the nfs export", ip)
 			ipWithNat = append(ipWithNat, ip)
 		}
 	}
@@ -235,33 +283,54 @@ func (n *NfsPublisher) Publish(ctx context.Context, publishContext map[string]st
 		if err != nil {
 			return nil, status.Errorf(codes.InvalidArgument, "can't find IP in X_CSI_POWERSTORE_EXTERNAL_ACCESS variable")
 		}
-		log.Debugf("externalAccess parsed IP: %s", externalAccess)
+		log.WithContext(ctx).Debugf("externalAccess parsed IP: %s", externalAccess)
 		ipWithNat = append(ipWithNat, externalAccess)
 	}
 	// Add host IP to existing nfs export
+	log.WithContext(ctx).WithFields(log.Fields{
+		log.FieldComponent: "controller",
+		log.FieldOperation: "ModifyNFSExport",
+		"export_id":        export.ID,
+		"hosts":            ipWithNat,
+	}).Info("modifying NFS export")
+	modifyStart := time.Now()
 	_, err = client.ModifyNFSExport(ctx, &gopowerstore.NFSExportModify{
 		AddRWRootHosts: ipWithNat,
 	}, export.ID)
 	if err != nil {
-		log.Debugf("Error while PublishVolume: %s ", err.Error())
-		if apiError, ok := err.(gopowerstore.APIError); !(ok && (apiError.NotFound() || apiError.HostAlreadyPresentInNFSExport())) {
+		log.WithContext(ctx).WithFields(log.Fields{
+			log.FieldComponent:  "controller",
+			log.FieldOperation:  "ModifyNFSExport",
+			"export_id":         export.ID,
+			log.FieldError:      err.Error(),
+			log.FieldDurationMs: time.Since(modifyStart).Milliseconds(),
+		}).Debug("ModifyNFSExport error")
+		if apiError, ok := err.(gopowerstore.APIError); !ok || (!apiError.NotFound() && !apiError.HostAlreadyPresentInNFSExport()) {
 			return nil, status.Errorf(codes.Internal, "failure when adding new host to nfs export: %s", err.Error())
 		}
+	} else {
+		log.WithContext(ctx).WithFields(log.Fields{
+			log.FieldComponent:  "controller",
+			log.FieldOperation:  "ModifyNFSExport",
+			"export_id":         export.ID,
+			log.FieldDurationMs: time.Since(modifyStart).Milliseconds(),
+		}).Info("ModifyNFSExport succeeded")
 	}
 
 	nas, err := client.GetNAS(ctx, fs.NasServerID)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failure getting nas %s", err.Error())
 	}
-	fileInterface, err := client.GetFileInterface(ctx, nas.CurrentPreferredIPv4InterfaceID)
+	fileInterfaceID := preferredFileInterfaceID(nas)
+	fileInterface, err := client.GetFileInterface(ctx, fileInterfaceID)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failure getting file interface %s", err.Error())
 	}
 	publishContext[KeyNasName] = nas.Name // we need to pass that to node part of the driver
-	publishContext[identifiers.KeyNfsExportPath] = fileInterface.IPAddress + ":/" + export.Name
+	publishContext[identifiers.KeyNfsExportPath] = formatNFSExportPath(fileInterface.IPAddress, export.Name)
 
-	// Add node IP to publish context only if exclusive access is not set
-	if !n.ExclusiveAccess {
+	// Add node IP to publish context only if exclusive access is not set and auto-select is not enabled
+	if !n.ExclusiveAccess && !n.NfsAutoSelect {
 		// Ensure we don't index an empty slice; fallback to the node IP when ipWithNat is empty.
 		if len(ipWithNat) > 0 {
 			publishContext[identifiers.KeyHostIP] = ipWithNat[0]
@@ -276,6 +345,26 @@ func (n *NfsPublisher) Publish(ctx context.Context, publishContext map[string]st
 	publishContext[identifiers.KeyExportID] = export.ID
 	publishContext[identifiers.KeyAllowRoot] = req.VolumeContext[identifiers.KeyAllowRoot]
 	publishContext[identifiers.KeyNfsACL] = req.VolumeContext[identifiers.KeyNfsACL]
+
+	// When NFS auto-select is enabled (and exclusiveAccess is not set), enrich publishContext
+	// with metadata for node-side IP discovery and export management.
+	// When exclusiveAccess=true, the controller manages host access exclusively via
+	// externalAccess CIDRs, so node-side auto-select is not applicable.
+	if n.NfsAutoSelect && !n.ExclusiveAccess {
+		publishContext[identifiers.KeyNfsAutoSelect] = "true"
+		publishContext[identifiers.KeyNasInterfaceIP] = fileInterface.IPAddress
+		// Forward PVC/PV identifiers from VolumeContext for node-side observability
+		if v, ok := req.VolumeContext[KeyCSIPVCName]; ok {
+			publishContext[KeyCSIPVCName] = v
+		}
+		if v, ok := req.VolumeContext[KeyCSIPVCNamespace]; ok {
+			publishContext[KeyCSIPVCNamespace] = v
+		}
+		if v, ok := req.VolumeContext[KeyCSIPVName]; ok {
+			publishContext[KeyCSIPVName] = v
+		}
+	}
+
 	return &csi.ControllerPublishVolumeResponse{PublishContext: publishContext}, nil
 }
 

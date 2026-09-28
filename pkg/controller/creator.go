@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2021-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2021-2026 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,6 +26,7 @@ import (
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers"
 	"github.com/dell/gopowerstore/api"
 
+	log "github.com/dell/csmlog"
 	"github.com/dell/gopowerstore"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc/codes"
@@ -66,11 +67,15 @@ type VolumeCreator interface {
 		volumeName string, sizeInBytes int64, parameters map[string]string, client gopowerstore.Client) (*csi.Volume, error)
 	// Create a volume from another volume
 	Clone(ctx context.Context, volumeSource *csi.VolumeContentSource_VolumeSource, volumeName string, sizeInBytes int64, parameters map[string]string, client gopowerstore.Client) (*csi.Volume, error)
+	// GetNAAResolution returns the NAA resolution result from the last Create call (nil for NFS)
+	GetNAAResolution() *NAAResolutionResult
 }
 
 // SCSICreator implementation of VolumeCreator for SCSI based (FC, iSCSI) volumes
 type SCSICreator struct {
 	vg *gopowerstore.VolumeGroup
+	// NAAResolution stores the NAA resolution result for post-create placement verification
+	NAAResolution *NAAResolutionResult
 }
 
 func setMetaData(reqParams map[string]string, createParams interface{}) {
@@ -260,11 +265,25 @@ func (sc *SCSICreator) Create(ctx context.Context, req *csi.CreateVolumeRequest,
 	setMetaData(req.Parameters, reqParams)
 	setVolumeCreateAttributes(req.Parameters, reqParams)
 
+	// NAA ID resolution for multi-appliance co-location (MTV migration support)
+	arrayID := req.Parameters[identifiers.KeyArrayID]
+	naaResolution := resolveNAAForColocation(ctx, req.Parameters, client, arrayID)
+	sc.NAAResolution = naaResolution // Store for post-create verification
+	if naaResolution != nil && naaResolution.Success {
+		reqParams.CoLocateResourceID = naaResolution.SourceVolumeID
+		log.Infof("CreateVolume with co_locate_resource_id=%s for same-appliance placement", naaResolution.SourceVolumeID)
+	}
+
 	resp, err := client.CreateVolume(ctx, reqParams)
 	// reset custom header
 	customHeaders.Del("DELL-VISIBILITY")
 	client.SetCustomHTTPHeaders(customHeaders)
 	return resp, err
+}
+
+// GetNAAResolution returns the NAA resolution result from the last Create call
+func (sc *SCSICreator) GetNAAResolution() *NAAResolutionResult {
+	return sc.NAAResolution
 }
 
 // CreateVolumeFromSnapshot create a volume from an existing snapshot.
@@ -371,12 +390,13 @@ func getCSIVolumeFromClone(VolumeID string, volumeSource *csi.VolumeContentSourc
 
 // NfsCreator implementation of VolumeCreator for NFS volumes
 type NfsCreator struct {
-	nasName string
+	nasName        string
+	nasInterfaceIP string // Preferred file interface IP for PV volume attributes (AC-007)
+	nfsAutoSelect  bool
 }
 
 // CheckSize validates that size is correct and returns size in bytes
 func (*NfsCreator) CheckSize(ctx context.Context, cr *csi.CapacityRange, isAutoRoundOffFsSizeEnabled bool) (int64, error) {
-	log := log.WithContext(ctx)
 	minSize := cr.GetRequiredBytes()
 	maxSize := cr.GetLimitBytes()
 
@@ -394,7 +414,7 @@ func (*NfsCreator) CheckSize(ctx context.Context, cr *csi.CapacityRange, isAutoR
 
 	// TODO: This roundoff logic to be removed once platform supports minimum filesystem size
 	if isAutoRoundOffFsSizeEnabled && minSize < MinFilesystemSizeBytes {
-		log.Warn("Auto round off Filesystem size has been enabled! Rounding off PVC size to 3Gi.")
+		log.WithContext(ctx).Warn("Auto round off Filesystem size has been enabled! Rounding off PVC size to 3Gi.")
 		return MinFilesystemSizeBytes, nil
 	}
 
@@ -412,7 +432,6 @@ func (*NfsCreator) CheckName(_ context.Context, name string) error {
 
 // CheckIfAlreadyExists queries storage array if FileSystem with given name exists
 func (c *NfsCreator) CheckIfAlreadyExists(ctx context.Context, name string, sizeInBytes int64, client gopowerstore.Client) (*csi.Volume, error) {
-	log := log.WithContext(ctx)
 	alreadyExistVolume, err := client.GetFSByName(ctx, name)
 	if err != nil {
 		return nil, status.Errorf(status.Code(err), "can't find filesystem '%s': %s", name, err.Error())
@@ -423,7 +442,7 @@ func (c *NfsCreator) CheckIfAlreadyExists(ctx context.Context, name string, size
 			"filesystem '%s' already exists but is incompatible volume size: %d < %d",
 			name, alreadyExistVolume.SizeTotal, sizeInBytes)
 	}
-	log.Infof("filesystem '%s' already exists", name)
+	log.WithContext(ctx).Infof("filesystem '%s' already exists", name)
 
 	// update the nas server name for the volume to ensure CreateVolume adds the correct nas to volume context
 	nasServerID := alreadyExistVolume.NasServerID
@@ -432,6 +451,16 @@ func (c *NfsCreator) CheckIfAlreadyExists(ctx context.Context, name string, size
 		return nil, status.Errorf(codes.Internal, "can't find nas server '%s': %s", nasServerID, err.Error())
 	}
 	c.nasName = nas.Name
+
+	// AC-007: Resolve the NAS preferred file interface IP for PV volume attributes traceability
+	// when NFS auto-select is enabled.
+	if c.nfsAutoSelect && preferredFileInterfaceID(nas) != "" {
+		fileInterface, fiErr := client.GetFileInterface(ctx, preferredFileInterfaceID(nas))
+		if fiErr == nil && fileInterface.IPAddress != "" {
+			c.nasInterfaceIP = fileInterface.IPAddress
+		}
+	}
+
 	volumeResponse := getCSIVolume(alreadyExistVolume.ID, sizeInBytes)
 	return volumeResponse, nil
 }
@@ -443,6 +472,20 @@ func (c *NfsCreator) Create(ctx context.Context, req *csi.CreateVolumeRequest, s
 		return gopowerstore.CreateResponse{}, err
 	}
 
+	// AC-007: Resolve the NAS preferred file interface IP for PV volume attributes traceability.
+	// This is best-effort — failure to resolve the IP does not block volume creation.
+	if c.nfsAutoSelect && preferredFileInterfaceID(nas) != "" {
+		fileInterface, fiErr := client.GetFileInterface(ctx, preferredFileInterfaceID(nas))
+		if fiErr == nil && fileInterface.IPAddress != "" {
+			c.nasInterfaceIP = fileInterface.IPAddress
+		} else if fiErr != nil {
+			log.WithContext(ctx).WithFields(log.Fields{
+				log.FieldComponent: "controller",
+				log.FieldOperation: "NfsCreator.Create",
+			}).Warnf("NFS auto-select: failed to resolve NAS interface IP for PV attributes: %s", fiErr.Error())
+		}
+	}
+
 	reqParams := &gopowerstore.FsCreate{
 		Name:        req.GetName(),
 		NASServerID: nas.ID,
@@ -451,6 +494,11 @@ func (c *NfsCreator) Create(ctx context.Context, req *csi.CreateVolumeRequest, s
 	setMetaData(req.Parameters, reqParams)
 	setNFSCreateAttributes(req.Parameters, reqParams)
 	return client.CreateFS(ctx, reqParams)
+}
+
+// GetNAAResolution returns nil for NFS volumes (NAA resolution is not applicable)
+func (*NfsCreator) GetNAAResolution() *NAAResolutionResult {
+	return nil
 }
 
 // CreateVolumeFromSnapshot create a FileSystem from an existing FileSystem snapshot.

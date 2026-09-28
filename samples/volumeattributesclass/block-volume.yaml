@@ -1,0 +1,18 @@
+---
+apiVersion: storage.k8s.io/v1beta1
+kind: VolumeAttributesClass
+metadata:
+  name: powerstore-block-vac
+driverName: csi-powerstore.dellemc.com
+parameters:
+  # Valid mutable parameters for Block volumes
+  Description: "Updated block volume description"
+
+  # PerformancePolicyID and ProtectionPolicyID can be specified either by the raw ID:
+  # PerformancePolicyID: "12345-abcde"
+  # Or by referencing the name using the 'name:' prefix:
+  PerformancePolicyID: "name:my-performance-policy"
+  ProtectionPolicyID: "name:my-protection-policy"
+
+  AppType: "Relational_Databases_Other"
+  AppTypeOther: "Custom_App"

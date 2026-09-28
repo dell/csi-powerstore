@@ -1,6 +1,6 @@
 /*
  *
- * Copyright © 2021-2025 Dell Inc. or its subsidiaries. All Rights Reserved.
+ * Copyright © 2021-2026 Dell Inc. or its subsidiaries. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -38,6 +38,7 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	k8score "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -134,7 +135,7 @@ func TestGetPowerStoreArrays(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, _, _, err := array.GetPowerStoreArrays(tt.args.fs, tt.args.data)
+			got, _, _, err := array.GetPowerStoreArrays(tt.args.fs, tt.args.data, nil)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("getPowerStoreArrays() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -160,7 +161,7 @@ func TestGetPowerStoreArrays(t *testing.T) {
 		fsMock := new(mocks.FsInterface)
 		fsMock.On("ReadFile", path).Return([]byte{}, e)
 
-		_, _, _, err := array.GetPowerStoreArrays(fsMock, path)
+		_, _, _, err := array.GetPowerStoreArrays(fsMock, path, nil)
 		assert.Error(t, err)
 		assert.Equal(t, e, err)
 	})
@@ -170,27 +171,29 @@ func TestGetPowerStoreArrays(t *testing.T) {
 		fsMock := new(mocks.FsInterface)
 		fsMock.On("ReadFile", path).Return([]byte("some12frandomgtqxt\nhere"), nil)
 
-		_, _, _, err := array.GetPowerStoreArrays(fsMock, path)
+		_, _, _, err := array.GetPowerStoreArrays(fsMock, path, nil)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "cannot unmarshal")
 	})
 
 	t.Run("incorrect endpoint", func(t *testing.T) {
 		f := &fs.Fs{Util: &gofsutil.FS{}}
-		_, _, _, err := array.GetPowerStoreArrays(f, "./testdata/incorrect-endpoint.yaml")
+		_, _, _, err := array.GetPowerStoreArrays(f, "./testdata/incorrect-endpoint.yaml", nil)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "can't get ips from endpoint")
 	})
 
 	t.Run("invalid endpoint", func(t *testing.T) {
+		// FR-8.1: normalizeEndpoint now catches missing-scheme endpoints earlier
+		// with a clearer error than the old "can't get ips from endpoint" message.
 		f := &fs.Fs{Util: &gofsutil.FS{}}
-		_, _, _, err := array.GetPowerStoreArrays(f, "./testdata/invalid-endpoint.yaml")
+		_, _, _, err := array.GetPowerStoreArrays(f, "./testdata/invalid-endpoint.yaml", nil)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "can't get ips from endpoint")
+		assert.Contains(t, err.Error(), "invalid array endpoint")
 	})
 	t.Run("no global ID", func(t *testing.T) {
 		f := &fs.Fs{Util: &gofsutil.FS{}}
-		_, _, _, err := array.GetPowerStoreArrays(f, "./testdata/no-globalID.yaml")
+		_, _, _, err := array.GetPowerStoreArrays(f, "./testdata/no-globalID.yaml", nil)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "no GlobalID field found in config.yaml")
 	})
@@ -198,7 +201,7 @@ func TestGetPowerStoreArrays(t *testing.T) {
 	t.Run("incorrect throttling limit", func(t *testing.T) {
 		_ = os.Setenv(identifiers.EnvThrottlingRateLimit, "abc")
 		f := &fs.Fs{Util: &gofsutil.FS{}}
-		_, _, _, err := array.GetPowerStoreArrays(f, "./testdata/one-arr.yaml")
+		_, _, _, err := array.GetPowerStoreArrays(f, "./testdata/one-arr.yaml", nil)
 		assert.NoError(t, err)
 	})
 
@@ -206,7 +209,7 @@ func TestGetPowerStoreArrays(t *testing.T) {
 		_ = os.Setenv(identifiers.EnvMultiNASFailureThreshold, "0")
 		_ = os.Setenv(identifiers.EnvMultiNASCooldownPeriod, "0m")
 		f := &fs.Fs{Util: &gofsutil.FS{}}
-		got, _, _, err := array.GetPowerStoreArrays(f, "./testdata/one-arr.yaml")
+		got, _, _, err := array.GetPowerStoreArrays(f, "./testdata/one-arr.yaml", nil)
 		assert.NoError(t, err)
 		assert.Equal(t, 5, got["gid1"].NASCooldownTracker.(*array.NASCooldown).GetThreshold())
 		assert.Equal(t, 5*time.Minute, got["gid1"].NASCooldownTracker.(*array.NASCooldown).GetCooldownPeriod())
@@ -217,7 +220,7 @@ func TestGetPowerStoreArrays(t *testing.T) {
 		_ = os.Setenv(identifiers.EnvMultiNASCooldownPeriod, "abc")
 
 		f := &fs.Fs{Util: &gofsutil.FS{}}
-		got, _, _, err := array.GetPowerStoreArrays(f, "./testdata/one-arr.yaml")
+		got, _, _, err := array.GetPowerStoreArrays(f, "./testdata/one-arr.yaml", nil)
 		assert.NoError(t, err)
 		assert.Equal(t, 5, got["gid1"].NASCooldownTracker.(*array.NASCooldown).GetThreshold())
 		assert.Equal(t, 5*time.Minute, got["gid1"].NASCooldownTracker.(*array.NASCooldown).GetCooldownPeriod())
@@ -377,7 +380,7 @@ func (s *LegacyParseVolumeTestSuite) TestVolumeUnknownError() {
 	s.mockAPI.GetFS.Return(gopowerstore.FileSystem{}, error(s.mockAPI.APIError))
 
 	_, err := array.ParseVolumeID(context.Background(), validFileSystemUUID, s.psArray, nil)
-	assert.ErrorContains(s.T(), err, s.mockAPI.APIError.ErrorMsg.Message)
+	assert.ErrorContains(s.T(), err, s.mockAPI.APIError.Message)
 }
 
 func (s *LegacyParseVolumeTestSuite) TestIPAsArrayID() {
@@ -424,7 +427,7 @@ func TestParseVolumeID(t *testing.T) {
 
 func TestLocker_UpdateArrays(t *testing.T) {
 	lck := array.Locker{}
-	err := lck.UpdateArrays("./testdata/one-arr.yaml", &fs.Fs{Util: &gofsutil.FS{}})
+	err := lck.UpdateArrays("./testdata/one-arr.yaml", &fs.Fs{Util: &gofsutil.FS{}}, nil)
 	assert.NoError(t, err)
 	assert.Equal(t, lck.DefaultArray().Endpoint, "https://127.0.0.1/api/rest")
 }
@@ -1180,4 +1183,344 @@ func TestDoesNodeMatchMetroSelectors(t *testing.T) {
 		result := metroArr.DoesNodeMatchMetroSelectors(node)
 		assert.False(t, result)
 	})
+}
+
+func TestArrays(t *testing.T) {
+	locker := array.Locker{}
+	arrays := map[string]*array.PowerStoreArray{
+		"gid1": {
+			Endpoint:  "https://127.0.0.1/api/rest",
+			GlobalID:  "gid1",
+			Username:  "admin",
+			Password:  "password",
+			Insecure:  true,
+			IsDefault: true,
+		},
+		"gid2": {
+			Endpoint:  "https://127.0.0.2/api/rest",
+			GlobalID:  "gid2",
+			Username:  "admin",
+			Password:  "password",
+			Insecure:  true,
+			IsDefault: false,
+		},
+	}
+	locker.SetArrays(arrays)
+
+	result := locker.Arrays()
+	assert.Equal(t, 2, len(result))
+	assert.Equal(t, "gid1", result["gid1"].GlobalID)
+	assert.Equal(t, "gid2", result["gid2"].GlobalID)
+}
+
+func TestGetNasName(t *testing.T) {
+	arr := &array.PowerStoreArray{
+		NasName: "nas-server-1",
+	}
+	result := arr.GetNasName()
+	assert.Equal(t, "nas-server-1", result)
+}
+
+func TestGetNasName_Empty(t *testing.T) {
+	arr := &array.PowerStoreArray{
+		NasName: "",
+	}
+	result := arr.GetNasName()
+	assert.Equal(t, "", result)
+}
+
+func TestGetIP(t *testing.T) {
+	arr := &array.PowerStoreArray{
+		IP: "192.168.1.100",
+	}
+	result := arr.GetIP()
+	assert.Equal(t, "192.168.1.100", result)
+}
+
+func TestGetIP_Empty(t *testing.T) {
+	arr := &array.PowerStoreArray{
+		IP: "",
+	}
+	result := arr.GetIP()
+	assert.Equal(t, "", result)
+}
+
+func TestVolumeHandle_ToString(t *testing.T) {
+	tests := []struct {
+		name     string
+		handle   *array.VolumeHandle
+		expected string
+	}{
+		{
+			name: "local volume only",
+			handle: &array.VolumeHandle{
+				LocalUUID:           "vol-123",
+				LocalArrayGlobalID:  "gid-1",
+				Protocol:            "scsi",
+				RemoteUUID:          "",
+				RemoteArrayGlobalID: "",
+			},
+			expected: "vol-123/gid-1/scsi",
+		},
+		{
+			name: "metro volume with remote",
+			handle: &array.VolumeHandle{
+				LocalUUID:           "vol-123",
+				LocalArrayGlobalID:  "gid-1",
+				Protocol:            "scsi",
+				RemoteUUID:          "vol-456",
+				RemoteArrayGlobalID: "gid-2",
+			},
+			expected: "vol-123/gid-1/scsi:vol-456/gid-2",
+		},
+		{
+			name: "empty local UUID",
+			handle: &array.VolumeHandle{
+				LocalUUID:           "",
+				LocalArrayGlobalID:  "gid-1",
+				Protocol:            "scsi",
+				RemoteUUID:          "",
+				RemoteArrayGlobalID: "",
+			},
+			expected: "/gid-1/scsi",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.handle.ToString()
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestUpdateArrays_Error(t *testing.T) {
+	lck := array.Locker{}
+	err := lck.UpdateArrays("./testdata/nonexistent.yaml", &fs.Fs{Util: &gofsutil.FS{}}, nil)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "can't get config for arrays")
+}
+
+func TestGetPowerStoreArrays_EmptyGlobalID(t *testing.T) {
+	// Create a temporary config file with empty GlobalID
+	configContent := `
+arrays:
+  - endpoint: "https://127.0.0.1/api/rest"
+    username: "admin"
+    password: "password"
+    insecure: true
+    globalID: ""
+`
+	tmpFile, err := os.CreateTemp("", "config-*.yaml")
+	assert.NoError(t, err)
+	defer func() {
+		_ = os.Remove(tmpFile.Name())
+	}()
+
+	_, err = tmpFile.WriteString(configContent)
+	assert.NoError(t, err)
+	_ = tmpFile.Close()
+
+	_, _, _, err = array.GetPowerStoreArrays(&fs.Fs{Util: &gofsutil.FS{}}, tmpFile.Name(), nil)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "no GlobalID field found")
+}
+
+// FR-8.1: bare IPv6 endpoint in config must be normalized to bracketed form
+// before the gopowerstore client is created.
+func TestGetPowerStoreArrays_BareIPv6EndpointNormalized(t *testing.T) {
+	_ = os.Setenv(identifiers.EnvThrottlingRateLimit, "1000")
+	_ = os.Setenv(identifiers.EnvMultiNASFailureThreshold, "10")
+	_ = os.Setenv(identifiers.EnvMultiNASCooldownPeriod, "2m")
+
+	// Use ::1 (IPv6 loopback) to avoid network timeouts in CI.
+	configContent := `
+arrays:
+  - endpoint: "https://::1/api/rest"
+    globalID: "gid-ipv6"
+    username: "admin"
+    password: "password"
+    skipCertificateValidation: true
+    isDefault: true
+`
+	tmpFile, err := os.CreateTemp("", "config-ipv6-bare-*.yaml")
+	assert.NoError(t, err)
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
+	_, err = tmpFile.WriteString(configContent)
+	assert.NoError(t, err)
+	_ = tmpFile.Close()
+
+	got, _, _, err := array.GetPowerStoreArrays(&fs.Fs{Util: &gofsutil.FS{}}, tmpFile.Name(), nil)
+	assert.NoError(t, err, "bare IPv6 endpoint must be accepted after normalization")
+	arr, ok := got["gid-ipv6"]
+	assert.True(t, ok, "array gid-ipv6 must be present")
+	// Endpoint must have been normalized to bracketed form
+	assert.Equal(t, "https://[::1]/api/rest", arr.Endpoint, "bare IPv6 endpoint must be normalized to bracketed form")
+}
+
+// FR-8.1 regression: already-bracketed IPv6 endpoint must be accepted as-is
+func TestGetPowerStoreArrays_BracketedIPv6EndpointUnchanged(t *testing.T) {
+	_ = os.Setenv(identifiers.EnvThrottlingRateLimit, "1000")
+	_ = os.Setenv(identifiers.EnvMultiNASFailureThreshold, "10")
+	_ = os.Setenv(identifiers.EnvMultiNASCooldownPeriod, "2m")
+
+	configContent := `
+arrays:
+  - endpoint: "https://[::1]/api/rest"
+    globalID: "gid-ipv6-bracketed"
+    username: "admin"
+    password: "password"
+    skipCertificateValidation: true
+    isDefault: true
+`
+	tmpFile, err := os.CreateTemp("", "config-ipv6-bracketed-*.yaml")
+	assert.NoError(t, err)
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
+	_, err = tmpFile.WriteString(configContent)
+	assert.NoError(t, err)
+	_ = tmpFile.Close()
+
+	got, _, _, err := array.GetPowerStoreArrays(&fs.Fs{Util: &gofsutil.FS{}}, tmpFile.Name(), nil)
+	assert.NoError(t, err, "bracketed IPv6 endpoint must be accepted")
+	arr, ok := got["gid-ipv6-bracketed"]
+	assert.True(t, ok, "array must be present")
+	assert.Equal(t, "https://[::1]/api/rest", arr.Endpoint, "already-bracketed endpoint must be unchanged")
+}
+
+// FR-9.1: configuring both an IPv4 and an IPv6 array in the same secret must
+// be rejected with a clear "dual-stack" error message. Uses loopback addresses
+// to avoid network timeouts in CI.
+func TestGetPowerStoreArrays_DualStackRejected(t *testing.T) {
+	_ = os.Setenv(identifiers.EnvThrottlingRateLimit, "1000")
+	_ = os.Setenv(identifiers.EnvMultiNASFailureThreshold, "10")
+	_ = os.Setenv(identifiers.EnvMultiNASCooldownPeriod, "2m")
+
+	configContent := `
+arrays:
+  - endpoint: "https://127.0.0.1/api/rest"
+    globalID: "gid-ipv4"
+    username: "admin"
+    password: "password"
+    skipCertificateValidation: true
+    isDefault: true
+
+  - endpoint: "https://[::1]/api/rest"
+    globalID: "gid-ipv6"
+    username: "admin"
+    password: "password"
+    skipCertificateValidation: true
+`
+	tmpFile, err := os.CreateTemp("", "config-dual-stack-*.yaml")
+	assert.NoError(t, err)
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
+	_, err = tmpFile.WriteString(configContent)
+	assert.NoError(t, err)
+	_ = tmpFile.Close()
+
+	_, _, _, err = array.GetPowerStoreArrays(&fs.Fs{Util: &gofsutil.FS{}}, tmpFile.Name(), nil)
+	require.EqualError(t, err, "dual-stack configuration detected: PowerStore does not support simultaneous IPv4 and IPv6 array endpoints")
+}
+
+func TestGetPowerStoreArrays_DualStackMappedIPv6Rejected(t *testing.T) {
+	configContent := `
+arrays:
+  - endpoint: "https://192.0.2.1/api/rest"
+    globalID: "gid-ipv4"
+    username: "admin"
+    password: "password"
+    skipCertificateValidation: true
+  - endpoint: "https://[::ffff:192.0.2.1]/api/rest"
+    globalID: "gid-mapped-ipv6"
+    username: "admin"
+    password: "password"
+    skipCertificateValidation: true
+`
+	tmpFile, err := os.CreateTemp("", "config-dual-stack-mapped-*.yaml")
+	assert.NoError(t, err)
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
+	_, err = tmpFile.WriteString(configContent)
+	assert.NoError(t, err)
+	_ = tmpFile.Close()
+
+	_, _, _, err = array.GetPowerStoreArrays(&fs.Fs{Util: &gofsutil.FS{}}, tmpFile.Name(), nil)
+	require.EqualError(t, err, "dual-stack configuration detected: PowerStore does not support simultaneous IPv4 and IPv6 array endpoints")
+}
+
+// FR-10.1: link-local bare IPv6 with zone ID must normalize to bracketed form
+// preserving the zone ID suffix.
+func TestNormalizeEndpoint_LinkLocalWithZone(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+		wantErr  bool
+	}{
+		{
+			name:     "bare link-local with zone ID",
+			input:    "https://fe80::1%eth0/api/rest",
+			expected: "https://[fe80::1%25eth0]/api/rest",
+		},
+		{
+			name:     "bare link-local without zone ID",
+			input:    "https://fe80::1/api/rest",
+			expected: "https://[fe80::1]/api/rest",
+		},
+		{
+			name:     "bare global unicast IPv6",
+			input:    "https://2001:db8::1/api/rest",
+			expected: "https://[2001:db8::1]/api/rest",
+		},
+		{
+			name:     "already-bracketed link-local with zone",
+			input:    "https://[fe80::1%25eth0]/api/rest",
+			expected: "https://[fe80::1%25eth0]/api/rest",
+		},
+		{
+			name:     "IPv4 endpoint unchanged",
+			input:    "https://192.168.1.1/api/rest",
+			expected: "https://192.168.1.1/api/rest",
+		},
+		{
+			name:     "FQDN endpoint unchanged",
+			input:    "https://powerstore.example.com/api/rest",
+			expected: "https://powerstore.example.com/api/rest",
+		},
+		{
+			name:    "missing scheme returns error",
+			input:   "powerstore.example.com/api/rest",
+			wantErr: true,
+		},
+		{
+			name:    "malformed bare IPv6 returns error",
+			input:   "https://2001:db8::invalid/api/rest",
+			wantErr: true,
+		},
+		{
+			name:    "malformed bracketed IPv6 returns error",
+			input:   "https://[2001:db8::invalid]/api/rest",
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := array.NormalizeEndpoint(tt.input)
+			if tt.wantErr {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), "invalid array endpoint")
+				return
+			}
+			assert.NoError(t, err)
+			assert.Equal(t, tt.expected, got)
+		})
+	}
+}
+
+// FR-9.1 regression: two IPv4 arrays must NOT be rejected as dual-stack
+func TestGetPowerStoreArrays_TwoIPv4ArraysAllowed(t *testing.T) {
+	_ = os.Setenv(identifiers.EnvThrottlingRateLimit, "1000")
+	_ = os.Setenv(identifiers.EnvMultiNASFailureThreshold, "10")
+	_ = os.Setenv(identifiers.EnvMultiNASCooldownPeriod, "2m")
+
+	_, _, _, err := array.GetPowerStoreArrays(&fs.Fs{Util: &gofsutil.FS{}}, "./testdata/two-arr.yaml", nil)
+	assert.NoError(t, err, "two IPv4 arrays must not trigger dual-stack rejection")
 }

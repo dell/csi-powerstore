@@ -20,12 +20,13 @@
 package identifiers
 
 import (
-	"bytes"
 	"context"
 	"crypto/rand"
 	"errors"
 	"fmt"
 	"net"
+	"net/netip"
+	"net/url"
 	"os"
 	"regexp"
 	"slices"
@@ -37,7 +38,7 @@ import (
 
 	"github.com/dell/csi-powerstore/v2/core"
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers/fs"
-	"github.com/dell/csmlog"
+	log "github.com/dell/csmlog"
 	"github.com/dell/gobrick"
 	csictx "github.com/dell/gocsi/context"
 	csiutils "github.com/dell/gocsi/utils/csi"
@@ -46,14 +47,15 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 )
 
-// Instantiate csmlog on a package level
-var log = csmlog.GetLogger()
-
 // Name contains default name of the driver, can be overridden
 var Name = "csi-powerstore.dellemc.com"
 
 // APIPort port for API calls
 var APIPort string
+
+// PodmonAPIToken is the shared secret token for authenticating podmon API requests.
+// This variable is package-scoped; each driver binary maintains its own instance.
+var PodmonAPIToken string
 
 // Update when the manifest version changes.
 var ManifestSemver string
@@ -63,8 +65,6 @@ var Manifest = map[string]string{
 	"semver": ManifestSemver,
 	"formed": core.CommitTime.Format(time.RFC1123),
 }
-
-type key int
 
 // ArrayConnectivityStatus Status of the array probe
 type ArrayConnectivityStatus struct {
@@ -83,6 +83,8 @@ const (
 	KeyExportID = "ExportID"
 	// KeyNatIP key value to pass in publish context
 	KeyNatIP = "NatIP"
+	// KeyNfsAutoSelect key value to pass in publish context for NFS auto-select
+	KeyNfsAutoSelect = "NfsAutoSelect"
 	// KeyArrayID key value to check in request parameters for array ip
 	KeyArrayID = "arrayID"
 	// KeyArrayVolumeName key value to check in request parameters for volume name
@@ -93,6 +95,8 @@ const (
 	KeyNfsACL = "nfsAcls"
 	// KeyNasName key value to specify NAS server name
 	KeyNasName = "nasName"
+	// KeyNasInterfaceIP key value for NAS preferred file interface IP (AC-007 PV traceability)
+	KeyNasInterfaceIP = "nasInterfaceIP"
 	// KeyVolumeDescription key value to specify volume description
 	KeyVolumeDescription = "csi.dell.com/description"
 	// KeyApplianceID key value to specify appliance_id
@@ -196,8 +200,6 @@ const (
 	// Zero indicates value zero for RPO
 	Zero = "Zero"
 
-	contextLogFieldsKey key = iota
-
 	// DefaultPodmonAPIPortNumber is the port number in default to expose internal health APIs
 	DefaultPodmonAPIPortNumber = "8083"
 
@@ -259,26 +261,63 @@ func RmSockFile(f fs.Interface) {
 	})
 }
 
-// GetIPListFromString returns list of ips in string form found in input string
-// A return value of nil indicates no match
+// GetIPListFromString returns list of ips in string form found in input string.
+// Supports IPv4 (bare and in URLs), FQDNs (in URLs), and IPv6 (bracketed in
+// URLs or bare in dash-delimited node-ID strings like "prefix-hostname-::1").
+// A return value of nil indicates no match.
 func GetIPListFromString(input string) []string {
-	ipRe := regexp.MustCompile(`\b((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)){3}|localhost\b)`)
-	urlRe := regexp.MustCompile(`https?://([a-zA-Z0-9.-]+)(:[0-9]+)?(/.*)?`)
-
-	ipMatches := ipRe.FindAllString(input, -1)
-	urlMatches := urlRe.FindAllStringSubmatch(input, -1)
-
-	var matches []string
-	matches = append(matches, ipMatches...)
-	for _, match := range urlMatches {
-		if len(match) > 1 {
-			if strings.Contains(match[1], ".") {
-				if !isDomain(match[1]) {
-					continue
-				}
+	// Extract a host from a URL first so embedded IPv4 text in an IPv4-mapped
+	// IPv6 address cannot be returned ahead of the complete logical address.
+	if u, err := url.Parse(input); err == nil && u.Host != "" {
+		host := u.Hostname()
+		if host != "" {
+			if addr, err := netip.ParseAddr(host); err == nil {
+				return []string{addr.String()}
 			}
-			if !slices.Contains(matches, match[1]) {
-				matches = append(matches, match[1])
+			if isDomain(host) {
+				return []string{host}
+			}
+		}
+	}
+
+	// IPv4 addresses and "localhost" — unchanged behaviour for legacy inputs.
+	ipv4Re := regexp.MustCompile(`\b((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)){3}|localhost\b)`)
+	matches := ipv4Re.FindAllString(input, -1)
+
+	// Scan dash-delimited tokens for bare IPv6 addresses (node-ID format:
+	// "prefix-hostname-2001:db8::1"). IPv6 addresses never contain "-", so
+	// splitting on "-" leaves the IPv6 part intact as a single token.
+	// However, when IPv6 addresses are encoded for node IDs (colons replaced with dashes),
+	// we need to handle the encoded format by reconstructing consecutive dash-separated tokens.
+	// Since the IPv6 address is always at the end of the node ID, we try reconstructing
+	// from the end backwards to find the longest valid IPv6 address.
+	tokens := strings.Split(input, "-")
+	for i := 0; i < len(tokens); i++ {
+		// Try parsing token directly (for unencoded IPv6 with colons)
+		if addr, err := netip.ParseAddr(tokens[i]); err == nil && addr.Is6() {
+			if !slices.Contains(matches, tokens[i]) {
+				matches = append(matches, tokens[i])
+			}
+			continue
+		}
+
+		// Try reconstructing dash-encoded IPv6 (colons replaced with dashes)
+		// Try different lengths of consecutive tokens from the end backwards
+		// We try from longest to shortest to prefer the most specific match
+		for length := 8; length >= 2 && length <= len(tokens); length-- {
+			start := len(tokens) - length
+			if start < 0 {
+				continue
+			}
+			reconstructed := tokens[start:]
+			// Join with colons - empty strings from double dashes will become ::
+			candidate := strings.Join(reconstructed, ":")
+			if addr, err := netip.ParseAddr(candidate); err == nil && addr.Is6() {
+				if !slices.Contains(matches, candidate) {
+					matches = append(matches, candidate)
+				}
+				// We found the IPv6 at the end, no need to continue
+				break
 			}
 		}
 	}
@@ -295,31 +334,20 @@ func isDomain(str string) bool {
 	return false
 }
 
-func parseMask(ipaddr string) (mask string, err error) {
-	removeExtra := regexp.MustCompile("^(.*[\\/])")
-	asd := ipaddr[len(ipaddr)-3:]
-	findSubnet := removeExtra.ReplaceAll([]byte(asd), []byte(""))
-	subnet, err := strconv.ParseInt(string(findSubnet), 10, 64)
+func parseMask(ipaddr string) (string, error) {
+	p, err := netip.ParsePrefix(ipaddr)
 	if err != nil {
-		return "", errors.New("Parse Mask: Error parsing mask")
+		return "", fmt.Errorf("parse mask: error parsing CIDR: %w", err)
 	}
-	if subnet < 0 || subnet > 32 {
-		return "", errors.New("Invalid subnet mask")
+	bits := p.Bits()
+	if p.Addr().Is4() {
+		// Return dotted-decimal mask for IPv4
+		m := net.CIDRMask(bits, 32)
+		return fmt.Sprintf("%d.%d.%d.%d", m[0], m[1], m[2], m[3]), nil
 	}
-	var buff bytes.Buffer
-	for i := 0; i < int(subnet); i++ {
-		buff.WriteString("1")
-	}
-	for i := subnet; i < 32; i++ {
-		buff.WriteString("0")
-	}
-	masker := buff.String()
-	a, _ := strconv.ParseUint(masker[:8], 2, 64)
-	b, _ := strconv.ParseUint(masker[8:16], 2, 64)
-	c, _ := strconv.ParseUint(masker[16:24], 2, 64)
-	d, _ := strconv.ParseUint(masker[24:32], 2, 64)
-	resultMask := fmt.Sprintf("%v.%v.%v.%v", a, b, c, d)
-	return resultMask, nil
+	// For IPv6 return the prefix length as a decimal number.
+	// netip.ParsePrefix already validates that bits is in [0, 128].
+	return strconv.Itoa(bits), nil
 }
 
 // GetIPListWithMaskFromString returns ip and mask in string form found in input string
@@ -358,7 +386,11 @@ func RandomString(length int) string {
 	return suff
 }
 
-// GetISCSITargetsInfoFromStorage returns list of gobrick compatible iscsi targets by querying PowerStore array
+// GetISCSITargetsInfoFromStorage returns list of gobrick compatible iscsi targets by querying PowerStore array.
+// FR-1.4: Multi-purpose block interfaces (Purposes: [Storage_Iscsi_Target, Storage_NVMe_TCP_Port]) are handled
+// correctly: the PowerStore API filter "cs.{Storage_Iscsi_Target}" is a "contains-set" query that returns all
+// addresses whose purposes array contains the specified value. A dual-purpose address therefore appears in both
+// this response and the NVMe response independently — no local Purposes iteration is needed.
 func GetISCSITargetsInfoFromStorage(client gopowerstore.Client, volumeApplianceID string) ([]gobrick.ISCSITargetInfo, error) {
 	addrInfo, err := client.GetStorageISCSITargetAddresses(context.Background())
 	if err != nil {
@@ -373,7 +405,12 @@ func GetISCSITargetsInfoFromStorage(client gopowerstore.Client, volumeApplianceI
 	for _, t := range addrInfo {
 		// volumeApplianceID will be empty in case the call is from NodeGetInfo
 		if t.ApplianceID == volumeApplianceID || volumeApplianceID == "" {
-			result = append(result, gobrick.ISCSITargetInfo{Target: t.IPPort.TargetIqn, Portal: fmt.Sprintf("%s:3260", t.Address), NetworkID: t.NetworkID})
+			// FR-1.2: pass the bare address. For IPv4 gobrick appends ":3260"; for
+			// IPv6 gobrick skips port-append (address already contains ":"), and
+			// iscsiadm uses the default port. Bracketed "[IPv6]:3260" must NOT be
+			// used here: goiscsi.validateIPAddress rejects it (net.ParseIP returns
+			// nil for bracketed+port strings). See DEPENDENCIES.md §goiscsi.
+			result = append(result, gobrick.ISCSITargetInfo{Target: t.IPPort.TargetIqn, Portal: t.Address, NetworkID: t.NetworkID})
 		}
 	}
 	return result, nil
@@ -401,7 +438,10 @@ func GetNVMETCPTargetsInfoFromStorage(client gopowerstore.Client, volumeApplianc
 	for _, t := range addrInfo {
 		// volumeApplianceID will be empty in case the call is from NodeGetInfo
 		if t.ApplianceID == volumeApplianceID || volumeApplianceID == "" {
-			result = append(result, gobrick.NVMeTargetInfo{Target: nvmeNQN, Portal: fmt.Sprintf("%s:4420", t.Address), NetworkID: t.NetworkID})
+			// FR-1.3: same rationale as iSCSI above — pass bare address.
+			// gonvme passes "-a <portal> -s 4420" as separate args; bracketed
+			// form is unnecessary and causes issues with session matching.
+			result = append(result, gobrick.NVMeTargetInfo{Target: nvmeNQN, Portal: t.Address, NetworkID: t.NetworkID})
 		}
 	}
 	return result, nil
@@ -417,7 +457,7 @@ func GetFCTargetsInfoFromStorage(client gopowerstore.Client, volumeApplianceID s
 	var result []gobrick.FCTargetInfo
 	for _, t := range fcPorts {
 		if t.IsLinkUp && t.ApplianceID == volumeApplianceID {
-			result = append(result, gobrick.FCTargetInfo{WWPN: strings.Replace(t.Wwn, ":", "", -1)})
+			result = append(result, gobrick.FCTargetInfo{WWPN: strings.ReplaceAll(t.Wwn, ":", "")})
 		}
 	}
 	return result, nil
@@ -442,6 +482,10 @@ func IsK8sMetadataSupported(client gopowerstore.Client) bool {
 // GetNVMEFCTargetInfoFromStorage returns a list of gobrick compatible NVMeFC targets by quering Powerstore Array
 func GetNVMEFCTargetInfoFromStorage(client gopowerstore.Client, volumeApplianceID string) ([]gobrick.NVMeTargetInfo, error) {
 	clusterInfo, err := client.GetCluster(context.Background())
+	if err != nil {
+		log.Error(err.Error())
+		return nil, err
+	}
 	nvmeNQN := clusterInfo.NVMeNQN
 
 	fcPorts, err := client.GetFCPorts(context.Background())
@@ -452,7 +496,7 @@ func GetNVMEFCTargetInfoFromStorage(client gopowerstore.Client, volumeApplianceI
 	var result []gobrick.NVMeTargetInfo
 	for _, t := range fcPorts {
 		if t.IsLinkUp && (t.ApplianceID == volumeApplianceID || volumeApplianceID == "") {
-			targetAddress := strings.Replace(fmt.Sprintf("nn-0x%s:pn-0x%s", strings.Replace(t.WwnNode, ":", "", -1), strings.Replace(t.WwnNVMe, ":", "", -1)), "\n", "", -1)
+			targetAddress := strings.ReplaceAll(fmt.Sprintf("nn-0x%s:pn-0x%s", strings.ReplaceAll(t.WwnNode, ":", ""), strings.ReplaceAll(t.WwnNVMe, ":", "")), "\n", "")
 			result = append(result, gobrick.NVMeTargetInfo{Target: nvmeNQN, Portal: targetAddress})
 		}
 	}
@@ -463,8 +507,12 @@ func GetNVMEFCTargetInfoFromStorage(client gopowerstore.Client, volumeApplianceI
 func ParseCIDR(externalAccessCIDR string) (string, error) {
 	// check if externalAccess has netmask bit or not
 	if !strings.Contains(externalAccessCIDR, "/") {
-		// if externalAccess is a plane ip we can add /32 from our end
-		externalAccessCIDR += "/32"
+		// FR-7.2: append /128 for bare IPv6, /32 for bare IPv4
+		if addr, err := netip.ParseAddr(externalAccessCIDR); err == nil && addr.Is6() {
+			externalAccessCIDR += "/128"
+		} else {
+			externalAccessCIDR += "/32"
+		}
 		log.Debugf("externalAccess after appending netMask bit: %s", externalAccessCIDR)
 	}
 	ip, ipnet, err := net.ParseCIDR(externalAccessCIDR)
@@ -486,13 +534,87 @@ func ParseCIDR(externalAccessCIDR string) (string, error) {
 	return externalAccess, nil
 }
 
+// FormatNFSHostEntry returns an address in the host-entry format accepted by PowerStore.
+func FormatNFSHostEntry(ip string) (string, error) {
+	addr, err := netip.ParseAddr(strings.Trim(ip, "[]"))
+	if err != nil {
+		return "", fmt.Errorf("invalid NFS host IP %q: %w", ip, err)
+	}
+	if addr.Is4() {
+		return addr.String() + "/255.255.255.255", nil
+	}
+	return addr.String() + "/128", nil
+}
+
+// HostEntryMatchesIP reports whether a PowerStore NFS host entry represents ip.
+func HostEntryMatchesIP(entry, ip string) bool {
+	host := entry
+	if slash := strings.LastIndexByte(entry, '/'); slash > 0 {
+		host = entry[:slash]
+	}
+	entryAddr, err := netip.ParseAddr(strings.Trim(host, "[]"))
+	if err != nil {
+		return false
+	}
+	target := ip
+	if slash := strings.LastIndexByte(ip, '/'); slash > 0 {
+		target = ip[:slash]
+	}
+	targetAddr, err := netip.ParseAddr(strings.Trim(target, "[]"))
+	return err == nil && entryAddr == targetAddr
+}
+
+// HostEntriesForIP returns entries that represent the supplied IP, preserving their original format.
+func HostEntriesForIP(entries []string, ip string) []string {
+	matched := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		if HostEntryMatchesIP(entry, ip) {
+			matched = append(matched, entry)
+		}
+	}
+	if len(matched) == 0 {
+		return nil
+	}
+	return matched
+}
+
+// ParseNFSExportPath returns the server address from a PowerStore NFS source.
+func ParseNFSExportPath(exportPath string) (string, error) {
+	if strings.HasPrefix(exportPath, "[") {
+		closeBracket := strings.IndexByte(exportPath, ']')
+		if closeBracket <= 1 || len(exportPath) <= closeBracket+2 || exportPath[closeBracket+1:closeBracket+3] != ":/" {
+			return "", fmt.Errorf("invalid NFS export path %q", exportPath)
+		}
+		host := exportPath[1:closeBracket]
+		if _, err := netip.ParseAddr(host); err != nil {
+			return "", fmt.Errorf("invalid NFS export host %q: %w", host, err)
+		}
+		return host, nil
+	}
+
+	separator := strings.Index(exportPath, ":/")
+	if separator == 0 {
+		return "", fmt.Errorf("NfsExportPath %q has empty IP component; expected format <IP>:/<path>", exportPath)
+	}
+	if separator < 0 {
+		return "", fmt.Errorf("invalid NFS export path %q", exportPath)
+	}
+	return exportPath[:separator], nil
+}
+
+// EncodeIPForKubernetes returns an address safe for use in a Kubernetes name or label key.
+func EncodeIPForKubernetes(ip string) string {
+	return strings.NewReplacer(":", "-", "%", "-").Replace(ip)
+}
+
 // HasRequiredTopology Checks if requiredTopology is present in the topology array and is true
 func HasRequiredTopology(topologies []*csi.Topology, arrIP string, requiredTopology string) bool {
 	if len(topologies) == 0 || len(arrIP) == 0 || len(requiredTopology) == 0 {
 		return false
 	}
 
-	topologyKey := Name + "/" + arrIP + "-" + strings.ToLower(requiredTopology)
+	safeIP := EncodeIPForKubernetes(arrIP)
+	topologyKey := Name + "/" + safeIP + "-" + strings.ToLower(requiredTopology)
 	for _, topology := range topologies {
 		if value, ok := topology.Segments[topologyKey]; ok && strings.EqualFold(value, "true") {
 			return true
@@ -501,11 +623,98 @@ func HasRequiredTopology(topologies []*csi.Topology, arrIP string, requiredTopol
 	return false
 }
 
+// RuntimeConfig holds the tuning parameters for PowerStore metrics calls.
+// This is used by the MetricsRuntime to configure circuit breaker, rate limiting, and caching.
+type RuntimeConfig struct {
+	Timeout        time.Duration
+	CacheTTL       time.Duration
+	RateLimit      int
+	CBThreshold    int
+	CBResetTimeout time.Duration
+	StaleReporter  func() func(globalID string, stale bool)
+}
+
 // GetNfsTopology Returns a topology array with only nfs
 func GetNfsTopology(arrIP string) []*csi.Topology {
 	nfsTopology := new(csi.Topology)
-	nfsTopology.Segments = map[string]string{Name + "/" + arrIP + "-nfs": "true"}
+	safeIP := EncodeIPForKubernetes(arrIP)
+	nfsTopology.Segments = map[string]string{Name + "/" + safeIP + "-nfs": "true"}
 	return []*csi.Topology{nfsTopology}
+}
+
+// blockProtocolSuffixes lists the PowerStore block-protocol topology key suffixes that must be
+// removed from NFS volume topology so that NFS pods are not incorrectly coupled to block-only nodes.
+var blockProtocolSuffixes = []string{"-fc", "-iscsi", "-nvmefc", "-nvmetcp"}
+
+// isBlockProtocolSegment reports whether the given topology key represents a PowerStore
+// block-protocol segment that should be stripped from NFS volume topology responses.
+func isBlockProtocolSegment(key string) bool {
+	if !strings.HasPrefix(key, Name+"/") {
+		return false
+	}
+	for _, suffix := range blockProtocolSuffixes {
+		if strings.HasSuffix(key, suffix) {
+			return true
+		}
+	}
+	return false
+}
+
+// GetEligibleNfsAccessibleTopologies returns a list of topologies for NFS-accessible PVs.
+// It scans all entries in Preferred (then Requisite if needed), retains only those
+// containing the correct NFS key from GetNfsTopology(arrIP), strips block protocol keys,
+// preserves custom labels, and deduplicates entries. Falls back to the legacy NFS-only topology.
+func GetEligibleNfsAccessibleTopologies(preferred, requisite []*csi.Topology, arrIP string) []*csi.Topology {
+	// Construct the NFS key directly - matches the format used by GetNfsTopology
+	nfsKey := Name + "/" + arrIP + "-nfs"
+	nfsValue := "true"
+
+	seen := make(map[string]struct{})
+	result := []*csi.Topology{}
+	filter := func(topos []*csi.Topology) {
+		for _, topo := range topos {
+			if v, ok := topo.Segments[nfsKey]; !ok || !strings.EqualFold(v, nfsValue) {
+				continue
+			}
+			// Remove block protocol keys, keep custom labels and the NFS key
+			newSegs := make(map[string]string)
+			for k, v := range topo.Segments {
+				if !isBlockProtocolSegment(k) {
+					newSegs[k] = v
+				}
+			}
+			// Normalize the NFS value to preserve the canonical topology format.
+			newSegs[nfsKey] = nfsValue
+			// Deduplicate by canonical key
+			key := canonicalTopologyKey(newSegs)
+			if _, found := seen[key]; !found {
+				result = append(result, &csi.Topology{Segments: newSegs})
+				seen[key] = struct{}{}
+			}
+		}
+	}
+	filter(preferred)
+	if len(result) == 0 {
+		filter(requisite)
+	}
+	if len(result) == 0 {
+		return GetNfsTopology(arrIP)
+	}
+	return result
+}
+
+// canonicalTopologyKey builds a stable string key for deduplication
+func canonicalTopologyKey(segs map[string]string) string {
+	keys := make([]string, 0, len(segs))
+	for k := range segs {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	var sb strings.Builder
+	for _, k := range keys {
+		sb.WriteString(k + "=" + segs[k] + ";")
+	}
+	return sb.String()
 }
 
 // Contains return true if element is present in the slice
@@ -531,35 +740,45 @@ func ExternalAccessAlreadyAdded(export gopowerstore.NFSExport, externalAccess st
 
 // SetPollingFrequency reads the pollingFrequency from Env, sets default vale if ENV not found
 func SetPollingFrequency(ctx context.Context) int64 {
-	log := log.WithContext(ctx)
 	var pollingFrequency int64
 	if pollRateEnv, ok := csictx.LookupEnv(ctx, EnvPodmonArrayConnectivityPollRate); ok {
 		if pollingFrequency, _ = strconv.ParseInt(pollRateEnv, 10, 32); pollingFrequency != 0 {
-			log.Debugf("use pollingFrequency as %d seconds", pollingFrequency)
+			log.WithContext(ctx).Debugf("use pollingFrequency as %d seconds", pollingFrequency)
 			return pollingFrequency
 		}
 	}
-	log.Debugf("use default pollingFrequency as %d seconds", DefaultPodmonPollRate)
+	log.WithContext(ctx).Debugf("use default pollingFrequency as %d seconds", DefaultPodmonPollRate)
 	return DefaultPodmonPollRate
 }
 
 // SetAPIPort set the port for running server
 func SetAPIPort(ctx context.Context) {
-	log := log.WithContext(ctx)
 	if port, ok := csictx.LookupEnv(ctx, EnvPodmonAPIPORT); ok && strings.TrimSpace(port) != "" {
 		APIPort = fmt.Sprintf(":%s", port)
-		log.Debugf("set podmon API port to %s", APIPort)
+		log.WithContext(ctx).Debugf("set podmon API port to %s", APIPort)
 		return
 	}
 	// If the port number cannot be fetched, set it to default
 	APIPort = ":" + DefaultPodmonAPIPortNumber
-	log.Debugf("set podmon API port to default %s", APIPort)
+	log.WithContext(ctx).Debugf("set podmon API port to default %s", APIPort)
 }
 
-// ReachableEndPoint checks if this endpoint is reachable or not
+// ReachableEndPoint checks if this endpoint is reachable or not.
+// It accepts IPv4 and IPv6 endpoints with or without a port, bracketed or unbracketed,
+// and handles trailing target portal group tags (e.g. "10.0.0.1:3260,1" or "[2001:db8::1]:3260,1").
+// When a port is omitted, it defaults to the standard iSCSI port 3260.
 func ReachableEndPoint(endpoint string) bool {
-	// this endpoint has IP:PORT
-	_, err := net.DialTimeout("tcp", endpoint, 2*time.Second)
+	ep := endpoint
+	if commaIdx := strings.Index(ep, ","); commaIdx >= 0 {
+		ep = ep[:commaIdx]
+	}
+	if _, _, err := net.SplitHostPort(ep); err != nil {
+		bare := strings.Trim(ep, "[]")
+		if bare != "" {
+			ep = net.JoinHostPort(bare, "3260")
+		}
+	}
+	_, err := net.DialTimeout("tcp", ep, 2*time.Second)
 	return err == nil
 }
 
@@ -670,12 +889,27 @@ func GetVolumeDisconnectTimeout() time.Duration {
 
 // HostAlreadyPresentInNFSExport checks if the given host IP is already present in any of the NFS export host lists.
 func HostAlreadyPresentInNFSExport(export gopowerstore.NFSExport, ip string) bool {
-	host := ip + "/255.255.255.255"
-	if Contains(export.ROHosts, host) ||
-		Contains(export.RORootHosts, host) ||
-		Contains(export.RWHosts, host) || Contains(export.RWRootHosts, host) {
-		log.Debug("Host IP is already present in NFS Export")
-		return true
+	for _, entries := range [][]string{export.ROHosts, export.RORootHosts, export.RWHosts, export.RWRootHosts} {
+		if len(HostEntriesForIP(entries, ip)) > 0 {
+			log.Debug("Host IP is already present in NFS Export")
+			return true
+		}
 	}
 	return false
+}
+
+// ParseNfsAutoSelectEnv parses the X_CSI_POWERSTORE_NFS_AUTO_SELECT environment variable.
+// Returns (bool, error). If the variable is unset or empty, it returns (false, nil).
+func ParseNfsAutoSelectEnv(ctx context.Context) (bool, error) {
+	if nfsAutoSelectVal, ok := csictx.LookupEnv(ctx, EnvNfsAutoSelect); ok && nfsAutoSelectVal != "" {
+		switch strings.ToLower(nfsAutoSelectVal) {
+		case "true":
+			return true, nil
+		case "false":
+			return false, nil
+		default:
+			return false, fmt.Errorf("invalid value for %s: %q, valid values are 'true' and 'false'", EnvNfsAutoSelect, nfsAutoSelectVal)
+		}
+	}
+	return false, nil
 }

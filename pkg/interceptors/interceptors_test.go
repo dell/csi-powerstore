@@ -30,7 +30,6 @@ import (
 	controller "github.com/dell/csi-powerstore/v2/pkg/controller"
 	"github.com/dell/csi-powerstore/v2/pkg/identifiers"
 	csictx "github.com/dell/gocsi/context"
-	lockprovider "github.com/dell/gocsi/middleware/serialvolume/lockprovider"
 	"github.com/akutz/gosync"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/stretchr/testify/assert"
@@ -196,7 +195,7 @@ func TestCreateMetadataRetrieverClient(t *testing.T) {
 	}
 
 	// Create a new context with the environment variable set
-	ctx := context.WithValue(context.Background(), csictx.RequestIDKey, "requestID")
+	ctx := context.WithValue(context.Background(), csictx.RequestIDKey, "requestID") //nolint:staticcheck // SA1029: key type from external gocsi library
 	ctx = csictx.WithEnviron(ctx, []string{fmt.Sprintf("%s=%s", identifiers.EnvMetadataRetrieverEndpoint, "endpoint")})
 
 	// Call the function
@@ -206,13 +205,6 @@ func TestCreateMetadataRetrieverClient(t *testing.T) {
 	if i.opts.MetadataSidecarClient == nil {
 		t.Error("Expected MetadataSidecarClient to be set, but it was nil")
 	}
-}
-
-// Define the options struct
-type options struct {
-	locker                lockprovider.VolumeLockerProvider
-	MetadataSidecarClient MetadataSidecarClient
-	timeout               time.Duration
 }
 
 // Define the Locker interface
@@ -279,52 +271,217 @@ func (m *MockMetadataSidecarClient) GetPVCLabelsByPVName(ctx context.Context, re
 
 func TestCreateVolume(t *testing.T) {
 	ctx := context.Background()
-	req := &csi.CreateVolumeRequest{
-		Name: "test-volume",
-		Parameters: map[string]string{
-			controller.KeyCSIPVCName:      "test-pvc",
-			controller.KeyCSIPVCNamespace: "default",
-		},
-	}
 	handler := func(_ context.Context, _ interface{}) (interface{}, error) {
 		return "success", nil
 	}
 
-	mockLocker := new(MockLocker)
-	mockLock := new(MockLock)
-	mockMetadataClient := new(MockMetadataSidecarClient)
-
-	interceptor := &interceptor{
-		opts: opts{
-			locker:                mockLocker,
-			MetadataSidecarClient: mockMetadataClient,
-			timeout:               5 * time.Second,
-		},
-	}
-
 	t.Run("successful volume creation", func(t *testing.T) {
+		req := &csi.CreateVolumeRequest{
+			Name: "test-volume",
+			Parameters: map[string]string{
+				controller.KeyCSIPVCName:      "test-pvc",
+				controller.KeyCSIPVCNamespace: "default",
+			},
+		}
+		mockLocker := new(MockLocker)
+		mockLock := new(MockLock)
+		mockMetadataClient := new(MockMetadataSidecarClient)
+
+		i := &interceptor{
+			opts: opts{
+				locker:                mockLocker,
+				MetadataSidecarClient: mockMetadataClient,
+				timeout:               5 * time.Second,
+			},
+		}
+
 		mockLocker.On("GetLockWithID", ctx, req.Name).Return(mockLock, nil)
-		mockLock.On("TryLock", interceptor.opts.timeout).Return(true)
+		mockLock.On("TryLock", i.opts.timeout).Return(true)
 		mockLock.On("Unlock").Return()
 		mockLock.On("Close").Return(nil)
 		mockMetadataClient.On("GetPVCLabels", ctx, mock.Anything).Return(&retriever.GetPVCLabelsResponse{
 			Parameters: map[string]string{"label1": "value1"},
 		}, nil)
 
-		res, err := interceptor.createVolume(ctx, req, nil, handler)
+		res, err := i.createVolume(ctx, req, nil, handler)
 		assert.NoError(t, err)
 		assert.Equal(t, "success", res)
 	})
 
 	t.Run("metadata retrieval failure", func(t *testing.T) {
+		req := &csi.CreateVolumeRequest{
+			Name: "test-volume",
+			Parameters: map[string]string{
+				controller.KeyCSIPVCName:      "test-pvc",
+				controller.KeyCSIPVCNamespace: "default",
+			},
+		}
+		mockLocker := new(MockLocker)
+		mockLock := new(MockLock)
+		mockMetadataClient := new(MockMetadataSidecarClient)
+
+		i := &interceptor{
+			opts: opts{
+				locker:                mockLocker,
+				MetadataSidecarClient: mockMetadataClient,
+				timeout:               5 * time.Second,
+			},
+		}
+
 		mockLocker.On("GetLockWithID", ctx, req.Name).Return(mockLock, nil)
-		mockLock.On("TryLock", interceptor.opts.timeout).Return(true)
+		mockLock.On("TryLock", i.opts.timeout).Return(true)
 		mockLock.On("Unlock").Return()
 		mockLock.On("Close").Return(nil)
-		mockMetadataClient.On("GetPVCLabels", ctx, mock.Anything).Return(nil, errors.New("metadata error"))
+		mockMetadataClient.On("GetPVCLabels", ctx, mock.Anything).Return((*retriever.GetPVCLabelsResponse)(nil), errors.New("metadata error"))
 
-		res, err := interceptor.createVolume(ctx, req, nil, handler)
+		res, err := i.createVolume(ctx, req, nil, handler)
 		assert.NoError(t, err)
 		assert.Equal(t, "success", res)
+	})
+
+	t.Run("GetLockWithID error", func(t *testing.T) {
+		req := &csi.CreateVolumeRequest{
+			Name: "test-volume",
+			Parameters: map[string]string{
+				controller.KeyCSIPVCName:      "test-pvc",
+				controller.KeyCSIPVCNamespace: "default",
+			},
+		}
+		mockLocker := new(MockLocker)
+		mockLocker.On("GetLockWithID", ctx, req.Name).Return((*MockLock)(nil), errors.New("lock error"))
+
+		i := &interceptor{
+			opts: opts{
+				locker:  mockLocker,
+				timeout: 5 * time.Second,
+			},
+		}
+
+		_, err := i.createVolume(ctx, req, nil, handler)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "lock error")
+	})
+
+	t.Run("nil MetadataSidecarClient", func(t *testing.T) {
+		req := &csi.CreateVolumeRequest{
+			Name: "test-volume",
+			Parameters: map[string]string{
+				controller.KeyCSIPVCName:      "test-pvc",
+				controller.KeyCSIPVCNamespace: "default",
+			},
+		}
+		mockLocker := new(MockLocker)
+		mockLock := new(MockLock)
+
+		i := &interceptor{
+			opts: opts{
+				locker:                mockLocker,
+				MetadataSidecarClient: nil,
+				timeout:               5 * time.Second,
+			},
+		}
+
+		mockLocker.On("GetLockWithID", ctx, req.Name).Return(mockLock, nil)
+		mockLock.On("TryLock", i.opts.timeout).Return(true)
+		mockLock.On("Unlock").Return()
+		mockLock.On("Close").Return(nil)
+
+		res, err := i.createVolume(ctx, req, nil, handler)
+		assert.NoError(t, err)
+		assert.Equal(t, "success", res)
+	})
+}
+
+func TestNodeStageVolume(t *testing.T) {
+	ctx := context.Background()
+	handler := func(_ context.Context, _ interface{}) (interface{}, error) {
+		return "success", nil
+	}
+
+	t.Run("GetLockWithID error", func(t *testing.T) {
+		req := &csi.NodeStageVolumeRequest{VolumeId: validBlockVolumeID}
+		mockLocker := new(MockLocker)
+		mockLocker.On("GetLockWithID", ctx, req.VolumeId).Return((*MockLock)(nil), errors.New("lock error"))
+
+		i := &interceptor{
+			opts: opts{
+				locker:  mockLocker,
+				timeout: 5 * time.Second,
+			},
+		}
+
+		_, err := i.nodeStageVolume(ctx, req, nil, handler)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "lock error")
+	})
+
+	t.Run("successful with closer", func(t *testing.T) {
+		req := &csi.NodeStageVolumeRequest{VolumeId: validBlockVolumeID}
+		mockLocker := new(MockLocker)
+		mockLock := new(MockLock)
+
+		mockLocker.On("GetLockWithID", ctx, req.VolumeId).Return(mockLock, nil)
+		mockLock.On("TryLock", mock.Anything).Return(true)
+		mockLock.On("Unlock").Return()
+		mockLock.On("Close").Return(nil)
+
+		i := &interceptor{
+			opts: opts{
+				locker:  mockLocker,
+				timeout: 5 * time.Second,
+			},
+		}
+
+		res, err := i.nodeStageVolume(ctx, req, nil, handler)
+		assert.NoError(t, err)
+		assert.Equal(t, "success", res)
+		mockLock.AssertCalled(t, "Close")
+	})
+}
+
+func TestNodeUnstageVolume(t *testing.T) {
+	ctx := context.Background()
+	handler := func(_ context.Context, _ interface{}) (interface{}, error) {
+		return "success", nil
+	}
+
+	t.Run("GetLockWithID error", func(t *testing.T) {
+		req := &csi.NodeUnstageVolumeRequest{VolumeId: validBlockVolumeID}
+		mockLocker := new(MockLocker)
+		mockLocker.On("GetLockWithID", ctx, req.VolumeId).Return((*MockLock)(nil), errors.New("lock error"))
+
+		i := &interceptor{
+			opts: opts{
+				locker:  mockLocker,
+				timeout: 5 * time.Second,
+			},
+		}
+
+		_, err := i.nodeUnstageVolume(ctx, req, nil, handler)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "lock error")
+	})
+
+	t.Run("successful with closer", func(t *testing.T) {
+		req := &csi.NodeUnstageVolumeRequest{VolumeId: validBlockVolumeID}
+		mockLocker := new(MockLocker)
+		mockLock := new(MockLock)
+
+		mockLocker.On("GetLockWithID", ctx, req.VolumeId).Return(mockLock, nil)
+		mockLock.On("TryLock", mock.Anything).Return(true)
+		mockLock.On("Unlock").Return()
+		mockLock.On("Close").Return(nil)
+
+		i := &interceptor{
+			opts: opts{
+				locker:  mockLocker,
+				timeout: 5 * time.Second,
+			},
+		}
+
+		res, err := i.nodeUnstageVolume(ctx, req, nil, handler)
+		assert.NoError(t, err)
+		assert.Equal(t, "success", res)
+		mockLock.AssertCalled(t, "Close")
 	})
 }
