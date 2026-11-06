@@ -2215,7 +2215,7 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 				gomega.Expect(res).To(gomega.BeNil())
 			})
 
-			ginkgo.It("creates a journal entry when staging local fails", func() {
+			ginkgo.It("skips staging the demoted local array and stages remote, creating a journal entry", func() {
 				// when checking metro state, indicate it is fractured and local is demoted
 				clientMock.On("GetVolume", mock.Anything, validBaseVolumeID).Return(gopowerstore.Volume{
 					ID:                        validBaseVolumeID,
@@ -2247,8 +2247,13 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 				setDefaultClientMocks()
 				iscsiConnectorMock.On("ConnectVolume", mock.Anything, mock.Anything).Return(gobrick.Device{}, nil)
-				scsiStageVolumeFail(utilMock, fsMock)
 				scsiStageRemoteMetroVolumeOK(utilMock, fsMock)
+
+				journalCreated := false
+				createOrUpdateJournalEntryFunc = func(_ context.Context, _ string, _ array.VolumeHandle, _ string, _ string, _ string, _ []byte) error {
+					journalCreated = true
+					return nil
+				}
 
 				res, err := nodeSvc.NodeStageVolume(context.Background(), &csi.NodeStageVolumeRequest{
 					VolumeId:          validMetroVolumeHandle,
@@ -2261,6 +2266,9 @@ var _ = ginkgo.Describe("CSINodeService", func() {
 
 				gomega.Expect(err).To(gomega.BeNil())
 				gomega.Expect(res).To(gomega.Equal(&csi.NodeStageVolumeResponse{}))
+				// only the remote device is connected; the demoted local array is never contacted for staging
+				iscsiConnectorMock.AssertNumberOfCalls(ginkgo.GinkgoT(), "ConnectVolume", 1)
+				gomega.Expect(journalCreated).To(gomega.BeTrue())
 			})
 
 			ginkgo.It("creates a journal entry when staging remote fails", func() {

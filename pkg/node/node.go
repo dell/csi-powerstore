@@ -546,7 +546,13 @@ func (s *Service) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeR
 	// For block volumes, stage only if array has connectivity to this node.
 	// This supports non-uniform metro configuration and will support Multi-az for powerstore non-metro volumes (future)
 	nodeConnectedToLocalArray := isNodeConnectedToArrayFunc(ctx, s.nodeID, arr)
-	if nodeConnectedToLocalArray {
+	// When the metro session is fractured, the demoted side is the unavailable one. Skip staging on it so a dead array
+	// cannot consume the request deadline before the surviving array is attempted.
+	skipLocalStage := isMetroFractured && localVolumeDemoted
+	skipRemoteStage := isMetroFractured && !localVolumeDemoted
+	if skipLocalStage {
+		log.WithContext(ctx).Infof("[METRO] Skipping stage of volume %s on node %s for demoted array %s due to Metro Session Fracture", id, s.opts.KubeNodeName, arr.Endpoint)
+	} else if nodeConnectedToLocalArray {
 		resp, err := stager.Stage(ctx, req, stagingPath, s.nodeID, logFields, s.Fs, id, false, client)
 		if err != nil {
 			if isMetroFractured && localVolumeDemoted {
@@ -568,7 +574,9 @@ func (s *Service) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeR
 	nodeConnectedToRemoteArray := false
 	if volumeHandle.IsMetro() { // For Remote Metro volume
 		nodeConnectedToRemoteArray = isNodeConnectedToArrayFunc(ctx, s.nodeID, remoteArray)
-		if nodeConnectedToRemoteArray {
+		if skipRemoteStage {
+			log.WithContext(ctx).Infof("[METRO] Skipping stage of volume %s on node %s for demoted array %s due to Metro Session Fracture", remoteVolumeID, s.opts.KubeNodeName, remoteArray.Endpoint)
+		} else if nodeConnectedToRemoteArray {
 			log.WithContext(ctx).Infof("Staging remote metro volume %s for volume %s", remoteVolumeID, id)
 			resp, err := stager.Stage(ctx, req, stagingPath, s.nodeID, logFields, s.Fs, remoteVolumeID, true, remoteArray.GetClient())
 			if err != nil {
